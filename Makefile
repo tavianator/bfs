@@ -9,10 +9,10 @@
 # the COPYING file or http://www.wtfpl.net/ for more details.       #
 #####################################################################
 
-CC := gcc
-CFLAGS := -std=c99 -g -Og -Wall -D_DEFAULT_SOURCE
-LDFLAGS :=
-RM := rm -f
+CC ?= gcc
+CFLAGS ?= -std=c99 -g -Og -Wall -D_DEFAULT_SOURCE
+LDFLAGS ?=
+RM ?= rm -f
 
 DEPS := bftw.h
 
