@@ -20,7 +20,7 @@ typedef struct {
 	bool hidden;
 } options;
 
-static int callback(const char *fpath, int typeflag, void *ptr) {
+static int callback(const char *fpath, const struct stat *sb, int typeflag, void *ptr) {
 	const options *opts = ptr;
 
 	const char *filename = strrchr(fpath, '/');
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	// TODO: getrlimit(RLIMIT_NOFILE)
-	if (bftw(opts.path, callback, 1024, &opts) != 0) {
+	if (bftw(opts.path, callback, 1024, 0, &opts) != 0) {
 		perror("bftw()");
 		return EXIT_FAILURE;
 	}

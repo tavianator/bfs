@@ -368,7 +368,7 @@ static dircache_entry *dirqueue_pop(dirqueue *queue) {
 	return entry;
 }
 
-int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, void *ptr) {
+int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 	int ret = -1, err;
 
 	dircache cache;
@@ -419,9 +419,13 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, void *ptr) {
 			}
 #endif
 
-			if (typeflag == BFTW_UNKNOWN) {
-				struct stat sb;
+			struct stat sb;
+			struct stat *sp = NULL;
+
+			if ((flags & BFTW_STAT) || typeflag == BFTW_UNKNOWN) {
 				if (fstatat(dirfd(dir), de->d_name, &sb, AT_SYMLINK_NOFOLLOW) == 0) {
+					sp = &sb;
+
 					switch (sb.st_mode & S_IFMT) {
 					case S_IFDIR:
 						typeflag = BFTW_D;
@@ -436,7 +440,7 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, void *ptr) {
 				}
 			}
 
-			int action = fn(path.str, typeflag, ptr);
+			int action = fn(path.str, sp, typeflag, ptr);
 
 			switch (action) {
 			case BFTW_CONTINUE:

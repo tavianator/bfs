@@ -9,11 +9,15 @@
  * the COPYING file or http://www.wtfpl.net/ for more details.       *
  *********************************************************************/
 
+#include <sys/stat.h>
+
 /**
  * Callback function type for bftw().
  *
  * @param fpath
  *         The path to the encountered file.
+ * @param sb
+ *         A stat() buffer; may be NULL if no stat() call was needed.
  * @param typeflag
  *         A typeflag value (see below).
  * @param ptr
@@ -21,7 +25,7 @@
  * @return
  *         An action value (see below).
  */
-typedef int bftw_fn(const char *fpath, int typeflag, void *ptr);
+typedef int bftw_fn(const char *fpath, const struct stat *sb, int typeflag, void *ptr);
 
 /**
  * Breadth First Tree Walk (or Better File Tree Walk).
@@ -36,12 +40,14 @@ typedef int bftw_fn(const char *fpath, int typeflag, void *ptr);
  *         The callback to invoke.
  * @param nopenfd
  *         The maximum number of file descriptors to keep open.
+ * @param flags
+ *         Flags that control bftw() behavior (see below).
  * @param ptr
  *         A generic pointer which is passed to fn().
  * @return
  *         0 on success, or -1 on failure.
  */
-int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, void *ptr);
+int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr);
 
 /** typeflag: Directory. */
 #define BFTW_D        0
@@ -60,3 +66,6 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, void *ptr);
 #define BFTW_SKIP_SUBTREE   2
 /** action: Stop walking. */
 #define BFTW_STOP           3
+
+/** flag: stat() each encountered file. */
+#define BFTW_STAT  (1 << 0)
