@@ -10,19 +10,27 @@
 #####################################################################
 
 CC ?= gcc
-CFLAGS ?= -std=c99 -g -Og -Wall -D_DEFAULT_SOURCE
+CFLAGS ?= -g -Og -Wall
 LDFLAGS ?=
+DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 RM ?= rm -f
 
-DEPS := bftw.h
+LOCAL_CPPFLAGS := -D_DEFAULT_SOURCE
+LOCAL_CFLAGS := -std=c99
+
+ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
+ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
+ALL_LDFLAGS = $(LDFLAGS)
 
 bfs: bfs.o bftw.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(CC) $(ALL_CFLAGS) $(ALL_LDFLAGS) $^ -o $@
 
-%.o: %.c $(DEPS)
-	$(CC) $(CFLAGS) -c $< -o $@
+%.o: %.c
+	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 clean:
-	$(RM) bfs *.o
+	$(RM) bfs *.o *.d
 
 .PHONY: clean
+
+-include $(wildcard *.d)
