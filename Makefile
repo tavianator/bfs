@@ -22,7 +22,7 @@ ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(LDFLAGS)
 
-bfs: bfs.o bftw.o
+bfs: bfs.o bftw.o color.o
 	$(CC) $(ALL_CFLAGS) $(ALL_LDFLAGS) $^ -o $@
 
 %.o: %.c
