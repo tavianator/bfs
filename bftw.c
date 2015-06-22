@@ -27,6 +27,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -225,7 +226,13 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, dynstr *
 
 	dircache_entry *parent = entry;
 	do {
-		pathsize += strlen(parent->name) + 1; // name + '/'
+		size_t namelen = strlen(parent->name);
+		pathsize += namelen;
+
+		if (namelen > 0 && parent->name[namelen - 1] != '/') {
+			++pathsize;
+		}
+
 		parent = parent->parent;
 	} while (parent);
 
@@ -241,11 +248,20 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, dynstr *
 	const char *relpath = path->str;
 
 	parent = entry;
-	while (1) {
+	while (true) {
 		size_t namelen = strlen(parent->name);
-		segment -= namelen + 1;
+		bool needs_slash = namelen > 0 && parent->name[namelen - 1] != '/';
+
+		segment -= namelen;
+		if (needs_slash) {
+			segment -= 1;
+		}
+
 		memcpy(segment, parent->name, namelen);
-		segment[namelen] = '/';
+
+		if (needs_slash) {
+			segment[namelen] = '/';
+		}
 
 		parent = parent->parent;
 		if (!parent) {
