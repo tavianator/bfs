@@ -16,6 +16,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct ext_color ext_color;
+
+struct ext_color {
+	const char *ext;
+	const char *color;
+	ext_color *next;
+};
+
 struct color_table {
 	const char *reset;
 	const char *normal;
@@ -36,6 +44,8 @@ struct color_table {
 	const char *ow;
 	const char *sticky;
 	const char *exec;
+
+	ext_color *ext_list;
 };
 
 color_table *parse_colors(char *ls_colors) {
@@ -64,6 +74,7 @@ color_table *parse_colors(char *ls_colors) {
 	colors->ow         = "34;42";
 	colors->sticky     = "37;44";
 	colors->exec       = "01;32";
+	colors->ext_list   = NULL;
 
 	if (!ls_colors) {
 		goto done;
@@ -71,6 +82,7 @@ color_table *parse_colors(char *ls_colors) {
 
 	char *start = ls_colors;
 	char *end;
+	ext_color *ext;
 	for (end = strchr(start, ':'); *start && end; start = end + 1, end = strchr(start, ':')) {
 		char *equals = strchr(start, '=');
 		if (!equals) {
@@ -167,9 +179,16 @@ color_table *parse_colors(char *ls_colors) {
 				colors->sticky_ow = value;
 			}
 			break;
-		}
 
-		// TODO: Handle file extensions
+		case '*':
+			ext = malloc(sizeof(ext_color));
+			if (ext) {
+				ext->ext = key + 1;
+				ext->color = value;
+				ext->next = colors->ext_list;
+				colors->ext_list = ext;
+			}
+		}
 	}
 
 done:
@@ -191,6 +210,18 @@ static const char *file_color(const color_table *colors, const char *filename, c
 			color = colors->setgid;
 		} else if (sb->st_mode & 0111) {
 			color = colors->exec;
+		}
+
+		if (!color) {
+			size_t namelen = strlen(filename);
+
+			for (ext_color *ext = colors->ext_list; ext; ext = ext->next) {
+				size_t extlen = strlen(ext->ext);
+				if (namelen >= extlen && strncmp(filename + namelen - extlen, ext->ext, extlen) == 0) {
+					color = ext->color;
+					break;
+				}
+			}
 		}
 
 		if (!color) {
