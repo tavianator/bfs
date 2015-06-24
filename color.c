@@ -20,7 +20,10 @@ typedef struct ext_color ext_color;
 
 struct ext_color {
 	const char *ext;
+	size_t len;
+
 	const char *color;
+
 	ext_color *next;
 };
 
@@ -184,6 +187,7 @@ color_table *parse_colors(char *ls_colors) {
 			ext = malloc(sizeof(ext_color));
 			if (ext) {
 				ext->ext = key + 1;
+				ext->len = strlen(ext->ext);
 				ext->color = value;
 				ext->next = colors->ext_list;
 				colors->ext_list = ext;
@@ -216,8 +220,7 @@ static const char *file_color(const color_table *colors, const char *filename, c
 			size_t namelen = strlen(filename);
 
 			for (ext_color *ext = colors->ext_list; ext; ext = ext->next) {
-				size_t extlen = strlen(ext->ext);
-				if (namelen >= extlen && strncmp(filename + namelen - extlen, ext->ext, extlen) == 0) {
+				if (namelen >= ext->len && memcmp(filename + namelen - ext->len, ext->ext, ext->len) == 0) {
 					color = ext->color;
 					break;
 				}
@@ -271,24 +274,15 @@ static const char *file_color(const color_table *colors, const char *filename, c
 	return color;
 }
 
-static void printf_color(const color_table *colors, const char *color, const char *format, ...) {
-	if (color) {
-		printf("\033[%sm", color);
-	}
-
-	va_list args;
-	va_start(args, format);
-	vprintf(format, args);
-	va_end(args);
-
-	if (color) {
-		printf("\033[%sm", colors->reset);
-	}
+static void print_esc(const char *esc) {
+	fputs("\033[", stdout);
+	fputs(esc, stdout);
+	fputs("m", stdout);
 }
 
 void pretty_print(const color_table *colors, const char *fpath, const struct stat *sb) {
 	if (!colors) {
-		printf("%s\n", fpath);
+		puts(fpath);
 		return;
 	}
 
@@ -299,14 +293,34 @@ void pretty_print(const color_table *colors, const char *fpath, const struct sta
 		filename = fpath + strlen(fpath);
 	}
 
-	int dirlen = filename - fpath;
-	printf_color(colors, colors->dir, "%.*s", dirlen, fpath);
+	if (colors->dir) {
+		print_esc(colors->dir);
+	}
+	fwrite(fpath, 1, filename - fpath, stdout);
+	if (colors->dir) {
+		print_esc(colors->reset);
+	}
 
 	const char *color = file_color(colors, filename, sb);
-	printf_color(colors, color, "%s", filename);
-	printf("\n");
+	if (color) {
+		print_esc(color);
+	}
+	fputs(filename, stdout);
+	if (color) {
+		print_esc(colors->reset);
+	}
+	fputs("\n", stdout);
 }
 
 void free_colors(color_table *colors) {
-	free(colors);
+	if (colors) {
+		ext_color *ext = colors->ext_list;
+		while (ext) {
+			ext_color *saved = ext;
+			ext = ext->next;
+			free(saved);
+		}
+
+		free(colors);
+	}
 }

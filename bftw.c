@@ -38,26 +38,28 @@
  */
 typedef struct {
 	char *str;
-	size_t size;
+	size_t length;
+	size_t capacity;
 } dynstr;
 
 /** Initialize a dynstr. */
 static void dynstr_init(dynstr *dstr) {
 	dstr->str = NULL;
-	dstr->size = 0;
+	dstr->length = 0;
+	dstr->capacity = 0;
 }
 
-/** Grow a dynstr to the gizen size if necessary. */
-static int dynstr_grow(dynstr *dstr, size_t size) {
-	if (size > dstr->size) {
-		size_t new_size = 3*(size + 1)/2;
-		char *new_str = realloc(dstr->str, new_size);
+/** Grow a dynstr to the given capacity if necessary. */
+static int dynstr_grow(dynstr *dstr, size_t length) {
+	if (length >= dstr->capacity) {
+		size_t new_capacity = 3*(length + 1)/2;
+		char *new_str = realloc(dstr->str, new_capacity);
 		if (!new_str) {
 			return -1;
 		}
 
 		dstr->str = new_str;
-		dstr->size = new_size;
+		dstr->capacity = new_capacity;
 	}
 
 	return 0;
@@ -66,12 +68,13 @@ static int dynstr_grow(dynstr *dstr, size_t size) {
 /** Concatenate a string to a dynstr at the given position. */
 static int dynstr_concat(dynstr *dstr, size_t pos, const char *more) {
 	size_t morelen = strlen(more);
-	size_t needed = pos + morelen + 1;
-	if (dynstr_grow(dstr, needed) != 0) {
+	size_t length = pos + morelen;
+	if (dynstr_grow(dstr, length) != 0) {
 		return -1;
 	}
 
 	memcpy(dstr->str + pos, more, morelen + 1);
+	dstr->length = length;
 	return 0;
 }
 
@@ -100,6 +103,8 @@ struct dircache_entry {
 	/** Reference count. */
 	size_t refcount;
 
+	/** The length of the directory's name. */
+	size_t namelen;
 	/** The directory's name. */
 	char name[];
 };
@@ -132,6 +137,7 @@ static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, con
 		entry->lru_prev = entry->lru_next = NULL;
 		entry->dir = NULL;
 		entry->refcount = 1;
+		entry->namelen = pathsize - 1;
 		memcpy(entry->name, path, pathsize);
 
 		while (parent) {
@@ -222,26 +228,27 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, dynstr *
 	}
 
 	// First, reserve enough space for the path
-	size_t pathsize = 1; // Terminating '\0'
+	size_t pathlen = 0;
 
 	dircache_entry *parent = entry;
 	do {
-		size_t namelen = strlen(parent->name);
-		pathsize += namelen;
+		size_t namelen = parent->namelen;
+		pathlen += namelen;
 
 		if (namelen > 0 && parent->name[namelen - 1] != '/') {
-			++pathsize;
+			++pathlen;
 		}
 
 		parent = parent->parent;
 	} while (parent);
 
-	if (dynstr_grow(path, pathsize) != 0) {
+	if (dynstr_grow(path, pathlen) != 0) {
 		return NULL;
 	}
+	path->length = pathlen;
 
 	// Now, build the path backwards while looking for a parent
-	char *segment = path->str + pathsize - 1;
+	char *segment = path->str + pathlen;
 	*segment = '\0';
 
 	int fd = AT_FDCWD;
@@ -249,7 +256,7 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, dynstr *
 
 	parent = entry;
 	while (true) {
-		size_t namelen = strlen(parent->name);
+		size_t namelen = parent->namelen;
 		bool needs_slash = namelen > 0 && parent->name[namelen - 1] != '/';
 
 		segment -= namelen;
@@ -407,7 +414,7 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 			goto done;
 		}
 
-		size_t pathlen = strlen(path.str);
+		size_t pathlen = path.length;
 
 		struct dirent *de;
 		while ((de = readdir(dir)) != NULL) {
