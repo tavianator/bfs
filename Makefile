@@ -31,6 +31,9 @@ bfs: bfs.o bftw.o color.o
 clean:
 	$(RM) bfs *.o *.d
 
-.PHONY: clean
+release: CFLAGS := -O2 -flto -Wall
+release: bfs
+
+.PHONY: clean release
 
 -include $(wildcard *.d)
