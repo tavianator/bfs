@@ -10,7 +10,7 @@
 #####################################################################
 
 CC ?= gcc
-CFLAGS ?= -g -Og -Wall
+CFLAGS ?= -g -Wall
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 RM ?= rm -f
@@ -20,10 +20,10 @@ LOCAL_CFLAGS := -std=c99
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
-ALL_LDFLAGS = $(LDFLAGS)
+ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
 
 bfs: bfs.o bftw.o color.o
-	$(CC) $(ALL_CFLAGS) $(ALL_LDFLAGS) $^ -o $@
+	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
