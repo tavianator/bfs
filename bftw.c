@@ -428,7 +428,7 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 
 			int typeflag = BFTW_UNKNOWN;
 
-#ifdef _DIRENT_HAVE_D_TYPE
+#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
 			switch (de->d_type) {
 			case DT_DIR:
 				typeflag = BFTW_D;
