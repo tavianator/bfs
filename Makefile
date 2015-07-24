@@ -31,7 +31,7 @@ bfs: bfs.o bftw.o color.o
 clean:
 	$(RM) bfs *.o *.d
 
-release: CFLAGS := -O2 -flto -Wall
+release: CFLAGS := -O2 -flto -Wall -DNDEBUG
 release: bfs
 
 .PHONY: clean release
