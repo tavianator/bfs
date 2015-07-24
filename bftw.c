@@ -91,6 +91,8 @@ typedef struct dircache_entry dircache_entry;
 struct dircache_entry {
 	/** The parent entry, if any. */
 	dircache_entry *parent;
+	/** This directory's depth in the walk. */
+	size_t depth;
 
 	/** Previous node in the LRU list. */
 	dircache_entry *lru_prev;
@@ -134,6 +136,7 @@ static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, con
 	dircache_entry *entry = malloc(sizeof(dircache_entry) + pathsize);
 	if (entry) {
 		entry->parent = parent;
+		entry->depth = parent ? parent->depth + 1 : 0;
 		entry->lru_prev = entry->lru_next = NULL;
 		entry->dir = NULL;
 		entry->refcount = 1;
@@ -422,62 +425,64 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				continue;
 			}
 
+			struct BFTW ftwbuf = {
+				.statbuf = NULL,
+				.typeflag = BFTW_UNKNOWN,
+				.base = pathlen,
+				.level = current->depth + 1,
+			};
+
 			if (dynstr_concat(&path, pathlen, de->d_name) != 0) {
 				goto done;
 			}
 
-			int typeflag = BFTW_UNKNOWN;
-
 #if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
 			switch (de->d_type) {
 			case DT_DIR:
-				typeflag = BFTW_D;
+				ftwbuf.typeflag = BFTW_D;
 				break;
 			case DT_REG:
-				typeflag = BFTW_R;
+				ftwbuf.typeflag = BFTW_R;
 				break;
 			case DT_LNK:
-				typeflag = BFTW_SL;
+				ftwbuf.typeflag = BFTW_SL;
 				break;
 			}
 #endif
 
 			struct stat sb;
-			struct stat *sp = NULL;
 
-			if ((flags & BFTW_STAT) || typeflag == BFTW_UNKNOWN) {
+			if ((flags & BFTW_STAT) || ftwbuf.typeflag == BFTW_UNKNOWN) {
 				if (fstatat(dirfd(dir), de->d_name, &sb, AT_SYMLINK_NOFOLLOW) == 0) {
-					sp = &sb;
+					ftwbuf.statbuf = &sb;
 
 					switch (sb.st_mode & S_IFMT) {
 					case S_IFDIR:
-						typeflag = BFTW_D;
+						ftwbuf.typeflag = BFTW_D;
 						break;
 					case S_IFREG:
-						typeflag = BFTW_R;
+						ftwbuf.typeflag = BFTW_R;
 						break;
 					case S_IFLNK:
-						typeflag = BFTW_SL;
+						ftwbuf.typeflag = BFTW_SL;
 						break;
 					}
 				}
 			}
 
-			int action = fn(path.str, sp, typeflag, ptr);
+			int action = fn(path.str, &ftwbuf, ptr);
 
 			switch (action) {
 			case BFTW_CONTINUE:
-				if (typeflag != BFTW_D) {
-					break;
-				}
+				if (ftwbuf.typeflag == BFTW_D) {
+					dircache_entry *next = dircache_add(&cache, current, de->d_name);
+					if (!next) {
+						goto done;
+					}
 
-				dircache_entry *next = dircache_add(&cache, current, de->d_name);
-				if (!next) {
-					goto done;
-				}
-
-				if (dirqueue_push(&queue, next) != 0) {
-					goto done;
+					if (dirqueue_push(&queue, next) != 0) {
+						goto done;
+					}
 				}
 				break;
 

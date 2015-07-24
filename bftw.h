@@ -12,20 +12,32 @@
 #include <sys/stat.h>
 
 /**
+ * Data about the current file for the bftw() callback.
+ */
+struct BFTW {
+        /** A stat() buffer; may be NULL if no stat() call was needed. */
+	const struct stat *statbuf;
+	/** A typeflag value (see below). */
+	int typeflag;
+	/** The string offset of the filename in the path. */
+	int base;
+	/** The depth of this file in the walk. */
+	int level;
+};
+
+/**
  * Callback function type for bftw().
  *
  * @param fpath
  *         The path to the encountered file.
- * @param sb
- *         A stat() buffer; may be NULL if no stat() call was needed.
- * @param typeflag
- *         A typeflag value (see below).
+ * @param ftwbuf
+ *         Additional data about the current file.
  * @param ptr
  *         The pointer passed to bftw().
  * @return
  *         An action value (see below).
  */
-typedef int bftw_fn(const char *fpath, const struct stat *sb, int typeflag, void *ptr);
+typedef int bftw_fn(const char *fpath, const struct BFTW *ftwbuf, void *ptr);
 
 /**
  * Breadth First Tree Walk (or Better File Tree Walk).

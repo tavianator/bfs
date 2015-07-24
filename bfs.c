@@ -23,17 +23,16 @@ typedef struct {
 	bool hidden;
 } options;
 
-static int callback(const char *fpath, const struct stat *sb, int typeflag, void *ptr) {
+static int callback(const char *fpath, const struct BFTW* ftwbuf, void *ptr) {
 	const options *opts = ptr;
 
 	if (!opts->hidden) {
-		const char *filename = strrchr(fpath, '/');
-		if (filename && filename[1] == '.') {
+		if (ftwbuf->base > 0 && fpath[ftwbuf->base] == '.') {
 			return BFTW_SKIP_SUBTREE;
 		}
 	}
 
-	pretty_print(opts->colors, fpath, sb);
+	pretty_print(opts->colors, fpath, ftwbuf->statbuf);
 	return BFTW_CONTINUE;
 }
 
