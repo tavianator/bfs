@@ -9,6 +9,9 @@
  * the COPYING file or http://www.wtfpl.net/ for more details.       *
  *********************************************************************/
 
+#ifndef BFS_BFTW_H
+#define BFS_BFTW_H
+
 #include <sys/stat.h>
 
 /**
@@ -23,6 +26,8 @@ struct BFTW {
 	int base;
 	/** The depth of this file in the walk. */
 	int level;
+	/** The errno that occurred, if typeflag == BFTW_ERROR. */
+	int error;
 };
 
 /**
@@ -69,6 +74,8 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr);
 #define BFTW_SL       2
 /** typeflag: Unknown type. */
 #define BFTW_UNKNOWN  3
+/** typeflag: An error occurred for this file. */
+#define BFTW_ERROR    4
 
 /** action: Keep walking. */
 #define BFTW_CONTINUE       0
@@ -80,4 +87,8 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr);
 #define BFTW_STOP           3
 
 /** flag: stat() each encountered file. */
-#define BFTW_STAT  (1 << 0)
+#define BFTW_STAT     (1 << 0)
+/** flag: Attempt to recover from encountered errors. */
+#define BFTW_RECOVER  (1 << 1)
+
+#endif // BFS_BFTW_H

@@ -23,8 +23,13 @@ typedef struct {
 	bool hidden;
 } options;
 
-static int callback(const char *fpath, const struct BFTW* ftwbuf, void *ptr) {
+static int callback(const char *fpath, const struct BFTW *ftwbuf, void *ptr) {
 	const options *opts = ptr;
+
+	if (ftwbuf->typeflag == BFTW_ERROR) {
+		print_error(opts->colors, fpath, ftwbuf);
+		return BFTW_SKIP_SUBTREE;
+	}
 
 	if (!opts->hidden) {
 		if (ftwbuf->base > 0 && fpath[ftwbuf->base] == '.') {
@@ -36,7 +41,7 @@ static int callback(const char *fpath, const struct BFTW* ftwbuf, void *ptr) {
 	return BFTW_CONTINUE;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 	int ret = EXIT_FAILURE;
 
 	options opts;
@@ -73,7 +78,7 @@ int main(int argc, char* argv[]) {
 		opts.path = ".";
 	}
 
-	int flags = 0;
+	int flags = BFTW_RECOVER;
 
 	if (color) {
 		flags |= BFTW_STAT;

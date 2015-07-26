@@ -105,6 +105,8 @@ struct dircache_entry {
 	/** Reference count. */
 	size_t refcount;
 
+	/** The offset of this directory in the full path. */
+	size_t nameoff;
 	/** The length of the directory's name. */
 	size_t namelen;
 	/** The directory's name. */
@@ -131,17 +133,28 @@ static void dircache_init(dircache *cache, size_t lru_size) {
 }
 
 /** Add an entry to the dircache. */
-static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, const char *path) {
-	size_t pathsize = strlen(path) + 1;
-	dircache_entry *entry = malloc(sizeof(dircache_entry) + pathsize);
+static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, const char *name) {
+	size_t namesize = strlen(name) + 1;
+	dircache_entry *entry = malloc(sizeof(dircache_entry) + namesize);
 	if (entry) {
 		entry->parent = parent;
-		entry->depth = parent ? parent->depth + 1 : 0;
+
+		if (parent) {
+			entry->depth = parent->depth + 1;
+			entry->nameoff = parent->nameoff + parent->namelen;
+			if (parent->namelen > 0 && parent->name[parent->namelen - 1] != '/') {
+				++entry->nameoff;
+			}
+		} else {
+			entry->depth = 0;
+			entry->nameoff = 0;
+		}
+
 		entry->lru_prev = entry->lru_next = NULL;
 		entry->dir = NULL;
 		entry->refcount = 1;
-		entry->namelen = pathsize - 1;
-		memcpy(entry->name, path, pathsize);
+		entry->namelen = namesize - 1;
+		memcpy(entry->name, name, namesize);
 
 		while (parent) {
 			++parent->refcount;
@@ -212,81 +225,73 @@ static DIR *opendirat(int fd, const char *name) {
 }
 
 /**
+ * Get the full path do a dircache_entry.
+ *
+ * @param entry
+ *         The entry to look up.
+ * @param[out] path
+ *         Will hold the full path to the entry, with a trailing '/'.
+ */
+static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
+	size_t pathlen = entry->nameoff + entry->namelen + 1;
+
+	if (dynstr_grow(path, pathlen) != 0) {
+		return -1;
+	}
+	path->length = pathlen;
+
+	// Build the path backwards
+	path->str[pathlen] = '\0';
+
+	do {
+		char *segment = path->str + entry->nameoff;
+		size_t namelen = entry->namelen;
+
+		memcpy(segment, entry->name, namelen);
+		if (namelen > 0 && entry->name[namelen - 1] != '/') {
+			segment[namelen] = '/';
+		}
+
+		entry = entry->parent;
+	} while (entry);
+
+	return 0;
+}
+
+/**
  * Open a dircache_entry.
  *
  * @param cache
  *         The cache containing the entry.
  * @param entry
  *         The entry to open.
- * @param[out] path
- *         Will hold the full path to the entry, with a trailing '/'.
+ * @param path
+ *         The full path to the entry (see dircache_entry_path()).
  * @return
  *         The opened DIR *, or NULL on error.
  */
-static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, dynstr *path) {
+static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const char *path) {
 	assert(!entry->dir);
 
 	if (cache->lru_remaining == 0) {
 		dircache_entry_close(cache, cache->lru_tail);
 	}
 
-	// First, reserve enough space for the path
-	size_t pathlen = 0;
-
-	dircache_entry *parent = entry;
+	size_t nameoff;
+	dircache_entry *base = entry;
 	do {
-		size_t namelen = parent->namelen;
-		pathlen += namelen;
-
-		if (namelen > 0 && parent->name[namelen - 1] != '/') {
-			++pathlen;
-		}
-
-		parent = parent->parent;
-	} while (parent);
-
-	if (dynstr_grow(path, pathlen) != 0) {
-		return NULL;
-	}
-	path->length = pathlen;
-
-	// Now, build the path backwards while looking for a parent
-	char *segment = path->str + pathlen;
-	*segment = '\0';
+		nameoff = base->nameoff;
+		base = base->parent;
+	} while (base && !base->dir);
 
 	int fd = AT_FDCWD;
-	const char *relpath = path->str;
-
-	parent = entry;
-	while (true) {
-		size_t namelen = parent->namelen;
-		bool needs_slash = namelen > 0 && parent->name[namelen - 1] != '/';
-
-		segment -= namelen;
-		if (needs_slash) {
-			segment -= 1;
-		}
-
-		memcpy(segment, parent->name, namelen);
-
-		if (needs_slash) {
-			segment[namelen] = '/';
-		}
-
-		parent = parent->parent;
-		if (!parent) {
-			break;
-		}
-
-		if (parent->dir && fd == AT_FDCWD) {
-			dircache_lru_remove(cache, parent);
-			dircache_lru_add(cache, parent);
-			fd = dirfd(parent->dir);
-			relpath = segment;
-		}
+	if (base) {
+		dircache_lru_remove(cache, base);
+		dircache_lru_add(cache, base);
+		fd = dirfd(base->dir);
 	}
 
-	DIR *dir = opendirat(fd, relpath);
+	DIR *dir = opendirat(fd, path + nameoff);
 	if (dir) {
 		entry->dir = dir;
 		dircache_lru_add(cache, entry);
@@ -395,7 +400,7 @@ static dircache_entry *dirqueue_pop(dirqueue *queue) {
 }
 
 int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
-	int ret = -1, err;
+	int ret = -1, err = 0;
 
 	dircache cache;
 	dircache_init(&cache, nopenfd);
@@ -408,16 +413,49 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 
 	dircache_entry *current = dircache_add(&cache, NULL, dirpath);
 	if (!current) {
-		goto done;
+		goto fail;
 	}
 
 	do {
-		DIR *dir = dircache_entry_open(&cache, current, &path);
-		if (!dir) {
-			goto done;
+		if (dircache_entry_path(current, &path) != 0) {
+			goto fail;
 		}
-
 		size_t pathlen = path.length;
+
+		DIR *dir = dircache_entry_open(&cache, current, path.str);
+		if (!dir) {
+			if (!(flags & BFTW_RECOVER)) {
+				goto fail;
+			}
+
+			err = errno;
+
+			struct BFTW ftwbuf = {
+				.statbuf = NULL,
+				.typeflag = BFTW_ERROR,
+				.base = current->nameoff,
+				.level = current->depth,
+				.error = err,
+			};
+
+			int action = fn(path.str, &ftwbuf, ptr);
+
+			switch (action) {
+			case BFTW_CONTINUE:
+			case BFTW_SKIP_SIBLINGS:
+			case BFTW_SKIP_SUBTREE:
+				goto next;
+
+			case BFTW_STOP:
+				goto done;
+
+			default:
+				err = EINVAL;
+				goto fail;
+			}
+
+			goto next;
+		}
 
 		struct dirent *de;
 		while ((de = readdir(dir)) != NULL) {
@@ -425,16 +463,17 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				continue;
 			}
 
+			if (dynstr_concat(&path, pathlen, de->d_name) != 0) {
+				goto fail;
+			}
+
 			struct BFTW ftwbuf = {
 				.statbuf = NULL,
 				.typeflag = BFTW_UNKNOWN,
 				.base = pathlen,
 				.level = current->depth + 1,
+				.error = 0,
 			};
-
-			if (dynstr_concat(&path, pathlen, de->d_name) != 0) {
-				goto done;
-			}
 
 #if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
 			switch (de->d_type) {
@@ -477,11 +516,11 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				if (ftwbuf.typeflag == BFTW_D) {
 					dircache_entry *next = dircache_add(&cache, current, de->d_name);
 					if (!next) {
-						goto done;
+						goto fail;
 					}
 
 					if (dirqueue_push(&queue, next) != 0) {
-						goto done;
+						goto fail;
 					}
 				}
 				break;
@@ -493,12 +532,11 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				break;
 
 			case BFTW_STOP:
-				ret = 0;
 				goto done;
 
 			default:
-				errno = EINVAL;
-				goto done;
+				err = EINVAL;
+				goto fail;
 			}
 		}
 
@@ -507,9 +545,15 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 		current = dirqueue_pop(&queue);
 	} while (current);
 
-	ret = 0;
 done:
-	err = errno;
+	if (err == 0) {
+		ret = 0;
+	}
+
+fail:
+	if (err == 0) {
+		err = errno;
+	}
 
 	while (current) {
 		dircache_entry_free(&cache, current);

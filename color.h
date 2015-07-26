@@ -9,6 +9,10 @@
  * the COPYING file or http://www.wtfpl.net/ for more details.       *
  *********************************************************************/
 
+#ifndef BFS_COLOR_H
+#define BFS_COLOR_H
+
+#include "bftw.h"
 #include <sys/stat.h>
 
 /**
@@ -38,9 +42,23 @@ color_table *parse_colors(char *ls_colors);
 void pretty_print(const color_table *colors, const char *fpath, const struct stat *sb);
 
 /**
+ * Pretty-print an error.
+ *
+ * @param colors
+ *         The color table to use.
+ * @param fpath
+ *         The file path in error.
+ * @param ftwbuf
+ *         The bftw() data for fpath.
+ */
+void print_error(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf);
+
+/**
  * Free a color table.
  *
  * @param colors
  *         The color table to free.
  */
 void free_colors(color_table *colors);
+
+#endif // BFS_COLOR_H

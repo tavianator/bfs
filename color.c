@@ -274,10 +274,10 @@ static const char *file_color(const color_table *colors, const char *filename, c
 	return color;
 }
 
-static void print_esc(const char *esc) {
-	fputs("\033[", stdout);
-	fputs(esc, stdout);
-	fputs("m", stdout);
+static void print_esc(const char *esc, FILE *file) {
+	fputs("\033[", file);
+	fputs(esc, file);
+	fputs("m", file);
 }
 
 void pretty_print(const color_table *colors, const char *fpath, const struct stat *sb) {
@@ -294,22 +294,37 @@ void pretty_print(const color_table *colors, const char *fpath, const struct sta
 	}
 
 	if (colors->dir) {
-		print_esc(colors->dir);
+		print_esc(colors->dir, stdout);
 	}
 	fwrite(fpath, 1, filename - fpath, stdout);
 	if (colors->dir) {
-		print_esc(colors->reset);
+		print_esc(colors->reset, stdout);
 	}
 
 	const char *color = file_color(colors, filename, sb);
 	if (color) {
-		print_esc(color);
+		print_esc(color, stdout);
 	}
 	fputs(filename, stdout);
 	if (color) {
-		print_esc(colors->reset);
+		print_esc(colors->reset, stdout);
 	}
 	fputs("\n", stdout);
+}
+
+void print_error(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf) {
+	const char *color = NULL;
+	if (colors) {
+		color = colors->orphan;
+	}
+
+	if (color) {
+		print_esc(color, stderr);
+	}
+	fprintf(stderr, "Error at %s: %s\n", fpath, strerror(ftwbuf->error));
+	if (color) {
+		print_esc(colors->reset, stderr);
+	}
 }
 
 void free_colors(color_table *colors) {
