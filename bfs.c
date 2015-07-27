@@ -15,7 +15,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <unistd.h>
+
+static int infer_nopenfd() {
+	int ret = 4096;
+
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+		if (rl.rlim_cur != RLIM_INFINITY) {
+			ret = rl.rlim_cur;
+		}
+	}
+
+	// Account for std{in,out,err}
+	if (ret > 3) {
+		ret -= 3;
+	}
+
+	return ret;
+}
 
 typedef struct {
 	const char *path;
@@ -85,8 +104,8 @@ int main(int argc, char *argv[]) {
 		opts.colors = parse_colors(getenv("LS_COLORS"));
 	}
 
-	// TODO: getrlimit(RLIMIT_NOFILE)
-	if (bftw(opts.path, callback, 1024, flags, &opts) != 0) {
+	int nopenfd = infer_nopenfd();
+	if (bftw(opts.path, callback, nopenfd, flags, &opts) != 0) {
 		perror("bftw()");
 		goto done;
 	}

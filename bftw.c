@@ -291,7 +291,19 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 		fd = dirfd(base->dir);
 	}
 
-	DIR *dir = opendirat(fd, path + nameoff);
+	const char *relpath = path + nameoff;
+	DIR *dir = opendirat(fd, relpath);
+
+	if (!dir
+	    && errno == EMFILE
+	    && cache->lru_tail
+	    && cache->lru_tail != base) {
+		// Too many open files, shrink the LRU cache
+		dircache_entry_close(cache, cache->lru_tail);
+		--cache->lru_remaining;
+		dir = opendirat(fd, relpath);
+	}
+
 	if (dir) {
 		entry->dir = dir;
 		dircache_lru_add(cache, entry);
