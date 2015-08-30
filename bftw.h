@@ -66,16 +66,24 @@ typedef int bftw_fn(const char *fpath, const struct BFTW *ftwbuf, void *ptr);
  */
 int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr);
 
+/** typeflag: Block device. */
+#define BFTW_BLK      0
+/** typeflag: Character device. */
+#define BFTW_CHR      1
 /** typeflag: Directory. */
-#define BFTW_D        0
-/** typeflag: Regular file. */
-#define BFTW_R        1
+#define BFTW_DIR      2
+/** typeflag: Pipe. */
+#define BFTW_FIFO     3
 /** typeflag: Symbolic link. */
-#define BFTW_SL       2
+#define BFTW_LNK      4
+/** typeflag: Regular file. */
+#define BFTW_REG      5
+/** typeflag: Socket. */
+#define BFTW_SOCK     6
 /** typeflag: Unknown type. */
-#define BFTW_UNKNOWN  3
+#define BFTW_UNKNOWN  7
 /** typeflag: An error occurred for this file. */
-#define BFTW_ERROR    4
+#define BFTW_ERROR    8
 
 /** action: Keep walking. */
 #define BFTW_CONTINUE       0

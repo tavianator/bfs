@@ -212,6 +212,59 @@ static bool eval_nohidden(const char *fpath, const struct BFTW *ftwbuf, const cm
 }
 
 /**
+ * -type test.
+ */
+static bool eval_type(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
+	return ftwbuf->typeflag == expr->data;
+}
+
+/**
+ * Parse -type [bcdpfls].
+ */
+static expression *parse_type(parser_state *state) {
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		fputs("-type needs a value.\n", stderr);
+		return NULL;
+	}
+
+	int typeflag = BFTW_UNKNOWN;
+
+	switch (arg[0]) {
+	case 'b':
+		typeflag = BFTW_BLK;
+		break;
+	case 'c':
+		typeflag = BFTW_CHR;
+		break;
+	case 'd':
+		typeflag = BFTW_DIR;
+		break;
+	case 'p':
+		typeflag = BFTW_FIFO;
+		break;
+	case 'f':
+		typeflag = BFTW_REG;
+		break;
+	case 'l':
+		typeflag = BFTW_LNK;
+		break;
+	case 's':
+		typeflag = BFTW_SOCK;
+		break;
+	}
+
+	if (typeflag == BFTW_UNKNOWN || arg[1] != '\0') {
+		fprintf(stderr, "Unknown type flag '%s'.\n", arg);
+		return NULL;
+	}
+
+	++state->i;
+
+	return new_expression(NULL, NULL, eval_type, typeflag);
+}
+
+/**
  * LITERAL : OPTION
  *         | TEST
  *         | ACTION
@@ -235,8 +288,10 @@ static expression *parse_literal(parser_state *state) {
 		return new_expression(NULL, NULL, eval_print, 0);
 	} else if (strcmp(arg, "-prune") == 0) {
 		return new_expression(NULL, NULL, eval_prune, 0);
+	} else if (strcmp(arg, "-type") == 0) {
+		return parse_type(state);
 	} else {
-		fprintf(stderr,  "Unknown argument '%s'.\n", arg);
+		fprintf(stderr, "Unknown argument '%s'.\n", arg);
 		return NULL;
 	}
 }

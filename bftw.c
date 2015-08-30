@@ -489,14 +489,26 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 
 #if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
 			switch (de->d_type) {
-			case DT_DIR:
-				ftwbuf.typeflag = BFTW_D;
+			case DT_BLK:
+				ftwbuf.typeflag = BFTW_BLK;
 				break;
-			case DT_REG:
-				ftwbuf.typeflag = BFTW_R;
+			case DT_CHR:
+				ftwbuf.typeflag = BFTW_CHR;
+				break;
+			case DT_DIR:
+				ftwbuf.typeflag = BFTW_DIR;
+				break;
+			case DT_FIFO:
+				ftwbuf.typeflag = BFTW_FIFO;
 				break;
 			case DT_LNK:
-				ftwbuf.typeflag = BFTW_SL;
+				ftwbuf.typeflag = BFTW_LNK;
+				break;
+			case DT_REG:
+				ftwbuf.typeflag = BFTW_REG;
+				break;
+			case DT_SOCK:
+				ftwbuf.typeflag = BFTW_SOCK;
 				break;
 			}
 #endif
@@ -508,14 +520,26 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 					ftwbuf.statbuf = &sb;
 
 					switch (sb.st_mode & S_IFMT) {
-					case S_IFDIR:
-						ftwbuf.typeflag = BFTW_D;
+					case S_IFBLK:
+						ftwbuf.typeflag = BFTW_BLK;
 						break;
-					case S_IFREG:
-						ftwbuf.typeflag = BFTW_R;
+					case S_IFCHR:
+						ftwbuf.typeflag = BFTW_CHR;
+						break;
+					case S_IFDIR:
+						ftwbuf.typeflag = BFTW_DIR;
+						break;
+					case S_IFIFO:
+						ftwbuf.typeflag = BFTW_FIFO;
 						break;
 					case S_IFLNK:
-						ftwbuf.typeflag = BFTW_SL;
+						ftwbuf.typeflag = BFTW_LNK;
+						break;
+					case S_IFREG:
+						ftwbuf.typeflag = BFTW_REG;
+						break;
+					case S_IFSOCK:
+						ftwbuf.typeflag = BFTW_SOCK;
 						break;
 					}
 				}
@@ -525,7 +549,7 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 
 			switch (action) {
 			case BFTW_CONTINUE:
-				if (ftwbuf.typeflag == BFTW_D) {
+				if (ftwbuf.typeflag == BFTW_DIR) {
 					dircache_entry *next = dircache_add(&cache, current, de->d_name);
 					if (!next) {
 						goto fail;
