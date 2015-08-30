@@ -207,8 +207,12 @@ static bool eval_hidden(const char *fpath, const struct BFTW *ftwbuf, const cmdl
  * -nohidden action.
  */
 static bool eval_nohidden(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return !eval_hidden(fpath, ftwbuf, cl, expr, ret)
-		|| eval_prune(fpath, ftwbuf, cl, expr, ret);
+	if (eval_hidden(fpath, ftwbuf, cl, expr, ret)) {
+		eval_prune(fpath, ftwbuf, cl, expr, ret);
+		return false;
+	} else {
+		return true;
+	}
 }
 
 /**
