@@ -174,18 +174,10 @@ static const char *skip_paths(parser_state *state) {
 }
 
 /**
- * Always true.
+ * -false test.
  */
-static bool eval_true(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return true;
-}
-
-/**
- * -print action.
- */
-static bool eval_print(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	pretty_print(cl->colors, fpath, ftwbuf->statbuf);
-	return true;
+static bool eval_false(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
+	return false;
 }
 
 /**
@@ -213,6 +205,21 @@ static bool eval_nohidden(const char *fpath, const struct BFTW *ftwbuf, const cm
 	} else {
 		return true;
 	}
+}
+
+/**
+ * -print action.
+ */
+static bool eval_print(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
+	pretty_print(cl->colors, fpath, ftwbuf->statbuf);
+	return true;
+}
+
+/**
+ * -true test.
+ */
+static bool eval_true(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
+	return true;
 }
 
 /**
@@ -283,6 +290,8 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
 		return new_expression(NULL, NULL, eval_true, 0);
+	} else if (strcmp(arg, "-false") == 0) {
+		return new_expression(NULL, NULL, eval_false, 0);
 	} else if (strcmp(arg, "-hidden") == 0) {
 		return new_expression(NULL, NULL, eval_hidden, 0);
 	} else if (strcmp(arg, "-nohidden") == 0) {
@@ -292,6 +301,8 @@ static expression *parse_literal(parser_state *state) {
 		return new_expression(NULL, NULL, eval_print, 0);
 	} else if (strcmp(arg, "-prune") == 0) {
 		return new_expression(NULL, NULL, eval_prune, 0);
+	} else if (strcmp(arg, "-true") == 0) {
+		return new_expression(NULL, NULL, eval_true, 0);
 	} else if (strcmp(arg, "-type") == 0) {
 		return parse_type(state);
 	} else {
