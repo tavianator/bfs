@@ -467,7 +467,9 @@ static expression *parse_term(parser_state *state) {
 			break;
 		}
 
-		if (strcmp(arg, "-o") == 0 || strcmp(arg, "-or") == 0 || strcmp(arg, ",") == 0) {
+		if (strcmp(arg, "-o") == 0 || strcmp(arg, "-or") == 0
+		    || strcmp(arg, ",") == 0
+		    || strcmp(arg, ")") == 0) {
 			break;
 		}
 
