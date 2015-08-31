@@ -11,6 +11,7 @@
 
 #include "bftw.h"
 #include "color.h"
+#include <fnmatch.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,24 +62,74 @@ struct expression {
 	expression *rhs;
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
-	/** Optional data for this expression. */
-	int data;
+	/** Optional integer data for this expression. */
+	int idata;
+	/** Optional string data for this expression. */
+	const char *sdata;
 };
 
 /**
  * Create a new expression.
  */
-static expression *new_expression(expression *lhs, expression *rhs, eval_fn *eval, int data) {
+static expression *new_expression(eval_fn *eval) {
 	expression *expr = malloc(sizeof(expression));
 	if (!expr) {
 		perror("malloc()");
 		return NULL;
 	}
 
-	expr->lhs = lhs;
-	expr->rhs = rhs;
+	expr->lhs = NULL;
+	expr->rhs = NULL;
 	expr->eval = eval;
-	expr->data = data;
+	expr->idata = 0;
+	expr->sdata = NULL;
+	return expr;
+}
+
+/**
+ * Create a new expression with integer data.
+ */
+static expression *new_expression_idata(eval_fn *eval, int idata) {
+	expression *expr = new_expression(eval);
+	if (expr) {
+		expr->idata = idata;
+	}
+	return expr;
+}
+
+/**
+ * Create a new expression with string data.
+ */
+static expression *new_expression_sdata(eval_fn *eval, const char *sdata) {
+	expression *expr = new_expression(eval);
+	if (expr) {
+		expr->sdata = sdata;
+	}
+	return expr;
+}
+
+/**
+ * Create a new unary expression.
+ */
+static expression *new_expression_unary(expression *rhs, eval_fn *eval) {
+	expression *expr = new_expression(eval);
+	if (expr) {
+		expr->rhs = rhs;
+		expr->eval = eval;
+	}
+	return expr;
+}
+
+/**
+ * Create a new binary expression.
+ */
+static expression *new_expression_binary(expression *lhs, expression *rhs, eval_fn *eval) {
+	expression *expr = new_expression(eval);
+	if (expr) {
+		expr->lhs = lhs;
+		expr->rhs = rhs;
+		expr->eval = eval;
+	}
 	return expr;
 }
 
@@ -218,6 +269,13 @@ static bool eval_nohidden(const expression *expr, eval_state *state) {
 }
 
 /**
+ * -name test.
+ */
+static bool eval_name(const expression *expr, eval_state *state) {
+	return fnmatch(expr->sdata, state->fpath + state->ftwbuf->base, 0) == 0;
+}
+
+/**
  * -print action.
  */
 static bool eval_print(const expression *expr, eval_state *state) {
@@ -236,7 +294,22 @@ static bool eval_true(const expression *expr, eval_state *state) {
  * -type test.
  */
 static bool eval_type(const expression *expr, eval_state *state) {
-	return state->ftwbuf->typeflag == expr->data;
+	return state->ftwbuf->typeflag == expr->idata;
+}
+
+/**
+ * Parse -name 'pattern'.
+ */
+static expression *parse_name(parser_state *state) {
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		fputs("-name needs a value.\n", stderr);
+		return NULL;
+	}
+
+	++state->i;
+
+	return new_expression_sdata(eval_name, arg);
 }
 
 /**
@@ -282,7 +355,7 @@ static expression *parse_type(parser_state *state) {
 
 	++state->i;
 
-	return new_expression(NULL, NULL, eval_type, typeflag);
+	return new_expression_idata(eval_type, typeflag);
 }
 
 /**
@@ -296,23 +369,25 @@ static expression *parse_literal(parser_state *state) {
 
 	if (strcmp(arg, "-color") == 0) {
 		state->cl->color = true;
-		return new_expression(NULL, NULL, eval_true, 0);
+		return new_expression(eval_true);
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
-		return new_expression(NULL, NULL, eval_true, 0);
+		return new_expression(eval_true);
 	} else if (strcmp(arg, "-false") == 0) {
-		return new_expression(NULL, NULL, eval_false, 0);
+		return new_expression(eval_false);
 	} else if (strcmp(arg, "-hidden") == 0) {
-		return new_expression(NULL, NULL, eval_hidden, 0);
+		return new_expression(eval_hidden);
 	} else if (strcmp(arg, "-nohidden") == 0) {
-		return new_expression(NULL, NULL, eval_nohidden, 0);
+		return new_expression(eval_nohidden);
+	} else if (strcmp(arg, "-name") == 0) {
+		return parse_name(state);
 	} else if (strcmp(arg, "-print") == 0) {
 		state->implicit_print = false;
-		return new_expression(NULL, NULL, eval_print, 0);
+		return new_expression(eval_print);
 	} else if (strcmp(arg, "-prune") == 0) {
-		return new_expression(NULL, NULL, eval_prune, 0);
+		return new_expression(eval_prune);
 	} else if (strcmp(arg, "-true") == 0) {
-		return new_expression(NULL, NULL, eval_true, 0);
+		return new_expression(eval_true);
 	} else if (strcmp(arg, "-type") == 0) {
 		return parse_type(state);
 	} else {
@@ -364,7 +439,7 @@ static expression *parse_factor(parser_state *state) {
 			return NULL;
 		}
 
-		return new_expression(NULL, factor, eval_not, 0);
+		return new_expression_unary(factor, eval_not);
 	} else {
 		return parse_literal(state);
 	}
@@ -402,7 +477,7 @@ static expression *parse_term(parser_state *state) {
 			return NULL;
 		}
 
-		term = new_expression(lhs, rhs, eval_and, 0);
+		term = new_expression_binary(lhs, rhs, eval_and);
 	}
 
 	return term;
@@ -441,7 +516,7 @@ static expression *parse_clause(parser_state *state) {
 			return NULL;
 		}
 
-		clause = new_expression(lhs, rhs, eval_or, 0);
+		clause = new_expression_binary(lhs, rhs, eval_or);
 	}
 
 	return clause;
@@ -480,7 +555,7 @@ static expression *parse_expression(parser_state *state) {
 			return NULL;
 		}
 
-		expr = new_expression(lhs, rhs, eval_comma, 0);
+		expr = new_expression_binary(lhs, rhs, eval_comma);
 	}
 
 	return expr;
@@ -522,13 +597,13 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (state.implicit_print) {
-		expression *print = new_expression(NULL, NULL, eval_print, 0);
+		expression *print = new_expression(eval_print);
 		if (!print) {
 			goto fail;
 		}
 
 		if (cl->expr) {
-			expression *expr = new_expression(cl->expr, print, eval_and, 0);
+			expression *expr = new_expression_binary(cl->expr, print, eval_and);
 			if (!expr) {
 				free_expression(print);
 				goto fail;
