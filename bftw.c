@@ -134,33 +134,46 @@ static void dircache_init(dircache *cache, size_t lru_size) {
 
 /** Add an entry to the dircache. */
 static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, const char *name) {
-	size_t namesize = strlen(name) + 1;
-	dircache_entry *entry = malloc(sizeof(dircache_entry) + namesize);
-	if (entry) {
-		entry->parent = parent;
+	size_t namelen = strlen(name);
+	size_t size = sizeof(dircache_entry) + namelen + 1;
 
-		if (parent) {
-			entry->depth = parent->depth + 1;
-			entry->nameoff = parent->nameoff + parent->namelen;
-			if (parent->namelen > 0 && parent->name[parent->namelen - 1] != '/') {
-				++entry->nameoff;
-			}
-		} else {
-			entry->depth = 0;
-			entry->nameoff = 0;
-		}
-
-		entry->lru_prev = entry->lru_next = NULL;
-		entry->dir = NULL;
-		entry->refcount = 1;
-		entry->namelen = namesize - 1;
-		memcpy(entry->name, name, namesize);
-
-		while (parent) {
-			++parent->refcount;
-			parent = parent->parent;
-		}
+	bool needs_slash = false;
+	if (namelen == 0 || name[namelen - 1] != '/') {
+		needs_slash = true;
+		++size;
 	}
+
+	dircache_entry *entry = malloc(size);
+	if (!entry) {
+		return NULL;
+	}
+
+	entry->parent = parent;
+
+	if (parent) {
+		entry->depth = parent->depth + 1;
+		entry->nameoff = parent->nameoff + parent->namelen;
+	} else {
+		entry->depth = 0;
+		entry->nameoff = 0;
+	}
+
+	entry->lru_prev = entry->lru_next = NULL;
+	entry->dir = NULL;
+	entry->refcount = 1;
+
+	memcpy(entry->name, name, namelen);
+	if (needs_slash) {
+		entry->name[namelen++] = '/';
+	}
+	entry->name[namelen] = '\0';
+	entry->namelen = namelen;
+
+	while (parent) {
+		++parent->refcount;
+		parent = parent->parent;
+	}
+
 	return entry;
 }
 
@@ -235,9 +248,6 @@ static DIR *opendirat(int fd, const char *name) {
 static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
 	size_t namelen = entry->namelen;
 	size_t pathlen = entry->nameoff + namelen;
-	if (namelen > 0 && entry->name[namelen - 1] != '/') {
-		++pathlen;
-	}
 
 	if (dynstr_grow(path, pathlen) != 0) {
 		return -1;
@@ -250,12 +260,7 @@ static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
 	do {
 		char *segment = path->str + entry->nameoff;
 		namelen = entry->namelen;
-
 		memcpy(segment, entry->name, namelen);
-		if (namelen > 0 && entry->name[namelen - 1] != '/') {
-			segment[namelen] = '/';
-		}
-
 		entry = entry->parent;
 	} while (entry);
 
