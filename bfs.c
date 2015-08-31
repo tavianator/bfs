@@ -12,6 +12,7 @@
 #include "bftw.h"
 #include "color.h"
 #include <fnmatch.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -154,6 +155,11 @@ struct cmdline {
 	color_table *colors;
 	/** -color option. */
 	bool color;
+
+	/** -mindepth option. */
+	int mindepth;
+	/** -maxdepth option. */
+	int maxdepth;
 
 	/** bftw() flags. */
 	int flags;
@@ -298,6 +304,45 @@ static bool eval_type(const expression *expr, eval_state *state) {
 }
 
 /**
+ * Parse an integer.
+ */
+static bool parse_int(const char *str, int *value) {
+	char *endptr;
+	long result = strtol(str, &endptr, 10);
+
+	if (*str == '\0' || *endptr != '\0') {
+		return false;
+	}
+
+	if (result < INT_MIN || result > INT_MAX) {
+		return false;
+	}
+
+	*value = result;
+	return true;
+}
+
+/**
+ * Parse -{min,max}depth N.
+ */
+static expression *parse_depth(parser_state *state, int *depth, const char *option) {
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		fprintf(stderr, "%s needs a value.\n", option);
+		return NULL;
+	}
+
+	++state->i;
+
+	if (!parse_int(arg, depth)) {
+		fprintf(stderr, "%s is not a valid integer.\n", arg);
+		return NULL;
+	}
+
+	return new_expression(eval_true);
+}
+
+/**
  * Parse -name 'pattern'.
  */
 static expression *parse_name(parser_state *state) {
@@ -379,6 +424,10 @@ static expression *parse_literal(parser_state *state) {
 		return new_expression(eval_hidden);
 	} else if (strcmp(arg, "-nohidden") == 0) {
 		return new_expression(eval_nohidden);
+	} else if (strcmp(arg, "-mindepth") == 0) {
+		return parse_depth(state, &state->cl->mindepth, arg);
+	} else if (strcmp(arg, "-maxdepth") == 0) {
+		return parse_depth(state, &state->cl->maxdepth, arg);
 	} else if (strcmp(arg, "-name") == 0) {
 		return parse_name(state);
 	} else if (strcmp(arg, "-print") == 0) {
@@ -580,6 +629,8 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 	cl->nroots = 0;
 	cl->colors = NULL;
 	cl->color = isatty(STDOUT_FILENO);
+	cl->mindepth = 0;
+	cl->maxdepth = INT_MAX;
 	cl->flags = BFTW_RECOVER;
 	cl->expr = NULL;
 
@@ -677,14 +728,22 @@ static int cmdline_callback(const char *fpath, const struct BFTW *ftwbuf, void *
 		.cl = cl,
 		.ret = BFTW_CONTINUE,
 	};
-	cl->expr->eval(cl->expr, &state);
+
+	if (ftwbuf->level >= cl->maxdepth) {
+		state.ret = BFTW_SKIP_SUBTREE;
+	}
+
+	if (ftwbuf->level >= cl->mindepth) {
+		cl->expr->eval(cl->expr, &state);
+	}
+
 	return state.ret;
 }
 
 /**
  * Evaluate the command line.
  */
-static int cmdline_eval(cmdline *cl) {
+static int eval_cmdline(cmdline *cl) {
 	int ret = 0;
 	int nopenfd = infer_nopenfd();
 
@@ -703,7 +762,7 @@ int main(int argc, char *argv[]) {
 
 	cmdline *cl = parse_cmdline(argc, argv);
 	if (cl) {
-		if (cmdline_eval(cl) == 0) {
+		if (eval_cmdline(cl) == 0) {
 			ret = EXIT_SUCCESS;
 		}
 	}
