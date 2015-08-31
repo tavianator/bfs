@@ -499,6 +499,7 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 	cl->colors = NULL;
 	cl->color = isatty(STDOUT_FILENO);
 	cl->flags = BFTW_RECOVER;
+	cl->expr = NULL;
 
 	parser_state state = {
 		.cl = cl,
