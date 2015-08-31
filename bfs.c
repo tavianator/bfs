@@ -117,6 +117,7 @@ struct cmdline {
 static void free_cmdline(cmdline *cl) {
 	if (cl) {
 		free_expression(cl->expr);
+		free_colors(cl->colors);
 		free(cl->roots);
 		free(cl);
 	}
