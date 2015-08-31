@@ -233,7 +233,11 @@ static DIR *opendirat(int fd, const char *name) {
  *         Will hold the full path to the entry, with a trailing '/'.
  */
 static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
-	size_t pathlen = entry->nameoff + entry->namelen + 1;
+	size_t namelen = entry->namelen;
+	size_t pathlen = entry->nameoff + namelen;
+	if (namelen > 0 && entry->name[namelen - 1] != '/') {
+		++pathlen;
+	}
 
 	if (dynstr_grow(path, pathlen) != 0) {
 		return -1;
@@ -245,7 +249,7 @@ static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
 
 	do {
 		char *segment = path->str + entry->nameoff;
-		size_t namelen = entry->namelen;
+		namelen = entry->namelen;
 
 		memcpy(segment, entry->name, namelen);
 		if (namelen > 0 && entry->name[namelen - 1] != '/') {
