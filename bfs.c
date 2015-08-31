@@ -29,22 +29,30 @@ typedef struct expression expression;
 typedef struct cmdline cmdline;
 
 /**
+ * Ephemeral state for evaluating an expression.
+ */
+typedef struct {
+	/** The path to the encountered file. */
+	const char *fpath;
+	/** Additional data about the current file. */
+	const struct BFTW *ftwbuf;
+	/** The parsed command line. */
+	const cmdline *cl;
+	/** The bftw() callback return value. */
+	int ret;
+} eval_state;
+
+/**
  * Expression evaluation function.
  *
- * @param fpath
- *         The path to the encountered file.
- * @param ftwbuf
- *         Additional data about the current file.
- * @param cmdline
- *         The parsed command line.
  * @param expr
  *         The current expression.
- * @param ret
- *         A pointer to the bftw() callback return value.
+ * @param state
+ *         The current evaluation state.
  * @return
  *         The result of the test.
  */
-typedef bool eval_fn(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret);
+typedef bool eval_fn(const expression *expr, eval_state *state);
 
 struct expression {
 	/** The left hand side of the expression. */
@@ -176,31 +184,32 @@ static const char *skip_paths(parser_state *state) {
 /**
  * -false test.
  */
-static bool eval_false(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
+static bool eval_false(const expression *expr, eval_state *state) {
 	return false;
 }
 
 /**
  * -prune action.
  */
-static bool eval_prune(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	*ret = BFTW_SKIP_SUBTREE;
+static bool eval_prune(const expression *expr, eval_state *state) {
+	state->ret = BFTW_SKIP_SUBTREE;
 	return true;
 }
 
 /**
  * -hidden test.
  */
-static bool eval_hidden(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return ftwbuf->base > 0 && fpath[ftwbuf->base] == '.';
+static bool eval_hidden(const expression *expr, eval_state *state) {
+	size_t base = state->ftwbuf->base;
+	return base > 0 && state->fpath[base] == '.';
 }
 
 /**
  * -nohidden action.
  */
-static bool eval_nohidden(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	if (eval_hidden(fpath, ftwbuf, cl, expr, ret)) {
-		eval_prune(fpath, ftwbuf, cl, expr, ret);
+static bool eval_nohidden(const expression *expr, eval_state *state) {
+	if (eval_hidden(expr, state)) {
+		eval_prune(expr, state);
 		return false;
 	} else {
 		return true;
@@ -210,23 +219,23 @@ static bool eval_nohidden(const char *fpath, const struct BFTW *ftwbuf, const cm
 /**
  * -print action.
  */
-static bool eval_print(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	pretty_print(cl->colors, fpath, ftwbuf->statbuf);
+static bool eval_print(const expression *expr, eval_state *state) {
+	pretty_print(state->cl->colors, state->fpath, state->ftwbuf->statbuf);
 	return true;
 }
 
 /**
  * -true test.
  */
-static bool eval_true(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
+static bool eval_true(const expression *expr, eval_state *state) {
 	return true;
 }
 
 /**
  * -type test.
  */
-static bool eval_type(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return ftwbuf->typeflag == expr->data;
+static bool eval_type(const expression *expr, eval_state *state) {
+	return state->ftwbuf->typeflag == expr->data;
 }
 
 /**
@@ -314,8 +323,8 @@ static expression *parse_literal(parser_state *state) {
 /**
  * Evaluate a negation.
  */
-static bool eval_not(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return !expr->rhs->eval(fpath, ftwbuf, cl, expr->rhs, ret);
+static bool eval_not(const expression *expr, eval_state *state) {
+	return !expr->rhs->eval(expr, state);
 }
 
 /**
@@ -363,9 +372,8 @@ static expression *parse_factor(parser_state *state) {
 /**
  * Evaluate a conjunction.
  */
-static bool eval_and(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return expr->lhs->eval(fpath, ftwbuf, cl, expr->lhs, ret)
-		&& expr->rhs->eval(fpath, ftwbuf, cl, expr->rhs, ret);
+static bool eval_and(const expression *expr, eval_state *state) {
+	return expr->lhs->eval(expr->lhs, state) && expr->rhs->eval(expr->rhs, state);
 }
 
 /**
@@ -402,9 +410,8 @@ static expression *parse_term(parser_state *state) {
 /**
  * Evaluate a disjunction.
  */
-static bool eval_or(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	return expr->lhs->eval(fpath, ftwbuf, cl, expr->lhs, ret)
-		|| expr->rhs->eval(fpath, ftwbuf, cl, expr->rhs, ret);
+static bool eval_or(const expression *expr, eval_state *state) {
+	return expr->lhs->eval(expr->lhs, state) || expr->rhs->eval(expr->rhs, state);
 }
 
 /**
@@ -442,9 +449,9 @@ static expression *parse_clause(parser_state *state) {
 /**
  * Evaluate the comma operator.
  */
-static bool eval_comma(const char *fpath, const struct BFTW *ftwbuf, const cmdline *cl, const expression *expr, int *ret) {
-	expr->lhs->eval(fpath, ftwbuf, cl, expr->lhs, ret);
-	return expr->rhs->eval(fpath, ftwbuf, cl, expr->rhs, ret);
+static bool eval_comma(const expression *expr, eval_state *state) {
+	expr->lhs->eval(expr->lhs, state);
+	return expr->rhs->eval(expr->rhs, state);
 }
 
 /**
@@ -581,9 +588,14 @@ static int cmdline_callback(const char *fpath, const struct BFTW *ftwbuf, void *
 		return BFTW_SKIP_SUBTREE;
 	}
 
-	int ret = BFTW_CONTINUE;
-	cl->expr->eval(fpath, ftwbuf, cl, cl->expr, &ret);
-	return ret;
+	eval_state state = {
+		.fpath = fpath,
+		.ftwbuf = ftwbuf,
+		.cl = cl,
+		.ret = BFTW_CONTINUE,
+	};
+	cl->expr->eval(cl->expr, &state);
+	return state.ret;
 }
 
 /**
