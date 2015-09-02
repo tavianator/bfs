@@ -290,6 +290,14 @@ static bool eval_print(const expression *expr, eval_state *state) {
 }
 
 /**
+ * -print0 action.
+ */
+static bool eval_print0(const expression *expr, eval_state *state) {
+	fwrite(state->fpath, 1, strlen(state->fpath) + 1, stdout);
+	return true;
+}
+
+/**
  * -true test.
  */
 static bool eval_true(const expression *expr, eval_state *state) {
@@ -301,6 +309,30 @@ static bool eval_true(const expression *expr, eval_state *state) {
  */
 static bool eval_type(const expression *expr, eval_state *state) {
 	return state->ftwbuf->typeflag == expr->idata;
+}
+
+/**
+ * Create a new option expression.
+ */
+static expression *new_option(parser_state *state) {
+	return new_expression(eval_true);
+}
+
+/**
+ * Create a new test expression.
+ */
+static expression *new_test(parser_state *state, eval_fn *eval) {
+	return new_expression(eval);
+}
+
+/**
+ * Create a new action expression.
+ */
+static expression *new_action(parser_state *state, eval_fn *eval) {
+	if (eval != eval_nohidden && eval != eval_prune) {
+		state->implicit_print = false;
+	}
+	return new_expression(eval);
 }
 
 /**
@@ -339,7 +371,7 @@ static expression *parse_depth(parser_state *state, int *depth, const char *opti
 		return NULL;
 	}
 
-	return new_expression(eval_true);
+	return new_option(state);
 }
 
 /**
@@ -414,16 +446,16 @@ static expression *parse_literal(parser_state *state) {
 
 	if (strcmp(arg, "-color") == 0) {
 		state->cl->color = true;
-		return new_expression(eval_true);
+		return new_option(state);
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
-		return new_expression(eval_true);
+		return new_option(state);
 	} else if (strcmp(arg, "-false") == 0) {
-		return new_expression(eval_false);
+		return new_test(state, eval_false);
 	} else if (strcmp(arg, "-hidden") == 0) {
-		return new_expression(eval_hidden);
+		return new_test(state, eval_hidden);
 	} else if (strcmp(arg, "-nohidden") == 0) {
-		return new_expression(eval_nohidden);
+		return new_action(state, eval_nohidden);
 	} else if (strcmp(arg, "-mindepth") == 0) {
 		return parse_depth(state, &state->cl->mindepth, arg);
 	} else if (strcmp(arg, "-maxdepth") == 0) {
@@ -431,12 +463,13 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-name") == 0) {
 		return parse_name(state);
 	} else if (strcmp(arg, "-print") == 0) {
-		state->implicit_print = false;
-		return new_expression(eval_print);
+		return new_action(state, eval_print);
+	} else if (strcmp(arg, "-print0") == 0) {
+		return new_action(state, eval_print0);
 	} else if (strcmp(arg, "-prune") == 0) {
-		return new_expression(eval_prune);
+		return new_action(state, eval_prune);
 	} else if (strcmp(arg, "-true") == 0) {
-		return new_expression(eval_true);
+		return new_test(state, eval_true);
 	} else if (strcmp(arg, "-type") == 0) {
 		return parse_type(state);
 	} else {
