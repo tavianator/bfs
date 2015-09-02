@@ -10,11 +10,13 @@
  *********************************************************************/
 
 #include "color.h"
+#include "bftw.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 typedef struct ext_color ext_color;
 
@@ -280,28 +282,23 @@ static void print_esc(const char *esc, FILE *file) {
 	fputs("m", file);
 }
 
-void pretty_print(const color_table *colors, const char *fpath, const struct stat *sb) {
+void pretty_print(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf) {
 	if (!colors) {
 		puts(fpath);
 		return;
 	}
 
-	const char *filename = strrchr(fpath, '/');
-	if (filename) {
-		++filename;
-	} else {
-		filename = fpath + strlen(fpath);
-	}
+	const char *filename = fpath + ftwbuf->base;
 
 	if (colors->dir) {
 		print_esc(colors->dir, stdout);
 	}
-	fwrite(fpath, 1, filename - fpath, stdout);
+	fwrite(fpath, 1, ftwbuf->base, stdout);
 	if (colors->dir) {
 		print_esc(colors->reset, stdout);
 	}
 
-	const char *color = file_color(colors, filename, sb);
+	const char *color = file_color(colors, filename, ftwbuf->statbuf);
 	if (color) {
 		print_esc(color, stdout);
 	}

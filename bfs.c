@@ -285,7 +285,7 @@ static bool eval_name(const expression *expr, eval_state *state) {
  * -print action.
  */
 static bool eval_print(const expression *expr, eval_state *state) {
-	pretty_print(state->cl->colors, state->fpath, state->ftwbuf->statbuf);
+	pretty_print(state->cl->colors, state->fpath, state->ftwbuf);
 	return true;
 }
 

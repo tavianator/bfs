@@ -420,30 +420,139 @@ static dircache_entry *dirqueue_pop(dirqueue *queue) {
 	return entry;
 }
 
-int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+static void ftwbuf_init(struct BFTW *ftwbuf, int base, int level) {
+	ftwbuf->statbuf = NULL;
+	ftwbuf->typeflag = BFTW_UNKNOWN;
+	ftwbuf->base = base;
+	ftwbuf->level = level;
+	ftwbuf->error = 0;
+}
+
+static void ftwbuf_set_error(struct BFTW *ftwbuf, int error) {
+	ftwbuf->typeflag = BFTW_ERROR;
+	ftwbuf->error = error;
+}
+
+static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
+#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
+	switch (de->d_type) {
+	case DT_BLK:
+		ftwbuf->typeflag = BFTW_BLK;
+		break;
+	case DT_CHR:
+		ftwbuf->typeflag = BFTW_CHR;
+		break;
+	case DT_DIR:
+		ftwbuf->typeflag = BFTW_DIR;
+		break;
+	case DT_FIFO:
+		ftwbuf->typeflag = BFTW_FIFO;
+		break;
+	case DT_LNK:
+		ftwbuf->typeflag = BFTW_LNK;
+		break;
+	case DT_REG:
+		ftwbuf->typeflag = BFTW_REG;
+		break;
+	case DT_SOCK:
+		ftwbuf->typeflag = BFTW_SOCK;
+		break;
+	}
+#endif
+}
+
+static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int fd, const char *path) {
+	int ret = fstatat(fd, path, sb, AT_SYMLINK_NOFOLLOW);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ftwbuf->statbuf = sb;
+
+	switch (sb->st_mode & S_IFMT) {
+	case S_IFBLK:
+		ftwbuf->typeflag = BFTW_BLK;
+		break;
+	case S_IFCHR:
+		ftwbuf->typeflag = BFTW_CHR;
+		break;
+	case S_IFDIR:
+		ftwbuf->typeflag = BFTW_DIR;
+		break;
+	case S_IFIFO:
+		ftwbuf->typeflag = BFTW_FIFO;
+		break;
+	case S_IFLNK:
+		ftwbuf->typeflag = BFTW_LNK;
+		break;
+	case S_IFREG:
+		ftwbuf->typeflag = BFTW_REG;
+		break;
+	case S_IFSOCK:
+		ftwbuf->typeflag = BFTW_SOCK;
+		break;
+	}
+
+	return 0;
+}
+
+int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 	int ret = -1, err = 0;
 
 	dircache cache;
 	dircache_init(&cache, nopenfd);
 
+	dircache_entry *current = NULL;
+
 	dirqueue queue;
 	dirqueue_init(&queue);
 
-	dynstr path;
-	dynstr_init(&path);
+	dynstr dynpath;
+	dynstr_init(&dynpath);
 
-	dircache_entry *current = dircache_add(&cache, NULL, dirpath);
+	struct BFTW ftwbuf;
+	ftwbuf_init(&ftwbuf, 0, 0);
+
+	struct stat sb;
+	if (ftwbuf_stat(&ftwbuf, &sb, AT_FDCWD, path) != 0) {
+		if (!(flags & BFTW_RECOVER)) {
+			goto fail;
+		}
+
+		err = errno;
+		ftwbuf_set_error(&ftwbuf, err);
+	}
+
+	switch (fn(path, &ftwbuf, ptr)) {
+	case BFTW_CONTINUE:
+	case BFTW_SKIP_SIBLINGS:
+		break;
+
+	case BFTW_SKIP_SUBTREE:
+	case BFTW_STOP:
+		goto done;
+
+	default:
+		err = EINVAL;
+		goto fail;
+	}
+
+	if (err != 0 || ftwbuf.typeflag != BFTW_DIR) {
+		goto done;
+	}
+
+	current = dircache_add(&cache, NULL, path);
 	if (!current) {
 		goto fail;
 	}
 
 	do {
-		if (dircache_entry_path(current, &path) != 0) {
+		if (dircache_entry_path(current, &dynpath) != 0) {
 			goto fail;
 		}
-		size_t pathlen = path.length;
+		size_t pathlen = dynpath.length;
 
-		DIR *dir = dircache_entry_open(&cache, current, path.str);
+		DIR *dir = dircache_entry_open(&cache, current, dynpath.str);
 		if (!dir) {
 			if (!(flags & BFTW_RECOVER)) {
 				goto fail;
@@ -451,17 +560,10 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 
 			err = errno;
 
-			struct BFTW ftwbuf = {
-				.statbuf = NULL,
-				.typeflag = BFTW_ERROR,
-				.base = current->nameoff,
-				.level = current->depth,
-				.error = err,
-			};
+			ftwbuf_init(&ftwbuf, current->nameoff, current->depth);
+			ftwbuf_set_error(&ftwbuf, err);
 
-			int action = fn(path.str, &ftwbuf, ptr);
-
-			switch (action) {
+			switch (fn(dynpath.str, &ftwbuf, ptr)) {
 			case BFTW_CONTINUE:
 			case BFTW_SKIP_SIBLINGS:
 			case BFTW_SKIP_SUBTREE:
@@ -474,8 +576,6 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				err = EINVAL;
 				goto fail;
 			}
-
-			goto next;
 		}
 
 		struct dirent *de;
@@ -484,79 +584,25 @@ int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				continue;
 			}
 
-			if (dynstr_concat(&path, pathlen, de->d_name) != 0) {
+			if (dynstr_concat(&dynpath, pathlen, de->d_name) != 0) {
 				goto fail;
 			}
 
-			struct BFTW ftwbuf = {
-				.statbuf = NULL,
-				.typeflag = BFTW_UNKNOWN,
-				.base = pathlen,
-				.level = current->depth + 1,
-				.error = 0,
-			};
-
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
-			switch (de->d_type) {
-			case DT_BLK:
-				ftwbuf.typeflag = BFTW_BLK;
-				break;
-			case DT_CHR:
-				ftwbuf.typeflag = BFTW_CHR;
-				break;
-			case DT_DIR:
-				ftwbuf.typeflag = BFTW_DIR;
-				break;
-			case DT_FIFO:
-				ftwbuf.typeflag = BFTW_FIFO;
-				break;
-			case DT_LNK:
-				ftwbuf.typeflag = BFTW_LNK;
-				break;
-			case DT_REG:
-				ftwbuf.typeflag = BFTW_REG;
-				break;
-			case DT_SOCK:
-				ftwbuf.typeflag = BFTW_SOCK;
-				break;
-			}
-#endif
-
-			struct stat sb;
+			ftwbuf_init(&ftwbuf, pathlen, current->depth + 1);
+			ftwbuf_use_dirent(&ftwbuf, de);
 
 			if ((flags & BFTW_STAT) || ftwbuf.typeflag == BFTW_UNKNOWN) {
-				if (fstatat(dirfd(dir), de->d_name, &sb, AT_SYMLINK_NOFOLLOW) == 0) {
-					ftwbuf.statbuf = &sb;
-
-					switch (sb.st_mode & S_IFMT) {
-					case S_IFBLK:
-						ftwbuf.typeflag = BFTW_BLK;
-						break;
-					case S_IFCHR:
-						ftwbuf.typeflag = BFTW_CHR;
-						break;
-					case S_IFDIR:
-						ftwbuf.typeflag = BFTW_DIR;
-						break;
-					case S_IFIFO:
-						ftwbuf.typeflag = BFTW_FIFO;
-						break;
-					case S_IFLNK:
-						ftwbuf.typeflag = BFTW_LNK;
-						break;
-					case S_IFREG:
-						ftwbuf.typeflag = BFTW_REG;
-						break;
-					case S_IFSOCK:
-						ftwbuf.typeflag = BFTW_SOCK;
-						break;
+				if (ftwbuf_stat(&ftwbuf, &sb, dirfd(dir), de->d_name) != 0) {
+					if (!(flags & BFTW_RECOVER)) {
+						goto fail;
 					}
+
+					err = errno;
+					ftwbuf_set_error(&ftwbuf, err);
 				}
 			}
 
-			int action = fn(path.str, &ftwbuf, ptr);
-
-			switch (action) {
+			switch (fn(dynpath.str, &ftwbuf, ptr)) {
 			case BFTW_CONTINUE:
 				if (ftwbuf.typeflag == BFTW_DIR) {
 					dircache_entry *next = dircache_add(&cache, current, de->d_name);
@@ -605,7 +651,7 @@ fail:
 		current = dirqueue_pop(&queue);
 	}
 
-	dynstr_free(&path);
+	dynstr_free(&dynpath);
 
 	errno = err;
 	return ret;

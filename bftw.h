@@ -51,7 +51,7 @@ typedef int bftw_fn(const char *fpath, const struct BFTW *ftwbuf, void *ptr);
  * and invokes a callback for each path it encounters.  However, bftw() operates
  * breadth-first.
  *
- * @param dirpath
+ * @param path
  *         The starting path.
  * @param fn
  *         The callback to invoke.
@@ -64,7 +64,7 @@ typedef int bftw_fn(const char *fpath, const struct BFTW *ftwbuf, void *ptr);
  * @return
  *         0 on success, or -1 on failure.
  */
-int bftw(const char *dirpath, bftw_fn *fn, int nopenfd, int flags, void *ptr);
+int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr);
 
 /** typeflag: Block device. */
 #define BFTW_BLK      0
