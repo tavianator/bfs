@@ -496,34 +496,159 @@ static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int fd, const char 
 	return 0;
 }
 
-int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
-	int ret = -1, err = 0;
+/**
+ * Holds the current state of the bftw() traversal.
+ */
+typedef struct {
+	/** bftw() callback. */
+	bftw_fn *fn;
+	/** bftw() flags. */
+	int flags;
+	/** bftw() callback data. */
+	void *ptr;
 
+	/** The appropriate errno value, if any. */
+	int error;
+
+	/** The cache of open directories. */
 	dircache cache;
-	dircache_init(&cache, nopenfd);
+	/** The current dircache entry. */
+	dircache_entry *current;
 
-	dircache_entry *current = NULL;
-
+	/** The queue of directories left to explore. */
 	dirqueue queue;
-	dirqueue_init(&queue);
+	/** The current path being explored. */
+	dynstr path;
 
-	dynstr dynpath;
-	dynstr_init(&dynpath);
-
+	/** Extra data about the current file. */
 	struct BFTW ftwbuf;
-	ftwbuf_init(&ftwbuf, 0, 0);
+	/** stat() buffer for the current file. */
+	struct stat statbuf;
+} bftw_state;
 
-	struct stat sb;
-	if (ftwbuf_stat(&ftwbuf, &sb, AT_FDCWD, path) != 0) {
-		if (!(flags & BFTW_RECOVER)) {
-			goto fail;
-		}
+/**
+ * Initialize the bftw() state.
+ */
+static void bftw_state_init(bftw_state *state, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+	state->fn = fn;
+	state->flags = flags;
+	state->ptr = ptr;
 
-		err = errno;
-		ftwbuf_set_error(&ftwbuf, err);
+	state->error = 0;
+
+	dircache_init(&state->cache, nopenfd);
+	state->current = NULL;
+
+	dirqueue_init(&state->queue);
+
+	dynstr_init(&state->path);
+}
+
+/**
+ * Set the current path.
+ */
+static int bftw_set_path(bftw_state *state, const struct dirent *de, const char *name) {
+	size_t base = 0;
+	size_t level = 0;
+	int fd = AT_FDCWD;
+
+	dircache_entry *current = state->current;
+	if (current) {
+		base = current->nameoff + current->namelen;
+		level = current->depth + 1;
+		fd = dirfd(current->dir);
 	}
 
-	switch (fn(path, &ftwbuf, ptr)) {
+	if (dynstr_concat(&state->path, base, name) != 0) {
+		return -1;
+	}
+
+	ftwbuf_init(&state->ftwbuf, base, level);
+
+	if (de) {
+		ftwbuf_use_dirent(&state->ftwbuf, de);
+	}
+
+	if ((state->flags & BFTW_STAT) || state->ftwbuf.typeflag == BFTW_UNKNOWN) {
+		if (ftwbuf_stat(&state->ftwbuf, &state->statbuf, fd, name) != 0) {
+			state->error = errno;
+			ftwbuf_set_error(&state->ftwbuf, state->error);
+		}
+	}
+
+	return 0;
+}
+
+/** internal action: Abort the traversal. */
+#define BFTW_FAIL (-1)
+
+/**
+ * Invoke the callback on the given path.
+ */
+static int bftw_handle_path(bftw_state *state) {
+	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
+	if (state->ftwbuf.typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
+		return BFTW_FAIL;
+	}
+
+	int action = state->fn(state->path.str, &state->ftwbuf, state->ptr);
+	switch (action) {
+	case BFTW_CONTINUE:
+	case BFTW_SKIP_SIBLINGS:
+	case BFTW_SKIP_SUBTREE:
+	case BFTW_STOP:
+		return action;
+
+	default:
+		state->error = EINVAL;
+		return BFTW_FAIL;
+	}
+}
+
+/**
+ * Push a new entry onto the queue.
+ */
+static int bftw_push(bftw_state *state, const char *name) {
+	dircache_entry *entry = dircache_add(&state->cache, state->current, name);
+	if (!entry) {
+		return -1;
+	}
+
+	return dirqueue_push(&state->queue, entry);
+}
+
+/**
+ * Pop an entry off the queue.
+ */
+static void bftw_pop(bftw_state *state) {
+	dircache_entry_free(&state->cache, state->current);
+	state->current = dirqueue_pop(&state->queue);
+}
+
+/**
+ * Dispose of the bftw() state.
+ */
+static void bftw_state_free(bftw_state *state) {
+	while (state->current) {
+		bftw_pop(state);
+	}
+
+	dynstr_free(&state->path);
+}
+
+int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+	int ret = -1;
+
+	bftw_state state;
+	bftw_state_init(&state, fn, nopenfd, flags, ptr);
+
+	// Handle 'path' itself first
+
+	if (bftw_set_path(&state, NULL, path) != 0) {
+		goto fail;
+	}
+
+	switch (bftw_handle_path(&state)) {
 	case BFTW_CONTINUE:
 	case BFTW_SKIP_SIBLINGS:
 		break;
@@ -532,38 +657,34 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 	case BFTW_STOP:
 		goto done;
 
-	default:
-		err = EINVAL;
+	case BFTW_FAIL:
 		goto fail;
 	}
 
-	if (err != 0 || ftwbuf.typeflag != BFTW_DIR) {
+	if (state.ftwbuf.typeflag != BFTW_DIR) {
 		goto done;
 	}
 
-	current = dircache_add(&cache, NULL, path);
-	if (!current) {
+	// Now start the breadth-first search
+
+	state.current = dircache_add(&state.cache, NULL, path);
+	if (!state.current) {
 		goto fail;
 	}
 
 	do {
-		if (dircache_entry_path(current, &dynpath) != 0) {
+		if (dircache_entry_path(state.current, &state.path) != 0) {
 			goto fail;
 		}
-		size_t pathlen = dynpath.length;
 
-		DIR *dir = dircache_entry_open(&cache, current, dynpath.str);
+		DIR *dir = dircache_entry_open(&state.cache, state.current, state.path.str);
 		if (!dir) {
-			if (!(flags & BFTW_RECOVER)) {
-				goto fail;
-			}
+			state.error = errno;
 
-			err = errno;
+			ftwbuf_init(&state.ftwbuf, state.current->nameoff, state.current->depth);
+			ftwbuf_set_error(&state.ftwbuf, state.error);
 
-			ftwbuf_init(&ftwbuf, current->nameoff, current->depth);
-			ftwbuf_set_error(&ftwbuf, err);
-
-			switch (fn(dynpath.str, &ftwbuf, ptr)) {
+			switch (bftw_handle_path(&state)) {
 			case BFTW_CONTINUE:
 			case BFTW_SKIP_SIBLINGS:
 			case BFTW_SKIP_SUBTREE:
@@ -572,8 +693,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 			case BFTW_STOP:
 				goto done;
 
-			default:
-				err = EINVAL;
+			case BFTW_FAIL:
 				goto fail;
 			}
 		}
@@ -584,75 +704,50 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				continue;
 			}
 
-			if (dynstr_concat(&dynpath, pathlen, de->d_name) != 0) {
+			if (bftw_set_path(&state, de, de->d_name) != 0) {
 				goto fail;
 			}
 
-			ftwbuf_init(&ftwbuf, pathlen, current->depth + 1);
-			ftwbuf_use_dirent(&ftwbuf, de);
-
-			if ((flags & BFTW_STAT) || ftwbuf.typeflag == BFTW_UNKNOWN) {
-				if (ftwbuf_stat(&ftwbuf, &sb, dirfd(dir), de->d_name) != 0) {
-					if (!(flags & BFTW_RECOVER)) {
-						goto fail;
-					}
-
-					err = errno;
-					ftwbuf_set_error(&ftwbuf, err);
-				}
-			}
-
-			switch (fn(dynpath.str, &ftwbuf, ptr)) {
+			switch (bftw_handle_path(&state)) {
 			case BFTW_CONTINUE:
-				if (ftwbuf.typeflag == BFTW_DIR) {
-					dircache_entry *next = dircache_add(&cache, current, de->d_name);
-					if (!next) {
-						goto fail;
-					}
-
-					if (dirqueue_push(&queue, next) != 0) {
-						goto fail;
-					}
-				}
 				break;
 
 			case BFTW_SKIP_SIBLINGS:
 				goto next;
 
 			case BFTW_SKIP_SUBTREE:
-				break;
+				continue;
 
 			case BFTW_STOP:
 				goto done;
 
-			default:
-				err = EINVAL;
+			case BFTW_FAIL:
 				goto fail;
+			}
+
+			if (state.ftwbuf.typeflag == BFTW_DIR) {
+				if (bftw_push(&state, de->d_name) != 0) {
+					goto fail;
+				}
 			}
 		}
 
 	next:
-		dircache_entry_free(&cache, current);
-		current = dirqueue_pop(&queue);
-	} while (current);
+		bftw_pop(&state);
+	} while (state.current);
 
 done:
-	if (err == 0) {
+	if (state.error == 0) {
 		ret = 0;
 	}
 
 fail:
-	if (err == 0) {
-		err = errno;
+	if (state.error == 0) {
+		state.error = errno;
 	}
 
-	while (current) {
-		dircache_entry_free(&cache, current);
-		current = dirqueue_pop(&queue);
-	}
+	bftw_state_free(&state);
 
-	dynstr_free(&dynpath);
-
-	errno = err;
+	errno = state.error;
 	return ret;
 }
