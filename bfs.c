@@ -88,6 +88,53 @@ static expression *new_expression(eval_fn *eval) {
 }
 
 /**
+ * -true test.
+ */
+static bool eval_true(const expression *expr, eval_state *state) {
+	return true;
+}
+
+/**
+ * Singleton true expression instance.
+ */
+static expression expr_true = {
+	.lhs = NULL,
+	.rhs = NULL,
+	.eval = eval_true,
+	.idata = 0,
+	.sdata = NULL,
+};
+
+/**
+ * -false test.
+ */
+static bool eval_false(const expression *expr, eval_state *state) {
+	return false;
+}
+
+/**
+ * Singleton false expression instance.
+ */
+static expression expr_false = {
+	.lhs = NULL,
+	.rhs = NULL,
+	.eval = eval_false,
+	.idata = 0,
+	.sdata = NULL,
+};
+
+/**
+ * Free an expression.
+ */
+static void free_expression(expression *expr) {
+	if (expr && expr != &expr_true && expr != &expr_false) {
+		free_expression(expr->lhs);
+		free_expression(expr->rhs);
+		free(expr);
+	}
+}
+
+/**
  * Create a new expression with integer data.
  */
 static expression *new_expression_idata(eval_fn *eval, int idata) {
@@ -112,37 +159,33 @@ static expression *new_expression_sdata(eval_fn *eval, const char *sdata) {
 /**
  * Create a new unary expression.
  */
-static expression *new_expression_unary(expression *rhs, eval_fn *eval) {
+static expression *new_unary_expression(expression *rhs, eval_fn *eval) {
 	expression *expr = new_expression(eval);
-	if (expr) {
-		expr->rhs = rhs;
-		expr->eval = eval;
+	if (!expr) {
+		free_expression(rhs);
+		return NULL;
 	}
+
+	expr->rhs = rhs;
+	expr->eval = eval;
 	return expr;
 }
 
 /**
  * Create a new binary expression.
  */
-static expression *new_expression_binary(expression *lhs, expression *rhs, eval_fn *eval) {
+static expression *new_binary_expression(expression *lhs, expression *rhs, eval_fn *eval) {
 	expression *expr = new_expression(eval);
-	if (expr) {
-		expr->lhs = lhs;
-		expr->rhs = rhs;
-		expr->eval = eval;
+	if (!expr) {
+		free_expression(rhs);
+		free_expression(lhs);
+		return NULL;
 	}
-	return expr;
-}
 
-/**
- * Free an expression.
- */
-static void free_expression(expression *expr) {
-	if (expr) {
-		free_expression(expr->lhs);
-		free_expression(expr->rhs);
-		free(expr);
-	}
+	expr->lhs = lhs;
+	expr->rhs = rhs;
+	expr->eval = eval;
+	return expr;
 }
 
 struct cmdline {
@@ -240,13 +283,6 @@ static const char *skip_paths(parser_state *state) {
 }
 
 /**
- * -false test.
- */
-static bool eval_false(const expression *expr, eval_state *state) {
-	return false;
-}
-
-/**
  * -prune action.
  */
 static bool eval_prune(const expression *expr, eval_state *state) {
@@ -298,13 +334,6 @@ static bool eval_print0(const expression *expr, eval_state *state) {
 }
 
 /**
- * -true test.
- */
-static bool eval_true(const expression *expr, eval_state *state) {
-	return true;
-}
-
-/**
  * -type test.
  */
 static bool eval_type(const expression *expr, eval_state *state) {
@@ -315,7 +344,7 @@ static bool eval_type(const expression *expr, eval_state *state) {
  * Create a new option expression.
  */
 static expression *new_option(parser_state *state) {
-	return new_expression(eval_true);
+	return &expr_true;
 }
 
 /**
@@ -454,7 +483,7 @@ static expression *parse_literal(parser_state *state) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_option(state);
 	} else if (strcmp(arg, "-false") == 0) {
-		return new_test(state, eval_false);
+		return &expr_false;
 	} else if (strcmp(arg, "-hidden") == 0) {
 		return new_test(state, eval_hidden);
 	} else if (strcmp(arg, "-nohidden") == 0) {
@@ -472,7 +501,7 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-prune") == 0) {
 		return new_action(state, eval_prune);
 	} else if (strcmp(arg, "-true") == 0) {
-		return new_test(state, eval_true);
+		return &expr_true;
 	} else if (strcmp(arg, "-type") == 0) {
 		return parse_type(state);
 	} else {
@@ -486,6 +515,19 @@ static expression *parse_literal(parser_state *state) {
  */
 static bool eval_not(const expression *expr, eval_state *state) {
 	return !expr->rhs->eval(expr, state);
+}
+
+/**
+ * Create a "not" expression.
+ */
+static expression *new_not_expression(expression *rhs) {
+	if (rhs == &expr_true) {
+		return &expr_false;
+	} else if (rhs == &expr_false) {
+		return &expr_true;
+	} else {
+		return new_unary_expression(rhs, eval_not);
+	}
 }
 
 /**
@@ -524,7 +566,7 @@ static expression *parse_factor(parser_state *state) {
 			return NULL;
 		}
 
-		return new_expression_unary(factor, eval_not);
+		return new_not_expression(factor);
 	} else {
 		return parse_literal(state);
 	}
@@ -535,6 +577,22 @@ static expression *parse_factor(parser_state *state) {
  */
 static bool eval_and(const expression *expr, eval_state *state) {
 	return expr->lhs->eval(expr->lhs, state) && expr->rhs->eval(expr->rhs, state);
+}
+
+/**
+ * Create an "and" expression.
+ */
+static expression *new_and_expression(expression *lhs, expression *rhs) {
+	if (lhs == &expr_true) {
+		return rhs;
+	} else if (lhs == &expr_false) {
+		free_expression(rhs);
+		return lhs;
+	} else if (rhs == &expr_true) {
+		return lhs;
+	} else {
+		return new_binary_expression(lhs, rhs, eval_and);
+	}
 }
 
 /**
@@ -565,10 +623,11 @@ static expression *parse_term(parser_state *state) {
 		expression *lhs = term;
 		expression *rhs = parse_factor(state);
 		if (!rhs) {
+			free_expression(lhs);
 			return NULL;
 		}
 
-		term = new_expression_binary(lhs, rhs, eval_and);
+		term = new_and_expression(lhs, rhs);
 	}
 
 	return term;
@@ -579,6 +638,22 @@ static expression *parse_term(parser_state *state) {
  */
 static bool eval_or(const expression *expr, eval_state *state) {
 	return expr->lhs->eval(expr->lhs, state) || expr->rhs->eval(expr->rhs, state);
+}
+
+/**
+ * Create an "or" expression.
+ */
+static expression *new_or_expression(expression *lhs, expression *rhs) {
+	if (lhs == &expr_true) {
+		free_expression(rhs);
+		return lhs;
+	} else if (lhs == &expr_false) {
+		return rhs;
+	} else if (rhs == &expr_false) {
+		return lhs;
+	} else {
+		return new_binary_expression(lhs, rhs, eval_or);
+	}
 }
 
 /**
@@ -604,10 +679,11 @@ static expression *parse_clause(parser_state *state) {
 		expression *lhs = clause;
 		expression *rhs = parse_term(state);
 		if (!rhs) {
+			free_expression(lhs);
 			return NULL;
 		}
 
-		clause = new_expression_binary(lhs, rhs, eval_or);
+		clause = new_or_expression(lhs, rhs);
 	}
 
 	return clause;
@@ -619,6 +695,17 @@ static expression *parse_clause(parser_state *state) {
 static bool eval_comma(const expression *expr, eval_state *state) {
 	expr->lhs->eval(expr->lhs, state);
 	return expr->rhs->eval(expr->rhs, state);
+}
+
+/**
+ * Create a "comma" expression.
+ */
+static expression *new_comma_expression(expression *lhs, expression *rhs) {
+	if (lhs == &expr_true || lhs == &expr_false) {
+		return rhs;
+	} else {
+		return new_binary_expression(lhs, rhs, eval_comma);
+	}
 }
 
 /**
@@ -643,10 +730,11 @@ static expression *parse_expression(parser_state *state) {
 		expression *lhs = expr;
 		expression *rhs = parse_clause(state);
 		if (!rhs) {
+			free_expression(lhs);
 			return NULL;
 		}
 
-		expr = new_expression_binary(lhs, rhs, eval_comma);
+		expr = new_comma_expression(lhs, rhs);
 	}
 
 	return expr;
@@ -668,7 +756,7 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 	cl->mindepth = 0;
 	cl->maxdepth = INT_MAX;
 	cl->flags = BFTW_RECOVER;
-	cl->expr = NULL;
+	cl->expr = &expr_true;
 
 	parser_state state = {
 		.cl = cl,
@@ -695,16 +783,9 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 			goto fail;
 		}
 
-		if (cl->expr) {
-			expression *expr = new_expression_binary(cl->expr, print, eval_and);
-			if (!expr) {
-				free_expression(print);
-				goto fail;
-			}
-
-			cl->expr = expr;
-		} else {
-			cl->expr = print;
+		cl->expr = new_and_expression(cl->expr, print);
+		if (!cl->expr) {
+			goto fail;
 		}
 	}
 
