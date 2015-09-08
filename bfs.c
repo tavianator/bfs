@@ -11,6 +11,8 @@
 
 #include "bftw.h"
 #include "color.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <fnmatch.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -283,6 +285,24 @@ static const char *skip_paths(parser_state *state) {
 }
 
 /**
+ * -delete action.
+ */
+static bool eval_delete(const expression *expr, eval_state *state) {
+	int flag = 0;
+	if (state->ftwbuf->typeflag == BFTW_DIR) {
+		flag |= AT_REMOVEDIR;
+	}
+
+	// TODO: Have bftw() tell us a better base fd to use
+	if (unlinkat(AT_FDCWD, state->fpath, flag) != 0) {
+		print_error(state->cl->colors, state->fpath, errno);
+		state->ret = BFTW_STOP;
+	}
+
+	return true;
+}
+
+/**
  * -prune action.
  */
 static bool eval_prune(const expression *expr, eval_state *state) {
@@ -479,6 +499,9 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
 		return new_option(state);
+	} else if (strcmp(arg, "-delete") == 0) {
+		state->cl->flags |= BFTW_DEPTH;
+		return new_action(state, eval_delete);
 	} else if (strcmp(arg, "-depth") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_option(state);
@@ -835,7 +858,7 @@ static int cmdline_callback(const char *fpath, const struct BFTW *ftwbuf, void *
 	const cmdline *cl = ptr;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
-		print_error(cl->colors, fpath, ftwbuf);
+		print_error(cl->colors, fpath, ftwbuf->error);
 		return BFTW_SKIP_SUBTREE;
 	}
 

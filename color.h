@@ -47,10 +47,10 @@ void pretty_print(const color_table *colors, const char *fpath, const struct BFT
  *         The color table to use.
  * @param fpath
  *         The file path in error.
- * @param ftwbuf
- *         The bftw() data for fpath.
+ * @param error
+ *         The error code that occurred.
  */
-void print_error(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf);
+void print_error(const color_table *colors, const char *fpath, int error);
 
 /**
  * Free a color table.

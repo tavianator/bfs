@@ -309,7 +309,7 @@ void pretty_print(const color_table *colors, const char *fpath, const struct BFT
 	fputs("\n", stdout);
 }
 
-void print_error(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf) {
+void print_error(const color_table *colors, const char *fpath, int error) {
 	const char *color = NULL;
 	if (colors) {
 		color = colors->orphan;
@@ -318,7 +318,7 @@ void print_error(const color_table *colors, const char *fpath, const struct BFTW
 	if (color) {
 		print_esc(color, stderr);
 	}
-	fprintf(stderr, "Error at %s: %s\n", fpath, strerror(ftwbuf->error));
+	fprintf(stderr, "Error at %s: %s\n", fpath, strerror(error));
 	if (color) {
 		print_esc(colors->reset, stderr);
 	}
