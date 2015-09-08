@@ -98,5 +98,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr);
 #define BFTW_STAT     (1 << 0)
 /** flag: Attempt to recover from encountered errors. */
 #define BFTW_RECOVER  (1 << 1)
+/** flag: Visit all of a directory's descendants before the directory itself. */
+#define BFTW_DEPTH    (1 << 2)
 
 #endif // BFS_BFTW_H

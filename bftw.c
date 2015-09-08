@@ -245,7 +245,7 @@ static DIR *opendirat(int fd, const char *name) {
  * @param[out] path
  *         Will hold the full path to the entry, with a trailing '/'.
  */
-static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
+static int dircache_entry_path(const dircache_entry *entry, dynstr *path) {
 	size_t namelen = entry->namelen;
 	size_t pathlen = entry->nameoff + namelen;
 
@@ -268,6 +268,45 @@ static int dircache_entry_path(dircache_entry *entry, dynstr *path) {
 }
 
 /**
+ * Get the appropriate (fd, path) pair for the *at() family of functions.
+ *
+ * @param cache
+ *         The cache containing the entry.
+ * @param entry
+ *         The entry being accessed.
+ * @param[out] fd
+ *         Will hold the appropriate file descriptor to use.
+ * @param[in,out] relpath
+ *         Will hold the appropriate path to use.
+ * @return The closest open ancestor entry.
+ */
+static dircache_entry *dircache_entry_base(dircache *cache, dircache_entry *entry, int *fd, const char **relpath) {
+	size_t nameoff = entry->namelen + entry->nameoff;
+	dircache_entry *base = entry;
+
+	while (base && !base->dir) {
+		nameoff = base->nameoff;
+		base = base->parent;
+	}
+
+	if (base) {
+		dircache_lru_remove(cache, base);
+		dircache_lru_add(cache, base);
+
+		*fd = dirfd(base->dir);
+		*relpath += nameoff;
+
+		// fstatat(fd, "") doesn't stat() fd itself, but
+		// fstatat(fd, ".") does, at least for directories
+		if (!**relpath) {
+			*relpath = ".";
+		}
+	}
+
+	return base;
+}
+
+/**
  * Open a dircache_entry.
  *
  * @param cache
@@ -286,21 +325,10 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 		dircache_entry_close(cache, cache->lru_tail);
 	}
 
-	size_t nameoff;
-	dircache_entry *base = entry;
-	do {
-		nameoff = base->nameoff;
-		base = base->parent;
-	} while (base && !base->dir);
-
 	int fd = AT_FDCWD;
-	if (base) {
-		dircache_lru_remove(cache, base);
-		dircache_lru_add(cache, base);
-		fd = dirfd(base->dir);
-	}
+	const char *relpath = path;
+	dircache_entry *base = dircache_entry_base(cache, entry, &fd, &relpath);
 
-	const char *relpath = path + nameoff;
 	DIR *dir = opendirat(fd, relpath);
 
 	if (!dir
@@ -323,16 +351,13 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 
 /** Free a dircache_entry. */
 static void dircache_entry_free(dircache *cache, dircache_entry *entry) {
-	while (entry) {
-		dircache_entry *saved = entry;
-		entry = entry->parent;
+	if (entry) {
+		assert(entry->refcount == 0);
 
-		if (--saved->refcount == 0) {
-			if (saved->dir) {
-				dircache_entry_close(cache, saved);
-			}
-			free(saved);
+		if (entry->dir) {
+			dircache_entry_close(cache, entry);
 		}
+		free(entry);
 	}
 }
 
@@ -497,6 +522,18 @@ static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int fd, const char 
 }
 
 /**
+ * Possible bftw() traversal statuses.
+ */
+typedef enum {
+	/** The current path is state.current. */
+	BFTW_CURRENT,
+	/** The current path is a child of state.current. */
+	BFTW_CHILD,
+	/** dircache_entry's are being garbage collected. */
+	BFTW_GC,
+} bftw_status;
+
+/**
  * Holds the current state of the bftw() traversal.
  */
 typedef struct {
@@ -514,6 +551,8 @@ typedef struct {
 	dircache cache;
 	/** The current dircache entry. */
 	dircache_entry *current;
+	/** The current traversal status. */
+	bftw_status status;
 
 	/** The queue of directories left to explore. */
 	dirqueue queue;
@@ -538,6 +577,7 @@ static void bftw_state_init(bftw_state *state, bftw_fn *fn, int nopenfd, int fla
 
 	dircache_init(&state->cache, nopenfd);
 	state->current = NULL;
+	state->status = BFTW_CURRENT;
 
 	dirqueue_init(&state->queue);
 
@@ -545,38 +585,66 @@ static void bftw_state_init(bftw_state *state, bftw_fn *fn, int nopenfd, int fla
 }
 
 /**
- * Set the current path.
+ * Concatenate a subpath to the current path.
  */
-static int bftw_set_path(bftw_state *state, const struct dirent *de, const char *name) {
-	size_t base = 0;
-	size_t level = 0;
-	int fd = AT_FDCWD;
+static int bftw_path_concat(bftw_state *state, const char *subpath) {
+	size_t nameoff = 0;
 
 	dircache_entry *current = state->current;
 	if (current) {
-		base = current->nameoff + current->namelen;
-		level = current->depth + 1;
-		fd = dirfd(current->dir);
+		nameoff = current->nameoff + current->namelen;
 	}
 
-	if (dynstr_concat(&state->path, base, name) != 0) {
-		return -1;
+	state->status = BFTW_CHILD;
+
+	return dynstr_concat(&state->path, nameoff, subpath);
+}
+
+/**
+ * Initialize the buffers with data about the current path.
+ */
+static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
+	size_t base = 0;
+	size_t level = 0;
+
+	dircache_entry *current = state->current;
+	if (current) {
+		base = current->nameoff;
+		level = current->depth;
+
+		if (state->status == BFTW_CHILD) {
+			base += current->namelen;
+			++level;
+		}
 	}
 
 	ftwbuf_init(&state->ftwbuf, base, level);
 
 	if (de) {
 		ftwbuf_use_dirent(&state->ftwbuf, de);
+	} else if (state->status != BFTW_CHILD) {
+		state->ftwbuf.typeflag = BFTW_DIR;
+	}
+
+	// In BFTW_DEPTH mode, defer the stat() call for directories
+	if ((state->flags & BFTW_DEPTH)
+	    && state->ftwbuf.typeflag == BFTW_DIR
+	    && state->status == BFTW_CHILD) {
+		return;
 	}
 
 	if ((state->flags & BFTW_STAT) || state->ftwbuf.typeflag == BFTW_UNKNOWN) {
-		if (ftwbuf_stat(&state->ftwbuf, &state->statbuf, fd, name) != 0) {
+		int fd = AT_FDCWD;
+		const char *relpath = state->path.str;
+		if (current) {
+			dircache_entry_base(&state->cache, current, &fd, &relpath);
+		}
+
+		if (ftwbuf_stat(&state->ftwbuf, &state->statbuf, fd, relpath) != 0) {
 			state->error = errno;
 			ftwbuf_set_error(&state->ftwbuf, state->error);
 		}
 	}
-
-	return 0;
 }
 
 /** internal action: Abort the traversal. */
@@ -589,6 +657,13 @@ static int bftw_handle_path(bftw_state *state) {
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
 	if (state->ftwbuf.typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
 		return BFTW_FAIL;
+	}
+
+	// In BFTW_DEPTH mode, defer handling directories
+	if (state->ftwbuf.typeflag == BFTW_DIR
+	    && (state->flags & BFTW_DEPTH)
+	    && state->status != BFTW_GC) {
+		return BFTW_CONTINUE;
 	}
 
 	int action = state->fn(state->path.str, &state->ftwbuf, state->ptr);
@@ -620,9 +695,64 @@ static int bftw_push(bftw_state *state, const char *name) {
 /**
  * Pop an entry off the queue.
  */
-static void bftw_pop(bftw_state *state) {
-	dircache_entry_free(&state->cache, state->current);
+static int bftw_pop(bftw_state *state, bool invoke_callback) {
+	int ret = BFTW_CONTINUE;
+	dircache_entry *entry = state->current;
+
+	if (!(state->flags & BFTW_DEPTH)) {
+		invoke_callback = false;
+	}
+
+	if (entry && invoke_callback) {
+		if (dircache_entry_path(entry, &state->path) != 0) {
+			ret = BFTW_FAIL;
+			invoke_callback = false;
+		}
+	}
+
+	state->status = BFTW_GC;
+
+	while (entry) {
+		dircache_entry *current = entry;
+		entry = entry->parent;
+
+		if (--current->refcount > 0) {
+			continue;
+		}
+
+		if (invoke_callback) {
+			size_t offset = current->nameoff + current->namelen;
+			state->path.str[offset] = '\0';
+			if (current->namelen > 1) {
+				// Trim the trailing slash
+				state->path.str[offset - 1] = '\0';
+			}
+
+			state->current = current;
+			bftw_init_buffers(state, NULL);
+
+			int action = bftw_handle_path(state);
+			switch (action) {
+			case BFTW_CONTINUE:
+			case BFTW_SKIP_SIBLINGS:
+			case BFTW_SKIP_SUBTREE:
+				break;
+
+			case BFTW_STOP:
+			case BFTW_FAIL:
+				ret = action;
+				invoke_callback = false;
+				break;
+			}
+		}
+
+		dircache_entry_free(&state->cache, current);
+	}
+
 	state->current = dirqueue_pop(&state->queue);
+	state->status = BFTW_CURRENT;
+
+	return ret;
 }
 
 /**
@@ -630,7 +760,7 @@ static void bftw_pop(bftw_state *state) {
  */
 static void bftw_state_free(bftw_state *state) {
 	while (state->current) {
-		bftw_pop(state);
+		bftw_pop(state, false);
 	}
 
 	dynstr_free(&state->path);
@@ -644,9 +774,11 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 
 	// Handle 'path' itself first
 
-	if (bftw_set_path(&state, NULL, path) != 0) {
+	if (bftw_path_concat(&state, path) != 0) {
 		goto fail;
 	}
+
+	bftw_init_buffers(&state, NULL);
 
 	switch (bftw_handle_path(&state)) {
 	case BFTW_CONTINUE:
@@ -681,7 +813,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 		if (!dir) {
 			state.error = errno;
 
-			ftwbuf_init(&state.ftwbuf, state.current->nameoff, state.current->depth);
+			bftw_init_buffers(&state, NULL);
 			ftwbuf_set_error(&state.ftwbuf, state.error);
 
 			switch (bftw_handle_path(&state)) {
@@ -704,9 +836,11 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 				continue;
 			}
 
-			if (bftw_set_path(&state, de, de->d_name) != 0) {
+			if (bftw_path_concat(&state, de->d_name) != 0) {
 				goto fail;
 			}
+
+			bftw_init_buffers(&state, de);
 
 			switch (bftw_handle_path(&state)) {
 			case BFTW_CONTINUE:
@@ -733,7 +867,18 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 		}
 
 	next:
-		bftw_pop(&state);
+		switch (bftw_pop(&state, true)) {
+		case BFTW_CONTINUE:
+		case BFTW_SKIP_SIBLINGS:
+		case BFTW_SKIP_SUBTREE:
+			break;
+
+		case BFTW_STOP:
+			goto done;
+
+		case BFTW_FAIL:
+			goto fail;
+		}
 	} while (state.current);
 
 done:

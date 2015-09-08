@@ -450,6 +450,9 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
 		return new_option(state);
+	} else if (strcmp(arg, "-depth") == 0) {
+		state->cl->flags |= BFTW_DEPTH;
+		return new_option(state);
 	} else if (strcmp(arg, "-false") == 0) {
 		return new_test(state, eval_false);
 	} else if (strcmp(arg, "-hidden") == 0) {
