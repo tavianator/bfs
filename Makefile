@@ -22,11 +22,16 @@ ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
 
+all: bfs
+
 bfs: bfs.o bftw.o color.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
+
+check: all
+	./tests.sh
 
 clean:
 	$(RM) bfs *.o *.d
@@ -34,6 +39,6 @@ clean:
 release: CFLAGS := -O2 -flto -Wall -DNDEBUG
 release: bfs
 
-.PHONY: clean release
+.PHONY: all check clean release
 
 -include $(wildcard *.d)
