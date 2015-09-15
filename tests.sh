@@ -58,7 +58,7 @@ function test_0007() {
 }
 
 for i in {1..7}; do
-    dir="$(mktemp -d)"
+    dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?
