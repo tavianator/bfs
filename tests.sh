@@ -47,12 +47,24 @@ function test_0005() {
     find_diff "$1" -maxdepth 1
 }
 
-for i in {1..5}; do
+function test_0006() {
+    basic_structure "$1"
+    find_diff "$1" -mindepth 1 -depth
+}
+
+function test_0007() {
+    basic_structure "$1"
+    find_diff "$1" -maxdepth 1 -depth
+}
+
+for i in {1..7}; do
     dir="$(mktemp -d)"
-    test_$(printf '%04d' $i) "$dir"
+    test="test_$(printf '%04d' $i)"
+    "$test" "$dir"
     status=$?
     rm -rf "$dir"
     if [ $status -ne 0 ]; then
+        echo "$test failed!" >&2
         exit $status
     fi
 done

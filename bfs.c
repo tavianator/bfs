@@ -873,7 +873,7 @@ static int cmdline_callback(const char *fpath, const struct BFTW *ftwbuf, void *
 		state.ret = BFTW_SKIP_SUBTREE;
 	}
 
-	if (ftwbuf->level >= cl->mindepth) {
+	if (ftwbuf->level >= cl->mindepth && ftwbuf->level <= cl->maxdepth) {
 		cl->expr->eval(cl->expr, &state);
 	}
 
