@@ -86,7 +86,7 @@ typedef enum {
  * @return
  *         An action value.
  */
-typedef bftw_action bftw_fn(const struct BFTW *ftwbuf, void *ptr);
+typedef bftw_action bftw_fn(struct BFTW *ftwbuf, void *ptr);
 
 typedef enum {
 	/** stat() each encountered file. */

@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /**
@@ -37,12 +38,27 @@ typedef struct cmdline cmdline;
  */
 typedef struct {
 	/** Data about the current file. */
-	const struct BFTW *ftwbuf;
+	struct BFTW *ftwbuf;
 	/** The parsed command line. */
 	const cmdline *cl;
 	/** The bftw() callback return value. */
 	bftw_action action;
+	/** A stat() buffer, if necessary. */
+	struct stat statbuf;
 } eval_state;
+
+/**
+ * Perform a stat() call if necessary.
+ */
+static void fill_statbuf(eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+
+	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
+		ftwbuf->statbuf = &state->statbuf;
+	} else {
+		perror("fstatat()");
+	}
+}
 
 /**
  * Expression evaluation function.
@@ -286,7 +302,7 @@ static const char *skip_paths(parser_state *state) {
  * -delete action.
  */
 static bool eval_delete(const expression *expr, eval_state *state) {
-	const struct BFTW *ftwbuf = state->ftwbuf;
+	struct BFTW *ftwbuf = state->ftwbuf;
 
 	int flag = 0;
 	if (ftwbuf->typeflag == BFTW_DIR) {
@@ -313,7 +329,7 @@ static bool eval_prune(const expression *expr, eval_state *state) {
  * -hidden test.
  */
 static bool eval_hidden(const expression *expr, eval_state *state) {
-	const struct BFTW *ftwbuf = state->ftwbuf;
+	struct BFTW *ftwbuf = state->ftwbuf;
 	return ftwbuf->nameoff > 0 && ftwbuf->path[ftwbuf->nameoff] == '.';
 }
 
@@ -333,7 +349,7 @@ static bool eval_nohidden(const expression *expr, eval_state *state) {
  * -name test.
  */
 static bool eval_name(const expression *expr, eval_state *state) {
-	const struct BFTW *ftwbuf = state->ftwbuf;
+	struct BFTW *ftwbuf = state->ftwbuf;
 	return fnmatch(expr->sdata, ftwbuf->path + ftwbuf->nameoff, 0) == 0;
 }
 
@@ -341,6 +357,9 @@ static bool eval_name(const expression *expr, eval_state *state) {
  * -print action.
  */
 static bool eval_print(const expression *expr, eval_state *state) {
+	if (state->cl->colors) {
+		fill_statbuf(state);
+	}
 	pretty_print(state->cl->colors, state->ftwbuf);
 	return true;
 }
@@ -821,7 +840,6 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	if (cl->color) {
 		cl->colors = parse_colors(getenv("LS_COLORS"));
-		cl->flags |= BFTW_STAT;
 	}
 
 	return cl;
@@ -855,7 +873,7 @@ static int infer_nopenfd() {
 /**
  * bftw() callback.
  */
-static bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
+static bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	const cmdline *cl = ptr;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
