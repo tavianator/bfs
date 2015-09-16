@@ -36,7 +36,7 @@ check: all
 clean:
 	$(RM) bfs *.o *.d
 
-release: CFLAGS := -O2 -flto -Wall -DNDEBUG
+release: CFLAGS := -O3 -flto -Wall -DNDEBUG
 release: bfs
 
 .PHONY: all check clean release
