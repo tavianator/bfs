@@ -282,18 +282,20 @@ static void print_esc(const char *esc, FILE *file) {
 	fputs("m", file);
 }
 
-void pretty_print(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf) {
+void pretty_print(const color_table *colors, const struct BFTW *ftwbuf) {
+	const char *path = ftwbuf->path;
+
 	if (!colors) {
-		puts(fpath);
+		puts(path);
 		return;
 	}
 
-	const char *filename = fpath + ftwbuf->base;
+	const char *filename = path + ftwbuf->nameoff;
 
 	if (colors->dir) {
 		print_esc(colors->dir, stdout);
 	}
-	fwrite(fpath, 1, ftwbuf->base, stdout);
+	fwrite(path, 1, ftwbuf->nameoff, stdout);
 	if (colors->dir) {
 		print_esc(colors->reset, stdout);
 	}
@@ -309,7 +311,7 @@ void pretty_print(const color_table *colors, const char *fpath, const struct BFT
 	fputs("\n", stdout);
 }
 
-void print_error(const color_table *colors, const char *fpath, int error) {
+void print_error(const color_table *colors, const char *path, int error) {
 	const char *color = NULL;
 	if (colors) {
 		color = colors->orphan;
@@ -318,7 +320,7 @@ void print_error(const color_table *colors, const char *fpath, int error) {
 	if (color) {
 		print_esc(color, stderr);
 	}
-	fprintf(stderr, "Error at %s: %s\n", fpath, strerror(error));
+	fprintf(stderr, "Error at %s: %s\n", path, strerror(error));
 	if (color) {
 		print_esc(colors->reset, stderr);
 	}

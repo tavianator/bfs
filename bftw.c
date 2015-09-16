@@ -274,33 +274,25 @@ static int dircache_entry_path(const dircache_entry *entry, dynstr *path) {
  *         The cache containing the entry.
  * @param entry
  *         The entry being accessed.
- * @param[out] fd
+ * @param[out] at_fd
  *         Will hold the appropriate file descriptor to use.
- * @param[in,out] relpath
+ * @param[in,out] at_path
  *         Will hold the appropriate path to use.
  * @return The closest open ancestor entry.
  */
-static dircache_entry *dircache_entry_base(dircache *cache, dircache_entry *entry, int *fd, const char **relpath) {
-	size_t nameoff = entry->namelen + entry->nameoff;
+static dircache_entry *dircache_entry_base(dircache *cache, dircache_entry *entry, int *at_fd, const char **at_path) {
 	dircache_entry *base = entry;
 
-	while (base && !base->dir) {
-		nameoff = base->nameoff;
+	do {
 		base = base->parent;
-	}
+	} while (base && !base->dir);
 
 	if (base) {
 		dircache_lru_remove(cache, base);
 		dircache_lru_add(cache, base);
 
-		*fd = dirfd(base->dir);
-		*relpath += nameoff;
-
-		// fstatat(fd, "") doesn't stat() fd itself, but
-		// fstatat(fd, ".") does, at least for directories
-		if (!**relpath) {
-			*relpath = ".";
-		}
+		*at_fd = dirfd(base->dir);
+		*at_path += base->nameoff + base->namelen;
 	}
 
 	return base;
@@ -325,11 +317,11 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 		dircache_entry_close(cache, cache->lru_tail);
 	}
 
-	int fd = AT_FDCWD;
-	const char *relpath = path;
-	dircache_entry *base = dircache_entry_base(cache, entry, &fd, &relpath);
+	int at_fd = AT_FDCWD;
+	const char *at_path = path;
+	dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
 
-	DIR *dir = opendirat(fd, relpath);
+	DIR *dir = opendirat(at_fd, at_path);
 
 	if (!dir
 	    && errno == EMFILE
@@ -338,7 +330,7 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 		// Too many open files, shrink the LRU cache
 		dircache_entry_close(cache, cache->lru_tail);
 		--cache->lru_remaining;
-		dir = opendirat(fd, relpath);
+		dir = opendirat(at_fd, at_path);
 	}
 
 	if (dir) {
@@ -445,14 +437,6 @@ static dircache_entry *dirqueue_pop(dirqueue *queue) {
 	return entry;
 }
 
-static void ftwbuf_init(struct BFTW *ftwbuf, int base, int level) {
-	ftwbuf->statbuf = NULL;
-	ftwbuf->typeflag = BFTW_UNKNOWN;
-	ftwbuf->base = base;
-	ftwbuf->level = level;
-	ftwbuf->error = 0;
-}
-
 static void ftwbuf_set_error(struct BFTW *ftwbuf, int error) {
 	ftwbuf->typeflag = BFTW_ERROR;
 	ftwbuf->error = error;
@@ -486,8 +470,8 @@ static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
 #endif
 }
 
-static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int fd, const char *path) {
-	int ret = fstatat(fd, path, sb, AT_SYMLINK_NOFOLLOW);
+static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
+	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, AT_SYMLINK_NOFOLLOW);
 	if (ret != 0) {
 		return ret;
 	}
@@ -604,45 +588,47 @@ static int bftw_path_concat(bftw_state *state, const char *subpath) {
  * Initialize the buffers with data about the current path.
  */
 static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
-	size_t base = 0;
-	size_t level = 0;
+	struct BFTW *ftwbuf = &state->ftwbuf;
+	ftwbuf->path = state->path.str;
+	ftwbuf->nameoff = 0;
+	ftwbuf->error = 0;
+	ftwbuf->depth = 0;
+	ftwbuf->statbuf = NULL;
+	ftwbuf->at_fd = AT_FDCWD;
+	ftwbuf->at_path = ftwbuf->path;
 
 	dircache_entry *current = state->current;
 	if (current) {
-		base = current->nameoff;
-		level = current->depth;
+		ftwbuf->nameoff = current->nameoff;
+		ftwbuf->depth = current->depth;
 
 		if (state->status == BFTW_CHILD) {
-			base += current->namelen;
-			++level;
+			ftwbuf->nameoff += current->namelen;
+			++ftwbuf->depth;
 		}
+
+		dircache_entry_base(&state->cache, current, &ftwbuf->at_fd, &ftwbuf->at_path);
 	}
 
-	ftwbuf_init(&state->ftwbuf, base, level);
-
 	if (de) {
-		ftwbuf_use_dirent(&state->ftwbuf, de);
+		ftwbuf_use_dirent(ftwbuf, de);
 	} else if (state->status != BFTW_CHILD) {
-		state->ftwbuf.typeflag = BFTW_DIR;
+		ftwbuf->typeflag = BFTW_DIR;
+	} else {
+		ftwbuf->typeflag = BFTW_UNKNOWN;
 	}
 
 	// In BFTW_DEPTH mode, defer the stat() call for directories
 	if ((state->flags & BFTW_DEPTH)
-	    && state->ftwbuf.typeflag == BFTW_DIR
+	    && ftwbuf->typeflag == BFTW_DIR
 	    && state->status == BFTW_CHILD) {
 		return;
 	}
 
-	if ((state->flags & BFTW_STAT) || state->ftwbuf.typeflag == BFTW_UNKNOWN) {
-		int fd = AT_FDCWD;
-		const char *relpath = state->path.str;
-		if (current) {
-			dircache_entry_base(&state->cache, current, &fd, &relpath);
-		}
-
-		if (ftwbuf_stat(&state->ftwbuf, &state->statbuf, fd, relpath) != 0) {
+	if ((state->flags & BFTW_STAT) || ftwbuf->typeflag == BFTW_UNKNOWN) {
+		if (ftwbuf_stat(ftwbuf, &state->statbuf) != 0) {
 			state->error = errno;
-			ftwbuf_set_error(&state->ftwbuf, state->error);
+			ftwbuf_set_error(ftwbuf, state->error);
 		}
 	}
 }
@@ -666,7 +652,7 @@ static int bftw_handle_path(bftw_state *state) {
 		return BFTW_CONTINUE;
 	}
 
-	int action = state->fn(state->path.str, &state->ftwbuf, state->ptr);
+	bftw_action action = state->fn(&state->ftwbuf, state->ptr);
 	switch (action) {
 	case BFTW_CONTINUE:
 	case BFTW_SKIP_SIBLINGS:
@@ -766,7 +752,7 @@ static void bftw_state_free(bftw_state *state) {
 	dynstr_free(&state->path);
 }
 
-int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+int bftw(const char *path, bftw_fn *fn, int nopenfd, bftw_flags flags, void *ptr) {
 	int ret = -1;
 
 	bftw_state state;

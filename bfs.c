@@ -36,14 +36,12 @@ typedef struct cmdline cmdline;
  * Ephemeral state for evaluating an expression.
  */
 typedef struct {
-	/** The path to the encountered file. */
-	const char *fpath;
-	/** Additional data about the current file. */
+	/** Data about the current file. */
 	const struct BFTW *ftwbuf;
 	/** The parsed command line. */
 	const cmdline *cl;
 	/** The bftw() callback return value. */
-	int ret;
+	bftw_action action;
 } eval_state;
 
 /**
@@ -288,15 +286,16 @@ static const char *skip_paths(parser_state *state) {
  * -delete action.
  */
 static bool eval_delete(const expression *expr, eval_state *state) {
+	const struct BFTW *ftwbuf = state->ftwbuf;
+
 	int flag = 0;
-	if (state->ftwbuf->typeflag == BFTW_DIR) {
+	if (ftwbuf->typeflag == BFTW_DIR) {
 		flag |= AT_REMOVEDIR;
 	}
 
-	// TODO: Have bftw() tell us a better base fd to use
-	if (unlinkat(AT_FDCWD, state->fpath, flag) != 0) {
-		print_error(state->cl->colors, state->fpath, errno);
-		state->ret = BFTW_STOP;
+	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {
+		print_error(state->cl->colors, ftwbuf->path, errno);
+		state->action = BFTW_STOP;
 	}
 
 	return true;
@@ -306,7 +305,7 @@ static bool eval_delete(const expression *expr, eval_state *state) {
  * -prune action.
  */
 static bool eval_prune(const expression *expr, eval_state *state) {
-	state->ret = BFTW_SKIP_SUBTREE;
+	state->action = BFTW_SKIP_SUBTREE;
 	return true;
 }
 
@@ -314,8 +313,8 @@ static bool eval_prune(const expression *expr, eval_state *state) {
  * -hidden test.
  */
 static bool eval_hidden(const expression *expr, eval_state *state) {
-	size_t base = state->ftwbuf->base;
-	return base > 0 && state->fpath[base] == '.';
+	const struct BFTW *ftwbuf = state->ftwbuf;
+	return ftwbuf->nameoff > 0 && ftwbuf->path[ftwbuf->nameoff] == '.';
 }
 
 /**
@@ -334,14 +333,15 @@ static bool eval_nohidden(const expression *expr, eval_state *state) {
  * -name test.
  */
 static bool eval_name(const expression *expr, eval_state *state) {
-	return fnmatch(expr->sdata, state->fpath + state->ftwbuf->base, 0) == 0;
+	const struct BFTW *ftwbuf = state->ftwbuf;
+	return fnmatch(expr->sdata, ftwbuf->path + ftwbuf->nameoff, 0) == 0;
 }
 
 /**
  * -print action.
  */
 static bool eval_print(const expression *expr, eval_state *state) {
-	pretty_print(state->cl->colors, state->fpath, state->ftwbuf);
+	pretty_print(state->cl->colors, state->ftwbuf);
 	return true;
 }
 
@@ -349,7 +349,8 @@ static bool eval_print(const expression *expr, eval_state *state) {
  * -print0 action.
  */
 static bool eval_print0(const expression *expr, eval_state *state) {
-	fwrite(state->fpath, 1, strlen(state->fpath) + 1, stdout);
+	const char *path = state->ftwbuf->path;
+	fwrite(path, 1, strlen(path) + 1, stdout);
 	return true;
 }
 
@@ -854,30 +855,29 @@ static int infer_nopenfd() {
 /**
  * bftw() callback.
  */
-static int cmdline_callback(const char *fpath, const struct BFTW *ftwbuf, void *ptr) {
+static bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 	const cmdline *cl = ptr;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
-		print_error(cl->colors, fpath, ftwbuf->error);
+		print_error(cl->colors, ftwbuf->path, ftwbuf->error);
 		return BFTW_SKIP_SUBTREE;
 	}
 
 	eval_state state = {
-		.fpath = fpath,
 		.ftwbuf = ftwbuf,
 		.cl = cl,
-		.ret = BFTW_CONTINUE,
+		.action = BFTW_CONTINUE,
 	};
 
-	if (ftwbuf->level >= cl->maxdepth) {
-		state.ret = BFTW_SKIP_SUBTREE;
+	if (ftwbuf->depth >= cl->maxdepth) {
+		state.action = BFTW_SKIP_SUBTREE;
 	}
 
-	if (ftwbuf->level >= cl->mindepth && ftwbuf->level <= cl->maxdepth) {
+	if (ftwbuf->depth >= cl->mindepth && ftwbuf->depth <= cl->maxdepth) {
 		cl->expr->eval(cl->expr, &state);
 	}
 
-	return state.ret;
+	return state.action;
 }
 
 /**

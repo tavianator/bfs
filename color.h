@@ -33,24 +33,22 @@ color_table *parse_colors(char *ls_colors);
  *
  * @param colors
  *         The color table to use.
- * @param fpath
- *         The file path to print.
  * @param ftwbuf
- *         The bftw() data for fpath.
+ *         The bftw() data for the current path.
  */
-void pretty_print(const color_table *colors, const char *fpath, const struct BFTW *ftwbuf);
+void pretty_print(const color_table *colors, const struct BFTW *ftwbuf);
 
 /**
  * Pretty-print an error.
  *
  * @param colors
  *         The color table to use.
- * @param fpath
+ * @param path
  *         The file path in error.
  * @param error
  *         The error code that occurred.
  */
-void print_error(const color_table *colors, const char *fpath, int error);
+void print_error(const color_table *colors, const char *path, int error);
 
 /**
  * Free a color table.

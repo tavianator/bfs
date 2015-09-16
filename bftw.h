@@ -12,37 +12,90 @@
 #ifndef BFS_BFTW_H
 #define BFS_BFTW_H
 
+#include <stddef.h>
 #include <sys/stat.h>
+
+/**
+ * Possible file types.
+ */
+typedef enum {
+	/** Unknown type. */
+	BFTW_UNKNOWN,
+	/** Block device. */
+	BFTW_BLK,
+	/** Character device. */
+	BFTW_CHR,
+	/** Directory. */
+	BFTW_DIR,
+	/** Pipe. */
+	BFTW_FIFO,
+	/** Symbolic link. */
+	BFTW_LNK,
+	/** Regular file. */
+	BFTW_REG,
+	/** Socket. */
+	BFTW_SOCK,
+	/** An error occurred for this file. */
+	BFTW_ERROR,
+} bftw_typeflag;
 
 /**
  * Data about the current file for the bftw() callback.
  */
 struct BFTW {
-        /** A stat() buffer; may be NULL if no stat() call was needed. */
-	const struct stat *statbuf;
-	/** A typeflag value (see below). */
-	int typeflag;
-	/** The string offset of the filename in the path. */
-	int base;
-	/** The depth of this file in the walk. */
-	int level;
+	/** The path to the file. */
+	const char *path;
+	/** The string offset of the filename. */
+	size_t nameoff;
+
+	/** The depth of this file in the traversal. */
+	size_t depth;
+
+	/** The file type. */
+	bftw_typeflag typeflag;
 	/** The errno that occurred, if typeflag == BFTW_ERROR. */
 	int error;
+
+	/** A stat() buffer; may be NULL if no stat() call was needed. */
+	const struct stat *statbuf;
+
+	/** A parent file descriptor for the *at() family of calls. */
+	int at_fd;
+	/** The path relative to atfd for the *at() family of calls. */
+	const char *at_path;
 };
+
+typedef enum {
+	/** Keep walking. */
+	BFTW_CONTINUE,
+	/** Skip this path's siblings. */
+	BFTW_SKIP_SIBLINGS,
+	/** Skip this path's children. */
+	BFTW_SKIP_SUBTREE,
+	/** Stop walking. */
+	BFTW_STOP,
+} bftw_action;
 
 /**
  * Callback function type for bftw().
  *
- * @param fpath
- *         The path to the encountered file.
  * @param ftwbuf
- *         Additional data about the current file.
+ *         Data about the current file.
  * @param ptr
  *         The pointer passed to bftw().
  * @return
- *         An action value (see below).
+ *         An action value.
  */
-typedef int bftw_fn(const char *fpath, const struct BFTW *ftwbuf, void *ptr);
+typedef bftw_action bftw_fn(const struct BFTW *ftwbuf, void *ptr);
+
+typedef enum {
+	/** stat() each encountered file. */
+	BFTW_STAT    = 1 << 0,
+	/** Attempt to recover from encountered errors. */
+	BFTW_RECOVER = 1 << 1,
+	/** Visit all of a directory's descendants before the directory itself. */
+	BFTW_DEPTH   = 1 << 2,
+} bftw_flags;
 
 /**
  * Breadth First Tree Walk (or Better File Tree Walk).
@@ -58,47 +111,12 @@ typedef int bftw_fn(const char *fpath, const struct BFTW *ftwbuf, void *ptr);
  * @param nopenfd
  *         The maximum number of file descriptors to keep open.
  * @param flags
- *         Flags that control bftw() behavior (see below).
+ *         Flags that control bftw() behavior.
  * @param ptr
  *         A generic pointer which is passed to fn().
  * @return
  *         0 on success, or -1 on failure.
  */
-int bftw(const char *path, bftw_fn *fn, int nopenfd, int flags, void *ptr);
-
-/** typeflag: Block device. */
-#define BFTW_BLK      0
-/** typeflag: Character device. */
-#define BFTW_CHR      1
-/** typeflag: Directory. */
-#define BFTW_DIR      2
-/** typeflag: Pipe. */
-#define BFTW_FIFO     3
-/** typeflag: Symbolic link. */
-#define BFTW_LNK      4
-/** typeflag: Regular file. */
-#define BFTW_REG      5
-/** typeflag: Socket. */
-#define BFTW_SOCK     6
-/** typeflag: Unknown type. */
-#define BFTW_UNKNOWN  7
-/** typeflag: An error occurred for this file. */
-#define BFTW_ERROR    8
-
-/** action: Keep walking. */
-#define BFTW_CONTINUE       0
-/** action: Skip this path's siblings. */
-#define BFTW_SKIP_SIBLINGS  1
-/** action: Skip this path's children. */
-#define BFTW_SKIP_SUBTREE   2
-/** action: Stop walking. */
-#define BFTW_STOP           3
-
-/** flag: stat() each encountered file. */
-#define BFTW_STAT     (1 << 0)
-/** flag: Attempt to recover from encountered errors. */
-#define BFTW_RECOVER  (1 << 1)
-/** flag: Visit all of a directory's descendants before the directory itself. */
-#define BFTW_DEPTH    (1 << 2)
+int bftw(const char *path, bftw_fn *fn, int nopenfd, bftw_flags flags, void *ptr);
 
 #endif // BFS_BFTW_H
