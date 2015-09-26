@@ -593,6 +593,7 @@ static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
 	ftwbuf->nameoff = 0;
 	ftwbuf->error = 0;
 	ftwbuf->depth = 0;
+	ftwbuf->visit = (state->status == BFTW_GC ? BFTW_POST : BFTW_PRE);
 	ftwbuf->statbuf = NULL;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
@@ -618,13 +619,6 @@ static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
 		ftwbuf->typeflag = BFTW_UNKNOWN;
 	}
 
-	// In BFTW_DEPTH mode, defer the stat() call for directories
-	if ((state->flags & BFTW_DEPTH)
-	    && ftwbuf->typeflag == BFTW_DIR
-	    && state->status == BFTW_CHILD) {
-		return;
-	}
-
 	if ((state->flags & BFTW_STAT) || ftwbuf->typeflag == BFTW_UNKNOWN) {
 		if (ftwbuf_stat(ftwbuf, &state->statbuf) != 0) {
 			state->error = errno;
@@ -643,13 +637,6 @@ static int bftw_handle_path(bftw_state *state) {
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
 	if (state->ftwbuf.typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
 		return BFTW_FAIL;
-	}
-
-	// In BFTW_DEPTH mode, defer handling directories
-	if (state->ftwbuf.typeflag == BFTW_DIR
-	    && (state->flags & BFTW_DEPTH)
-	    && state->status != BFTW_GC) {
-		return BFTW_CONTINUE;
 	}
 
 	bftw_action action = state->fn(&state->ftwbuf, state->ptr);

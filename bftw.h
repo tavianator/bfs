@@ -40,6 +40,16 @@ typedef enum {
 } bftw_typeflag;
 
 /**
+ * Possible visit occurrences.
+ */
+typedef enum {
+	/** Pre-order visit. */
+	BFTW_PRE,
+	/** Post-order visit. */
+	BFTW_POST,
+} bftw_visit;
+
+/**
  * Data about the current file for the bftw() callback.
  */
 struct BFTW {
@@ -50,6 +60,8 @@ struct BFTW {
 
 	/** The depth of this file in the traversal. */
 	size_t depth;
+	/** Which visit this is. */
+	bftw_visit visit;
 
 	/** The file type. */
 	bftw_typeflag typeflag;
@@ -93,7 +105,7 @@ typedef enum {
 	BFTW_STAT    = 1 << 0,
 	/** Attempt to recover from encountered errors. */
 	BFTW_RECOVER = 1 << 1,
-	/** Visit all of a directory's descendants before the directory itself. */
+	/** Visit directories in post-order as well as pre-order. */
 	BFTW_DEPTH   = 1 << 2,
 } bftw_flags;
 

@@ -891,7 +891,17 @@ static bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		state.action = BFTW_SKIP_SUBTREE;
 	}
 
-	if (ftwbuf->depth >= cl->mindepth && ftwbuf->depth <= cl->maxdepth) {
+	// In -depth mode, only handle directories on the BFTW_POST visit
+	bftw_visit expected_visit = BFTW_PRE;
+	if ((cl->flags & BFTW_DEPTH)
+	    && ftwbuf->typeflag == BFTW_DIR
+	    && ftwbuf->depth < cl->maxdepth) {
+		expected_visit = BFTW_POST;
+	}
+
+	if (ftwbuf->visit == expected_visit
+	    && ftwbuf->depth >= cl->mindepth
+	    && ftwbuf->depth <= cl->maxdepth) {
 		cl->expr->eval(cl->expr, &state);
 	}
 
