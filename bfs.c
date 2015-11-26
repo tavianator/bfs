@@ -378,6 +378,14 @@ static bool eval_print0(const expression *expr, eval_state *state) {
 }
 
 /**
+ * -quit action.
+ */
+static bool eval_quit(const expression *expr, eval_state *state) {
+	state->action = BFTW_STOP;
+	return true;
+}
+
+/**
  * -type test.
  */
 static bool eval_type(const expression *expr, eval_state *state) {
@@ -547,6 +555,8 @@ static expression *parse_literal(parser_state *state) {
 		return new_action(state, eval_print0);
 	} else if (strcmp(arg, "-prune") == 0) {
 		return new_action(state, eval_prune);
+	} else if (strcmp(arg, "-quit") == 0) {
+		return new_action(state, eval_quit);
 	} else if (strcmp(arg, "-true") == 0) {
 		return &expr_true;
 	} else if (strcmp(arg, "-type") == 0) {
