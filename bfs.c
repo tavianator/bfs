@@ -534,7 +534,7 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-delete") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_action(state, eval_delete);
-	} else if (strcmp(arg, "-depth") == 0) {
+	} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_option(state);
 	} else if (strcmp(arg, "-false") == 0) {
