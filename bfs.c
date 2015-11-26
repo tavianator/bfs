@@ -52,6 +52,9 @@ typedef struct {
  */
 static void fill_statbuf(eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
+	if (ftwbuf->statbuf) {
+		return;
+	}
 
 	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
 		ftwbuf->statbuf = &state->statbuf;
@@ -357,10 +360,11 @@ static bool eval_name(const expression *expr, eval_state *state) {
  * -print action.
  */
 static bool eval_print(const expression *expr, eval_state *state) {
-	if (state->cl->colors) {
+	color_table *colors = state->cl->colors;
+	if (colors) {
 		fill_statbuf(state);
 	}
-	pretty_print(state->cl->colors, state->ftwbuf);
+	pretty_print(colors, state->ftwbuf);
 	return true;
 }
 
