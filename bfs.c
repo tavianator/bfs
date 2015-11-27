@@ -154,28 +154,6 @@ static void free_expression(expression *expr) {
 }
 
 /**
- * Create a new expression with integer data.
- */
-static expression *new_expression_idata(eval_fn *eval, int idata) {
-	expression *expr = new_expression(eval);
-	if (expr) {
-		expr->idata = idata;
-	}
-	return expr;
-}
-
-/**
- * Create a new expression with string data.
- */
-static expression *new_expression_sdata(eval_fn *eval, const char *sdata) {
-	expression *expr = new_expression(eval);
-	if (expr) {
-		expr->sdata = sdata;
-	}
-	return expr;
-}
-
-/**
  * Create a new unary expression.
  */
 static expression *new_unary_expression(expression *rhs, eval_fn *eval) {
@@ -271,6 +249,10 @@ typedef struct {
 
 	/** Whether a -print action is implied. */
 	bool implicit_print;
+	/** Whether warnings are enabled (see -warn, -nowarn). */
+	bool warn;
+	/** Whether any non-option arguments have been encountered. */
+	bool non_option_seen;
 } parser_state;
 
 /**
@@ -403,7 +385,21 @@ static bool eval_type(const expression *expr, eval_state *state) {
 /**
  * Create a new option expression.
  */
-static expression *new_option(parser_state *state) {
+static expression *new_option(parser_state *state, const char *option) {
+	if (state->warn && state->non_option_seen) {
+		fprintf(stderr,
+		        "The '%s' option applies to the entire command line.\n"
+		        "For clarity, place it before any non-option arguments.\n\n",
+		        option);
+	}
+
+	return &expr_true;
+}
+
+/**
+ * Create a new positional option expression.
+ */
+static expression *new_positional_option(parser_state *state) {
 	return &expr_true;
 }
 
@@ -411,7 +407,30 @@ static expression *new_option(parser_state *state) {
  * Create a new test expression.
  */
 static expression *new_test(parser_state *state, eval_fn *eval) {
+	state->non_option_seen = true;
 	return new_expression(eval);
+}
+
+/**
+ * Create a new test expression with integer data.
+ */
+static expression *new_test_idata(parser_state *state, eval_fn *eval, int idata) {
+	expression *test = new_test(state, eval);
+	if (test) {
+		test->idata = idata;
+	}
+	return test;
+}
+
+/**
+ * Create a new test expression with string data.
+ */
+static expression *new_test_sdata(parser_state *state, eval_fn *eval, const char *sdata) {
+	expression *test = new_test(state, eval);
+	if (test) {
+		test->sdata = sdata;
+	}
+	return test;
 }
 
 /**
@@ -421,22 +440,10 @@ static expression *new_action(parser_state *state, eval_fn *eval) {
 	if (eval != eval_nohidden && eval != eval_prune) {
 		state->implicit_print = false;
 	}
+
+	state->non_option_seen = true;
+
 	return new_expression(eval);
-}
-
-/**
- * Parse any option that takes a string argument.
- */
-static expression *parse_sdata(parser_state *state, eval_fn *fn) {
-	const char *arg = state->argv[state->i];
-	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", state->argv[state->i - 1]);
-		return NULL;
-	}
-
-	++state->i;
-
-	return new_expression_sdata(fn, arg);
 }
 
 /**
@@ -459,12 +466,27 @@ static bool parse_int(const char *str, int *value) {
 }
 
 /**
- * Parse -{min,max}depth N.
+ * Parse a test that takes a string argument.
  */
-static expression *parse_depth(parser_state *state, int *depth) {
+static expression *parse_test_sdata(parser_state *state, const char *test, eval_fn *eval) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", state->argv[state->i - 1]);
+		fprintf(stderr, "%s needs a value.\n", test);
+		return NULL;
+	}
+
+	++state->i;
+
+	return new_test_sdata(state, eval, arg);
+}
+
+/**
+ * Parse -{min,max}depth N.
+ */
+static expression *parse_depth(parser_state *state, const char *option, int *depth) {
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		fprintf(stderr, "%s needs a value.\n", option);
 		return NULL;
 	}
 
@@ -475,7 +497,7 @@ static expression *parse_depth(parser_state *state, int *depth) {
 		return NULL;
 	}
 
-	return new_option(state);
+	return new_option(state, option);
 }
 
 /**
@@ -521,7 +543,7 @@ static expression *parse_type(parser_state *state) {
 
 	++state->i;
 
-	return new_expression_idata(eval_type, typeflag);
+	return new_test_idata(state, eval_type, typeflag);
 }
 
 /**
@@ -535,16 +557,16 @@ static expression *parse_literal(parser_state *state) {
 
 	if (strcmp(arg, "-color") == 0) {
 		state->cl->color = true;
-		return new_option(state);
+		return new_option(state, arg);
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
-		return new_option(state);
+		return new_option(state, arg);
 	} else if (strcmp(arg, "-delete") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_action(state, eval_delete);
 	} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
-		return new_option(state);
+		return new_option(state, arg);
 	} else if (strcmp(arg, "-false") == 0) {
 		return &expr_false;
 	} else if (strcmp(arg, "-hidden") == 0) {
@@ -552,13 +574,13 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-nohidden") == 0) {
 		return new_action(state, eval_nohidden);
 	} else if (strcmp(arg, "-mindepth") == 0) {
-		return parse_depth(state, &state->cl->mindepth);
+		return parse_depth(state, arg, &state->cl->mindepth);
 	} else if (strcmp(arg, "-maxdepth") == 0) {
-		return parse_depth(state, &state->cl->maxdepth);
+		return parse_depth(state, arg, &state->cl->maxdepth);
 	} else if (strcmp(arg, "-name") == 0) {
-		return parse_sdata(state, eval_name);
+		return parse_test_sdata(state, arg, eval_name);
 	} else if (strcmp(arg, "-path") == 0 || strcmp(arg, "-wholename") == 0) {
-		return parse_sdata(state, eval_path);
+		return parse_test_sdata(state, arg, eval_path);
 	} else if (strcmp(arg, "-print") == 0) {
 		return new_action(state, eval_print);
 	} else if (strcmp(arg, "-print0") == 0) {
@@ -571,6 +593,12 @@ static expression *parse_literal(parser_state *state) {
 		return &expr_true;
 	} else if (strcmp(arg, "-type") == 0) {
 		return parse_type(state);
+	} else if (strcmp(arg, "-warn") == 0) {
+		state->warn = true;
+		return new_positional_option(state);
+	} else if (strcmp(arg, "-nowarn") == 0) {
+		state->warn = false;
+		return new_positional_option(state);
 	} else {
 		fprintf(stderr, "Unknown argument '%s'.\n", arg);
 		return NULL;
@@ -830,6 +858,8 @@ static cmdline *parse_cmdline(int argc, char *argv[]) {
 		.argv = argv,
 		.i = 1,
 		.implicit_print = true,
+		.warn = true,
+		.non_option_seen = false,
 	};
 
 	if (skip_paths(&state)) {
