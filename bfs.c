@@ -357,6 +357,14 @@ static bool eval_name(const expression *expr, eval_state *state) {
 }
 
 /**
+ * -path test.
+ */
+static bool eval_path(const expression *expr, eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+	return fnmatch(expr->sdata, ftwbuf->path, 0) == 0;
+}
+
+/**
  * -print action.
  */
 static bool eval_print(const expression *expr, eval_state *state) {
@@ -417,6 +425,21 @@ static expression *new_action(parser_state *state, eval_fn *eval) {
 }
 
 /**
+ * Parse any option that takes a string argument.
+ */
+static expression *parse_sdata(parser_state *state, eval_fn *fn) {
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		fprintf(stderr, "%s needs a value.\n", state->argv[state->i - 1]);
+		return NULL;
+	}
+
+	++state->i;
+
+	return new_expression_sdata(fn, arg);
+}
+
+/**
  * Parse an integer.
  */
 static bool parse_int(const char *str, int *value) {
@@ -438,10 +461,10 @@ static bool parse_int(const char *str, int *value) {
 /**
  * Parse -{min,max}depth N.
  */
-static expression *parse_depth(parser_state *state, int *depth, const char *option) {
+static expression *parse_depth(parser_state *state, int *depth) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", option);
+		fprintf(stderr, "%s needs a value.\n", state->argv[state->i - 1]);
 		return NULL;
 	}
 
@@ -453,21 +476,6 @@ static expression *parse_depth(parser_state *state, int *depth, const char *opti
 	}
 
 	return new_option(state);
-}
-
-/**
- * Parse -name 'pattern'.
- */
-static expression *parse_name(parser_state *state) {
-	const char *arg = state->argv[state->i];
-	if (!arg) {
-		fputs("-name needs a value.\n", stderr);
-		return NULL;
-	}
-
-	++state->i;
-
-	return new_expression_sdata(eval_name, arg);
 }
 
 /**
@@ -544,11 +552,13 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-nohidden") == 0) {
 		return new_action(state, eval_nohidden);
 	} else if (strcmp(arg, "-mindepth") == 0) {
-		return parse_depth(state, &state->cl->mindepth, arg);
+		return parse_depth(state, &state->cl->mindepth);
 	} else if (strcmp(arg, "-maxdepth") == 0) {
-		return parse_depth(state, &state->cl->maxdepth, arg);
+		return parse_depth(state, &state->cl->maxdepth);
 	} else if (strcmp(arg, "-name") == 0) {
-		return parse_name(state);
+		return parse_sdata(state, eval_name);
+	} else if (strcmp(arg, "-path") == 0 || strcmp(arg, "-wholename") == 0) {
+		return parse_sdata(state, eval_path);
 	} else if (strcmp(arg, "-print") == 0) {
 		return new_action(state, eval_print);
 	} else if (strcmp(arg, "-print0") == 0) {

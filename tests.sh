@@ -13,6 +13,9 @@ function basic_structure() {
     touchp "$1/e/f"
     mkdir -p "$1/g/h"
     mkdir -p "$1/i"
+    touchp "$1/j/foo"
+    touchp "$1/k/foo/bar"
+    touchp "$1/l/foo/bar/baz"
 }
 
 # Checks for any (order-independent) differences between bfs and find
@@ -67,7 +70,17 @@ function test_0009() {
     find_diff "$1" -maxdepth 2 -depth
 }
 
-for i in {1..9}; do
+function test_0010() {
+    basic_structure "$1"
+    find_diff "$1" -name '*f*'
+}
+
+function test_0011() {
+    basic_structure "$1"
+    find_diff "$1" -path "$1/*f*"
+}
+
+for i in {1..11}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
