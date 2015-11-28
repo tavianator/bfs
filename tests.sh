@@ -18,6 +18,16 @@ function basic_structure() {
     touchp "$1/l/foo/bar/baz"
 }
 
+# Creates a file+directory structure with various permissions for tests
+function perms_structure() {
+    install -Dm444 /dev/null "$1/r"
+    install -Dm222 /dev/null "$1/w"
+    install -Dm644 /dev/null "$1/rw"
+    install -Dm555 /dev/null "$1/rx"
+    install -Dm311 /dev/null "$1/wx"
+    install -Dm755 /dev/null "$1/rwx"
+}
+
 # Checks for any (order-independent) differences between bfs and find
 function find_diff() {
     diff -u <(./bfs "$@" | sort) <(find "$@" | sort)
@@ -80,7 +90,22 @@ function test_0011() {
     find_diff "$1" -path "$1/*f*"
 }
 
-for i in {1..11}; do
+function test_0012() {
+    perms_structure "$1"
+    find_diff "$1" -executable
+}
+
+function test_0013() {
+    perms_structure "$1"
+    find_diff "$1" -readable
+}
+
+function test_0014() {
+    perms_structure "$1"
+    find_diff "$1" -writable
+}
+
+for i in {1..14}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"

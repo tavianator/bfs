@@ -284,6 +284,14 @@ static const char *skip_paths(parser_state *state) {
 }
 
 /**
+ * -executable, -readable, -writable action.
+ */
+static bool eval_access(const expression *expr, eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, AT_SYMLINK_NOFOLLOW) == 0;
+}
+
+/**
  * -delete action.
  */
 static bool eval_delete(const expression *expr, eval_state *state) {
@@ -567,6 +575,8 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_option(state, arg);
+	} else if (strcmp(arg, "-executable") == 0) {
+		return new_test_idata(state, eval_access, X_OK);
 	} else if (strcmp(arg, "-false") == 0) {
 		return &expr_false;
 	} else if (strcmp(arg, "-hidden") == 0) {
@@ -589,6 +599,8 @@ static expression *parse_literal(parser_state *state) {
 		return new_action(state, eval_prune);
 	} else if (strcmp(arg, "-quit") == 0) {
 		return new_action(state, eval_quit);
+	} else if (strcmp(arg, "-readable") == 0) {
+		return new_test_idata(state, eval_access, R_OK);
 	} else if (strcmp(arg, "-true") == 0) {
 		return &expr_true;
 	} else if (strcmp(arg, "-type") == 0) {
@@ -599,6 +611,8 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-nowarn") == 0) {
 		state->warn = false;
 		return new_positional_option(state);
+	} else if (strcmp(arg, "-writable") == 0) {
+		return new_test_idata(state, eval_access, W_OK);
 	} else {
 		fprintf(stderr, "Unknown argument '%s'.\n", arg);
 		return NULL;
