@@ -24,7 +24,7 @@ ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
 
 all: bfs
 
-bfs: bfs.o bftw.o color.o
+bfs: bftw.o color.o eval.o main.o parse.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 %.o: %.c
