@@ -234,7 +234,11 @@ static DIR *opendirat(int fd, const char *name) {
 		return NULL;
 	}
 
-	return fdopendir(dfd);
+	DIR *dir = fdopendir(dfd);
+	if (!dir) {
+		close(dfd);
+	}
+	return dir;
 }
 
 /**
