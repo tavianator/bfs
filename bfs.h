@@ -97,6 +97,7 @@ void free_cmdline(cmdline *cl);
 // Predicate evaluation functions
 bool eval_access(const expression *expr, eval_state *state);
 bool eval_delete(const expression *expr, eval_state *state);
+bool eval_empty(const expression *expr, eval_state *state);
 bool eval_false(const expression *expr, eval_state *state);
 bool eval_hidden(const expression *expr, eval_state *state);
 bool eval_name(const expression *expr, eval_state *state);

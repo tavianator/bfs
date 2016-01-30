@@ -348,6 +348,8 @@ static expression *parse_literal(parser_state *state) {
 	} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_option(state, arg);
+	} else if (strcmp(arg, "-empty") == 0) {
+		return new_test(state, eval_empty);
 	} else if (strcmp(arg, "-executable") == 0) {
 		return new_test_idata(state, eval_access, X_OK);
 	} else if (strcmp(arg, "-false") == 0) {

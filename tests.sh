@@ -105,7 +105,12 @@ function test_0014() {
     find_diff "$1" -writable
 }
 
-for i in {1..14}; do
+function test_0015() {
+    basic_structure "$1"
+    find_diff "$1" -empty
+}
+
+for i in {1..15}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"

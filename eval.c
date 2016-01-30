@@ -1,5 +1,6 @@
 #include "bfs.h"
 #include "bftw.h"
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -75,6 +76,49 @@ bool eval_delete(const expression *expr, eval_state *state) {
 	}
 
 	return true;
+}
+
+/**
+ * -empty test.
+ */
+bool eval_empty(const expression *expr, eval_state *state) {
+	bool ret = false;
+	struct BFTW *ftwbuf = state->ftwbuf;
+
+	if (ftwbuf->typeflag == BFTW_DIR) {
+		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_DIRECTORY);
+		if (dfd < 0) {
+			perror("openat()");
+			goto done;
+		}
+
+		DIR *dir = fdopendir(dfd);
+		if (!dir) {
+			perror("fdopendir()");
+			close(dfd);
+			goto done;
+		}
+
+		ret = true;
+
+		struct dirent *de;
+		while ((de = readdir(dir)) != NULL) {
+			if (strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
+				ret = false;
+				break;
+			}
+		}
+
+		closedir(dir);
+	} else {
+		fill_statbuf(state);
+		if (ftwbuf->statbuf) {
+			ret = ftwbuf->statbuf->st_size == 0;
+		}
+	}
+
+done:
+	return ret;
 }
 
 /**
