@@ -15,6 +15,7 @@
 #include "color.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <time.h>
 
 /**
  * The parsed command line.
@@ -64,7 +65,22 @@ struct cmdline {
 
 	/** The command line expression. */
 	expression *expr;
+
+	/** The current time. */
+	struct timespec now;
 };
+
+/**
+ * Possible types of numeric comparison.
+ */
+typedef enum {
+	/** Exactly n. */
+	CMP_EXACT,
+	/** Less than n. */
+	CMP_LESS,
+	/** Greater than n. */
+	CMP_GREATER,
+} cmpflag;
 
 struct expression {
 	/** The left hand side of the expression. */
@@ -73,6 +89,8 @@ struct expression {
 	expression *rhs;
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
+	/** The comparison flag. */
+	cmpflag cmp;
 	/** Optional integer data for this expression. */
 	int idata;
 	/** Optional string data for this expression. */
@@ -95,20 +113,31 @@ int eval_cmdline(cmdline *cl);
 void free_cmdline(cmdline *cl);
 
 // Predicate evaluation functions
-bool eval_access(const expression *expr, eval_state *state);
-bool eval_delete(const expression *expr, eval_state *state);
-bool eval_empty(const expression *expr, eval_state *state);
+bool eval_true(const expression *expr, eval_state *state);
 bool eval_false(const expression *expr, eval_state *state);
+
+bool eval_access(const expression *expr, eval_state *state);
+
+bool eval_amin(const expression *expr, eval_state *state);
+bool eval_atime(const expression *expr, eval_state *state);
+bool eval_cmin(const expression *expr, eval_state *state);
+bool eval_ctime(const expression *expr, eval_state *state);
+bool eval_mmin(const expression *expr, eval_state *state);
+bool eval_mtime(const expression *expr, eval_state *state);
+
+bool eval_empty(const expression *expr, eval_state *state);
 bool eval_hidden(const expression *expr, eval_state *state);
+bool eval_type(const expression *expr, eval_state *state);
+
 bool eval_name(const expression *expr, eval_state *state);
-bool eval_nohidden(const expression *expr, eval_state *state);
 bool eval_path(const expression *expr, eval_state *state);
+
+bool eval_delete(const expression *expr, eval_state *state);
+bool eval_nohidden(const expression *expr, eval_state *state);
 bool eval_print(const expression *expr, eval_state *state);
 bool eval_print0(const expression *expr, eval_state *state);
 bool eval_prune(const expression *expr, eval_state *state);
 bool eval_quit(const expression *expr, eval_state *state);
-bool eval_true(const expression *expr, eval_state *state);
-bool eval_type(const expression *expr, eval_state *state);
 
 // Operator evaluation functions
 bool eval_not(const expression *expr, eval_state *state);

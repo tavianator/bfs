@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 struct eval_state {
@@ -24,17 +25,57 @@ struct eval_state {
 /**
  * Perform a stat() call if necessary.
  */
-static void fill_statbuf(eval_state *state) {
+static const struct stat *fill_statbuf(eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-	if (ftwbuf->statbuf) {
-		return;
+	if (!ftwbuf->statbuf) {
+		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
+			ftwbuf->statbuf = &state->statbuf;
+		} else {
+			perror("fstatat()");
+		}
+	}
+	return ftwbuf->statbuf;
+}
+
+/**
+ * Get the difference (in seconds) between two struct timespecs.
+ */
+static time_t timespec_diff(const struct timespec *lhs, const struct timespec *rhs) {
+	time_t ret = lhs->tv_sec - rhs->tv_sec;
+	if (lhs->tv_nsec < rhs->tv_nsec) {
+		--ret;
+	}
+	return ret;
+}
+
+/**
+ * Convert a second count to minutes.
+ */
+static time_t to_minutes(time_t seconds) {
+	return seconds/60;
+}
+
+/**
+ * Convert a second count to days.
+ */
+static time_t to_days(time_t seconds) {
+	return seconds/60/60/24;
+}
+
+/**
+ * Perform a comparison.
+ */
+static bool do_cmp(const expression *expr, int n) {
+	switch (expr->cmp) {
+	case CMP_EXACT:
+		return n == expr->idata;
+	case CMP_LESS:
+		return n < expr->idata;
+	case CMP_GREATER:
+		return n > expr->idata;
 	}
 
-	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
-		ftwbuf->statbuf = &state->statbuf;
-	} else {
-		perror("fstatat()");
-	}
+	return false;
 }
 
 /**
@@ -52,11 +93,89 @@ bool eval_false(const expression *expr, eval_state *state) {
 }
 
 /**
- * -executable, -readable, -writable action.
+ * -executable, -readable, -writable tests.
  */
 bool eval_access(const expression *expr, eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, AT_SYMLINK_NOFOLLOW) == 0;
+}
+
+/**
+ * -amin test.
+ */
+bool eval_amin(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_atim);
+	return do_cmp(expr, to_minutes(diff));
+}
+
+/**
+ * -atime test.
+ */
+bool eval_atime(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_atim);
+	return do_cmp(expr, to_days(diff));
+}
+
+/**
+ * -cmin test.
+ */
+bool eval_cmin(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_ctim);
+	return do_cmp(expr, to_minutes(diff));
+}
+
+/**
+ * -ctime test.
+ */
+bool eval_ctime(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_ctim);
+	return do_cmp(expr, to_days(diff));
+}
+
+/**
+ * -mmin test.
+ */
+bool eval_mmin(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_mtim);
+	return do_cmp(expr, to_minutes(diff));
+}
+
+/**
+ * -mtime test.
+ */
+bool eval_mtime(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_mtim);
+	return do_cmp(expr, to_days(diff));
 }
 
 /**
@@ -111,9 +230,9 @@ bool eval_empty(const expression *expr, eval_state *state) {
 
 		closedir(dir);
 	} else {
-		fill_statbuf(state);
-		if (ftwbuf->statbuf) {
-			ret = ftwbuf->statbuf->st_size == 0;
+		const struct stat *statbuf = fill_statbuf(state);
+		if (statbuf) {
+			ret = statbuf->st_size == 0;
 		}
 	}
 

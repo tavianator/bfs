@@ -18,6 +18,7 @@ static expression *new_expression(eval_fn *eval) {
 	expr->lhs = NULL;
 	expr->rhs = NULL;
 	expr->eval = eval;
+	expr->cmp = CMP_EXACT;
 	expr->idata = 0;
 	expr->sdata = NULL;
 	return expr;
@@ -164,6 +165,50 @@ static const char *skip_paths(parser_state *state) {
 }
 
 /**
+ * Parse an integer.
+ */
+static bool parse_int(const char *str, int *value) {
+	char *endptr;
+	long result = strtol(str, &endptr, 10);
+
+	if (*str == '\0' || *endptr != '\0') {
+		goto bad;
+	}
+
+	if (result < INT_MIN || result > INT_MAX) {
+		goto bad;
+	}
+
+	*value = result;
+	return true;
+
+bad:
+	fprintf(stderr, "'%s' is not a valid integer.\n", str);
+	return false;
+}
+
+/**
+ * Parse an integer and a comparison flag.
+ */
+static bool parse_icmp(const char *str, expression *expr) {
+	switch (str[0]) {
+	case '-':
+		expr->cmp = CMP_LESS;
+		++str;
+		break;
+	case '+':
+		expr->cmp = CMP_GREATER;
+		++str;
+		break;
+	default:
+		expr->cmp = CMP_EXACT;
+		break;
+	}
+
+	return parse_int(str, &expr->idata);
+}
+
+/**
  * Create a new option expression.
  */
 static expression *new_option(parser_state *state, const char *option) {
@@ -228,22 +273,25 @@ static expression *new_action(parser_state *state, eval_fn *eval) {
 }
 
 /**
- * Parse an integer.
+ * Parse a test expression with integer data and a comparison flag.
  */
-static bool parse_int(const char *str, int *value) {
-	char *endptr;
-	long result = strtol(str, &endptr, 10);
-
-	if (*str == '\0' || *endptr != '\0') {
-		return false;
+static expression *parse_test_icmp(parser_state *state, const char *test, eval_fn *eval) {
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		fprintf(stderr, "%s needs a value.\n", test);
+		return NULL;
 	}
 
-	if (result < INT_MIN || result > INT_MAX) {
-		return false;
-	}
+	++state->i;
 
-	*value = result;
-	return true;
+	expression *expr = new_test(state, eval);
+	if (expr) {
+		if (!parse_icmp(arg, expr)) {
+			free_expression(expr);
+			expr = NULL;
+		}
+	}
+	return expr;
 }
 
 /**
@@ -274,7 +322,6 @@ static expression *parse_depth(parser_state *state, const char *option, int *dep
 	++state->i;
 
 	if (!parse_int(arg, depth)) {
-		fprintf(stderr, "%s is not a valid integer.\n", arg);
 		return NULL;
 	}
 
@@ -336,7 +383,15 @@ static expression *parse_literal(parser_state *state) {
 	// Paths are already skipped at this point
 	const char *arg = state->argv[state->i++];
 
-	if (strcmp(arg, "-color") == 0) {
+	if (strcmp(arg, "-amin") == 0) {
+		return parse_test_icmp(state, arg, eval_amin);
+	} else if (strcmp(arg, "-atime") == 0) {
+		return parse_test_icmp(state, arg, eval_atime);
+	} else if (strcmp(arg, "-cmin") == 0) {
+		return parse_test_icmp(state, arg, eval_cmin);
+	} else if (strcmp(arg, "-ctime") == 0) {
+		return parse_test_icmp(state, arg, eval_ctime);
+	} else if (strcmp(arg, "-color") == 0) {
 		state->cl->color = true;
 		return new_option(state, arg);
 	} else if (strcmp(arg, "-nocolor") == 0) {
@@ -362,6 +417,10 @@ static expression *parse_literal(parser_state *state) {
 		return parse_depth(state, arg, &state->cl->mindepth);
 	} else if (strcmp(arg, "-maxdepth") == 0) {
 		return parse_depth(state, arg, &state->cl->maxdepth);
+	} else if (strcmp(arg, "-mmin") == 0) {
+		return parse_test_icmp(state, arg, eval_mmin);
+	} else if (strcmp(arg, "-mtime") == 0) {
+		return parse_test_icmp(state, arg, eval_mtime);
 	} else if (strcmp(arg, "-name") == 0) {
 		return parse_test_sdata(state, arg, eval_name);
 	} else if (strcmp(arg, "-path") == 0 || strcmp(arg, "-wholename") == 0) {
@@ -612,6 +671,11 @@ cmdline *parse_cmdline(int argc, char *argv[]) {
 	cl->maxdepth = INT_MAX;
 	cl->flags = BFTW_RECOVER;
 	cl->expr = &expr_true;
+
+	if (clock_gettime(CLOCK_REALTIME, &cl->now) != 0) {
+		perror("clock_gettime()");
+		goto fail;
+	}
 
 	parser_state state = {
 		.cl = cl,
