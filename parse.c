@@ -409,6 +409,10 @@ static expression *parse_literal(parser_state *state) {
 		return new_test_idata(state, eval_access, X_OK);
 	} else if (strcmp(arg, "-false") == 0) {
 		return &expr_false;
+	} else if (strcmp(arg, "-gid") == 0) {
+		return parse_test_icmp(state, arg, eval_gid);
+	} else if (strcmp(arg, "-uid") == 0) {
+		return parse_test_icmp(state, arg, eval_uid);
 	} else if (strcmp(arg, "-hidden") == 0) {
 		return new_test(state, eval_hidden);
 	} else if (strcmp(arg, "-nohidden") == 0) {

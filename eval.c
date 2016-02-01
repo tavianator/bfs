@@ -179,6 +179,30 @@ bool eval_mtime(const expression *expr, eval_state *state) {
 }
 
 /**
+ * -gid test.
+ */
+bool eval_gid(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return do_cmp(expr, statbuf->st_gid);
+}
+
+/**
+ * -uid test.
+ */
+bool eval_uid(const expression *expr, eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return do_cmp(expr, statbuf->st_uid);
+}
+
+/**
  * -delete action.
  */
 bool eval_delete(const expression *expr, eval_state *state) {

@@ -125,6 +125,9 @@ bool eval_ctime(const expression *expr, eval_state *state);
 bool eval_mmin(const expression *expr, eval_state *state);
 bool eval_mtime(const expression *expr, eval_state *state);
 
+bool eval_gid(const expression *expr, eval_state *state);
+bool eval_uid(const expression *expr, eval_state *state);
+
 bool eval_empty(const expression *expr, eval_state *state);
 bool eval_hidden(const expression *expr, eval_state *state);
 bool eval_type(const expression *expr, eval_state *state);
