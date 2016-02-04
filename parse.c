@@ -18,9 +18,6 @@ static struct expr *new_expr(eval_fn *eval) {
 	expr->lhs = NULL;
 	expr->rhs = NULL;
 	expr->eval = eval;
-	expr->cmp = CMP_EXACT;
-	expr->idata = 0;
-	expr->sdata = NULL;
 	return expr;
 }
 
@@ -31,8 +28,6 @@ static struct expr expr_true = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.eval = eval_true,
-	.idata = 0,
-	.sdata = NULL,
 };
 
 /**
@@ -42,8 +37,6 @@ static struct expr expr_false = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.eval = eval_false,
-	.idata = 0,
-	.sdata = NULL,
 };
 
 /**
