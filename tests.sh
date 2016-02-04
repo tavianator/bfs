@@ -28,6 +28,15 @@ function perms_structure() {
     install -Dm755 /dev/null "$1/rwx"
 }
 
+# Creates a file+directory structure with various symbolic and hard links
+function links_structure() {
+    touchp "$1/a"
+    ln -s a "$1/b"
+    ln "$1/a" "$1/c"
+    mkdir -p "$1/d/e"
+    ln -s ../../d "$1/d/e/f"
+}
+
 # Checks for any (order-independent) differences between bfs and find
 function find_diff() {
     diff -u <(./bfs "$@" | sort) <(find "$@" | sort)
@@ -134,7 +143,14 @@ function test_0019() {
     find_diff "$1" -cnewer "$1/e/f"
 }
 
-for i in {1..19}; do
+function test_0020() {
+    links_structure "$1"
+    find_diff "$1" -links 2 && \
+        find_diff "$1" -links -2 && \
+        find_diff "$1" -links +1
+}
+
+for i in {1..20}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"

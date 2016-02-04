@@ -285,6 +285,18 @@ bool eval_inum(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -links test.
+ */
+bool eval_links(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return do_cmp(expr, statbuf->st_nlink);
+}
+
+/**
  * -name test.
  */
 bool eval_name(const struct expr *expr, struct eval_state *state) {

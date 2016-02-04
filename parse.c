@@ -501,6 +501,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 		return new_action(state, eval_nohidden);
 	} else if (strcmp(arg, "-inum") == 0) {
 		return parse_test_icmp(state, arg, eval_inum);
+	} else if (strcmp(arg, "-links") == 0) {
+		return parse_test_icmp(state, arg, eval_links);
 	} else if (strcmp(arg, "-mindepth") == 0) {
 		return parse_depth(state, arg, &state->cl->mindepth);
 	} else if (strcmp(arg, "-maxdepth") == 0) {
