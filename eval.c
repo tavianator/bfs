@@ -49,20 +49,6 @@ static time_t timespec_diff(const struct timespec *lhs, const struct timespec *r
 }
 
 /**
- * Convert a second count to minutes.
- */
-static time_t to_minutes(time_t seconds) {
-	return seconds/60;
-}
-
-/**
- * Convert a second count to days.
- */
-static time_t to_days(time_t seconds) {
-	return seconds/60/60/24;
-}
-
-/**
  * Perform a comparison.
  */
 static bool do_cmp(const struct expr *expr, int n) {
@@ -101,81 +87,38 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -amin test.
+ * -[acm]{min,time} tests.
  */
-bool eval_amin(const struct expr *expr, struct eval_state *state) {
+bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_atim);
-	return do_cmp(expr, to_minutes(diff));
-}
-
-/**
- * -atime test.
- */
-bool eval_atime(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
+	const struct timespec *time;
+	switch (expr->timefield) {
+	case ATIME:
+		time = &statbuf->st_atim;
+		break;
+	case CTIME:
+		time = &statbuf->st_ctim;
+		break;
+	case MTIME:
+		time = &statbuf->st_mtim;
+		break;
 	}
 
-	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_atim);
-	return do_cmp(expr, to_days(diff));
-}
-
-/**
- * -cmin test.
- */
-bool eval_cmin(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
+	time_t diff = timespec_diff(&state->cl->now, time);
+	switch (expr->timeunit) {
+	case MINUTES:
+		diff /= 60;
+		break;
+	case DAYS:
+		diff /= 60*60*24;
+		break;
 	}
 
-	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_ctim);
-	return do_cmp(expr, to_minutes(diff));
-}
-
-/**
- * -ctime test.
- */
-bool eval_ctime(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
-	}
-
-	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_ctim);
-	return do_cmp(expr, to_days(diff));
-}
-
-/**
- * -mmin test.
- */
-bool eval_mmin(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
-	}
-
-	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_mtim);
-	return do_cmp(expr, to_minutes(diff));
-}
-
-/**
- * -mtime test.
- */
-bool eval_mtime(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
-	}
-
-	time_t diff = timespec_diff(&state->cl->now, &statbuf->st_mtim);
-	return do_cmp(expr, to_days(diff));
+	return do_cmp(expr, diff);
 }
 
 /**

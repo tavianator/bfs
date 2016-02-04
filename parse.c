@@ -303,6 +303,18 @@ static struct expr *parse_test_sdata(struct parser_state *state, const char *tes
 }
 
 /**
+ * Parse -[acm]{min,time}.
+ */
+static struct expr *parse_acmtime(struct parser_state *state, const char *option, enum timefield field, enum timeunit unit) {
+	struct expr *expr = parse_test_icmp(state, option, eval_acmtime);
+	if (expr) {
+		expr->timefield = field;
+		expr->timeunit = unit;
+	}
+	return expr;
+}
+
+/**
  * Parse -{min,max}depth N.
  */
 static struct expr *parse_depth(struct parser_state *state, const char *option, int *depth) {
@@ -377,13 +389,13 @@ static struct expr *parse_literal(struct parser_state *state) {
 	const char *arg = state->argv[state->i++];
 
 	if (strcmp(arg, "-amin") == 0) {
-		return parse_test_icmp(state, arg, eval_amin);
+		return parse_acmtime(state, arg, ATIME, MINUTES);
 	} else if (strcmp(arg, "-atime") == 0) {
-		return parse_test_icmp(state, arg, eval_atime);
+		return parse_acmtime(state, arg, ATIME, DAYS);
 	} else if (strcmp(arg, "-cmin") == 0) {
-		return parse_test_icmp(state, arg, eval_cmin);
+		return parse_acmtime(state, arg, CTIME, MINUTES);
 	} else if (strcmp(arg, "-ctime") == 0) {
-		return parse_test_icmp(state, arg, eval_ctime);
+		return parse_acmtime(state, arg, CTIME, DAYS);
 	} else if (strcmp(arg, "-color") == 0) {
 		state->cl->color = true;
 		return new_option(state, arg);
@@ -415,9 +427,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 	} else if (strcmp(arg, "-maxdepth") == 0) {
 		return parse_depth(state, arg, &state->cl->maxdepth);
 	} else if (strcmp(arg, "-mmin") == 0) {
-		return parse_test_icmp(state, arg, eval_mmin);
+		return parse_acmtime(state, arg, MTIME, MINUTES);
 	} else if (strcmp(arg, "-mtime") == 0) {
-		return parse_test_icmp(state, arg, eval_mtime);
+		return parse_acmtime(state, arg, MTIME, DAYS);
 	} else if (strcmp(arg, "-name") == 0) {
 		return parse_test_sdata(state, arg, eval_name);
 	} else if (strcmp(arg, "-path") == 0 || strcmp(arg, "-wholename") == 0) {

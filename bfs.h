@@ -80,6 +80,28 @@ enum cmpflag {
 	CMP_GREATER,
 };
 
+/**
+ * Available struct stat time fields.
+ */
+enum timefield {
+	/** Access time. */
+	ATIME,
+	/** Status change time. */
+	CTIME,
+	/** Modification time. */
+	MTIME,
+};
+
+/**
+ * Possible time units.
+ */
+enum timeunit {
+	/** Minutes. */
+	MINUTES,
+	/** Days. */
+	DAYS,
+};
+
 struct expr {
 	/** The left hand side of the expression. */
 	struct expr *lhs;
@@ -87,8 +109,12 @@ struct expr {
 	struct expr *rhs;
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
-	/** The comparison flag. */
+	/** The optional comparison flag. */
 	enum cmpflag cmp;
+	/** The optional time field. */
+	enum timefield timefield;
+	/** The optional time unit. */
+	enum timeunit timeunit;
 	/** Optional integer data for this expression. */
 	int idata;
 	/** Optional string data for this expression. */
@@ -116,12 +142,7 @@ bool eval_false(const struct expr *expr, struct eval_state *state);
 
 bool eval_access(const struct expr *expr, struct eval_state *state);
 
-bool eval_amin(const struct expr *expr, struct eval_state *state);
-bool eval_atime(const struct expr *expr, struct eval_state *state);
-bool eval_cmin(const struct expr *expr, struct eval_state *state);
-bool eval_ctime(const struct expr *expr, struct eval_state *state);
-bool eval_mmin(const struct expr *expr, struct eval_state *state);
-bool eval_mtime(const struct expr *expr, struct eval_state *state);
+bool eval_acmtime(const struct expr *expr, struct eval_state *state);
 
 bool eval_gid(const struct expr *expr, struct eval_state *state);
 bool eval_uid(const struct expr *expr, struct eval_state *state);
