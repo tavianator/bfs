@@ -18,15 +18,13 @@
 #include <string.h>
 #include <sys/stat.h>
 
-typedef struct ext_color ext_color;
-
 struct ext_color {
 	const char *ext;
 	size_t len;
 
 	const char *color;
 
-	ext_color *next;
+	struct ext_color *next;
 };
 
 struct color_table {
@@ -50,11 +48,11 @@ struct color_table {
 	const char *sticky;
 	const char *exec;
 
-	ext_color *ext_list;
+	struct ext_color *ext_list;
 };
 
-color_table *parse_colors(char *ls_colors) {
-	color_table *colors = malloc(sizeof(color_table));
+struct color_table *parse_colors(char *ls_colors) {
+	struct color_table *colors = malloc(sizeof(struct color_table));
 	if (!colors) {
 		goto done;
 	}
@@ -87,7 +85,7 @@ color_table *parse_colors(char *ls_colors) {
 
 	char *start = ls_colors;
 	char *end;
-	ext_color *ext;
+	struct ext_color *ext;
 	for (end = strchr(start, ':'); *start && end; start = end + 1, end = strchr(start, ':')) {
 		char *equals = strchr(start, '=');
 		if (!equals) {
@@ -186,7 +184,7 @@ color_table *parse_colors(char *ls_colors) {
 			break;
 
 		case '*':
-			ext = malloc(sizeof(ext_color));
+			ext = malloc(sizeof(struct ext_color));
 			if (ext) {
 				ext->ext = key + 1;
 				ext->len = strlen(ext->ext);
@@ -201,7 +199,7 @@ done:
 	return colors;
 }
 
-static const char *file_color(const color_table *colors, const char *filename, const struct stat *sb) {
+static const char *file_color(const struct color_table *colors, const char *filename, const struct stat *sb) {
 	if (!sb) {
 		return colors->orphan;
 	}
@@ -221,7 +219,7 @@ static const char *file_color(const color_table *colors, const char *filename, c
 		if (!color) {
 			size_t namelen = strlen(filename);
 
-			for (ext_color *ext = colors->ext_list; ext; ext = ext->next) {
+			for (struct ext_color *ext = colors->ext_list; ext; ext = ext->next) {
 				if (namelen >= ext->len && memcmp(filename + namelen - ext->len, ext->ext, ext->len) == 0) {
 					color = ext->color;
 					break;
@@ -282,7 +280,7 @@ static void print_esc(const char *esc, FILE *file) {
 	fputs("m", file);
 }
 
-void pretty_print(const color_table *colors, const struct BFTW *ftwbuf) {
+void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf) {
 	const char *path = ftwbuf->path;
 
 	if (!colors) {
@@ -311,7 +309,7 @@ void pretty_print(const color_table *colors, const struct BFTW *ftwbuf) {
 	fputs("\n", stdout);
 }
 
-void print_error(const color_table *colors, const char *path, int error) {
+void print_error(const struct color_table *colors, const char *path, int error) {
 	const char *color = NULL;
 	if (colors) {
 		color = colors->orphan;
@@ -326,11 +324,11 @@ void print_error(const color_table *colors, const char *path, int error) {
 	}
 }
 
-void free_colors(color_table *colors) {
+void free_colors(struct color_table *colors) {
 	if (colors) {
-		ext_color *ext = colors->ext_list;
+		struct ext_color *ext = colors->ext_list;
 		while (ext) {
-			ext_color *saved = ext;
+			struct ext_color *saved = ext;
 			ext = ext->next;
 			free(saved);
 		}

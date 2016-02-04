@@ -15,9 +15,9 @@ struct eval_state {
 	/** Data about the current file. */
 	struct BFTW *ftwbuf;
 	/** The parsed command line. */
-	const cmdline *cl;
+	const struct cmdline *cl;
 	/** The bftw() callback return value. */
-	bftw_action action;
+	enum bftw_action action;
 	/** A stat() buffer, if necessary. */
 	struct stat statbuf;
 };
@@ -25,7 +25,7 @@ struct eval_state {
 /**
  * Perform a stat() call if necessary.
  */
-static const struct stat *fill_statbuf(eval_state *state) {
+static const struct stat *fill_statbuf(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
 		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
@@ -65,7 +65,7 @@ static time_t to_days(time_t seconds) {
 /**
  * Perform a comparison.
  */
-static bool do_cmp(const expression *expr, int n) {
+static bool do_cmp(const struct expr *expr, int n) {
 	switch (expr->cmp) {
 	case CMP_EXACT:
 		return n == expr->idata;
@@ -81,21 +81,21 @@ static bool do_cmp(const expression *expr, int n) {
 /**
  * -true test.
  */
-bool eval_true(const expression *expr, eval_state *state) {
+bool eval_true(const struct expr *expr, struct eval_state *state) {
 	return true;
 }
 
 /**
  * -false test.
  */
-bool eval_false(const expression *expr, eval_state *state) {
+bool eval_false(const struct expr *expr, struct eval_state *state) {
 	return false;
 }
 
 /**
  * -executable, -readable, -writable tests.
  */
-bool eval_access(const expression *expr, eval_state *state) {
+bool eval_access(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, AT_SYMLINK_NOFOLLOW) == 0;
 }
@@ -103,7 +103,7 @@ bool eval_access(const expression *expr, eval_state *state) {
 /**
  * -amin test.
  */
-bool eval_amin(const expression *expr, eval_state *state) {
+bool eval_amin(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -116,7 +116,7 @@ bool eval_amin(const expression *expr, eval_state *state) {
 /**
  * -atime test.
  */
-bool eval_atime(const expression *expr, eval_state *state) {
+bool eval_atime(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -129,7 +129,7 @@ bool eval_atime(const expression *expr, eval_state *state) {
 /**
  * -cmin test.
  */
-bool eval_cmin(const expression *expr, eval_state *state) {
+bool eval_cmin(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -142,7 +142,7 @@ bool eval_cmin(const expression *expr, eval_state *state) {
 /**
  * -ctime test.
  */
-bool eval_ctime(const expression *expr, eval_state *state) {
+bool eval_ctime(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -155,7 +155,7 @@ bool eval_ctime(const expression *expr, eval_state *state) {
 /**
  * -mmin test.
  */
-bool eval_mmin(const expression *expr, eval_state *state) {
+bool eval_mmin(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -168,7 +168,7 @@ bool eval_mmin(const expression *expr, eval_state *state) {
 /**
  * -mtime test.
  */
-bool eval_mtime(const expression *expr, eval_state *state) {
+bool eval_mtime(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -181,7 +181,7 @@ bool eval_mtime(const expression *expr, eval_state *state) {
 /**
  * -gid test.
  */
-bool eval_gid(const expression *expr, eval_state *state) {
+bool eval_gid(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -193,7 +193,7 @@ bool eval_gid(const expression *expr, eval_state *state) {
 /**
  * -uid test.
  */
-bool eval_uid(const expression *expr, eval_state *state) {
+bool eval_uid(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
@@ -205,7 +205,7 @@ bool eval_uid(const expression *expr, eval_state *state) {
 /**
  * -delete action.
  */
-bool eval_delete(const expression *expr, eval_state *state) {
+bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
 	int flag = 0;
@@ -224,7 +224,7 @@ bool eval_delete(const expression *expr, eval_state *state) {
 /**
  * -empty test.
  */
-bool eval_empty(const expression *expr, eval_state *state) {
+bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	bool ret = false;
 	struct BFTW *ftwbuf = state->ftwbuf;
 
@@ -267,7 +267,7 @@ done:
 /**
  * -prune action.
  */
-bool eval_prune(const expression *expr, eval_state *state) {
+bool eval_prune(const struct expr *expr, struct eval_state *state) {
 	state->action = BFTW_SKIP_SUBTREE;
 	return true;
 }
@@ -275,7 +275,7 @@ bool eval_prune(const expression *expr, eval_state *state) {
 /**
  * -hidden test.
  */
-bool eval_hidden(const expression *expr, eval_state *state) {
+bool eval_hidden(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	return ftwbuf->nameoff > 0 && ftwbuf->path[ftwbuf->nameoff] == '.';
 }
@@ -283,7 +283,7 @@ bool eval_hidden(const expression *expr, eval_state *state) {
 /**
  * -nohidden action.
  */
-bool eval_nohidden(const expression *expr, eval_state *state) {
+bool eval_nohidden(const struct expr *expr, struct eval_state *state) {
 	if (eval_hidden(expr, state)) {
 		eval_prune(expr, state);
 		return false;
@@ -295,7 +295,7 @@ bool eval_nohidden(const expression *expr, eval_state *state) {
 /**
  * -name test.
  */
-bool eval_name(const expression *expr, eval_state *state) {
+bool eval_name(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	return fnmatch(expr->sdata, ftwbuf->path + ftwbuf->nameoff, 0) == 0;
 }
@@ -303,7 +303,7 @@ bool eval_name(const expression *expr, eval_state *state) {
 /**
  * -path test.
  */
-bool eval_path(const expression *expr, eval_state *state) {
+bool eval_path(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	return fnmatch(expr->sdata, ftwbuf->path, 0) == 0;
 }
@@ -311,8 +311,8 @@ bool eval_path(const expression *expr, eval_state *state) {
 /**
  * -print action.
  */
-bool eval_print(const expression *expr, eval_state *state) {
-	color_table *colors = state->cl->colors;
+bool eval_print(const struct expr *expr, struct eval_state *state) {
+	struct color_table *colors = state->cl->colors;
 	if (colors) {
 		fill_statbuf(state);
 	}
@@ -323,7 +323,7 @@ bool eval_print(const expression *expr, eval_state *state) {
 /**
  * -print0 action.
  */
-bool eval_print0(const expression *expr, eval_state *state) {
+bool eval_print0(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
 	fwrite(path, 1, strlen(path) + 1, stdout);
 	return true;
@@ -332,7 +332,7 @@ bool eval_print0(const expression *expr, eval_state *state) {
 /**
  * -quit action.
  */
-bool eval_quit(const expression *expr, eval_state *state) {
+bool eval_quit(const struct expr *expr, struct eval_state *state) {
 	state->action = BFTW_STOP;
 	return true;
 }
@@ -340,35 +340,35 @@ bool eval_quit(const expression *expr, eval_state *state) {
 /**
  * -type test.
  */
-bool eval_type(const expression *expr, eval_state *state) {
+bool eval_type(const struct expr *expr, struct eval_state *state) {
 	return state->ftwbuf->typeflag == expr->idata;
 }
 
 /**
  * Evaluate a negation.
  */
-bool eval_not(const expression *expr, eval_state *state) {
+bool eval_not(const struct expr *expr, struct eval_state *state) {
 	return !expr->rhs->eval(expr, state);
 }
 
 /**
  * Evaluate a conjunction.
  */
-bool eval_and(const expression *expr, eval_state *state) {
+bool eval_and(const struct expr *expr, struct eval_state *state) {
 	return expr->lhs->eval(expr->lhs, state) && expr->rhs->eval(expr->rhs, state);
 }
 
 /**
  * Evaluate a disjunction.
  */
-bool eval_or(const expression *expr, eval_state *state) {
+bool eval_or(const struct expr *expr, struct eval_state *state) {
 	return expr->lhs->eval(expr->lhs, state) || expr->rhs->eval(expr->rhs, state);
 }
 
 /**
  * Evaluate the comma operator.
  */
-bool eval_comma(const expression *expr, eval_state *state) {
+bool eval_comma(const struct expr *expr, struct eval_state *state) {
 	expr->lhs->eval(expr->lhs, state);
 	return expr->rhs->eval(expr->rhs, state);
 }
@@ -397,15 +397,15 @@ static int infer_nopenfd() {
 /**
  * bftw() callback.
  */
-static bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
-	const cmdline *cl = ptr;
+static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
+	const struct cmdline *cl = ptr;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		print_error(cl->colors, ftwbuf->path, ftwbuf->error);
 		return BFTW_SKIP_SUBTREE;
 	}
 
-	eval_state state = {
+	struct eval_state state = {
 		.ftwbuf = ftwbuf,
 		.cl = cl,
 		.action = BFTW_CONTINUE,
@@ -416,7 +416,7 @@ static bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	}
 
 	// In -depth mode, only handle directories on the BFTW_POST visit
-	bftw_visit expected_visit = BFTW_PRE;
+	enum bftw_visit expected_visit = BFTW_PRE;
 	if ((cl->flags & BFTW_DEPTH)
 	    && ftwbuf->typeflag == BFTW_DIR
 	    && ftwbuf->depth < cl->maxdepth) {
@@ -435,7 +435,7 @@ static bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 /**
  * Evaluate the command line.
  */
-int eval_cmdline(cmdline *cl) {
+int eval_cmdline(struct cmdline *cl) {
 	int ret = 0;
 	int nopenfd = infer_nopenfd();
 

@@ -17,7 +17,7 @@
 /**
  * A lookup table for colors.
  */
-typedef struct color_table color_table;
+struct color_table;
 
 /**
  * Parse a color table.
@@ -26,7 +26,7 @@ typedef struct color_table color_table;
  *         A color table in the LS_COLORS environment variable format.
  * @return The parsed color table.
  */
-color_table *parse_colors(char *ls_colors);
+struct color_table *parse_colors(char *ls_colors);
 
 /**
  * Pretty-print a file path.
@@ -36,7 +36,7 @@ color_table *parse_colors(char *ls_colors);
  * @param ftwbuf
  *         The bftw() data for the current path.
  */
-void pretty_print(const color_table *colors, const struct BFTW *ftwbuf);
+void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf);
 
 /**
  * Pretty-print an error.
@@ -48,7 +48,7 @@ void pretty_print(const color_table *colors, const struct BFTW *ftwbuf);
  * @param error
  *         The error code that occurred.
  */
-void print_error(const color_table *colors, const char *path, int error);
+void print_error(const struct color_table *colors, const char *path, int error);
 
 /**
  * Free a color table.
@@ -56,6 +56,6 @@ void print_error(const color_table *colors, const char *path, int error);
  * @param colors
  *         The color table to free.
  */
-void free_colors(color_table *colors);
+void free_colors(struct color_table *colors);
 
 #endif // BFS_COLOR_H

@@ -37,21 +37,21 @@
 /**
  * Simple dynamically-sized string type.
  */
-typedef struct {
+struct dynstr {
 	char *str;
 	size_t length;
 	size_t capacity;
-} dynstr;
+};
 
 /** Initialize a dynstr. */
-static void dynstr_init(dynstr *dstr) {
+static void dynstr_init(struct dynstr *dstr) {
 	dstr->str = NULL;
 	dstr->length = 0;
 	dstr->capacity = 0;
 }
 
 /** Grow a dynstr to the given capacity if necessary. */
-static int dynstr_grow(dynstr *dstr, size_t length) {
+static int dynstr_grow(struct dynstr *dstr, size_t length) {
 	if (length >= dstr->capacity) {
 		size_t new_capacity = 3*(length + 1)/2;
 		char *new_str = realloc(dstr->str, new_capacity);
@@ -67,7 +67,7 @@ static int dynstr_grow(dynstr *dstr, size_t length) {
 }
 
 /** Concatenate a string to a dynstr at the given position. */
-static int dynstr_concat(dynstr *dstr, size_t pos, const char *more) {
+static int dynstr_concat(struct dynstr *dstr, size_t pos, const char *more) {
 	size_t morelen = strlen(more);
 	size_t length = pos + morelen;
 	if (dynstr_grow(dstr, length) != 0) {
@@ -80,25 +80,23 @@ static int dynstr_concat(dynstr *dstr, size_t pos, const char *more) {
 }
 
 /** Free a dynstr. */
-static void dynstr_free(dynstr *dstr) {
+static void dynstr_free(struct dynstr *dstr) {
 	free(dstr->str);
 }
 
 /**
  * A single entry in the dircache.
  */
-typedef struct dircache_entry dircache_entry;
-
 struct dircache_entry {
 	/** The parent entry, if any. */
-	dircache_entry *parent;
+	struct dircache_entry *parent;
 	/** This directory's depth in the walk. */
 	size_t depth;
 
 	/** Previous node in the LRU list. */
-	dircache_entry *lru_prev;
+	struct dircache_entry *lru_prev;
 	/** Next node in the LRU list. */
-	dircache_entry *lru_next;
+	struct dircache_entry *lru_next;
 
 	/** The DIR pointer, if open. */
 	DIR *dir;
@@ -117,26 +115,26 @@ struct dircache_entry {
 /**
  * A directory cache.
  */
-typedef struct {
+struct dircache {
 	/** Most recently used entry. */
-	dircache_entry *lru_head;
+	struct dircache_entry *lru_head;
 	/** Least recently used entry. */
-	dircache_entry *lru_tail;
+	struct dircache_entry *lru_tail;
 	/** Remaining LRU list capacity. */
 	size_t lru_remaining;
-} dircache;
+};
 
 /** Initialize a dircache. */
-static void dircache_init(dircache *cache, size_t lru_size) {
+static void dircache_init(struct dircache *cache, size_t lru_size) {
 	assert(lru_size > 0);
 	cache->lru_head = cache->lru_tail = NULL;
 	cache->lru_remaining = lru_size;
 }
 
 /** Add an entry to the dircache. */
-static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, const char *name) {
+static struct dircache_entry *dircache_add(struct dircache *cache, struct dircache_entry *parent, const char *name) {
 	size_t namelen = strlen(name);
-	size_t size = sizeof(dircache_entry) + namelen + 1;
+	size_t size = sizeof(struct dircache_entry) + namelen + 1;
 
 	bool needs_slash = false;
 	if (namelen == 0 || name[namelen - 1] != '/') {
@@ -144,7 +142,7 @@ static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, con
 		++size;
 	}
 
-	dircache_entry *entry = malloc(size);
+	struct dircache_entry *entry = malloc(size);
 	if (!entry) {
 		return NULL;
 	}
@@ -179,7 +177,7 @@ static dircache_entry *dircache_add(dircache *cache, dircache_entry *parent, con
 }
 
 /** Add an entry to the head of the LRU list. */
-static void dircache_lru_add(dircache *cache, dircache_entry *entry) {
+static void dircache_lru_add(struct dircache *cache, struct dircache_entry *entry) {
 	assert(entry->dir);
 	assert(entry->lru_prev == NULL);
 	assert(entry->lru_next == NULL);
@@ -199,7 +197,7 @@ static void dircache_lru_add(dircache *cache, dircache_entry *entry) {
 }
 
 /** Remove an entry from the LRU list. */
-static void dircache_lru_remove(dircache *cache, dircache_entry *entry) {
+static void dircache_lru_remove(struct dircache *cache, struct dircache_entry *entry) {
 	if (entry->lru_prev) {
 		assert(cache->lru_head != entry);
 		entry->lru_prev->lru_next = entry->lru_next;
@@ -222,7 +220,7 @@ static void dircache_lru_remove(dircache *cache, dircache_entry *entry) {
 }
 
 /** Close a dircache_entry and remove it from the LRU list. */
-static void dircache_entry_close(dircache *cache, dircache_entry *entry) {
+static void dircache_entry_close(struct dircache *cache, struct dircache_entry *entry) {
 	dircache_lru_remove(cache, entry);
 	closedir(entry->dir);
 	entry->dir = NULL;
@@ -250,7 +248,7 @@ static DIR *opendirat(int fd, const char *name) {
  * @param[out] path
  *         Will hold the full path to the entry, with a trailing '/'.
  */
-static int dircache_entry_path(const dircache_entry *entry, dynstr *path) {
+static int dircache_entry_path(const struct dircache_entry *entry, struct dynstr *path) {
 	size_t namelen = entry->namelen;
 	size_t pathlen = entry->nameoff + namelen;
 
@@ -285,8 +283,8 @@ static int dircache_entry_path(const dircache_entry *entry, dynstr *path) {
  *         Will hold the appropriate path to use.
  * @return The closest open ancestor entry.
  */
-static dircache_entry *dircache_entry_base(dircache *cache, dircache_entry *entry, int *at_fd, const char **at_path) {
-	dircache_entry *base = entry;
+static struct dircache_entry *dircache_entry_base(struct dircache *cache, struct dircache_entry *entry, int *at_fd, const char **at_path) {
+	struct dircache_entry *base = entry;
 
 	do {
 		base = base->parent;
@@ -315,7 +313,7 @@ static dircache_entry *dircache_entry_base(dircache *cache, dircache_entry *entr
  * @return
  *         The opened DIR *, or NULL on error.
  */
-static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const char *path) {
+static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
 	assert(!entry->dir);
 
 	if (cache->lru_remaining == 0) {
@@ -324,7 +322,7 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
-	dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
+	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
 
 	DIR *dir = opendirat(at_fd, at_path);
 
@@ -347,7 +345,7 @@ static DIR *dircache_entry_open(dircache *cache, dircache_entry *entry, const ch
 }
 
 /** Free a dircache_entry. */
-static void dircache_entry_free(dircache *cache, dircache_entry *entry) {
+static void dircache_entry_free(struct dircache *cache, struct dircache_entry *entry) {
 	if (entry) {
 		assert(entry->refcount == 0);
 
@@ -364,40 +362,38 @@ static void dircache_entry_free(dircache *cache, dircache_entry *entry) {
 /**
  * A single block in the dirqueue chain.
  */
-typedef struct dirqueue_block dirqueue_block;
-
 struct dirqueue_block {
 	/** The next block in the chain. */
-	dirqueue_block *next;
+	struct dirqueue_block *next;
 	/** The elements in the queue. */
-	dircache_entry *entries[DIRQUEUE_BLOCK_SIZE];
+	struct dircache_entry *entries[DIRQUEUE_BLOCK_SIZE];
 };
 
 /**
  * A queue of 'dircache_entry's to examine.
  */
-typedef struct {
+struct dirqueue {
 	/** The first block. */
-	dirqueue_block *head;
+	struct dirqueue_block *head;
 	/** The last block. */
-	dirqueue_block *tail;
+	struct dirqueue_block *tail;
 	/** The index in 'head' of the next entry to read. */
 	size_t front;
 	/** The index in 'tail' of the next entry to write. */
 	size_t back;
-} dirqueue;
+};
 
 /** Initialize a dirqueue. */
-static void dirqueue_init(dirqueue *queue) {
+static void dirqueue_init(struct dirqueue *queue) {
 	queue->head = queue->tail = NULL;
 	queue->front = 0;
 	queue->back = DIRQUEUE_BLOCK_SIZE;
 }
 
 /** Add an entry to the dirqueue. */
-static int dirqueue_push(dirqueue *queue, dircache_entry *entry) {
+static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
 	if (queue->back == DIRQUEUE_BLOCK_SIZE) {
-		dirqueue_block *block = malloc(sizeof(dirqueue_block));
+		struct dirqueue_block *block = malloc(sizeof(struct dirqueue_block));
 		if (!block) {
 			return -1;
 		}
@@ -421,7 +417,7 @@ static int dirqueue_push(dirqueue *queue, dircache_entry *entry) {
 }
 
 /** Remove an entry from the dirqueue. */
-static dircache_entry *dirqueue_pop(dirqueue *queue) {
+static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
 	if (!queue->head) {
 		return NULL;
 	}
@@ -432,8 +428,8 @@ static dircache_entry *dirqueue_pop(dirqueue *queue) {
 		return NULL;
 	}
 
-	dirqueue_block *head = queue->head;
-	dircache_entry *entry = head->entries[queue->front];
+	struct dirqueue_block *head = queue->head;
+	struct dircache_entry *entry = head->entries[queue->front];
 	if (++queue->front == DIRQUEUE_BLOCK_SIZE) {
 		queue->head = head->next;
 		queue->front = 0;
@@ -513,19 +509,19 @@ static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
 /**
  * Possible bftw() traversal statuses.
  */
-typedef enum {
+enum bftw_status {
 	/** The current path is state.current. */
 	BFTW_CURRENT,
 	/** The current path is a child of state.current. */
 	BFTW_CHILD,
 	/** dircache_entry's are being garbage collected. */
 	BFTW_GC,
-} bftw_status;
+};
 
 /**
  * Holds the current state of the bftw() traversal.
  */
-typedef struct {
+struct bftw_state {
 	/** bftw() callback. */
 	bftw_fn *fn;
 	/** bftw() flags. */
@@ -537,27 +533,27 @@ typedef struct {
 	int error;
 
 	/** The cache of open directories. */
-	dircache cache;
+	struct dircache cache;
 	/** The current dircache entry. */
-	dircache_entry *current;
+	struct dircache_entry *current;
 	/** The current traversal status. */
-	bftw_status status;
+	enum bftw_status status;
 
 	/** The queue of directories left to explore. */
-	dirqueue queue;
+	struct dirqueue queue;
 	/** The current path being explored. */
-	dynstr path;
+	struct dynstr path;
 
 	/** Extra data about the current file. */
 	struct BFTW ftwbuf;
 	/** stat() buffer for the current file. */
 	struct stat statbuf;
-} bftw_state;
+};
 
 /**
  * Initialize the bftw() state.
  */
-static void bftw_state_init(bftw_state *state, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+static void bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 	state->fn = fn;
 	state->flags = flags;
 	state->ptr = ptr;
@@ -576,10 +572,10 @@ static void bftw_state_init(bftw_state *state, bftw_fn *fn, int nopenfd, int fla
 /**
  * Concatenate a subpath to the current path.
  */
-static int bftw_path_concat(bftw_state *state, const char *subpath) {
+static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 	size_t nameoff = 0;
 
-	dircache_entry *current = state->current;
+	struct dircache_entry *current = state->current;
 	if (current) {
 		nameoff = current->nameoff + current->namelen;
 	}
@@ -592,7 +588,7 @@ static int bftw_path_concat(bftw_state *state, const char *subpath) {
 /**
  * Initialize the buffers with data about the current path.
  */
-static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
+static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de) {
 	struct BFTW *ftwbuf = &state->ftwbuf;
 	ftwbuf->path = state->path.str;
 	ftwbuf->nameoff = 0;
@@ -603,7 +599,7 @@ static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
 
-	dircache_entry *current = state->current;
+	struct dircache_entry *current = state->current;
 	if (current) {
 		ftwbuf->nameoff = current->nameoff;
 		ftwbuf->depth = current->depth;
@@ -638,13 +634,13 @@ static void bftw_init_buffers(bftw_state *state, const struct dirent *de) {
 /**
  * Invoke the callback on the given path.
  */
-static int bftw_handle_path(bftw_state *state) {
+static int bftw_handle_path(struct bftw_state *state) {
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
 	if (state->ftwbuf.typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
 		return BFTW_FAIL;
 	}
 
-	bftw_action action = state->fn(&state->ftwbuf, state->ptr);
+	enum bftw_action action = state->fn(&state->ftwbuf, state->ptr);
 	switch (action) {
 	case BFTW_CONTINUE:
 	case BFTW_SKIP_SIBLINGS:
@@ -661,8 +657,8 @@ static int bftw_handle_path(bftw_state *state) {
 /**
  * Push a new entry onto the queue.
  */
-static int bftw_push(bftw_state *state, const char *name) {
-	dircache_entry *entry = dircache_add(&state->cache, state->current, name);
+static int bftw_push(struct bftw_state *state, const char *name) {
+	struct dircache_entry *entry = dircache_add(&state->cache, state->current, name);
 	if (!entry) {
 		return -1;
 	}
@@ -673,9 +669,9 @@ static int bftw_push(bftw_state *state, const char *name) {
 /**
  * Pop an entry off the queue.
  */
-static int bftw_pop(bftw_state *state, bool invoke_callback) {
+static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 	int ret = BFTW_CONTINUE;
-	dircache_entry *entry = state->current;
+	struct dircache_entry *entry = state->current;
 
 	if (!(state->flags & BFTW_DEPTH)) {
 		invoke_callback = false;
@@ -691,7 +687,7 @@ static int bftw_pop(bftw_state *state, bool invoke_callback) {
 	state->status = BFTW_GC;
 
 	while (entry) {
-		dircache_entry *current = entry;
+		struct dircache_entry *current = entry;
 		entry = entry->parent;
 
 		if (--current->refcount > 0) {
@@ -736,7 +732,7 @@ static int bftw_pop(bftw_state *state, bool invoke_callback) {
 /**
  * Dispose of the bftw() state.
  */
-static void bftw_state_free(bftw_state *state) {
+static void bftw_state_free(struct bftw_state *state) {
 	while (state->current) {
 		bftw_pop(state, false);
 	}
@@ -744,10 +740,10 @@ static void bftw_state_free(bftw_state *state) {
 	dynstr_free(&state->path);
 }
 
-int bftw(const char *path, bftw_fn *fn, int nopenfd, bftw_flags flags, void *ptr) {
+int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void *ptr) {
 	int ret = -1;
 
-	bftw_state state;
+	struct bftw_state state;
 	bftw_state_init(&state, fn, nopenfd, flags, ptr);
 
 	// Handle 'path' itself first

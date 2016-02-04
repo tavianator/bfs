@@ -18,7 +18,7 @@
 /**
  * Possible file types.
  */
-typedef enum {
+enum bftw_typeflag {
 	/** Unknown type. */
 	BFTW_UNKNOWN,
 	/** Block device. */
@@ -37,17 +37,17 @@ typedef enum {
 	BFTW_SOCK,
 	/** An error occurred for this file. */
 	BFTW_ERROR,
-} bftw_typeflag;
+};
 
 /**
  * Possible visit occurrences.
  */
-typedef enum {
+enum bftw_visit {
 	/** Pre-order visit. */
 	BFTW_PRE,
 	/** Post-order visit. */
 	BFTW_POST,
-} bftw_visit;
+};
 
 /**
  * Data about the current file for the bftw() callback.
@@ -61,10 +61,10 @@ struct BFTW {
 	/** The depth of this file in the traversal. */
 	size_t depth;
 	/** Which visit this is. */
-	bftw_visit visit;
+	enum bftw_visit visit;
 
 	/** The file type. */
-	bftw_typeflag typeflag;
+	enum bftw_typeflag typeflag;
 	/** The errno that occurred, if typeflag == BFTW_ERROR. */
 	int error;
 
@@ -77,7 +77,7 @@ struct BFTW {
 	const char *at_path;
 };
 
-typedef enum {
+enum bftw_action {
 	/** Keep walking. */
 	BFTW_CONTINUE,
 	/** Skip this path's siblings. */
@@ -86,7 +86,7 @@ typedef enum {
 	BFTW_SKIP_SUBTREE,
 	/** Stop walking. */
 	BFTW_STOP,
-} bftw_action;
+};
 
 /**
  * Callback function type for bftw().
@@ -98,16 +98,19 @@ typedef enum {
  * @return
  *         An action value.
  */
-typedef bftw_action bftw_fn(struct BFTW *ftwbuf, void *ptr);
+typedef enum bftw_action bftw_fn(struct BFTW *ftwbuf, void *ptr);
 
-typedef enum {
+/**
+ * Flags that control bftw() behavior.
+ */
+enum bftw_flags {
 	/** stat() each encountered file. */
 	BFTW_STAT    = 1 << 0,
 	/** Attempt to recover from encountered errors. */
 	BFTW_RECOVER = 1 << 1,
 	/** Visit directories in post-order as well as pre-order. */
 	BFTW_DEPTH   = 1 << 2,
-} bftw_flags;
+};
 
 /**
  * Breadth First Tree Walk (or Better File Tree Walk).
@@ -129,6 +132,6 @@ typedef enum {
  * @return
  *         0 on success, or -1 on failure.
  */
-int bftw(const char *path, bftw_fn *fn, int nopenfd, bftw_flags flags, void *ptr);
+int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void *ptr);
 
 #endif // BFS_BFTW_H
