@@ -63,9 +63,6 @@ struct cmdline {
 
 	/** The command line expression. */
 	struct expr *expr;
-
-	/** The current time. */
-	struct timespec now;
 };
 
 /**
@@ -109,14 +106,20 @@ struct expr {
 	struct expr *rhs;
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
+
 	/** The optional comparison flag. */
 	enum cmpflag cmp;
+
+	/** The optional reference time. */
+	struct timespec reftime;
 	/** The optional time field. */
 	enum timefield timefield;
 	/** The optional time unit. */
 	enum timeunit timeunit;
+
 	/** Optional integer data for this expression. */
 	int idata;
+
 	/** Optional string data for this expression. */
 	const char *sdata;
 };

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /**
@@ -127,6 +128,9 @@ struct parser_state {
 	bool warn;
 	/** Whether any non-option arguments have been encountered. */
 	bool non_option_seen;
+
+	/** The current time. */
+	struct timespec now;
 };
 
 /**
@@ -308,10 +312,40 @@ static struct expr *parse_test_sdata(struct parser_state *state, const char *tes
 static struct expr *parse_acmtime(struct parser_state *state, const char *option, enum timefield field, enum timeunit unit) {
 	struct expr *expr = parse_test_icmp(state, option, eval_acmtime);
 	if (expr) {
+		expr->reftime = state->now;
 		expr->timefield = field;
 		expr->timeunit = unit;
 	}
 	return expr;
+}
+
+/**
+ * "Parse" -daystart.
+ */
+static struct expr *parse_daystart(struct parser_state *state) {
+	// Should be called before localtime_r() according to POSIX.1-2004
+	tzset();
+
+	struct tm tm;
+	if (!localtime_r(&state->now.tv_sec, &tm)) {
+		perror("localtime_r()");
+		return NULL;
+	}
+
+	tm.tm_sec = 0;
+	tm.tm_min = 0;
+	tm.tm_hour = 0;
+	++tm.tm_mday;
+	time_t time = mktime(&tm);
+	if (time == -1) {
+		perror("mktime()");
+		return NULL;
+	}
+
+	state->now.tv_sec = time;
+	state->now.tv_nsec = 0;
+
+	return new_positional_option(state);
 }
 
 /**
@@ -402,6 +436,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 	} else if (strcmp(arg, "-nocolor") == 0) {
 		state->cl->color = false;
 		return new_option(state, arg);
+	} else if (strcmp(arg, "-daystart") == 0) {
+		return parse_daystart(state);
 	} else if (strcmp(arg, "-delete") == 0) {
 		state->cl->flags |= BFTW_DEPTH;
 		return new_action(state, eval_delete);
@@ -681,11 +717,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cl->flags = BFTW_RECOVER;
 	cl->expr = &expr_true;
 
-	if (clock_gettime(CLOCK_REALTIME, &cl->now) != 0) {
-		perror("clock_gettime()");
-		goto fail;
-	}
-
 	struct parser_state state = {
 		.cl = cl,
 		.argv = argv,
@@ -694,6 +725,11 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.warn = true,
 		.non_option_seen = false,
 	};
+
+	if (clock_gettime(CLOCK_REALTIME, &state.now) != 0) {
+		perror("clock_gettime()");
+		goto fail;
+	}
 
 	if (skip_paths(&state)) {
 		cl->expr = parse_expr(&state);

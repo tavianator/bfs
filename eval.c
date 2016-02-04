@@ -108,7 +108,7 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 		break;
 	}
 
-	time_t diff = timespec_diff(&state->cl->now, time);
+	time_t diff = timespec_diff(&expr->reftime, time);
 	switch (expr->timeunit) {
 	case MINUTES:
 		diff /= 60;
