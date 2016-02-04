@@ -273,6 +273,18 @@ bool eval_nohidden(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -inum test.
+ */
+bool eval_inum(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return do_cmp(expr, statbuf->st_ino);
+}
+
+/**
  * -name test.
  */
 bool eval_name(const struct expr *expr, struct eval_state *state) {
