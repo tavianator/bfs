@@ -1,8 +1,23 @@
+/*********************************************************************
+ * bfs                                                               *
+ * Copyright (C) 2015-2016 Tavian Barnes <tavianator@tavianator.com> *
+ *                                                                   *
+ * This program is free software. It comes without any warranty, to  *
+ * the extent permitted by applicable law. You can redistribute it   *
+ * and/or modify it under the terms of the Do What The Fuck You Want *
+ * To Public License, Version 2, as published by Sam Hocevar. See    *
+ * the COPYING file or http://www.wtfpl.net/ for more details.       *
+ *********************************************************************/
+
 #include "bfs.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -320,6 +335,28 @@ static struct expr *parse_acmtime(struct parser_state *state, const char *option
 }
 
 /**
+ * Parse -[ac]?newer.
+ */
+static struct expr *parse_acnewer(struct parser_state *state, const char *option, enum timefield field) {
+	struct expr *expr = parse_test_sdata(state, option, eval_acnewer);
+	if (!expr) {
+		return NULL;
+	}
+
+	struct stat sb;
+	if (fstatat(AT_FDCWD, expr->sdata, &sb, AT_SYMLINK_NOFOLLOW) != 0) {
+		print_error(NULL, expr->sdata, errno);
+		free_expr(expr);
+		return NULL;
+	}
+
+	expr->reftime = sb.st_mtim;
+	expr->timefield = field;
+
+	return expr;
+}
+
+/**
  * "Parse" -daystart.
  */
 static struct expr *parse_daystart(struct parser_state *state) {
@@ -426,10 +463,14 @@ static struct expr *parse_literal(struct parser_state *state) {
 		return parse_acmtime(state, arg, ATIME, MINUTES);
 	} else if (strcmp(arg, "-atime") == 0) {
 		return parse_acmtime(state, arg, ATIME, DAYS);
+	} else if (strcmp(arg, "-anewer") == 0) {
+		return parse_acnewer(state, arg, ATIME);
 	} else if (strcmp(arg, "-cmin") == 0) {
 		return parse_acmtime(state, arg, CTIME, MINUTES);
 	} else if (strcmp(arg, "-ctime") == 0) {
 		return parse_acmtime(state, arg, CTIME, DAYS);
+	} else if (strcmp(arg, "-cnewer") == 0) {
+		return parse_acnewer(state, arg, CTIME);
 	} else if (strcmp(arg, "-color") == 0) {
 		state->cl->color = true;
 		return new_option(state, arg);
@@ -468,6 +509,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 		return parse_acmtime(state, arg, MTIME, DAYS);
 	} else if (strcmp(arg, "-name") == 0) {
 		return parse_test_sdata(state, arg, eval_name);
+	} else if (strcmp(arg, "-newer") == 0) {
+		return parse_acnewer(state, arg, MTIME);
 	} else if (strcmp(arg, "-path") == 0 || strcmp(arg, "-wholename") == 0) {
 		return parse_test_sdata(state, arg, eval_path);
 	} else if (strcmp(arg, "-print") == 0) {

@@ -1,3 +1,14 @@
+/*********************************************************************
+ * bfs                                                               *
+ * Copyright (C) 2015-2016 Tavian Barnes <tavianator@tavianator.com> *
+ *                                                                   *
+ * This program is free software. It comes without any warranty, to  *
+ * the extent permitted by applicable law. You can redistribute it   *
+ * and/or modify it under the terms of the Do What The Fuck You Want *
+ * To Public License, Version 2, as published by Sam Hocevar. See    *
+ * the COPYING file or http://www.wtfpl.net/ for more details.       *
+ *********************************************************************/
+
 #include "bfs.h"
 #include "bftw.h"
 #include <dirent.h>
@@ -119,6 +130,32 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return do_cmp(expr, diff);
+}
+
+/**
+ * -[ac]?newer tests.
+ */
+bool eval_acnewer(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	const struct timespec *time;
+	switch (expr->timefield) {
+	case ATIME:
+		time = &statbuf->st_atim;
+		break;
+	case CTIME:
+		time = &statbuf->st_ctim;
+		break;
+	case MTIME:
+		time = &statbuf->st_mtim;
+		break;
+	}
+
+	return time->tv_sec > expr->reftime.tv_sec
+		|| (time->tv_sec == expr->reftime.tv_sec && time->tv_nsec > expr->reftime.tv_nsec);
 }
 
 /**

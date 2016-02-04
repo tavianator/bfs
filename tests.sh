@@ -124,7 +124,17 @@ function test_0017() {
         find_diff "$1" -uid -10000
 }
 
-for i in {1..17}; do
+function test_0018() {
+    basic_structure "$1"
+    find_diff "$1" -newer "$1/e/f"
+}
+
+function test_0019() {
+    basic_structure "$1"
+    find_diff "$1" -cnewer "$1/e/f"
+}
+
+for i in {1..19}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"

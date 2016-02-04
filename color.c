@@ -318,7 +318,7 @@ void print_error(const struct color_table *colors, const char *path, int error) 
 	if (color) {
 		print_esc(color, stderr);
 	}
-	fprintf(stderr, "Error at %s: %s\n", path, strerror(error));
+	fprintf(stderr, "'%s': %s\n", path, strerror(error));
 	if (color) {
 		print_esc(colors->reset, stderr);
 	}
