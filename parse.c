@@ -459,90 +459,165 @@ static struct expr *parse_literal(struct parser_state *state) {
 	// Paths are already skipped at this point
 	const char *arg = state->argv[state->i++];
 
-	if (strcmp(arg, "-amin") == 0) {
-		return parse_acmtime(state, arg, ATIME, MINUTES);
-	} else if (strcmp(arg, "-atime") == 0) {
-		return parse_acmtime(state, arg, ATIME, DAYS);
-	} else if (strcmp(arg, "-anewer") == 0) {
-		return parse_acnewer(state, arg, ATIME);
-	} else if (strcmp(arg, "-cmin") == 0) {
-		return parse_acmtime(state, arg, CTIME, MINUTES);
-	} else if (strcmp(arg, "-ctime") == 0) {
-		return parse_acmtime(state, arg, CTIME, DAYS);
-	} else if (strcmp(arg, "-cnewer") == 0) {
-		return parse_acnewer(state, arg, CTIME);
-	} else if (strcmp(arg, "-color") == 0) {
-		state->cl->color = true;
-		return new_option(state, arg);
-	} else if (strcmp(arg, "-nocolor") == 0) {
-		state->cl->color = false;
-		return new_option(state, arg);
-	} else if (strcmp(arg, "-daystart") == 0) {
-		return parse_daystart(state);
-	} else if (strcmp(arg, "-delete") == 0) {
-		state->cl->flags |= BFTW_DEPTH;
-		return new_action(state, eval_delete);
-	} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
-		state->cl->flags |= BFTW_DEPTH;
-		return new_option(state, arg);
-	} else if (strcmp(arg, "-empty") == 0) {
-		return new_test(state, eval_empty);
-	} else if (strcmp(arg, "-executable") == 0) {
-		return new_test_idata(state, eval_access, X_OK);
-	} else if (strcmp(arg, "-false") == 0) {
-		return &expr_false;
-	} else if (strcmp(arg, "-gid") == 0) {
-		return parse_test_icmp(state, arg, eval_gid);
-	} else if (strcmp(arg, "-uid") == 0) {
-		return parse_test_icmp(state, arg, eval_uid);
-	} else if (strcmp(arg, "-hidden") == 0) {
-		return new_test(state, eval_hidden);
-	} else if (strcmp(arg, "-nohidden") == 0) {
-		return new_action(state, eval_nohidden);
-	} else if (strcmp(arg, "-inum") == 0) {
-		return parse_test_icmp(state, arg, eval_inum);
-	} else if (strcmp(arg, "-links") == 0) {
-		return parse_test_icmp(state, arg, eval_links);
-	} else if (strcmp(arg, "-mindepth") == 0) {
-		return parse_depth(state, arg, &state->cl->mindepth);
-	} else if (strcmp(arg, "-maxdepth") == 0) {
-		return parse_depth(state, arg, &state->cl->maxdepth);
-	} else if (strcmp(arg, "-mmin") == 0) {
-		return parse_acmtime(state, arg, MTIME, MINUTES);
-	} else if (strcmp(arg, "-mtime") == 0) {
-		return parse_acmtime(state, arg, MTIME, DAYS);
-	} else if (strcmp(arg, "-name") == 0) {
-		return parse_test_sdata(state, arg, eval_name);
-	} else if (strcmp(arg, "-newer") == 0) {
-		return parse_acnewer(state, arg, MTIME);
-	} else if (strcmp(arg, "-path") == 0 || strcmp(arg, "-wholename") == 0) {
-		return parse_test_sdata(state, arg, eval_path);
-	} else if (strcmp(arg, "-print") == 0) {
-		return new_action(state, eval_print);
-	} else if (strcmp(arg, "-print0") == 0) {
-		return new_action(state, eval_print0);
-	} else if (strcmp(arg, "-prune") == 0) {
-		return new_action(state, eval_prune);
-	} else if (strcmp(arg, "-quit") == 0) {
-		return new_action(state, eval_quit);
-	} else if (strcmp(arg, "-readable") == 0) {
-		return new_test_idata(state, eval_access, R_OK);
-	} else if (strcmp(arg, "-true") == 0) {
-		return &expr_true;
-	} else if (strcmp(arg, "-type") == 0) {
-		return parse_type(state);
-	} else if (strcmp(arg, "-warn") == 0) {
-		state->warn = true;
-		return new_positional_option(state);
-	} else if (strcmp(arg, "-nowarn") == 0) {
-		state->warn = false;
-		return new_positional_option(state);
-	} else if (strcmp(arg, "-writable") == 0) {
-		return new_test_idata(state, eval_access, W_OK);
-	} else {
-		fprintf(stderr, "Unknown argument '%s'.\n", arg);
+	if (arg[0] != '-') {
+		fprintf(stderr, "Expected a predicate; found '%s'.\n", arg);
 		return NULL;
 	}
+
+	switch (arg[1]) {
+	case 'a':
+		if (strcmp(arg, "-amin") == 0) {
+			return parse_acmtime(state, arg, ATIME, MINUTES);
+		} else if (strcmp(arg, "-atime") == 0) {
+			return parse_acmtime(state, arg, ATIME, DAYS);
+		} else if (strcmp(arg, "-anewer") == 0) {
+			return parse_acnewer(state, arg, ATIME);
+		}
+		break;
+
+	case 'c':
+		if (strcmp(arg, "-cmin") == 0) {
+			return parse_acmtime(state, arg, CTIME, MINUTES);
+		} else if (strcmp(arg, "-ctime") == 0) {
+			return parse_acmtime(state, arg, CTIME, DAYS);
+		} else if (strcmp(arg, "-cnewer") == 0) {
+			return parse_acnewer(state, arg, CTIME);
+		} else if (strcmp(arg, "-color") == 0) {
+			state->cl->color = true;
+			return new_option(state, arg);
+		}
+		break;
+
+	case 'd':
+		if (strcmp(arg, "-daystart") == 0) {
+			return parse_daystart(state);
+		} else if (strcmp(arg, "-delete") == 0) {
+			state->cl->flags |= BFTW_DEPTH;
+			return new_action(state, eval_delete);
+		} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
+			state->cl->flags |= BFTW_DEPTH;
+			return new_option(state, arg);
+		}
+		break;
+
+	case 'e':
+		if (strcmp(arg, "-empty") == 0) {
+			return new_test(state, eval_empty);
+		} else if (strcmp(arg, "-executable") == 0) {
+			return new_test_idata(state, eval_access, X_OK);
+		}
+		break;
+
+	case 'f':
+		if (strcmp(arg, "-false") == 0) {
+			return &expr_false;
+		}
+		break;
+
+	case 'g':
+		if (strcmp(arg, "-gid") == 0) {
+			return parse_test_icmp(state, arg, eval_gid);
+		}
+		break;
+
+	case 'h':
+		if (strcmp(arg, "-hidden") == 0) {
+			return new_test(state, eval_hidden);
+		}
+		break;
+
+	case 'i':
+		if (strcmp(arg, "-inum") == 0) {
+			return parse_test_icmp(state, arg, eval_inum);
+		}
+		break;
+
+	case 'l':
+		if (strcmp(arg, "-links") == 0) {
+			return parse_test_icmp(state, arg, eval_links);
+		}
+		break;
+
+	case 'm':
+		if (strcmp(arg, "-mindepth") == 0) {
+			return parse_depth(state, arg, &state->cl->mindepth);
+		} else if (strcmp(arg, "-maxdepth") == 0) {
+			return parse_depth(state, arg, &state->cl->maxdepth);
+		} else if (strcmp(arg, "-mmin") == 0) {
+			return parse_acmtime(state, arg, MTIME, MINUTES);
+		} else if (strcmp(arg, "-mtime") == 0) {
+			return parse_acmtime(state, arg, MTIME, DAYS);
+		}
+		break;
+
+	case 'n':
+		if (strcmp(arg, "-name") == 0) {
+			return parse_test_sdata(state, arg, eval_name);
+		} else if (strcmp(arg, "-newer") == 0) {
+			return parse_acnewer(state, arg, MTIME);
+		} else if (strcmp(arg, "-nocolor") == 0) {
+			state->cl->color = false;
+			return new_option(state, arg);
+		} else if (strcmp(arg, "-nohidden") == 0) {
+			return new_action(state, eval_nohidden);
+		} else if (strcmp(arg, "-nowarn") == 0) {
+			state->warn = false;
+			return new_positional_option(state);
+		}
+		break;
+
+	case 'p':
+		if (strcmp(arg, "-path") == 0) {
+			return parse_test_sdata(state, arg, eval_path);
+		} else if (strcmp(arg, "-print") == 0) {
+			return new_action(state, eval_print);
+		} else if (strcmp(arg, "-print0") == 0) {
+			return new_action(state, eval_print0);
+		} else if (strcmp(arg, "-prune") == 0) {
+			return new_action(state, eval_prune);
+		}
+		break;
+
+	case 'q':
+		if (strcmp(arg, "-quit") == 0) {
+			return new_action(state, eval_quit);
+		}
+		break;
+
+	case 'r':
+		if (strcmp(arg, "-readable") == 0) {
+			return new_test_idata(state, eval_access, R_OK);
+		}
+		break;
+
+	case 't':
+		if (strcmp(arg, "-true") == 0) {
+			return &expr_true;
+		} else if (strcmp(arg, "-type") == 0) {
+			return parse_type(state);
+		}
+		break;
+
+	case  'u':
+		if (strcmp(arg, "-uid") == 0) {
+			return parse_test_icmp(state, arg, eval_uid);
+		}
+		break;
+
+	case 'w':
+		if (strcmp(arg, "-warn") == 0) {
+			state->warn = true;
+			return new_positional_option(state);
+		} else if (strcmp(arg, "-wholename") == 0) {
+			return parse_test_sdata(state, arg, eval_path);
+		} else if (strcmp(arg, "-writable") == 0) {
+			return new_test_idata(state, eval_access, W_OK);
+		}
+		break;
+	}
+
+	fprintf(stderr, "Unknown argument '%s'.\n", arg);
+	return NULL;
 }
 
 /**
