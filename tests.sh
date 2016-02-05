@@ -35,6 +35,7 @@ function links_structure() {
     ln "$1/a" "$1/c"
     mkdir -p "$1/d/e"
     ln -s ../../d "$1/d/e/f"
+    touchp "$1/d/e/g"
 }
 
 # Checks for any (order-independent) differences between bfs and find
@@ -150,7 +151,24 @@ function test_0020() {
         find_diff "$1" -links +1
 }
 
-for i in {1..20}; do
+function test_0021() {
+    links_structure "$1"
+    find_diff -P "$1/d/e/f" && \
+        find_diff -P "$1/d/e/f/"
+}
+
+function test_0022() {
+    links_structure "$1"
+    find_diff -H "$1/d/e/f" && \
+        find_diff -H "$1/d/e/f/"
+}
+
+function test_0023() {
+    links_structure "$1"
+    find_diff -H "$1" -newer "$1/d/e/f"
+}
+
+for i in {1..23}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"

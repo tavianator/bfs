@@ -105,11 +105,13 @@ typedef enum bftw_action bftw_fn(struct BFTW *ftwbuf, void *ptr);
  */
 enum bftw_flags {
 	/** stat() each encountered file. */
-	BFTW_STAT    = 1 << 0,
+	BFTW_STAT        = 1 << 0,
 	/** Attempt to recover from encountered errors. */
-	BFTW_RECOVER = 1 << 1,
+	BFTW_RECOVER     = 1 << 1,
 	/** Visit directories in post-order as well as pre-order. */
-	BFTW_DEPTH   = 1 << 2,
+	BFTW_DEPTH       = 1 << 2,
+	/** If the initial path is a symbolic link, follow it. */
+	BFTW_FOLLOW_ROOT = 1 << 3,
 };
 
 /**

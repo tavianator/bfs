@@ -471,8 +471,8 @@ static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
 #endif
 }
 
-static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
-	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, AT_SYMLINK_NOFOLLOW);
+static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int flags) {
+	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, flags);
 	if (ret != 0) {
 		return ret;
 	}
@@ -620,8 +620,18 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		ftwbuf->typeflag = BFTW_UNKNOWN;
 	}
 
-	if ((state->flags & BFTW_STAT) || ftwbuf->typeflag == BFTW_UNKNOWN) {
-		if (ftwbuf_stat(ftwbuf, &state->statbuf) != 0) {
+	bool follow;
+	if (state->flags & BFTW_FOLLOW_ROOT) {
+		follow = !state->current;
+	} else {
+		follow = false;
+	}
+
+	if ((state->flags & BFTW_STAT)
+	    || ftwbuf->typeflag == BFTW_UNKNOWN
+	    || (ftwbuf->typeflag == BFTW_LNK && follow)) {
+		int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
+		if (ftwbuf_stat(ftwbuf, &state->statbuf, flags) != 0) {
 			state->error = errno;
 			ftwbuf_set_error(ftwbuf, state->error);
 		}

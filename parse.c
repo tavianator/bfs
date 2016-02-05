@@ -344,7 +344,11 @@ static struct expr *parse_acnewer(struct parser_state *state, const char *option
 	}
 
 	struct stat sb;
-	if (fstatat(AT_FDCWD, expr->sdata, &sb, AT_SYMLINK_NOFOLLOW) != 0) {
+
+	bool follow = state->cl->flags & BFTW_FOLLOW_ROOT;
+	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
+
+	if (fstatat(AT_FDCWD, expr->sdata, &sb, flags) != 0) {
 		print_error(NULL, expr->sdata, errno);
 		free_expr(expr);
 		return NULL;
@@ -465,6 +469,20 @@ static struct expr *parse_literal(struct parser_state *state) {
 	}
 
 	switch (arg[1]) {
+	case 'P':
+		if (strcmp(arg, "-P") == 0) {
+			state->cl->flags &= ~BFTW_FOLLOW_ROOT;
+			return new_option(state, arg);
+		}
+		break;
+
+	case 'H':
+		if (strcmp(arg, "-H") == 0) {
+			state->cl->flags |= BFTW_FOLLOW_ROOT;
+			return new_option(state, arg);
+		}
+		break;
+
 	case 'a':
 		if (strcmp(arg, "-amin") == 0) {
 			return parse_acmtime(state, arg, ATIME, MINUTES);
