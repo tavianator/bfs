@@ -631,7 +631,15 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	    || ftwbuf->typeflag == BFTW_UNKNOWN
 	    || (ftwbuf->typeflag == BFTW_LNK && follow)) {
 		int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
-		if (ftwbuf_stat(ftwbuf, &state->statbuf, flags) != 0) {
+
+		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, flags);
+		if (ret != 0 && follow && errno == ENOENT) {
+			// Could be a broken symlink, retry without following
+			flags = AT_SYMLINK_NOFOLLOW;
+			ret = ftwbuf_stat(ftwbuf, &state->statbuf, flags);
+		}
+
+		if (ret != 0) {
 			state->error = errno;
 			ftwbuf_set_error(ftwbuf, state->error);
 		}
