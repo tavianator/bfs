@@ -27,7 +27,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -103,6 +105,11 @@ struct dircache_entry {
 
 	/** Reference count. */
 	size_t refcount;
+
+	/** The device number, for cycle detection. */
+	dev_t dev;
+	/** The inode number, for cycle detection. */
+	ino_t ino;
 
 	/** The offset of this directory in the full path. */
 	size_t nameoff;
@@ -438,11 +445,7 @@ static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
 	return entry;
 }
 
-static void ftwbuf_set_error(struct BFTW *ftwbuf, int error) {
-	ftwbuf->typeflag = BFTW_ERROR;
-	ftwbuf->error = error;
-}
-
+/** Fill in ftwbuf fields with information from a struct dirent. */
 static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
 #if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
 	switch (de->d_type) {
@@ -471,6 +474,7 @@ static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
 #endif
 }
 
+/** Call stat() and use the results. */
 static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int flags) {
 	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, flags);
 	if (ret != 0) {
@@ -534,13 +538,14 @@ struct bftw_state {
 
 	/** The cache of open directories. */
 	struct dircache cache;
+
+	/** The queue of directories left to explore. */
+	struct dirqueue queue;
 	/** The current dircache entry. */
 	struct dircache_entry *current;
 	/** The current traversal status. */
 	enum bftw_status status;
 
-	/** The queue of directories left to explore. */
-	struct dirqueue queue;
 	/** The current path being explored. */
 	struct dynstr path;
 
@@ -561,10 +566,10 @@ static void bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, 
 	state->error = 0;
 
 	dircache_init(&state->cache, nopenfd);
-	state->current = NULL;
-	state->status = BFTW_CURRENT;
 
 	dirqueue_init(&state->queue);
+	state->current = NULL;
+	state->status = BFTW_CURRENT;
 
 	dynstr_init(&state->path);
 }
@@ -583,6 +588,15 @@ static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 	state->status = BFTW_CHILD;
 
 	return dynstr_concat(&state->path, nameoff, subpath);
+}
+
+/**
+ * Record an error.
+ */
+static void bftw_set_error(struct bftw_state *state, int error) {
+	state->error = error;
+	state->ftwbuf.error = error;
+	state->ftwbuf.typeflag = BFTW_ERROR;
 }
 
 /**
@@ -620,16 +634,15 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		ftwbuf->typeflag = BFTW_UNKNOWN;
 	}
 
-	bool follow;
-	if (state->flags & BFTW_FOLLOW_ROOT) {
-		follow = !state->current;
-	} else {
-		follow = false;
-	}
+	bool follow = state->flags & (current ? BFTW_FOLLOW_NONROOT : BFTW_FOLLOW_ROOT);
+
+	bool detect_cycles = (state->flags & BFTW_DETECT_CYCLES)
+		&& state->status == BFTW_CHILD;
 
 	if ((state->flags & BFTW_STAT)
 	    || ftwbuf->typeflag == BFTW_UNKNOWN
-	    || (ftwbuf->typeflag == BFTW_LNK && follow)) {
+	    || (ftwbuf->typeflag == BFTW_LNK && follow)
+	    || (ftwbuf->typeflag == BFTW_DIR && detect_cycles)) {
 		int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, flags);
@@ -640,8 +653,19 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		}
 
 		if (ret != 0) {
-			state->error = errno;
-			ftwbuf_set_error(ftwbuf, state->error);
+			bftw_set_error(state, errno);
+			return;
+		}
+
+		if (ftwbuf->typeflag == BFTW_DIR && detect_cycles) {
+			dev_t dev = ftwbuf->statbuf->st_dev;
+			ino_t ino = ftwbuf->statbuf->st_ino;
+			for (const struct dircache_entry *entry = current; entry; entry = entry->parent) {
+				if (dev == entry->dev && ino == entry->ino) {
+					bftw_set_error(state, ELOOP);
+					return;
+				}
+			}
 		}
 	}
 }
@@ -673,10 +697,30 @@ static int bftw_handle_path(struct bftw_state *state) {
 }
 
 /**
+ * Add a new entry to the cache.
+ */
+static struct dircache_entry *bftw_add(struct bftw_state *state, const char *name) {
+	struct dircache_entry *entry = dircache_add(&state->cache, state->current, name);
+	if (!entry) {
+		return NULL;
+	}
+
+	if (state->flags & BFTW_DETECT_CYCLES) {
+		const struct stat *statbuf = state->ftwbuf.statbuf;
+		if (statbuf) {
+			entry->dev = statbuf->st_dev;
+			entry->ino = statbuf->st_ino;
+		}
+	}
+
+	return entry;
+}
+
+/**
  * Push a new entry onto the queue.
  */
 static int bftw_push(struct bftw_state *state, const char *name) {
-	struct dircache_entry *entry = dircache_add(&state->cache, state->current, name);
+	struct dircache_entry *entry = bftw_add(state, name);
 	if (!entry) {
 		return -1;
 	}
@@ -791,7 +835,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 	// Now start the breadth-first search
 
-	state.current = dircache_add(&state.cache, NULL, path);
+	state.current = bftw_add(&state, path);
 	if (!state.current) {
 		goto fail;
 	}
@@ -803,10 +847,10 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 		DIR *dir = dircache_entry_open(&state.cache, state.current, state.path.str);
 		if (!dir) {
-			state.error = errno;
+			int error = errno;
 
 			bftw_init_buffers(&state, NULL);
-			ftwbuf_set_error(&state.ftwbuf, state.error);
+			bftw_set_error(&state, error);
 
 			switch (bftw_handle_path(&state)) {
 			case BFTW_CONTINUE:

@@ -345,7 +345,7 @@ static struct expr *parse_acnewer(struct parser_state *state, const char *option
 
 	struct stat sb;
 
-	bool follow = state->cl->flags & BFTW_FOLLOW_ROOT;
+	bool follow = state->cl->flags & BFTW_FOLLOW;
 	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 	if (fstatat(AT_FDCWD, expr->sdata, &sb, flags) != 0) {
@@ -471,14 +471,22 @@ static struct expr *parse_literal(struct parser_state *state) {
 	switch (arg[1]) {
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
-			state->cl->flags &= ~BFTW_FOLLOW_ROOT;
+			state->cl->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
 			return new_option(state, arg);
 		}
 		break;
 
 	case 'H':
 		if (strcmp(arg, "-H") == 0) {
+			state->cl->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
 			state->cl->flags |= BFTW_FOLLOW_ROOT;
+			return new_option(state, arg);
+		}
+		break;
+
+	case 'L':
+		if (strcmp(arg, "-L") == 0) {
+			state->cl->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
 			return new_option(state, arg);
 		}
 		break;
@@ -529,6 +537,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'f':
 		if (strcmp(arg, "-false") == 0) {
 			return &expr_false;
+		} else if (strcmp(arg, "-follow") == 0) {
+			state->cl->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
+			return new_option(state, arg);
 		}
 		break;
 
