@@ -15,6 +15,7 @@
 #include "color.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <sys/types.h>
 #include <time.h>
 
 /**
@@ -117,6 +118,11 @@ struct expr {
 	/** The optional time unit. */
 	enum timeunit timeunit;
 
+	/** Optional device number for a target file. */
+	dev_t dev;
+	/** Optional inode number for a target file. */
+	ino_t ino;
+
 	/** Optional integer data for this expression. */
 	int idata;
 
@@ -155,6 +161,7 @@ bool eval_empty(const struct expr *expr, struct eval_state *state);
 bool eval_hidden(const struct expr *expr, struct eval_state *state);
 bool eval_inum(const struct expr *expr, struct eval_state *state);
 bool eval_links(const struct expr *expr, struct eval_state *state);
+bool eval_samefile(const struct expr *expr, struct eval_state *state);
 bool eval_type(const struct expr *expr, struct eval_state *state);
 
 bool eval_name(const struct expr *expr, struct eval_state *state);

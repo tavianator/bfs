@@ -342,6 +342,18 @@ bool eval_quit(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -samefile test.
+ */
+bool eval_samefile(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return statbuf->st_dev == expr->dev && statbuf->st_ino == expr->ino;
+}
+
+/**
  * -type test.
  */
 bool eval_type(const struct expr *expr, struct eval_state *state) {

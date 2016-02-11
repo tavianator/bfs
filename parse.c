@@ -149,6 +149,21 @@ struct parser_state {
 };
 
 /**
+ * Invoke stat() on an argument.
+ */
+static int stat_arg(const struct parser_state *state, struct expr *expr, struct stat *sb) {
+	bool follow = state->cl->flags & BFTW_FOLLOW;
+	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
+
+	int ret = fstatat(AT_FDCWD, expr->sdata, sb, flags);
+	if (ret != 0) {
+		print_error(NULL, expr->sdata, errno);
+		free_expr(expr);
+	}
+	return ret;
+}
+
+/**
  * Parse the expression specified on the command line.
  */
 static struct expr *parse_expr(struct parser_state *state);
@@ -344,13 +359,7 @@ static struct expr *parse_acnewer(struct parser_state *state, const char *option
 	}
 
 	struct stat sb;
-
-	bool follow = state->cl->flags & BFTW_FOLLOW;
-	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
-
-	if (fstatat(AT_FDCWD, expr->sdata, &sb, flags) != 0) {
-		print_error(NULL, expr->sdata, errno);
-		free_expr(expr);
+	if (stat_arg(state, expr, &sb) != 0) {
 		return NULL;
 	}
 
@@ -406,6 +415,26 @@ static struct expr *parse_depth(struct parser_state *state, const char *option, 
 	}
 
 	return new_option(state, option);
+}
+
+/**
+ * Parse -samefile FILE.
+ */
+static struct expr *parse_samefile(struct parser_state *state, const char *option) {
+	struct expr *expr = parse_test_sdata(state, option, eval_samefile);
+	if (!expr) {
+		return NULL;
+	}
+
+	struct stat sb;
+	if (stat_arg(state, expr, &sb) != 0) {
+		return NULL;
+	}
+
+	expr->dev = sb.st_dev;
+	expr->ino = sb.st_ino;
+
+	return expr;
 }
 
 /**
@@ -618,6 +647,11 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return new_test_idata(state, eval_access, R_OK);
 		}
 		break;
+
+	case 's':
+		if (strcmp(arg, "-samefile") == 0) {
+			return parse_samefile(state, arg);
+		}
 
 	case 't':
 		if (strcmp(arg, "-true") == 0) {

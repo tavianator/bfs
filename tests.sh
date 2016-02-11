@@ -189,7 +189,12 @@ function test_0027() {
     find_diff -L "$1" -depth 2>/dev/null
 }
 
-for i in {1..27}; do
+function test_0028() {
+    links_structure "$1"
+    find_diff "$1" -samefile "$1/a"
+}
+
+for i in {1..28}; do
     dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
