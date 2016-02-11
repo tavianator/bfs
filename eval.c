@@ -402,9 +402,9 @@ static int infer_nopenfd() {
 		}
 	}
 
-	// Account for std{in,out,err}
-	if (ret > 3) {
-		ret -= 3;
+	// Account for std{in,out,err}, and allow one free for the predicates
+	if (ret > 4) {
+		ret -= 4;
 	}
 
 	return ret;
