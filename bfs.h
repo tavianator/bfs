@@ -138,7 +138,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]);
 /**
  * Evaluate the command line.
  */
-int eval_cmdline(struct cmdline *cl);
+int eval_cmdline(const struct cmdline *cl);
 
 /**
  * Free the parsed command line.

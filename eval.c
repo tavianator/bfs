@@ -29,6 +29,8 @@ struct eval_state {
 	const struct cmdline *cl;
 	/** The bftw() callback return value. */
 	enum bftw_action action;
+	/** The eval_cmdline() return value. */
+	int ret;
 	/** A stat() buffer, if necessary. */
 	struct stat statbuf;
 };
@@ -42,6 +44,7 @@ static const struct stat *fill_statbuf(struct eval_state *state) {
 		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
+			state->ret = -1;
 			perror("fstatat()");
 		}
 	}
@@ -211,12 +214,14 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	if (ftwbuf->typeflag == BFTW_DIR) {
 		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_DIRECTORY);
 		if (dfd < 0) {
+			state->ret = -1;
 			perror("openat()");
 			goto done;
 		}
 
 		DIR *dir = fdopendir(dfd);
 		if (!dir) {
+			state->ret = -1;
 			perror("fdopendir()");
 			close(dfd);
 			goto done;
@@ -411,10 +416,22 @@ static int infer_nopenfd() {
 }
 
 /**
+ * Type passed as the argument to the bftw() callback.
+ */
+struct callback_args {
+	/** The parsed command line. */
+	const struct cmdline *cl;
+	/** Eventual return value from eval_cmdline(). */
+	int ret;
+};
+
+/**
  * bftw() callback.
  */
 static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
-	const struct cmdline *cl = ptr;
+	struct callback_args *args = ptr;
+
+	const struct cmdline *cl = args->cl;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		print_error(cl->colors, ftwbuf->path, ftwbuf->error);
@@ -425,6 +442,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		.ftwbuf = ftwbuf,
 		.cl = cl,
 		.action = BFTW_CONTINUE,
+		.ret = args->ret,
 	};
 
 	if (ftwbuf->depth >= cl->maxdepth) {
@@ -445,22 +463,27 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		cl->expr->eval(cl->expr, &state);
 	}
 
+	args->ret = state.ret;
 	return state.action;
 }
 
 /**
  * Evaluate the command line.
  */
-int eval_cmdline(struct cmdline *cl) {
-	int ret = 0;
+int eval_cmdline(const struct cmdline *cl) {
 	int nopenfd = infer_nopenfd();
 
+	struct callback_args args = {
+		.cl = cl,
+		.ret = 0,
+	};
+
 	for (size_t i = 0; i < cl->nroots; ++i) {
-		if (bftw(cl->roots[i], cmdline_callback, nopenfd, cl->flags, cl) != 0) {
-			ret = -1;
+		if (bftw(cl->roots[i], cmdline_callback, nopenfd, cl->flags, &args) != 0) {
+			args.ret = -1;
 			perror("bftw()");
 		}
 	}
 
-	return ret;
+	return args.ret;
 }
