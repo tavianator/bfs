@@ -36,6 +36,14 @@ struct eval_state {
 };
 
 /**
+ * Report an error that occurs during evaluation.
+ */
+static void eval_error(struct eval_state *state) {
+	print_error(state->cmdline->colors, state->ftwbuf->path, errno);
+	state->ret = -1;
+}
+
+/**
  * Perform a stat() call if necessary.
  */
 static const struct stat *fill_statbuf(struct eval_state *state) {
@@ -44,8 +52,7 @@ static const struct stat *fill_statbuf(struct eval_state *state) {
 		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
-			state->ret = -1;
-			perror("fstatat()");
+			eval_error(state);
 		}
 	}
 	return ftwbuf->statbuf;
@@ -197,7 +204,7 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	}
 
 	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {
-		print_error(state->cmdline->colors, ftwbuf->path, errno);
+		eval_error(state);
 		state->action = BFTW_STOP;
 	}
 
@@ -214,15 +221,13 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	if (ftwbuf->typeflag == BFTW_DIR) {
 		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_DIRECTORY);
 		if (dfd < 0) {
-			state->ret = -1;
-			perror("openat()");
+			eval_error(state);
 			goto done;
 		}
 
 		DIR *dir = fdopendir(dfd);
 		if (!dir) {
-			state->ret = -1;
-			perror("fdopendir()");
+			eval_error(state);
 			close(dfd);
 			goto done;
 		}
