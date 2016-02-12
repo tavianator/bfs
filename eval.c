@@ -400,27 +400,6 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * Infer the number of open file descriptors we're allowed to have.
- */
-static int infer_nopenfd() {
-	int ret = 4096;
-
-	struct rlimit rl;
-	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-		if (rl.rlim_cur != RLIM_INFINITY) {
-			ret = rl.rlim_cur;
-		}
-	}
-
-	// Account for std{in,out,err}, and allow one free for the predicates
-	if (ret > 4) {
-		ret -= 4;
-	}
-
-	return ret;
-}
-
-/**
  * Type passed as the argument to the bftw() callback.
  */
 struct callback_args {
@@ -473,10 +452,51 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 }
 
 /**
+ * Infer the number of open file descriptors we're allowed to have.
+ */
+static int infer_fdlimit() {
+	int ret = 4096;
+
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+		if (rl.rlim_cur != RLIM_INFINITY) {
+			ret = rl.rlim_cur;
+		}
+	}
+
+	// Account for std{in,out,err}, and allow an extra fd for the predicates
+	int nopen = 4;
+
+	// Check /dev/fd for the current number of open fds, if possible (we may
+	// have inherited more than just the standard ones)
+	DIR *dir = opendir("/dev/fd");
+	if (dir) {
+		nopen = 0;
+
+		struct dirent *de;
+		while ((de = readdir(dir)) != NULL) {
+			if (strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
+				++nopen;
+			}
+		}
+
+		closedir(dir);
+	}
+
+	if (ret > nopen) {
+		ret -= nopen;
+	} else {
+		ret = 1;
+	}
+
+	return ret;
+}
+
+/**
  * Evaluate the command line.
  */
 int eval_cmdline(const struct cmdline *cmdline) {
-	int nopenfd = infer_nopenfd();
+	int nopenfd = infer_fdlimit();
 
 	struct callback_args args = {
 		.cmdline = cmdline,
