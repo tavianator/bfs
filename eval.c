@@ -26,7 +26,7 @@ struct eval_state {
 	/** Data about the current file. */
 	struct BFTW *ftwbuf;
 	/** The parsed command line. */
-	const struct cmdline *cl;
+	const struct cmdline *cmdline;
 	/** The bftw() callback return value. */
 	enum bftw_action action;
 	/** The eval_cmdline() return value. */
@@ -197,7 +197,7 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	}
 
 	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {
-		print_error(state->cl->colors, ftwbuf->path, errno);
+		print_error(state->cmdline->colors, ftwbuf->path, errno);
 		state->action = BFTW_STOP;
 	}
 
@@ -321,7 +321,7 @@ bool eval_path(const struct expr *expr, struct eval_state *state) {
  * -print action.
  */
 bool eval_print(const struct expr *expr, struct eval_state *state) {
-	struct color_table *colors = state->cl->colors;
+	struct color_table *colors = state->cmdline->colors;
 	if (colors) {
 		fill_statbuf(state);
 	}
@@ -420,7 +420,7 @@ static int infer_nopenfd() {
  */
 struct callback_args {
 	/** The parsed command line. */
-	const struct cmdline *cl;
+	const struct cmdline *cmdline;
 	/** Eventual return value from eval_cmdline(). */
 	int ret;
 };
@@ -431,36 +431,36 @@ struct callback_args {
 static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	struct callback_args *args = ptr;
 
-	const struct cmdline *cl = args->cl;
+	const struct cmdline *cmdline = args->cmdline;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
-		print_error(cl->colors, ftwbuf->path, ftwbuf->error);
+		print_error(cmdline->colors, ftwbuf->path, ftwbuf->error);
 		return BFTW_SKIP_SUBTREE;
 	}
 
 	struct eval_state state = {
 		.ftwbuf = ftwbuf,
-		.cl = cl,
+		.cmdline = cmdline,
 		.action = BFTW_CONTINUE,
 		.ret = args->ret,
 	};
 
-	if (ftwbuf->depth >= cl->maxdepth) {
+	if (ftwbuf->depth >= cmdline->maxdepth) {
 		state.action = BFTW_SKIP_SUBTREE;
 	}
 
 	// In -depth mode, only handle directories on the BFTW_POST visit
 	enum bftw_visit expected_visit = BFTW_PRE;
-	if ((cl->flags & BFTW_DEPTH)
+	if ((cmdline->flags & BFTW_DEPTH)
 	    && ftwbuf->typeflag == BFTW_DIR
-	    && ftwbuf->depth < cl->maxdepth) {
+	    && ftwbuf->depth < cmdline->maxdepth) {
 		expected_visit = BFTW_POST;
 	}
 
 	if (ftwbuf->visit == expected_visit
-	    && ftwbuf->depth >= cl->mindepth
-	    && ftwbuf->depth <= cl->maxdepth) {
-		cl->expr->eval(cl->expr, &state);
+	    && ftwbuf->depth >= cmdline->mindepth
+	    && ftwbuf->depth <= cmdline->maxdepth) {
+		cmdline->expr->eval(cmdline->expr, &state);
 	}
 
 	args->ret = state.ret;
@@ -470,16 +470,16 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 /**
  * Evaluate the command line.
  */
-int eval_cmdline(const struct cmdline *cl) {
+int eval_cmdline(const struct cmdline *cmdline) {
 	int nopenfd = infer_nopenfd();
 
 	struct callback_args args = {
-		.cl = cl,
+		.cmdline = cmdline,
 		.ret = 0,
 	};
 
-	for (size_t i = 0; i < cl->nroots; ++i) {
-		if (bftw(cl->roots[i], cmdline_callback, nopenfd, cl->flags, &args) != 0) {
+	for (size_t i = 0; i < cmdline->nroots; ++i) {
+		if (bftw(cmdline->roots[i], cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
 			args.ret = -1;
 			perror("bftw()");
 		}

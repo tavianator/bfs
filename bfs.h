@@ -138,12 +138,12 @@ struct cmdline *parse_cmdline(int argc, char *argv[]);
 /**
  * Evaluate the command line.
  */
-int eval_cmdline(const struct cmdline *cl);
+int eval_cmdline(const struct cmdline *cmdline);
 
 /**
  * Free the parsed command line.
  */
-void free_cmdline(struct cmdline *cl);
+void free_cmdline(struct cmdline *cmdline);
 
 // Predicate evaluation functions
 bool eval_true(const struct expr *expr, struct eval_state *state);
