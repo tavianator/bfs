@@ -206,7 +206,7 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 
 	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {
 		eval_error(state);
-		state->action = BFTW_STOP;
+		return false;
 	}
 
 	return true;
