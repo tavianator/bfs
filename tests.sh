@@ -6,7 +6,7 @@ function touchp() {
 }
 
 # Creates a simple file+directory structure for tests
-function basic_structure() {
+function make_basic() {
     touchp "$1/a"
     touchp "$1/b"
     touchp "$1/c/d"
@@ -18,8 +18,11 @@ function basic_structure() {
     touchp "$1/l/foo/bar/baz"
 }
 
+basic="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.basic.XXXXXXXXXX)"
+make_basic "$basic"
+
 # Creates a file+directory structure with various permissions for tests
-function perms_structure() {
+function make_perms() {
     install -Dm444 /dev/null "$1/r"
     install -Dm222 /dev/null "$1/w"
     install -Dm644 /dev/null "$1/rw"
@@ -28,8 +31,11 @@ function perms_structure() {
     install -Dm755 /dev/null "$1/rwx"
 }
 
+perms="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.perms.XXXXXXXXXX)"
+make_perms "$perms"
+
 # Creates a file+directory structure with various symbolic and hard links
-function links_structure() {
+function make_links() {
     touchp "$1/a"
     ln -s a "$1/b"
     ln "$1/a" "$1/c"
@@ -39,6 +45,17 @@ function links_structure() {
     ln -s q "$1/d/e/i"
 }
 
+links="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.links.XXXXXXXXXX)"
+make_links "$links"
+
+# Clean up temporary directories on exit
+function cleanup() {
+    rm -rf "$links"
+    rm -rf "$perms"
+    rm -rf "$basic"
+}
+trap cleanup EXIT
+
 # Checks for any (order-independent) differences between bfs and find
 function find_diff() {
     diff -u <(./bfs "$@" | sort) <(find "$@" | sort)
@@ -47,159 +64,129 @@ function find_diff() {
 # Test cases
 
 function test_0001() {
-    basic_structure "$1"
-    find_diff "$1"
+    find_diff "$basic"
 }
 
 function test_0002() {
-    basic_structure "$1"
-    find_diff "$1" -type d
+    find_diff "$basic" -type d
 }
 
 function test_0003() {
-    basic_structure "$1"
-    find_diff "$1" -type f
+    find_diff "$basic" -type f
 }
 
 function test_0004() {
-    basic_structure "$1"
-    find_diff "$1" -mindepth 1
+    find_diff "$basic" -mindepth 1
 }
 
 function test_0005() {
-    basic_structure "$1"
-    find_diff "$1" -maxdepth 1
+    find_diff "$basic" -maxdepth 1
 }
 
 function test_0006() {
-    basic_structure "$1"
-    find_diff "$1" -mindepth 1 -depth
+    find_diff "$basic" -mindepth 1 -depth
 }
 
 function test_0007() {
-    basic_structure "$1"
-    find_diff "$1" -mindepth 2 -depth
+    find_diff "$basic" -mindepth 2 -depth
 }
 
 function test_0008() {
-    basic_structure "$1"
-    find_diff "$1" -maxdepth 1 -depth
+    find_diff "$basic" -maxdepth 1 -depth
 }
 
 function test_0009() {
-    basic_structure "$1"
-    find_diff "$1" -maxdepth 2 -depth
+    find_diff "$basic" -maxdepth 2 -depth
 }
 
 function test_0010() {
-    basic_structure "$1"
-    find_diff "$1" -name '*f*'
+    find_diff "$basic" -name '*f*'
 }
 
 function test_0011() {
-    basic_structure "$1"
-    find_diff "$1" -path "$1/*f*"
+    find_diff "$basic" -path "$basic/*f*"
 }
 
 function test_0012() {
-    perms_structure "$1"
-    find_diff "$1" -executable
+    find_diff "$perms" -executable
 }
 
 function test_0013() {
-    perms_structure "$1"
-    find_diff "$1" -readable
+    find_diff "$perms" -readable
 }
 
 function test_0014() {
-    perms_structure "$1"
-    find_diff "$1" -writable
+    find_diff "$perms" -writable
 }
 
 function test_0015() {
-    basic_structure "$1"
-    find_diff "$1" -empty
+    find_diff "$basic" -empty
 }
 
 function test_0016() {
-    basic_structure "$1"
-    find_diff "$1" -gid "$(id -g)" && \
-        find_diff "$1" -gid +0 && \
-        find_diff "$1" -gid -10000
+    find_diff "$basic" -gid "$(id -g)" && \
+        find_diff "$basic" -gid +0 && \
+        find_diff "$basic" -gid -10000
 }
 
 function test_0017() {
-    basic_structure "$1"
-    find_diff "$1" -uid "$(id -u)" && \
-        find_diff "$1" -uid +0 && \
-        find_diff "$1" -uid -10000
+    find_diff "$basic" -uid "$(id -u)" && \
+        find_diff "$basic" -uid +0 && \
+        find_diff "$basic" -uid -10000
 }
 
 function test_0018() {
-    basic_structure "$1"
-    find_diff "$1" -newer "$1/e/f"
+    find_diff "$basic" -newer "$basic/e/f"
 }
 
 function test_0019() {
-    basic_structure "$1"
-    find_diff "$1" -cnewer "$1/e/f"
+    find_diff "$basic" -cnewer "$basic/e/f"
 }
 
 function test_0020() {
-    links_structure "$1"
-    find_diff "$1" -links 2 && \
-        find_diff "$1" -links -2 && \
-        find_diff "$1" -links +1
+    find_diff "$links" -links 2 && \
+        find_diff "$links" -links -2 && \
+        find_diff "$links" -links +1
 }
 
 function test_0021() {
-    links_structure "$1"
-    find_diff -P "$1/d/e/f" && \
-        find_diff -P "$1/d/e/f/"
+    find_diff -P "$links/d/e/f" && \
+        find_diff -P "$links/d/e/f/"
 }
 
 function test_0022() {
-    links_structure "$1"
-    find_diff -H "$1/d/e/f" && \
-        find_diff -H "$1/d/e/f/"
+    find_diff -H "$links/d/e/f" && \
+        find_diff -H "$links/d/e/f/"
 }
 
 function test_0023() {
-    links_structure "$1"
-    find_diff -H "$1" -newer "$1/d/e/f"
+    find_diff -H "$links" -newer "$links/d/e/f"
 }
 
 function test_0024() {
-    links_structure "$1"
-    find_diff -H "$1/d/e/i"
+    find_diff -H "$links/d/e/i"
 }
 
 function test_0025() {
-    links_structure "$1"
-    find_diff -L "$1" 2>/dev/null
+    find_diff -L "$links" 2>/dev/null
 }
 
 function test_0026() {
-    links_structure "$1"
-    find_diff "$1" -follow 2>/dev/null
+    find_diff "$links" -follow 2>/dev/null
 }
 
 function test_0027() {
-    links_structure "$1"
-    find_diff -L "$1" -depth 2>/dev/null
+    find_diff -L "$links" -depth 2>/dev/null
 }
 
 function test_0028() {
-    links_structure "$1"
-    find_diff "$1" -samefile "$1/a"
+    find_diff "$links" -samefile "$links/a"
 }
 
 for i in {1..28}; do
-    dir="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?
-    rm -rf "$dir"
     if [ $status -ne 0 ]; then
         echo "$test failed!" >&2
         exit $status
