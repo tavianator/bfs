@@ -371,6 +371,54 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -xtype test.
+ */
+bool eval_xtype(const struct expr *expr, struct eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+
+	bool is_root = ftwbuf->depth == 0;
+	bool follow = state->cmdline->flags & (is_root ? BFTW_FOLLOW_ROOT : BFTW_FOLLOW_NONROOT);
+
+	bool is_link = ftwbuf->typeflag == BFTW_LNK;
+	if (follow == is_link) {
+		return eval_type(expr, state);
+	}
+
+	// -xtype does the opposite of everything else
+	int at_flags = follow ? AT_SYMLINK_NOFOLLOW : 0;
+
+	struct stat sb;
+	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, at_flags) != 0) {
+		if (!follow && errno == ENOENT) {
+			// Broken symlink
+			return eval_type(expr, state);
+		} else {
+			eval_error(state);
+			return false;
+		}
+	}
+
+	switch (expr->idata) {
+	case BFTW_BLK:
+		return S_ISBLK(sb.st_mode);
+	case BFTW_CHR:
+		return S_ISCHR(sb.st_mode);
+	case BFTW_DIR:
+		return S_ISDIR(sb.st_mode);
+	case BFTW_FIFO:
+		return S_ISFIFO(sb.st_mode);
+	case BFTW_LNK:
+		return S_ISLNK(sb.st_mode);
+	case BFTW_REG:
+		return S_ISREG(sb.st_mode);
+	case BFTW_SOCK:
+		return S_ISSOCK(sb.st_mode);
+	}
+
+	return false;
+}
+
+/**
  * Evaluate a negation.
  */
 bool eval_not(const struct expr *expr, struct eval_state *state) {

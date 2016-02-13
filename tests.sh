@@ -183,7 +183,23 @@ function test_0028() {
     find_diff "$links" -samefile "$links/a"
 }
 
-for i in {1..28}; do
+function test_0029() {
+    find_diff "$links" -xtype l
+}
+
+function test_0030() {
+    find_diff "$links" -xtype f
+}
+
+function test_0031() {
+    find_diff -L "$links" -xtype l 2>/dev/null
+}
+
+function test_0032() {
+    find_diff -L "$links" -xtype f 2>/dev/null
+}
+
+for i in {1..32}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

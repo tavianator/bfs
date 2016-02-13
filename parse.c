@@ -438,12 +438,12 @@ static struct expr *parse_samefile(struct parser_state *state, const char *optio
 }
 
 /**
- * Parse -type [bcdpfls].
+ * Parse -x?type [bcdpfls].
  */
-static struct expr *parse_type(struct parser_state *state) {
+static struct expr *parse_type(struct parser_state *state, const char *option, eval_fn *eval) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fputs("-type needs a value.\n", stderr);
+		fprintf(stderr, "%s needs a value.\n", option);
 		return NULL;
 	}
 
@@ -480,7 +480,7 @@ static struct expr *parse_type(struct parser_state *state) {
 
 	++state->i;
 
-	return new_test_idata(state, eval_type, typeflag);
+	return new_test_idata(state, eval, typeflag);
 }
 
 /**
@@ -657,7 +657,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-true") == 0) {
 			return &expr_true;
 		} else if (strcmp(arg, "-type") == 0) {
-			return parse_type(state);
+			return parse_type(state, arg, eval_type);
 		}
 		break;
 
@@ -677,6 +677,11 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return new_test_idata(state, eval_access, W_OK);
 		}
 		break;
+
+	case 'x':
+		if (strcmp(arg, "-xtype") == 0) {
+			return parse_type(state, arg, eval_xtype);
+		}
 	}
 
 	fprintf(stderr, "Unknown argument '%s'.\n", arg);
