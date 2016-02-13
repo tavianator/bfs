@@ -215,7 +215,15 @@ function test_0036() {
     find_diff "//" -maxdepth 0 -name '/' 2>/dev/null
 }
 
-for i in {1..36}; do
+function test_0037() {
+    find_diff "$basic" -iname '*F*'
+}
+
+function test_0038() {
+    find_diff "$basic" -ipath "$basic/*F*"
+}
+
+for i in {1..38}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

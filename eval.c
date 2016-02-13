@@ -308,7 +308,7 @@ bool eval_links(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -name test.
+ * -i?name test.
  */
 bool eval_name(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
@@ -333,17 +333,17 @@ bool eval_name(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	bool ret = fnmatch(expr->sdata, name, 0) == 0;
+	bool ret = fnmatch(expr->sdata, name, expr->idata) == 0;
 	free(copy);
 	return ret;
 }
 
 /**
- * -path test.
+ * -i?path test.
  */
 bool eval_path(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-	return fnmatch(expr->sdata, ftwbuf->path, 0) == 0;
+	return fnmatch(expr->sdata, ftwbuf->path, expr->idata) == 0;
 }
 
 /**

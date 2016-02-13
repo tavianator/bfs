@@ -12,6 +12,7 @@
 #include "bfs.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -418,6 +419,42 @@ static struct expr *parse_depth(struct parser_state *state, const char *option, 
 }
 
 /**
+ * Set the FNM_CASEFOLD flag, if supported.
+ */
+static struct expr *set_fnm_casefold(struct expr *expr, bool casefold) {
+	if (expr) {
+		if (casefold) {
+#ifdef FNM_CASEFOLD
+			expr->idata = FNM_CASEFOLD;
+#else
+			fprintf(stderr, "%s is missing platform support.\n", option);
+			free(expr);
+			expr = NULL;
+#endif
+		} else {
+			expr->idata = 0;
+		}
+	}
+	return expr;
+}
+
+/**
+ * Parse -i?name.
+ */
+static struct expr *parse_name(struct parser_state *state, const char *option, bool casefold) {
+	struct expr *expr = parse_test_sdata(state, option, eval_name);
+	return set_fnm_casefold(expr, casefold);
+}
+
+/**
+ * Parse -i?path, -i?wholename.
+ */
+static struct expr *parse_path(struct parser_state *state, const char *option, bool casefold) {
+	struct expr *expr = parse_test_sdata(state, option, eval_path);
+	return set_fnm_casefold(expr, casefold);
+}
+
+/**
  * Parse -samefile FILE.
  */
 static struct expr *parse_samefile(struct parser_state *state, const char *option) {
@@ -585,8 +622,12 @@ static struct expr *parse_literal(struct parser_state *state) {
 		break;
 
 	case 'i':
-		if (strcmp(arg, "-inum") == 0) {
+		if (strcmp(arg, "-iname") == 0) {
+			return parse_name(state, arg, true);
+		} else if (strcmp(arg, "-inum") == 0) {
 			return parse_test_icmp(state, arg, eval_inum);
+		} else if (strcmp(arg, "-ipath") == 0 || strcmp(arg, "-iwholename") == 0) {
+			return parse_path(state, arg, true);
 		}
 		break;
 
@@ -610,7 +651,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'n':
 		if (strcmp(arg, "-name") == 0) {
-			return parse_test_sdata(state, arg, eval_name);
+			return parse_name(state, arg, false);
 		} else if (strcmp(arg, "-newer") == 0) {
 			return parse_acnewer(state, arg, MTIME);
 		} else if (strcmp(arg, "-nocolor") == 0) {
@@ -626,7 +667,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'p':
 		if (strcmp(arg, "-path") == 0) {
-			return parse_test_sdata(state, arg, eval_path);
+			return parse_path(state, arg, false);
 		} else if (strcmp(arg, "-print") == 0) {
 			return new_action(state, eval_print);
 		} else if (strcmp(arg, "-print0") == 0) {
@@ -672,7 +713,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 			state->warn = true;
 			return new_positional_option(state);
 		} else if (strcmp(arg, "-wholename") == 0) {
-			return parse_test_sdata(state, arg, eval_path);
+			return parse_path(state, arg, false);
 		} else if (strcmp(arg, "-writable") == 0) {
 			return new_test_idata(state, eval_access, W_OK);
 		}
