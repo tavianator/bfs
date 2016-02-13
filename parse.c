@@ -101,28 +101,28 @@ static struct expr *new_binary_expr(struct expr *lhs, struct expr *rhs, eval_fn 
 /**
  * Free the parsed command line.
  */
-void free_cmdline(struct cmdline *cl) {
-	if (cl) {
-		free_expr(cl->expr);
-		free_colors(cl->colors);
-		free(cl->roots);
-		free(cl);
+void free_cmdline(struct cmdline *cmdline) {
+	if (cmdline) {
+		free_expr(cmdline->expr);
+		free_colors(cmdline->colors);
+		free(cmdline->roots);
+		free(cmdline);
 	}
 }
 
 /**
  * Add a root path to the cmdline.
  */
-static bool cmdline_add_root(struct cmdline *cl, const char *root) {
-	size_t i = cl->nroots++;
-	const char **roots = realloc(cl->roots, cl->nroots*sizeof(const char *));
+static bool cmdline_add_root(struct cmdline *cmdline, const char *root) {
+	size_t i = cmdline->nroots++;
+	const char **roots = realloc(cmdline->roots, cmdline->nroots*sizeof(const char *));
 	if (!roots) {
 		perror("realloc()");
 		return false;
 	}
 
 	roots[i] = root;
-	cl->roots = roots;
+	cmdline->roots = roots;
 	return true;
 }
 
@@ -131,7 +131,7 @@ static bool cmdline_add_root(struct cmdline *cl, const char *root) {
  */
 struct parser_state {
 	/** The command line being parsed. */
-	struct cmdline *cl;
+	struct cmdline *cmdline;
 	/** The command line arguments. */
 	char **argv;
 	/** Current argument index. */
@@ -152,7 +152,7 @@ struct parser_state {
  * Invoke stat() on an argument.
  */
 static int stat_arg(const struct parser_state *state, struct expr *expr, struct stat *sb) {
-	bool follow = state->cl->flags & BFTW_FOLLOW;
+	bool follow = state->cmdline->flags & BFTW_FOLLOW;
 	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 	int ret = fstatat(AT_FDCWD, expr->sdata, sb, flags);
@@ -183,7 +183,7 @@ static const char *skip_paths(struct parser_state *state) {
 			return arg;
 		}
 
-		if (!cmdline_add_root(state->cl, arg)) {
+		if (!cmdline_add_root(state->cmdline, arg)) {
 			return NULL;
 		}
 
@@ -500,22 +500,22 @@ static struct expr *parse_literal(struct parser_state *state) {
 	switch (arg[1]) {
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
-			state->cl->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
+			state->cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
 			return new_option(state, arg);
 		}
 		break;
 
 	case 'H':
 		if (strcmp(arg, "-H") == 0) {
-			state->cl->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
-			state->cl->flags |= BFTW_FOLLOW_ROOT;
+			state->cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
+			state->cmdline->flags |= BFTW_FOLLOW_ROOT;
 			return new_option(state, arg);
 		}
 		break;
 
 	case 'L':
 		if (strcmp(arg, "-L") == 0) {
-			state->cl->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
+			state->cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
 			return new_option(state, arg);
 		}
 		break;
@@ -538,7 +538,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-cnewer") == 0) {
 			return parse_acnewer(state, arg, CTIME);
 		} else if (strcmp(arg, "-color") == 0) {
-			state->cl->color = true;
+			state->cmdline->color = true;
 			return new_option(state, arg);
 		}
 		break;
@@ -547,10 +547,10 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-daystart") == 0) {
 			return parse_daystart(state);
 		} else if (strcmp(arg, "-delete") == 0) {
-			state->cl->flags |= BFTW_DEPTH;
+			state->cmdline->flags |= BFTW_DEPTH;
 			return new_action(state, eval_delete);
 		} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
-			state->cl->flags |= BFTW_DEPTH;
+			state->cmdline->flags |= BFTW_DEPTH;
 			return new_option(state, arg);
 		}
 		break;
@@ -567,7 +567,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-false") == 0) {
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
-			state->cl->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
+			state->cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
 			return new_option(state, arg);
 		}
 		break;
@@ -598,9 +598,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'm':
 		if (strcmp(arg, "-mindepth") == 0) {
-			return parse_depth(state, arg, &state->cl->mindepth);
+			return parse_depth(state, arg, &state->cmdline->mindepth);
 		} else if (strcmp(arg, "-maxdepth") == 0) {
-			return parse_depth(state, arg, &state->cl->maxdepth);
+			return parse_depth(state, arg, &state->cmdline->maxdepth);
 		} else if (strcmp(arg, "-mmin") == 0) {
 			return parse_acmtime(state, arg, MTIME, MINUTES);
 		} else if (strcmp(arg, "-mtime") == 0) {
@@ -614,7 +614,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-newer") == 0) {
 			return parse_acnewer(state, arg, MTIME);
 		} else if (strcmp(arg, "-nocolor") == 0) {
-			state->cl->color = false;
+			state->cmdline->color = false;
 			return new_option(state, arg);
 		} else if (strcmp(arg, "-nohidden") == 0) {
 			return new_action(state, eval_nohidden);
@@ -888,22 +888,22 @@ static struct expr *parse_expr(struct parser_state *state) {
  * Parse the command line.
  */
 struct cmdline *parse_cmdline(int argc, char *argv[]) {
-	struct cmdline *cl = malloc(sizeof(struct cmdline));
-	if (!cl) {
+	struct cmdline *cmdline = malloc(sizeof(struct cmdline));
+	if (!cmdline) {
 		goto fail;
 	}
 
-	cl->roots = NULL;
-	cl->nroots = 0;
-	cl->colors = NULL;
-	cl->color = isatty(STDOUT_FILENO);
-	cl->mindepth = 0;
-	cl->maxdepth = INT_MAX;
-	cl->flags = BFTW_RECOVER;
-	cl->expr = &expr_true;
+	cmdline->roots = NULL;
+	cmdline->nroots = 0;
+	cmdline->colors = NULL;
+	cmdline->color = isatty(STDOUT_FILENO);
+	cmdline->mindepth = 0;
+	cmdline->maxdepth = INT_MAX;
+	cmdline->flags = BFTW_RECOVER;
+	cmdline->expr = &expr_true;
 
 	struct parser_state state = {
-		.cl = cl,
+		.cmdline = cmdline,
 		.argv = argv,
 		.i = 1,
 		.implicit_print = true,
@@ -917,8 +917,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (skip_paths(&state)) {
-		cl->expr = parse_expr(&state);
-		if (!cl->expr) {
+		cmdline->expr = parse_expr(&state);
+		if (!cmdline->expr) {
 			goto fail;
 		}
 	}
@@ -934,25 +934,25 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 			goto fail;
 		}
 
-		cl->expr = new_and_expr(cl->expr, print);
-		if (!cl->expr) {
+		cmdline->expr = new_and_expr(cmdline->expr, print);
+		if (!cmdline->expr) {
 			goto fail;
 		}
 	}
 
-	if (cl->nroots == 0) {
-		if (!cmdline_add_root(cl, ".")) {
+	if (cmdline->nroots == 0) {
+		if (!cmdline_add_root(cmdline, ".")) {
 			goto fail;
 		}
 	}
 
-	if (cl->color) {
-		cl->colors = parse_colors(getenv("LS_COLORS"));
+	if (cmdline->color) {
+		cmdline->colors = parse_colors(getenv("LS_COLORS"));
 	}
 
-	return cl;
+	return cmdline;
 
 fail:
-	free_cmdline(cl);
+	free_cmdline(cmdline);
 	return NULL;
 }

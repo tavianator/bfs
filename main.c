@@ -15,13 +15,13 @@
 int main(int argc, char *argv[]) {
 	int ret = EXIT_FAILURE;
 
-	struct cmdline *cl = parse_cmdline(argc, argv);
-	if (cl) {
-		if (eval_cmdline(cl) == 0) {
+	struct cmdline *cmdline = parse_cmdline(argc, argv);
+	if (cmdline) {
+		if (eval_cmdline(cmdline) == 0) {
 			ret = EXIT_SUCCESS;
 		}
 	}
 
-	free_cmdline(cl);
+	free_cmdline(cmdline);
 	return ret;
 }
