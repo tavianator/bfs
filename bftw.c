@@ -600,14 +600,27 @@ static void bftw_set_error(struct bftw_state *state, int error) {
 }
 
 /**
+ * Figure out the name offset in a path.
+ */
+static size_t basename_offset(const char *path) {
+	size_t i;
+
+	// Strip trailing slashes
+	for (i = strlen(path); i > 0 && path[i - 1] == '/'; --i);
+
+	// Find the beginning of the name
+	for (; i > 0 && path[i - 1] != '/'; --i);
+
+	return i;
+}
+
+/**
  * Initialize the buffers with data about the current path.
  */
 static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de) {
 	struct BFTW *ftwbuf = &state->ftwbuf;
 	ftwbuf->path = state->path.str;
-	ftwbuf->nameoff = 0;
 	ftwbuf->error = 0;
-	ftwbuf->depth = 0;
 	ftwbuf->visit = (state->status == BFTW_GC ? BFTW_POST : BFTW_PRE);
 	ftwbuf->statbuf = NULL;
 	ftwbuf->at_fd = AT_FDCWD;
@@ -624,6 +637,9 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		}
 
 		dircache_entry_base(&state->cache, current, &ftwbuf->at_fd, &ftwbuf->at_path);
+	} else {
+		ftwbuf->nameoff = basename_offset(ftwbuf->path);
+		ftwbuf->depth = 0;
 	}
 
 	if (de) {

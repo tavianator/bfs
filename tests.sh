@@ -199,7 +199,23 @@ function test_0032() {
     find_diff -L "$links" -xtype f 2>/dev/null
 }
 
-for i in {1..32}; do
+function test_0033() {
+    find_diff "$basic/a" -name 'a'
+}
+
+function test_0034() {
+    find_diff "$basic/g/" -name 'g'
+}
+
+function test_0035() {
+    find_diff "/" -maxdepth 0 -name '/' 2>/dev/null
+}
+
+function test_0036() {
+    find_diff "//" -maxdepth 0 -name '/' 2>/dev/null
+}
+
+for i in {1..36}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

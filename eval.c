@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -311,7 +312,30 @@ bool eval_links(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_name(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-	return fnmatch(expr->sdata, ftwbuf->path + ftwbuf->nameoff, 0) == 0;
+
+	const char *name = ftwbuf->path + ftwbuf->nameoff;
+	char *copy = NULL;
+	if (ftwbuf->depth == 0) {
+		// Any trailing slashes are not part of the name.  This can only
+		// happen for the root path.
+		const char *slash = strchr(name, '/');
+		if (slash == name) {
+			// The name of "/" (or "//", etc.) is "/"
+			name = "/";
+		} else if (slash) {
+			copy = strdup(name);
+			if (!copy) {
+				eval_error(state);
+				return false;
+			}
+			copy[slash - name] = '\0';
+			name = copy;
+		}
+	}
+
+	bool ret = fnmatch(expr->sdata, name, 0) == 0;
+	free(copy);
+	return ret;
 }
 
 /**
