@@ -49,7 +49,7 @@ static void eval_error(struct eval_state *state) {
 static const struct stat *fill_statbuf(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
-		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, AT_SYMLINK_NOFOLLOW) == 0) {
+		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, ftwbuf->at_flags) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
 			eval_error(state);
@@ -104,7 +104,7 @@ bool eval_false(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_access(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, AT_SYMLINK_NOFOLLOW) == 0;
+	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, ftwbuf->at_flags) == 0;
 }
 
 /**

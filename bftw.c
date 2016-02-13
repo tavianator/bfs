@@ -635,6 +635,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	}
 
 	bool follow = state->flags & (current ? BFTW_FOLLOW_NONROOT : BFTW_FOLLOW_ROOT);
+	ftwbuf->at_flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 	bool detect_cycles = (state->flags & BFTW_DETECT_CYCLES)
 		&& state->status == BFTW_CHILD;
@@ -643,13 +644,10 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	    || ftwbuf->typeflag == BFTW_UNKNOWN
 	    || (ftwbuf->typeflag == BFTW_LNK && follow)
 	    || (ftwbuf->typeflag == BFTW_DIR && detect_cycles)) {
-		int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
-
-		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, flags);
+		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, ftwbuf->at_flags);
 		if (ret != 0 && follow && errno == ENOENT) {
 			// Could be a broken symlink, retry without following
-			flags = AT_SYMLINK_NOFOLLOW;
-			ret = ftwbuf_stat(ftwbuf, &state->statbuf, flags);
+			ret = ftwbuf_stat(ftwbuf, &state->statbuf, AT_SYMLINK_NOFOLLOW);
 		}
 
 		if (ret != 0) {

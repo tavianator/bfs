@@ -75,6 +75,8 @@ struct BFTW {
 	int at_fd;
 	/** The path relative to atfd for the *at() family of calls. */
 	const char *at_path;
+	/** Appropriate flags (such as AT_SYMLINK_NOFOLLOW) for the *at() family of calls. */
+	int at_flags;
 };
 
 enum bftw_action {
