@@ -679,6 +679,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return parse_depth(state, arg, &state->cmdline->maxdepth);
 		} else if (strcmp(arg, "-mmin") == 0) {
 			return parse_acmtime(state, arg, MTIME, MINUTES);
+		} else if (strcmp(arg, "-mount") == 0) {
+			state->cmdline->flags |= BFTW_MOUNT;
+			return new_option(state, arg);
 		} else if (strcmp(arg, "-mtime") == 0) {
 			return parse_acmtime(state, arg, MTIME, DAYS);
 		}
@@ -762,7 +765,10 @@ static struct expr *parse_literal(struct parser_state *state) {
 		break;
 
 	case 'x':
-		if (strcmp(arg, "-xtype") == 0) {
+		if (strcmp(arg, "-xdev") == 0) {
+			state->cmdline->flags |= BFTW_MOUNT;
+			return new_option(state, arg);
+		} else if (strcmp(arg, "-xtype") == 0) {
 			return parse_type(state, arg, eval_xtype);
 		}
 		break;

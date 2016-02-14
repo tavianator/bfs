@@ -656,10 +656,12 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	bool detect_cycles = (state->flags & BFTW_DETECT_CYCLES)
 		&& state->status == BFTW_CHILD;
 
+	bool mount = state->flags & BFTW_MOUNT;
+
 	if ((state->flags & BFTW_STAT)
 	    || ftwbuf->typeflag == BFTW_UNKNOWN
 	    || (ftwbuf->typeflag == BFTW_LNK && follow)
-	    || (ftwbuf->typeflag == BFTW_DIR && detect_cycles)) {
+	    || (ftwbuf->typeflag == BFTW_DIR && (detect_cycles || mount))) {
 		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, ftwbuf->at_flags);
 		if (ret != 0 && follow && errno == ENOENT) {
 			// Could be a broken symlink, retry without following
@@ -719,7 +721,7 @@ static struct dircache_entry *bftw_add(struct bftw_state *state, const char *nam
 		return NULL;
 	}
 
-	if (state->flags & BFTW_DETECT_CYCLES) {
+	if (state->flags & (BFTW_DETECT_CYCLES | BFTW_MOUNT)) {
 		const struct stat *statbuf = state->ftwbuf.statbuf;
 		if (statbuf) {
 			entry->dev = statbuf->st_dev;
@@ -910,6 +912,13 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 			}
 
 			if (state.ftwbuf.typeflag == BFTW_DIR) {
+				const struct stat *statbuf = state.ftwbuf.statbuf;
+				if ((flags & BFTW_MOUNT)
+				    && statbuf
+				    && statbuf->st_dev != state.current->dev) {
+					continue;
+				}
+
 				if (bftw_push(&state, de->d_name) != 0) {
 					goto fail;
 				}

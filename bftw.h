@@ -120,6 +120,8 @@ enum bftw_flags {
 	BFTW_FOLLOW         = BFTW_FOLLOW_ROOT | BFTW_FOLLOW_NONROOT,
 	/** Detect directory cycles. */
 	BFTW_DETECT_CYCLES  = 1 << 5,
+	/** Stay on the same filesystem. */
+	BFTW_MOUNT          = 1 << 6,
 };
 
 /**
