@@ -20,6 +20,10 @@ CFLAGS ?= -g -Wall
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 RM ?= rm -f
+INSTALL ?= install
+
+DESTDIR ?=
+PREFIX ?= /usr
 
 LOCAL_CPPFLAGS := -D_DEFAULT_SOURCE -D_GNU_SOURCE -DBFS_VERSION=\"$(VERSION)\"
 LOCAL_CFLAGS := -std=c99
@@ -33,6 +37,9 @@ all: bfs
 bfs: bftw.o color.o eval.o main.o parse.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
+release: CFLAGS := -O3 -flto -Wall -DNDEBUG
+release: bfs
+
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
@@ -42,9 +49,12 @@ check: all
 clean:
 	$(RM) bfs *.o *.d
 
-release: CFLAGS := -O3 -flto -Wall -DNDEBUG
-release: bfs
+install:
+	$(INSTALL) -D -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
 
-.PHONY: all check clean release
+uninstall:
+	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
+
+.PHONY: all release check clean install uninstall
 
 -include $(wildcard *.d)

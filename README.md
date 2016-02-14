@@ -91,3 +91,28 @@ When `bfs` detects that its output is a terminal, it automatically colors its ou
 This makes it easier to identify relevant files at a glance.
 
 ![Screenshot](http://i.imgur.com/5V6Sxw5.png)
+
+
+Try it!
+-------
+
+To get `bfs`, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
+Then run
+
+    $ make
+
+This will build the `bfs` binary in the current directory.
+You can test it out:
+
+    $ ./bfs -nohidden
+
+If you're interested in speed, you may want to build the release version instead:
+
+    $ make clean
+    $ make release
+
+Finally, if you want to install it globally, run
+
+    $ sudo make install
+
+If you're on Arch Linux, `bfs` is available in the [AUR](https://aur.archlinux.org/packages/bfs/).
