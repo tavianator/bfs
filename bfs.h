@@ -18,8 +18,13 @@
 #include <sys/types.h>
 #include <time.h>
 
-#define BFS_VERSION "0.0"
-#define BFS_HOMEPAGE "https://github.com/tavianator/bfs"
+#ifndef BFS_VERSION
+#	define BFS_VERSION "0.67"
+#endif
+
+#ifndef BFS_HOMEPAGE
+#	define BFS_HOMEPAGE "https://github.com/tavianator/bfs"
+#endif
 
 /**
  * A command line expression.

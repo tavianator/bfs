@@ -9,13 +9,19 @@
 # the COPYING file or http://www.wtfpl.net/ for more details.       #
 #####################################################################
 
+ifeq ($(wildcard .git),)
+VERSION := 0.67
+else
+VERSION := $(shell git describe --always)
+endif
+
 CC ?= gcc
 CFLAGS ?= -g -Wall
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 RM ?= rm -f
 
-LOCAL_CPPFLAGS := -D_DEFAULT_SOURCE -D_GNU_SOURCE
+LOCAL_CPPFLAGS := -D_DEFAULT_SOURCE -D_GNU_SOURCE -DBFS_VERSION=\"$(VERSION)\"
 LOCAL_CFLAGS := -std=c99
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
