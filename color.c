@@ -49,9 +49,11 @@ struct color_table {
 	const char *exec;
 
 	struct ext_color *ext_list;
+
+	char *data;
 };
 
-struct color_table *parse_colors(char *ls_colors) {
+struct color_table *parse_colors(const char *ls_colors) {
 	struct color_table *colors = malloc(sizeof(struct color_table));
 	if (!colors) {
 		goto done;
@@ -79,11 +81,15 @@ struct color_table *parse_colors(char *ls_colors) {
 	colors->exec       = "01;32";
 	colors->ext_list   = NULL;
 
-	if (!ls_colors) {
+	if (ls_colors) {
+		colors->data = strdup(ls_colors);
+	}
+
+	if (!colors->data) {
 		goto done;
 	}
 
-	char *start = ls_colors;
+	char *start = colors->data;
 	char *end;
 	struct ext_color *ext;
 	for (end = strchr(start, ':'); *start && end; start = end + 1, end = strchr(start, ':')) {
@@ -333,6 +339,7 @@ void free_colors(struct color_table *colors) {
 			free(saved);
 		}
 
+		free(colors->data);
 		free(colors);
 	}
 }

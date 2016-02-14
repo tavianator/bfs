@@ -26,7 +26,7 @@ struct color_table;
  *         A color table in the LS_COLORS environment variable format.
  * @return The parsed color table.
  */
-struct color_table *parse_colors(char *ls_colors);
+struct color_table *parse_colors(const char *ls_colors);
 
 /**
  * Pretty-print a file path.
