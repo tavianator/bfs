@@ -223,7 +223,23 @@ function test_0038() {
     find_diff "$basic" -ipath "$basic/*F*"
 }
 
-for i in {1..38}; do
+function test_0039() {
+    find_diff "$links" -lname '[aq]'
+}
+
+function test_0040() {
+    find_diff "$links" -ilname '[AQ]'
+}
+
+function test_0041() {
+    find_diff -L "$links" -lname '[aq]' 2>/dev/null
+}
+
+function test_0042() {
+    find_diff -L "$links" -lname '[AQ]' 2>/dev/null
+}
+
+for i in {1..42}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

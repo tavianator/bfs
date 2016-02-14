@@ -457,6 +457,14 @@ static struct expr *parse_path(struct parser_state *state, const char *option, b
 }
 
 /**
+ * Parse -i?lname.
+ */
+static struct expr *parse_lname(struct parser_state *state, const char *option, bool casefold) {
+	struct expr *expr = parse_test_sdata(state, option, eval_lname);
+	return set_fnm_casefold(expr, casefold);
+}
+
+/**
  * Parse -noleaf.
  */
 static struct expr *parse_noleaf(struct parser_state *state, const char *option) {
@@ -670,7 +678,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 		break;
 
 	case 'i':
-		if (strcmp(arg, "-iname") == 0) {
+		if (strcmp(arg, "-ilname") == 0) {
+			return parse_lname(state, arg, true);
+		} if (strcmp(arg, "-iname") == 0) {
 			return parse_name(state, arg, true);
 		} else if (strcmp(arg, "-inum") == 0) {
 			return parse_test_icmp(state, arg, eval_inum);
@@ -682,6 +692,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'l':
 		if (strcmp(arg, "-links") == 0) {
 			return parse_test_icmp(state, arg, eval_links);
+		} else if (strcmp(arg, "-lname") == 0) {
+			return parse_lname(state, arg, false);
 		}
 		break;
 

@@ -308,6 +308,42 @@ bool eval_links(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -i?lname test.
+ */
+bool eval_lname(const struct expr *expr, struct eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+	if (ftwbuf->typeflag != BFTW_LNK) {
+		return false;
+	}
+
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	size_t size = statbuf->st_size + 1;
+	char *name = malloc(size);
+	if (!name) {
+		eval_error(state);
+		return false;
+	}
+
+	ssize_t ret = readlinkat(ftwbuf->at_fd, ftwbuf->at_path, name, size);
+	if (ret < 0) {
+		eval_error(state);
+		return false;
+	} else if (ret >= size) {
+		return false;
+	}
+
+	name[ret] = '\0';
+
+	bool match = fnmatch(expr->sdata, name, expr->idata) == 0;
+	free(name);
+	return match;
+}
+
+/**
  * -i?name test.
  */
 bool eval_name(const struct expr *expr, struct eval_state *state) {

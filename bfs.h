@@ -168,6 +168,7 @@ bool eval_samefile(const struct expr *expr, struct eval_state *state);
 bool eval_type(const struct expr *expr, struct eval_state *state);
 bool eval_xtype(const struct expr *expr, struct eval_state *state);
 
+bool eval_lname(const struct expr *expr, struct eval_state *state);
 bool eval_name(const struct expr *expr, struct eval_state *state);
 bool eval_path(const struct expr *expr, struct eval_state *state);
 
