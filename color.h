@@ -38,17 +38,35 @@ struct color_table *parse_colors(const char *ls_colors);
  */
 void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf);
 
+#if __GNUC__
+#	define BFS_PRINTF_ATTRIBUTE(f, v) __attribute__((format(printf, f, v)))
+#else
+#	define BFS_PRINTF_ATTRIBUTE(f, v)
+#endif
+
 /**
- * Pretty-print an error.
+ * Pretty-print a warning message.
  *
  * @param colors
  *         The color table to use.
- * @param path
- *         The file path in error.
- * @param error
- *         The error code that occurred.
+ * @param format
+ *         The format string.
+ * @param ...
+ *         The format string's arguments.
  */
-void print_error(const struct color_table *colors, const char *path, int error);
+void pretty_warning(const struct color_table *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
+
+/**
+ * Pretty-print an error message.
+ *
+ * @param colors
+ *         The color table to use.
+ * @param format
+ *         The format string.
+ * @param ...
+ *         The format string's arguments.
+ */
+void pretty_error(const struct color_table *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
 
 /**
  * Free a color table.

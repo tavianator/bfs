@@ -40,7 +40,8 @@ struct eval_state {
  * Report an error that occurs during evaluation.
  */
 static void eval_error(struct eval_state *state) {
-	print_error(state->cmdline->colors, state->ftwbuf->path, errno);
+	pretty_error(state->cmdline->stderr_colors,
+	             "'%s': %s\n", state->ftwbuf->path, strerror(errno));
 	state->ret = -1;
 }
 
@@ -386,10 +387,11 @@ bool eval_path(const struct expr *expr, struct eval_state *state) {
  * -print action.
  */
 bool eval_print(const struct expr *expr, struct eval_state *state) {
-	struct color_table *colors = state->cmdline->colors;
+	const struct color_table *colors = state->cmdline->stdout_colors;
 	if (colors) {
 		fill_statbuf(state);
 	}
+
 	pretty_print(colors, state->ftwbuf);
 	return true;
 }
@@ -526,7 +528,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	const struct cmdline *cmdline = args->cmdline;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
-		print_error(cmdline->colors, ftwbuf->path, ftwbuf->error);
+		pretty_error(cmdline->stderr_colors, "'%s': %s\n", ftwbuf->path, strerror(ftwbuf->error));
 		return BFTW_SKIP_SUBTREE;
 	}
 

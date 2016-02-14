@@ -155,12 +155,15 @@ struct parser_state {
  * Invoke stat() on an argument.
  */
 static int stat_arg(const struct parser_state *state, struct expr *expr, struct stat *sb) {
-	bool follow = state->cmdline->flags & BFTW_FOLLOW;
+	const struct cmdline *cmdline = state->cmdline;
+
+	bool follow = cmdline->flags & BFTW_FOLLOW;
 	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 	int ret = fstatat(AT_FDCWD, expr->sdata, sb, flags);
 	if (ret != 0) {
-		print_error(NULL, expr->sdata, errno);
+		pretty_error(cmdline->stderr_colors,
+		             "'%s': %s\n", expr->sdata, strerror(errno));
 		free_expr(expr);
 	}
 	return ret;
@@ -197,7 +200,7 @@ static const char *skip_paths(struct parser_state *state) {
 /**
  * Parse an integer.
  */
-static bool parse_int(const char *str, int *value) {
+static bool parse_int(const struct parser_state *state, const char *str, int *value) {
 	char *endptr;
 	long result = strtol(str, &endptr, 10);
 
@@ -213,14 +216,15 @@ static bool parse_int(const char *str, int *value) {
 	return true;
 
 bad:
-	fprintf(stderr, "'%s' is not a valid integer.\n", str);
+	pretty_error(state->cmdline->stderr_colors,
+	             "error: '%s' is not a valid integer.\n", str);
 	return false;
 }
 
 /**
  * Parse an integer and a comparison flag.
  */
-static bool parse_icmp(const char *str, struct expr *expr) {
+static bool parse_icmp(const struct parser_state *state, const char *str, struct expr *expr) {
 	switch (str[0]) {
 	case '-':
 		expr->cmp = CMP_LESS;
@@ -235,7 +239,7 @@ static bool parse_icmp(const char *str, struct expr *expr) {
 		break;
 	}
 
-	return parse_int(str, &expr->idata);
+	return parse_int(state, str, &expr->idata);
 }
 
 /**
@@ -243,10 +247,10 @@ static bool parse_icmp(const char *str, struct expr *expr) {
  */
 static struct expr *new_option(struct parser_state *state, const char *option) {
 	if (state->warn && state->non_option_seen) {
-		fprintf(stderr,
-		        "The '%s' option applies to the entire command line.\n"
-		        "For clarity, place it before any non-option arguments.\n\n",
-		        option);
+		pretty_warning(state->cmdline->stderr_colors,
+		               "warning: The '%s' option applies to the entire command line.  For clarity, place\n"
+		               "it before any non-option arguments.\n\n",
+		               option);
 	}
 
 	return &expr_true;
@@ -308,7 +312,8 @@ static struct expr *new_action(struct parser_state *state, eval_fn *eval) {
 static struct expr *parse_test_icmp(struct parser_state *state, const char *test, eval_fn *eval) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", test);
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a value.\n", test);
 		return NULL;
 	}
 
@@ -316,7 +321,7 @@ static struct expr *parse_test_icmp(struct parser_state *state, const char *test
 
 	struct expr *expr = new_test(state, eval);
 	if (expr) {
-		if (!parse_icmp(arg, expr)) {
+		if (!parse_icmp(state, arg, expr)) {
 			free_expr(expr);
 			expr = NULL;
 		}
@@ -330,7 +335,8 @@ static struct expr *parse_test_icmp(struct parser_state *state, const char *test
 static struct expr *parse_test_sdata(struct parser_state *state, const char *test, eval_fn *eval) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", test);
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a value.\n", test);
 		return NULL;
 	}
 
@@ -407,13 +413,14 @@ static struct expr *parse_daystart(struct parser_state *state) {
 static struct expr *parse_depth(struct parser_state *state, const char *option, int *depth) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", option);
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a value.\n", option);
 		return NULL;
 	}
 
 	++state->i;
 
-	if (!parse_int(arg, depth)) {
+	if (!parse_int(state, arg, depth)) {
 		return NULL;
 	}
 
@@ -423,13 +430,14 @@ static struct expr *parse_depth(struct parser_state *state, const char *option, 
 /**
  * Set the FNM_CASEFOLD flag, if supported.
  */
-static struct expr *set_fnm_casefold(struct expr *expr, bool casefold) {
+static struct expr *set_fnm_casefold(const struct parser_state *state, const char *option, struct expr *expr, bool casefold) {
 	if (expr) {
 		if (casefold) {
 #ifdef FNM_CASEFOLD
 			expr->idata = FNM_CASEFOLD;
 #else
-			fprintf(stderr, "%s is missing platform support.\n", option);
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s is missing platform support.\n", option);
 			free(expr);
 			expr = NULL;
 #endif
@@ -445,7 +453,7 @@ static struct expr *set_fnm_casefold(struct expr *expr, bool casefold) {
  */
 static struct expr *parse_name(struct parser_state *state, const char *option, bool casefold) {
 	struct expr *expr = parse_test_sdata(state, option, eval_name);
-	return set_fnm_casefold(expr, casefold);
+	return set_fnm_casefold(state, option, expr, casefold);
 }
 
 /**
@@ -453,7 +461,7 @@ static struct expr *parse_name(struct parser_state *state, const char *option, b
  */
 static struct expr *parse_path(struct parser_state *state, const char *option, bool casefold) {
 	struct expr *expr = parse_test_sdata(state, option, eval_path);
-	return set_fnm_casefold(expr, casefold);
+	return set_fnm_casefold(state, option, expr, casefold);
 }
 
 /**
@@ -461,7 +469,7 @@ static struct expr *parse_path(struct parser_state *state, const char *option, b
  */
 static struct expr *parse_lname(struct parser_state *state, const char *option, bool casefold) {
 	struct expr *expr = parse_test_sdata(state, option, eval_lname);
-	return set_fnm_casefold(expr, casefold);
+	return set_fnm_casefold(state, option, expr, casefold);
 }
 
 /**
@@ -469,9 +477,9 @@ static struct expr *parse_lname(struct parser_state *state, const char *option, 
  */
 static struct expr *parse_noleaf(struct parser_state *state, const char *option) {
 	if (state->warn) {
-		fprintf(stderr,
-		        "bfs does not apply the optimization that %s inhibits.\n\n",
-		        option);
+		pretty_warning(state->cmdline->stderr_colors,
+		               "warning: bfs does not apply the optimization that %s inhibits.\n\n",
+		               option);
 	}
 
 	return new_option(state, option);
@@ -503,7 +511,8 @@ static struct expr *parse_samefile(struct parser_state *state, const char *optio
 static struct expr *parse_type(struct parser_state *state, const char *option, eval_fn *eval) {
 	const char *arg = state->argv[state->i];
 	if (!arg) {
-		fprintf(stderr, "%s needs a value.\n", option);
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a value.\n", option);
 		return NULL;
 	}
 
@@ -534,7 +543,8 @@ static struct expr *parse_type(struct parser_state *state, const char *option, e
 	}
 
 	if (typeflag == BFTW_UNKNOWN || arg[1] != '\0') {
-		fprintf(stderr, "Unknown type flag '%s'.\n", arg);
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: Unknown type flag '%s'.\n", arg);
 		return NULL;
 	}
 
@@ -580,33 +590,36 @@ static struct expr *parse_version(struct parser_state *state) {
  *         | ACTION
  */
 static struct expr *parse_literal(struct parser_state *state) {
+	struct cmdline *cmdline = state->cmdline;
+
 	// Paths are already skipped at this point
 	const char *arg = state->argv[state->i++];
 
 	if (arg[0] != '-') {
-		fprintf(stderr, "Expected a predicate; found '%s'.\n", arg);
+		pretty_error(cmdline->stderr_colors,
+		             "error: Expected a predicate; found '%s'.\n", arg);
 		return NULL;
 	}
 
 	switch (arg[1]) {
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
-			state->cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
+			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
 			return new_option(state, arg);
 		}
 		break;
 
 	case 'H':
 		if (strcmp(arg, "-H") == 0) {
-			state->cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
-			state->cmdline->flags |= BFTW_FOLLOW_ROOT;
+			cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
+			cmdline->flags |= BFTW_FOLLOW_ROOT;
 			return new_option(state, arg);
 		}
 		break;
 
 	case 'L':
 		if (strcmp(arg, "-L") == 0) {
-			state->cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
+			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
 			return new_option(state, arg);
 		}
 		break;
@@ -629,7 +642,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-cnewer") == 0) {
 			return parse_acnewer(state, arg, CTIME);
 		} else if (strcmp(arg, "-color") == 0) {
-			state->cmdline->color = true;
+			cmdline->stdout_colors = cmdline->colors;
+			cmdline->stderr_colors = cmdline->colors;
 			return new_option(state, arg);
 		}
 		break;
@@ -638,10 +652,10 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-daystart") == 0) {
 			return parse_daystart(state);
 		} else if (strcmp(arg, "-delete") == 0) {
-			state->cmdline->flags |= BFTW_DEPTH;
+			cmdline->flags |= BFTW_DEPTH;
 			return new_action(state, eval_delete);
 		} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
-			state->cmdline->flags |= BFTW_DEPTH;
+			cmdline->flags |= BFTW_DEPTH;
 			return new_option(state, arg);
 		}
 		break;
@@ -658,7 +672,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-false") == 0) {
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
-			state->cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
+			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
 			return new_option(state, arg);
 		}
 		break;
@@ -699,13 +713,13 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'm':
 		if (strcmp(arg, "-mindepth") == 0) {
-			return parse_depth(state, arg, &state->cmdline->mindepth);
+			return parse_depth(state, arg, &cmdline->mindepth);
 		} else if (strcmp(arg, "-maxdepth") == 0) {
-			return parse_depth(state, arg, &state->cmdline->maxdepth);
+			return parse_depth(state, arg, &cmdline->maxdepth);
 		} else if (strcmp(arg, "-mmin") == 0) {
 			return parse_acmtime(state, arg, MTIME, MINUTES);
 		} else if (strcmp(arg, "-mount") == 0) {
-			state->cmdline->flags |= BFTW_MOUNT;
+			cmdline->flags |= BFTW_MOUNT;
 			return new_option(state, arg);
 		} else if (strcmp(arg, "-mtime") == 0) {
 			return parse_acmtime(state, arg, MTIME, DAYS);
@@ -718,7 +732,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-newer") == 0) {
 			return parse_acnewer(state, arg, MTIME);
 		} else if (strcmp(arg, "-nocolor") == 0) {
-			state->cmdline->color = false;
+			cmdline->stdout_colors = NULL;
+			cmdline->stderr_colors = NULL;
 			return new_option(state, arg);
 		} else if (strcmp(arg, "-nohidden") == 0) {
 			return new_action(state, eval_nohidden);
@@ -793,7 +808,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'x':
 		if (strcmp(arg, "-xdev") == 0) {
-			state->cmdline->flags |= BFTW_MOUNT;
+			cmdline->flags |= BFTW_MOUNT;
 			return new_option(state, arg);
 		} else if (strcmp(arg, "-xtype") == 0) {
 			return parse_type(state, arg, eval_xtype);
@@ -809,7 +824,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 		break;
 	}
 
-	fprintf(stderr, "Unknown argument '%s'.\n", arg);
+	pretty_error(cmdline->stderr_colors,
+	             "error: Unknown argument '%s'.\n", arg);
 	return NULL;
 }
 
@@ -1025,12 +1041,14 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	cmdline->roots = NULL;
 	cmdline->nroots = 0;
-	cmdline->colors = NULL;
-	cmdline->color = isatty(STDOUT_FILENO);
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
 	cmdline->expr = &expr_true;
+
+	cmdline->colors = parse_colors(getenv("LS_COLORS"));
+	cmdline->stdout_colors = isatty(STDOUT_FILENO) ? cmdline->colors : NULL;
+	cmdline->stderr_colors = isatty(STDERR_FILENO) ? cmdline->colors : NULL;
 
 	struct parser_state state = {
 		.cmdline = cmdline,
@@ -1059,7 +1077,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (state.i < argc) {
-		fprintf(stderr, "Unexpected argument '%s'.\n", argv[state.i]);
+		pretty_error(cmdline->stderr_colors,
+		             "error: Unexpected argument '%s'.\n", argv[state.i]);
 		goto fail;
 	}
 
@@ -1079,10 +1098,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		if (!cmdline_add_root(cmdline, ".")) {
 			goto fail;
 		}
-	}
-
-	if (cmdline->color) {
-		cmdline->colors = parse_colors(getenv("LS_COLORS"));
 	}
 
 done:

@@ -48,6 +48,9 @@ struct color_table {
 	const char *sticky;
 	const char *exec;
 
+	const char *warning;
+	const char *error;
+
 	struct ext_color *ext_list;
 
 	char *data;
@@ -79,6 +82,8 @@ struct color_table *parse_colors(const char *ls_colors) {
 	colors->ow         = "34;42";
 	colors->sticky     = "37;44";
 	colors->exec       = "01;32";
+	colors->warning    = "40;33;01";
+	colors->error      = "40;31;01";
 	colors->ext_list   = NULL;
 
 	if (ls_colors) {
@@ -315,19 +320,34 @@ void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf) {
 	fputs("\n", stdout);
 }
 
-void print_error(const struct color_table *colors, const char *path, int error) {
-	const char *color = NULL;
-	if (colors) {
-		color = colors->orphan;
-	}
-
+static void pretty_format(const struct color_table *colors, const char *color, const char *format, va_list args) {
 	if (color) {
 		print_esc(color, stderr);
 	}
-	fprintf(stderr, "'%s': %s\n", path, strerror(error));
+
+	vfprintf(stderr, format, args);
+
 	if (color) {
 		print_esc(colors->reset, stderr);
 	}
+}
+
+void pretty_warning(const struct color_table *colors, const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+
+	pretty_format(colors, colors ? colors->warning : NULL, format, args);
+
+	va_end(args);
+}
+
+void pretty_error(const struct color_table *colors, const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+
+	pretty_format(colors, colors ? colors->error : NULL, format, args);
+
+	va_end(args);
 }
 
 void free_colors(struct color_table *colors) {
