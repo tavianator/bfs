@@ -144,6 +144,8 @@ struct parser_state {
 	bool warn;
 	/** Whether any non-option arguments have been encountered. */
 	bool non_option_seen;
+	/** Whether an information option like -help or -version was passed. */
+	bool just_info;
 
 	/** The current time. */
 	struct timespec now;
@@ -521,6 +523,37 @@ static struct expr *parse_type(struct parser_state *state, const char *option, e
 }
 
 /**
+ * "Parse" -help.
+ */
+static struct expr *parse_help(struct parser_state *state) {
+	printf("Usage: %s [arguments...]\n\n", state->argv[0]);
+
+	printf("bfs is compatible with find; see find -help or man find for help with find-\n"
+	       "compatible options :)\n\n");
+
+	printf("Extra features:\n"
+	       "  -color, -nocolor: Turn on or off file type colorization.\n\n"
+	       "  -hidden, -nohidden: Match hidden files, or filter them out.\n\n");
+
+	printf("%s\n", BFS_HOMEPAGE);
+
+	state->just_info = true;
+	return NULL;
+}
+
+/**
+ * "Parse" -version.
+ */
+static struct expr *parse_version(struct parser_state *state) {
+	printf("bfs %s\n\n", BFS_VERSION);
+
+	printf("%s\n", BFS_HOMEPAGE);
+
+	state->just_info = true;
+	return NULL;
+}
+
+/**
  * LITERAL : OPTION
  *         | TEST
  *         | ACTION
@@ -616,7 +649,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 		break;
 
 	case 'h':
-		if (strcmp(arg, "-hidden") == 0) {
+		if (strcmp(arg, "-help") == 0) {
+			return parse_help(state);
+		} else if (strcmp(arg, "-hidden") == 0) {
 			return new_test(state, eval_hidden);
 		}
 		break;
@@ -693,6 +728,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-samefile") == 0) {
 			return parse_samefile(state, arg);
 		}
+		break;
 
 	case 't':
 		if (strcmp(arg, "-true") == 0) {
@@ -705,6 +741,12 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case  'u':
 		if (strcmp(arg, "-uid") == 0) {
 			return parse_test_icmp(state, arg, eval_uid);
+		}
+		break;
+
+	case 'v':
+		if (strcmp(arg, "-version") == 0) {
+			return parse_version(state);
 		}
 		break;
 
@@ -723,6 +765,15 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-xtype") == 0) {
 			return parse_type(state, arg, eval_xtype);
 		}
+		break;
+
+	case '-':
+		if (strcmp(arg, "--help") == 0) {
+			return parse_help(state);
+		} else if (strcmp(arg, "--version") == 0) {
+			return parse_version(state);
+		}
+		break;
 	}
 
 	fprintf(stderr, "Unknown argument '%s'.\n", arg);
@@ -955,6 +1006,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.implicit_print = true,
 		.warn = true,
 		.non_option_seen = false,
+		.just_info = false,
 	};
 
 	if (clock_gettime(CLOCK_REALTIME, &state.now) != 0) {
@@ -965,7 +1017,11 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	if (skip_paths(&state)) {
 		cmdline->expr = parse_expr(&state);
 		if (!cmdline->expr) {
-			goto fail;
+			if (state.just_info) {
+				goto done;
+			} else {
+				goto fail;
+			}
 		}
 	}
 
@@ -996,6 +1052,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		cmdline->colors = parse_colors(getenv("LS_COLORS"));
 	}
 
+done:
 	return cmdline;
 
 fail:

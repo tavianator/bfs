@@ -568,6 +568,10 @@ static int infer_fdlimit() {
  * Evaluate the command line.
  */
 int eval_cmdline(const struct cmdline *cmdline) {
+	if (!cmdline->expr) {
+		return 0;
+	}
+
 	int nopenfd = infer_fdlimit();
 
 	struct callback_args args = {

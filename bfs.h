@@ -18,6 +18,9 @@
 #include <sys/types.h>
 #include <time.h>
 
+#define BFS_VERSION "0.0"
+#define BFS_HOMEPAGE "https://github.com/tavianator/bfs"
+
 /**
  * A command line expression.
  */
