@@ -457,6 +457,19 @@ static struct expr *parse_path(struct parser_state *state, const char *option, b
 }
 
 /**
+ * Parse -noleaf.
+ */
+static struct expr *parse_noleaf(struct parser_state *state, const char *option) {
+	if (state->warn) {
+		fprintf(stderr,
+		        "bfs does not apply the optimization that %s inhibits.\n\n",
+		        option);
+	}
+
+	return new_option(state, option);
+}
+
+/**
  * Parse -samefile FILE.
  */
 static struct expr *parse_samefile(struct parser_state *state, const char *option) {
@@ -697,6 +710,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return new_option(state, arg);
 		} else if (strcmp(arg, "-nohidden") == 0) {
 			return new_action(state, eval_nohidden);
+		} else if (strcmp(arg, "-noleaf") == 0) {
+			return parse_noleaf(state, arg);
 		} else if (strcmp(arg, "-nowarn") == 0) {
 			state->warn = false;
 			return new_positional_option(state);
