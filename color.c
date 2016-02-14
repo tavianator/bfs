@@ -27,7 +27,7 @@ struct ext_color {
 	struct ext_color *next;
 };
 
-struct color_table {
+struct colors {
 	const char *reset;
 	const char *normal;
 	const char *file;
@@ -56,8 +56,8 @@ struct color_table {
 	char *data;
 };
 
-struct color_table *parse_colors(const char *ls_colors) {
-	struct color_table *colors = malloc(sizeof(struct color_table));
+struct colors *parse_colors(const char *ls_colors) {
+	struct colors *colors = malloc(sizeof(struct colors));
 	if (!colors) {
 		goto done;
 	}
@@ -210,7 +210,7 @@ done:
 	return colors;
 }
 
-static const char *file_color(const struct color_table *colors, const char *filename, const struct stat *sb) {
+static const char *file_color(const struct colors *colors, const char *filename, const struct stat *sb) {
 	if (!sb) {
 		return colors->orphan;
 	}
@@ -291,7 +291,7 @@ static void print_esc(const char *esc, FILE *file) {
 	fputs("m", file);
 }
 
-void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf) {
+void pretty_print(const struct colors *colors, const struct BFTW *ftwbuf) {
 	const char *path = ftwbuf->path;
 
 	if (!colors) {
@@ -320,7 +320,7 @@ void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf) {
 	fputs("\n", stdout);
 }
 
-static void pretty_format(const struct color_table *colors, const char *color, const char *format, va_list args) {
+static void pretty_format(const struct colors *colors, const char *color, const char *format, va_list args) {
 	if (color) {
 		print_esc(color, stderr);
 	}
@@ -332,7 +332,7 @@ static void pretty_format(const struct color_table *colors, const char *color, c
 	}
 }
 
-void pretty_warning(const struct color_table *colors, const char *format, ...) {
+void pretty_warning(const struct colors *colors, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 
@@ -341,7 +341,7 @@ void pretty_warning(const struct color_table *colors, const char *format, ...) {
 	va_end(args);
 }
 
-void pretty_error(const struct color_table *colors, const char *format, ...) {
+void pretty_error(const struct colors *colors, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 
@@ -350,7 +350,7 @@ void pretty_error(const struct color_table *colors, const char *format, ...) {
 	va_end(args);
 }
 
-void free_colors(struct color_table *colors) {
+void free_colors(struct colors *colors) {
 	if (colors) {
 		struct ext_color *ext = colors->ext_list;
 		while (ext) {

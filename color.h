@@ -17,7 +17,7 @@
 /**
  * A lookup table for colors.
  */
-struct color_table;
+struct colors;
 
 /**
  * Parse a color table.
@@ -26,7 +26,7 @@ struct color_table;
  *         A color table in the LS_COLORS environment variable format.
  * @return The parsed color table.
  */
-struct color_table *parse_colors(const char *ls_colors);
+struct colors *parse_colors(const char *ls_colors);
 
 /**
  * Pretty-print a file path.
@@ -36,7 +36,7 @@ struct color_table *parse_colors(const char *ls_colors);
  * @param ftwbuf
  *         The bftw() data for the current path.
  */
-void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf);
+void pretty_print(const struct colors *colors, const struct BFTW *ftwbuf);
 
 #if __GNUC__
 #	define BFS_PRINTF_ATTRIBUTE(f, v) __attribute__((format(printf, f, v)))
@@ -54,7 +54,7 @@ void pretty_print(const struct color_table *colors, const struct BFTW *ftwbuf);
  * @param ...
  *         The format string's arguments.
  */
-void pretty_warning(const struct color_table *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
+void pretty_warning(const struct colors *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
 
 /**
  * Pretty-print an error message.
@@ -66,7 +66,7 @@ void pretty_warning(const struct color_table *colors, const char *format, ...) B
  * @param ...
  *         The format string's arguments.
  */
-void pretty_error(const struct color_table *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
+void pretty_error(const struct colors *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
 
 /**
  * Free a color table.
@@ -74,6 +74,6 @@ void pretty_error(const struct color_table *colors, const char *format, ...) BFS
  * @param colors
  *         The color table to free.
  */
-void free_colors(struct color_table *colors);
+void free_colors(struct colors *colors);
 
 #endif // BFS_COLOR_H

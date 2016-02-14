@@ -387,7 +387,7 @@ bool eval_path(const struct expr *expr, struct eval_state *state) {
  * -print action.
  */
 bool eval_print(const struct expr *expr, struct eval_state *state) {
-	const struct color_table *colors = state->cmdline->stdout_colors;
+	const struct colors *colors = state->cmdline->stdout_colors;
 	if (colors) {
 		fill_statbuf(state);
 	}

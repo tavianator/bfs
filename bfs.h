@@ -53,11 +53,11 @@ struct cmdline {
 	size_t nroots;
 
 	/** Color data. */
-	struct color_table *colors;
+	struct colors *colors;
 	/** Colors to use for stdout. */
-	const struct color_table *stdout_colors;
+	const struct colors *stdout_colors;
 	/** Colors to use for stderr. */
-	const struct color_table *stderr_colors;
+	const struct colors *stderr_colors;
 
 	/** -mindepth option. */
 	int mindepth;
