@@ -10,10 +10,13 @@
  *********************************************************************/
 
 #include "bfs.h"
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <grp.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -428,6 +431,82 @@ static struct expr *parse_depth(struct parser_state *state, const char *option, 
 }
 
 /**
+ * Parse -group.
+ */
+static struct expr *parse_group(struct parser_state *state, const char *option) {
+	struct expr *expr = parse_test_sdata(state, option, eval_gid);
+	if (!expr) {
+		return NULL;
+	}
+
+	const char *error;
+
+	errno = 0;
+	struct group *grp = getgrnam(expr->sdata);
+	if (grp) {
+		expr->idata = grp->gr_gid;
+	} else if (errno != 0) {
+		error = strerror(errno);
+		goto error;
+	} else if (isdigit(expr->sdata[0])) {
+		if (!parse_int(state, expr->sdata, &expr->idata)) {
+			goto fail;
+		}
+	} else {
+		error = "No such group";
+		goto error;
+	}
+
+	return expr;
+
+error:
+	pretty_error(state->cmdline->stderr_colors,
+	             "%s %s: %s\n", option, expr->sdata, error);
+
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
+ * Parse -user.
+ */
+static struct expr *parse_user(struct parser_state *state, const char *option) {
+	struct expr *expr = parse_test_sdata(state, option, eval_uid);
+	if (!expr) {
+		return NULL;
+	}
+
+	const char *error;
+
+	errno = 0;
+	struct passwd *pwd = getpwnam(expr->sdata);
+	if (pwd) {
+		expr->idata = pwd->pw_uid;
+	} else if (errno != 0) {
+		error = strerror(errno);
+		goto error;
+	} else if (isdigit(expr->sdata[0])) {
+		if (!parse_int(state, expr->sdata, &expr->idata)) {
+			goto fail;
+		}
+	} else {
+		error = "No such user";
+		goto error;
+	}
+
+	return expr;
+
+error:
+	pretty_error(state->cmdline->stderr_colors,
+	             "%s %s: %s\n", option, expr->sdata, error);
+
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
  * Set the FNM_CASEFOLD flag, if supported.
  */
 static struct expr *set_fnm_casefold(const struct parser_state *state, const char *option, struct expr *expr, bool casefold) {
@@ -680,6 +759,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'g':
 		if (strcmp(arg, "-gid") == 0) {
 			return parse_test_icmp(state, arg, eval_gid);
+		} else if (strcmp(arg, "-group") == 0) {
+			return parse_group(state, arg);
 		}
 		break;
 
@@ -786,6 +867,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case  'u':
 		if (strcmp(arg, "-uid") == 0) {
 			return parse_test_icmp(state, arg, eval_uid);
+		} else if (strcmp(arg, "-user") == 0) {
+			return parse_user(state, arg);
 		}
 		break;
 

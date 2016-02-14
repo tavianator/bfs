@@ -239,7 +239,23 @@ function test_0042() {
     find_diff -L "$links" -lname '[AQ]' 2>/dev/null
 }
 
-for i in {1..42}; do
+function test_0043() {
+    find_diff -L "$basic" -user "$(id -un)"
+}
+
+function test_0044() {
+    find_diff -L "$basic" -user "$(id -u)"
+}
+
+function test_0045() {
+    find_diff -L "$basic" -group "$(id -gn)"
+}
+
+function test_0046() {
+    find_diff -L "$basic" -group "$(id -g)"
+}
+
+for i in {1..46}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?
