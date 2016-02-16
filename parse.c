@@ -461,7 +461,7 @@ static struct expr *parse_group(struct parser_state *state, const char *option) 
 
 error:
 	pretty_error(state->cmdline->stderr_colors,
-	             "%s %s: %s\n", option, expr->sdata, error);
+	             "error: %s %s: %s\n", option, expr->sdata, error);
 
 fail:
 	free_expr(expr);
@@ -499,7 +499,7 @@ static struct expr *parse_user(struct parser_state *state, const char *option) {
 
 error:
 	pretty_error(state->cmdline->stderr_colors,
-	             "%s %s: %s\n", option, expr->sdata, error);
+	             "error: %s %s: %s\n", option, expr->sdata, error);
 
 fail:
 	free_expr(expr);
