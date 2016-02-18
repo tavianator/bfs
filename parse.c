@@ -686,7 +686,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
-			return new_option(state, arg);
+			return new_positional_option(state);
 		}
 		break;
 
@@ -694,14 +694,14 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-H") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
 			cmdline->flags |= BFTW_FOLLOW_ROOT;
-			return new_option(state, arg);
+			return new_positional_option(state);
 		}
 		break;
 
 	case 'L':
 		if (strcmp(arg, "-L") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return new_option(state, arg);
+			return new_positional_option(state);
 		}
 		break;
 
@@ -754,7 +754,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return new_option(state, arg);
+			return new_positional_option(state);
 		}
 		break;
 
