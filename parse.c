@@ -457,6 +457,7 @@ static struct expr *parse_group(struct parser_state *state, const char *option) 
 		goto error;
 	}
 
+	expr->cmp = CMP_EXACT;
 	return expr;
 
 error:
@@ -495,6 +496,7 @@ static struct expr *parse_user(struct parser_state *state, const char *option) {
 		goto error;
 	}
 
+	expr->cmp = CMP_EXACT;
 	return expr;
 
 error:
