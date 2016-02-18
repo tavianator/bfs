@@ -11,6 +11,7 @@
 
 #include "bfs.h"
 #include "bftw.h"
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -118,7 +119,7 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	const struct timespec *time;
+	const struct timespec *time = NULL;
 	switch (expr->timefield) {
 	case ATIME:
 		time = &statbuf->st_atim;
@@ -130,6 +131,7 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 		time = &statbuf->st_mtim;
 		break;
 	}
+	assert(time);
 
 	time_t diff = timespec_diff(&expr->reftime, time);
 	switch (expr->timeunit) {
@@ -153,7 +155,7 @@ bool eval_acnewer(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	const struct timespec *time;
+	const struct timespec *time = NULL;
 	switch (expr->timefield) {
 	case ATIME:
 		time = &statbuf->st_atim;
@@ -165,6 +167,7 @@ bool eval_acnewer(const struct expr *expr, struct eval_state *state) {
 		time = &statbuf->st_mtim;
 		break;
 	}
+	assert(time);
 
 	return time->tv_sec > expr->reftime.tv_sec
 		|| (time->tv_sec == expr->reftime.tv_sec && time->tv_nsec > expr->reftime.tv_nsec);
