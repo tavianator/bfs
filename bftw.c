@@ -363,85 +363,76 @@ static void dircache_entry_free(struct dircache *cache, struct dircache_entry *e
 	}
 }
 
-/** The size of a dirqueue block. */
-#define DIRQUEUE_BLOCK_SIZE 1023
-
-/**
- * A single block in the dirqueue chain.
- */
-struct dirqueue_block {
-	/** The next block in the chain. */
-	struct dirqueue_block *next;
-	/** The elements in the queue. */
-	struct dircache_entry *entries[DIRQUEUE_BLOCK_SIZE];
-};
-
 /**
  * A queue of 'dircache_entry's to examine.
  */
 struct dirqueue {
-	/** The first block. */
-	struct dirqueue_block *head;
-	/** The last block. */
-	struct dirqueue_block *tail;
-	/** The index in 'head' of the next entry to read. */
+	/** The circular buffer of entries. */
+	struct dircache_entry **entries;
+	/** Bitmask for circular buffer indices; one less than the capacity. */
+	size_t mask;
+	/** The index of the front of the queue. */
 	size_t front;
-	/** The index in 'tail' of the next entry to write. */
+	/** The index of the back of the queue. */
 	size_t back;
 };
 
 /** Initialize a dirqueue. */
 static void dirqueue_init(struct dirqueue *queue) {
-	queue->head = queue->tail = NULL;
+	queue->entries = NULL;
+	queue->mask = 0;
 	queue->front = 0;
-	queue->back = DIRQUEUE_BLOCK_SIZE;
+	queue->back = 0;
 }
 
 /** Add an entry to the dirqueue. */
 static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
-	if (queue->back == DIRQUEUE_BLOCK_SIZE) {
-		struct dirqueue_block *block = malloc(sizeof(struct dirqueue_block));
-		if (!block) {
+	if (queue->front == queue->back) {
+		size_t old_size = queue->mask + 1;
+		struct dircache_entry **old_entries = queue->entries;
+
+		size_t new_size = 2*old_size;
+		struct dircache_entry **new_entries = malloc(new_size*sizeof(struct dircache_entry *));
+		if (!new_entries) {
 			return -1;
 		}
 
-		block->next = NULL;
+		if (old_entries) {
+			size_t tail = queue->front;
+			size_t head = old_size - tail;
+			memcpy(new_entries, old_entries + queue->front, head*sizeof(struct dircache_entry *));
+			memcpy(new_entries + head, old_entries, tail*sizeof(struct dircache_entry *));
+			free(old_entries);
 
-		if (queue->tail) {
-			queue->tail->next = block;
+			queue->front = 0;
+			queue->back = old_size;
 		}
-		queue->tail = block;
 
-		if (!queue->head) {
-			queue->head = block;
-		}
-
-		queue->back = 0;
+		queue->entries = new_entries;
+		queue->mask = new_size - 1;
 	}
 
-	queue->tail->entries[queue->back++] = entry;
+	queue->entries[queue->back] = entry;
+	queue->back += 1;
+	queue->back &= queue->mask;
 	return 0;
 }
 
 /** Remove an entry from the dirqueue. */
 static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
-	if (!queue->head) {
+	if (!queue->entries) {
 		return NULL;
 	}
 
-	if (queue->head == queue->tail && queue->front == queue->back) {
-		free(queue->head);
-		dirqueue_init(queue);
-		return NULL;
+	struct dircache_entry *entry = queue->entries[queue->front];
+	queue->front += 1;
+	queue->front &= queue->mask;
+
+	if (queue->front == queue->back) {
+		free(queue->entries);
+		queue->entries = NULL;
 	}
 
-	struct dirqueue_block *head = queue->head;
-	struct dircache_entry *entry = head->entries[queue->front];
-	if (++queue->front == DIRQUEUE_BLOCK_SIZE) {
-		queue->head = head->next;
-		queue->front = 0;
-		free(head);
-	}
 	return entry;
 }
 
