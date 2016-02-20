@@ -328,15 +328,13 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
 static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
 	assert(!entry->fd);
 
-	DIR *dir = NULL;
+	if (cache->lru_remaining == 0) {
+		dircache_entry_close(cache, cache->lru_tail);
+	}
 
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
 	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
-
-	if (cache->lru_remaining == 0) {
-		dircache_entry_close(cache, cache->lru_tail);
-	}
 
 	int flags = O_DIRECTORY;
 	int fd = openat(at_fd, at_path, flags);
@@ -345,7 +343,7 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 		fd = openat(at_fd, at_path, flags);
 	}
 	if (fd < 0) {
-		goto done;
+		return NULL;
 	}
 
 	entry->fd = fd;
@@ -362,15 +360,13 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 		fd = dup(entry->fd);
 	}
 	if (fd < 0) {
-		goto done;
+		return NULL;
 	}
 
-	dir = fdopendir(fd);
+	DIR *dir = fdopendir(fd);
 	if (!dir) {
 		close(fd);
 	}
-
-done:
 	return dir;
 }
 
