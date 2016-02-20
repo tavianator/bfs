@@ -411,7 +411,24 @@ static void dirqueue_init(struct dirqueue *queue) {
 
 /** Add an entry to the dirqueue. */
 static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
-	if (queue->front == queue->back) {
+	if (!queue->entries) {
+		size_t size = 256;
+
+		queue->entries = malloc(size*sizeof(struct dircache_entry *));
+		if (!queue->entries) {
+			return -1;
+		}
+
+		queue->mask = size - 1;
+	}
+
+	size_t back = queue->back;
+
+	queue->entries[back] = entry;
+	back += 1;
+	back &= queue->mask;
+
+	if (back == queue->front) {
 		size_t old_size = queue->mask + 1;
 		struct dircache_entry **old_entries = queue->entries;
 
@@ -421,41 +438,32 @@ static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
 			return -1;
 		}
 
-		if (old_entries) {
-			size_t tail = queue->front;
-			size_t head = old_size - tail;
-			memcpy(new_entries, old_entries + queue->front, head*sizeof(struct dircache_entry *));
-			memcpy(new_entries + head, old_entries, tail*sizeof(struct dircache_entry *));
-			free(old_entries);
-
-			queue->front = 0;
-			queue->back = old_size;
-		}
+		size_t mid = old_size - back;
+		memcpy(new_entries, old_entries + back, mid*sizeof(struct dircache_entry *));
+		memcpy(new_entries + mid, old_entries, back*sizeof(struct dircache_entry *));
+		free(old_entries);
 
 		queue->entries = new_entries;
 		queue->mask = new_size - 1;
+		queue->front = 0;
+		queue->back = old_size;
+	} else {
+		queue->back = back;
 	}
 
-	queue->entries[queue->back] = entry;
-	queue->back += 1;
-	queue->back &= queue->mask;
 	return 0;
 }
 
 /** Remove an entry from the dirqueue. */
 static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
-	if (!queue->entries) {
+	if (queue->front == queue->back) {
+		free(queue->entries);
 		return NULL;
 	}
 
 	struct dircache_entry *entry = queue->entries[queue->front];
 	queue->front += 1;
 	queue->front &= queue->mask;
-
-	if (queue->front == queue->back) {
-		free(queue->entries);
-		queue->entries = NULL;
-	}
 
 	return entry;
 }
