@@ -100,8 +100,8 @@ struct dircache_entry {
 	/** Next node in the LRU list. */
 	struct dircache_entry *lru_next;
 
-	/** The DIR pointer, if open. */
-	DIR *dir;
+	/** An open file descriptor to this directory, or 0. */
+	int fd;
 
 	/** Reference count. */
 	size_t refcount;
@@ -165,7 +165,7 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 	}
 
 	entry->lru_prev = entry->lru_next = NULL;
-	entry->dir = NULL;
+	entry->fd = 0;
 	entry->refcount = 1;
 
 	memcpy(entry->name, name, namelen);
@@ -185,7 +185,7 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 
 /** Add an entry to the head of the LRU list. */
 static void dircache_lru_add(struct dircache *cache, struct dircache_entry *entry) {
-	assert(entry->dir);
+	assert(entry->fd);
 	assert(entry->lru_prev == NULL);
 	assert(entry->lru_next == NULL);
 
@@ -229,22 +229,8 @@ static void dircache_lru_remove(struct dircache *cache, struct dircache_entry *e
 /** Close a dircache_entry and remove it from the LRU list. */
 static void dircache_entry_close(struct dircache *cache, struct dircache_entry *entry) {
 	dircache_lru_remove(cache, entry);
-	closedir(entry->dir);
-	entry->dir = NULL;
-}
-
-/** POSIX doesn't have this?! */
-static DIR *opendirat(int fd, const char *name) {
-	int dfd = openat(fd, name, O_DIRECTORY);
-	if (dfd < 0) {
-		return NULL;
-	}
-
-	DIR *dir = fdopendir(dfd);
-	if (!dir) {
-		close(dfd);
-	}
-	return dir;
+	close(entry->fd);
+	entry->fd = 0;
 }
 
 /**
@@ -295,17 +281,36 @@ static struct dircache_entry *dircache_entry_base(struct dircache *cache, struct
 
 	do {
 		base = base->parent;
-	} while (base && !base->dir);
+	} while (base && !base->fd);
 
 	if (base) {
 		dircache_lru_remove(cache, base);
 		dircache_lru_add(cache, base);
 
-		*at_fd = dirfd(base->dir);
+		*at_fd = base->fd;
 		*at_path += base->nameoff + base->namelen;
 	}
 
 	return base;
+}
+
+/**
+ * Check if we should retry an operation due to EMFILE.
+ *
+ * @param cache
+ *         The cache in question.
+ * @param save
+ *         A dircache_entry that must be preserved.
+ */
+static bool dircache_should_retry(struct dircache *cache, const struct dircache_entry *save) {
+	if (errno == EMFILE && cache->lru_tail && cache->lru_tail != save) {
+		// Too many open files, shrink the LRU cache
+		dircache_entry_close(cache, cache->lru_tail);
+		--cache->lru_remaining;
+		return true;
+	} else {
+		return false;
+	}
 }
 
 /**
@@ -321,33 +326,51 @@ static struct dircache_entry *dircache_entry_base(struct dircache *cache, struct
  *         The opened DIR *, or NULL on error.
  */
 static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
-	assert(!entry->dir);
+	assert(!entry->fd);
 
-	if (cache->lru_remaining == 0) {
-		dircache_entry_close(cache, cache->lru_tail);
-	}
+	DIR *dir = NULL;
 
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
 	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
 
-	DIR *dir = opendirat(at_fd, at_path);
-
-	if (!dir
-	    && errno == EMFILE
-	    && cache->lru_tail
-	    && cache->lru_tail != base) {
-		// Too many open files, shrink the LRU cache
+	if (cache->lru_remaining == 0) {
 		dircache_entry_close(cache, cache->lru_tail);
-		--cache->lru_remaining;
-		dir = opendirat(at_fd, at_path);
 	}
 
-	if (dir) {
-		entry->dir = dir;
-		dircache_lru_add(cache, entry);
+	int flags = O_DIRECTORY;
+	int fd = openat(at_fd, at_path, flags);
+
+	if (fd < 0 && dircache_should_retry(cache, base)) {
+		fd = openat(at_fd, at_path, flags);
+	}
+	if (fd < 0) {
+		goto done;
 	}
 
+	entry->fd = fd;
+	dircache_lru_add(cache, entry);
+
+	// Now we dup() the fd and pass it to fdopendir().  This way we can
+	// close the DIR* as soon as we're done with it, reducing the memory
+	// footprint significantly, while keeping the fd around for future
+	// openat() calls.
+
+	fd = dup(entry->fd);
+
+	if (fd < 0 && dircache_should_retry(cache, entry)) {
+		fd = dup(entry->fd);
+	}
+	if (fd < 0) {
+		goto done;
+	}
+
+	dir = fdopendir(fd);
+	if (!dir) {
+		close(fd);
+	}
+
+done:
 	return dir;
 }
 
@@ -356,9 +379,10 @@ static void dircache_entry_free(struct dircache *cache, struct dircache_entry *e
 	if (entry) {
 		assert(entry->refcount == 0);
 
-		if (entry->dir) {
+		if (entry->fd) {
 			dircache_entry_close(cache, entry);
 		}
+
 		free(entry);
 	}
 }
@@ -556,7 +580,12 @@ static void bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, 
 
 	state->error = 0;
 
-	dircache_init(&state->cache, nopenfd);
+	size_t lru_size = nopenfd;
+	if (lru_size > 1) {
+		// 1 extra to account for dup()
+		--lru_size;
+	}
+	dircache_init(&state->cache, lru_size);
 
 	dirqueue_init(&state->queue);
 	state->current = NULL;
@@ -890,15 +919,18 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 				break;
 
 			case BFTW_SKIP_SIBLINGS:
+				closedir(dir);
 				goto next;
 
 			case BFTW_SKIP_SUBTREE:
 				continue;
 
 			case BFTW_STOP:
+				closedir(dir);
 				goto done;
 
 			case BFTW_FAIL:
+				closedir(dir);
 				goto fail;
 			}
 
@@ -911,10 +943,13 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 				}
 
 				if (bftw_push(&state, de->d_name) != 0) {
+					closedir(dir);
 					goto fail;
 				}
 			}
 		}
+
+		closedir(dir);
 
 	next:
 		switch (bftw_pop(&state, true)) {
