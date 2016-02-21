@@ -13,11 +13,9 @@
  * bftw() implementation.
  *
  * The goal of this implementation is to avoid re-traversal by using openat() as
- * much as possible.  The 'dircache' attempts to accomplish this by storing a
- * hierarchy of 'dircache_entry's, along with an LRU list of recently accessed
- * entries.  Every entry in the LRU list has an open DIR *; to open an entry, we
- * traverse its chain of parents, hoping to find an open one.  The size of the
- * LRU list is limited, because so are the available file descriptors.
+ * much as possible.  Since the number of open file descriptors is limited, the
+ * 'dircache' maintains a priority queue of open 'dircache_entry's, ordered by
+ * their reference counts to keep the most-referenced parent directories open.
  *
  * The 'dirqueue' is a simple FIFO of 'dircache_entry's left to explore.
  */
@@ -95,16 +93,13 @@ struct dircache_entry {
 	/** This directory's depth in the walk. */
 	size_t depth;
 
-	/** Previous node in the LRU list. */
-	struct dircache_entry *lru_prev;
-	/** Next node in the LRU list. */
-	struct dircache_entry *lru_next;
-
-	/** An open file descriptor to this directory, or 0. */
-	int fd;
-
 	/** Reference count. */
 	size_t refcount;
+	/** Index in the priority queue. */
+	size_t heap_index;
+
+	/** An open file descriptor to this directory, or -1. */
+	int fd;
 
 	/** The device number, for cycle detection. */
 	dev_t dev;
@@ -123,19 +118,127 @@ struct dircache_entry {
  * A directory cache.
  */
 struct dircache {
-	/** Most recently used entry. */
-	struct dircache_entry *lru_head;
-	/** Least recently used entry. */
-	struct dircache_entry *lru_tail;
-	/** Remaining LRU list capacity. */
-	size_t lru_remaining;
+	/** A min-heap of open entries, ordered by refcount. */
+	struct dircache_entry **heap;
+	/** Current heap size. */
+	size_t size;
+	/** Maximum heap size. */
+	size_t capacity;
 };
 
 /** Initialize a dircache. */
-static void dircache_init(struct dircache *cache, size_t lru_size) {
-	assert(lru_size > 0);
-	cache->lru_head = cache->lru_tail = NULL;
-	cache->lru_remaining = lru_size;
+static int dircache_init(struct dircache *cache, size_t capacity) {
+	cache->heap = malloc(capacity*sizeof(struct dircache_entry *));
+	if (!cache->heap) {
+		return -1;
+	}
+
+	cache->size = 0;
+	cache->capacity = capacity;
+	return 0;
+}
+
+/** Destroy a dircache. */
+static void dircache_free(struct dircache *cache) {
+	assert(cache->size == 0);
+	free(cache->heap);
+}
+
+/** Move an entry to a particular place in the heap. */
+static void dircache_heap_move(struct dircache *cache, struct dircache_entry *entry, size_t i) {
+	cache->heap[i] = entry;
+	entry->heap_index = i;
+}
+
+/** Bubble an entry up the heap. */
+static void dircache_bubble_up(struct dircache *cache, struct dircache_entry *entry) {
+	size_t i = entry->heap_index;
+
+	while (i > 0) {
+		size_t pi = (i - 1)/2;
+		struct dircache_entry *parent = cache->heap[pi];
+		if (entry->refcount >= parent->refcount) {
+			break;
+		}
+
+		dircache_heap_move(cache, parent, i);
+		i = pi;
+	}
+
+	dircache_heap_move(cache, entry, i);
+}
+
+/** Bubble an entry down the heap. */
+static void dircache_bubble_down(struct dircache *cache, struct dircache_entry *entry) {
+	size_t i = entry->heap_index;
+
+	while (true) {
+		size_t ci = 2*i + 1;
+		if (ci >= cache->size) {
+			break;
+		}
+
+		struct dircache_entry *child = cache->heap[ci];
+
+		size_t ri = ci + 1;
+		if (ri < cache->size) {
+			struct dircache_entry *right = cache->heap[ri];
+			if (child->refcount > right->refcount) {
+				ci = ri;
+				child = right;
+			}
+		}
+
+		dircache_heap_move(cache, child, i);
+		i = ci;
+	}
+
+	dircache_heap_move(cache, entry, i);
+}
+
+/** Increment a dircache_entry's reference count. */
+static void dircache_entry_incref(struct dircache *cache, struct dircache_entry *entry) {
+	++entry->refcount;
+
+	if (entry->fd >= 0) {
+		dircache_bubble_down(cache, entry);
+	}
+}
+
+/** Decrement a dircache_entry's reference count. */
+static void dircache_entry_decref(struct dircache *cache, struct dircache_entry *entry) {
+	--entry->refcount;
+
+	if (entry->fd >= 0) {
+		dircache_bubble_up(cache, entry);
+	}
+}
+
+/** Add a dircache_entry to the priority queue. */
+static void dircache_push(struct dircache *cache, struct dircache_entry *entry) {
+	assert(cache->size < cache->capacity);
+	assert(entry->fd >= 0);
+
+	size_t size = cache->size++;
+	entry->heap_index = size;
+	dircache_bubble_up(cache, entry);
+}
+
+/** Close a dircache_entry and remove it from the priority queue. */
+static void dircache_pop(struct dircache *cache, struct dircache_entry *entry) {
+	assert(cache->size > 0);
+	assert(entry->fd >= 0);
+
+	close(entry->fd);
+	entry->fd = -1;
+
+	size_t size = --cache->size;
+	size_t i = entry->heap_index;
+	if (i != size) {
+		struct dircache_entry *end = cache->heap[size];
+		end->heap_index = i;
+		dircache_bubble_down(cache, end);
+	}
 }
 
 /** Add an entry to the dircache. */
@@ -164,9 +267,8 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 		entry->nameoff = 0;
 	}
 
-	entry->lru_prev = entry->lru_next = NULL;
-	entry->fd = 0;
 	entry->refcount = 1;
+	entry->fd = -1;
 
 	memcpy(entry->name, name, namelen);
 	if (needs_slash) {
@@ -176,61 +278,11 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 	entry->namelen = namelen;
 
 	while (parent) {
-		++parent->refcount;
+		dircache_entry_incref(cache, parent);
 		parent = parent->parent;
 	}
 
 	return entry;
-}
-
-/** Add an entry to the head of the LRU list. */
-static void dircache_lru_add(struct dircache *cache, struct dircache_entry *entry) {
-	assert(entry->fd);
-	assert(entry->lru_prev == NULL);
-	assert(entry->lru_next == NULL);
-
-	entry->lru_next = cache->lru_head;
-	cache->lru_head = entry;
-
-	if (entry->lru_next) {
-		entry->lru_next->lru_prev = entry;
-	}
-
-	if (!cache->lru_tail) {
-		cache->lru_tail = entry;
-	}
-
-	--cache->lru_remaining;
-}
-
-/** Remove an entry from the LRU list. */
-static void dircache_lru_remove(struct dircache *cache, struct dircache_entry *entry) {
-	if (entry->lru_prev) {
-		assert(cache->lru_head != entry);
-		entry->lru_prev->lru_next = entry->lru_next;
-	} else {
-		assert(cache->lru_head == entry);
-		cache->lru_head = entry->lru_next;
-	}
-
-	if (entry->lru_next) {
-		assert(cache->lru_tail != entry);
-		entry->lru_next->lru_prev = entry->lru_prev;
-	} else {
-		assert(cache->lru_tail == entry);
-		cache->lru_tail = entry->lru_prev;
-	}
-
-	entry->lru_prev = entry->lru_next = NULL;
-
-	++cache->lru_remaining;
-}
-
-/** Close a dircache_entry and remove it from the LRU list. */
-static void dircache_entry_close(struct dircache *cache, struct dircache_entry *entry) {
-	dircache_lru_remove(cache, entry);
-	close(entry->fd);
-	entry->fd = 0;
 }
 
 /**
@@ -281,12 +333,9 @@ static struct dircache_entry *dircache_entry_base(struct dircache *cache, struct
 
 	do {
 		base = base->parent;
-	} while (base && !base->fd);
+	} while (base && base->fd < 0);
 
 	if (base) {
-		dircache_lru_remove(cache, base);
-		dircache_lru_add(cache, base);
-
 		*at_fd = base->fd;
 		*at_path += base->nameoff + base->namelen;
 	}
@@ -303,15 +352,23 @@ static struct dircache_entry *dircache_entry_base(struct dircache *cache, struct
  *         A dircache_entry that must be preserved.
  */
 static bool dircache_should_retry(struct dircache *cache, const struct dircache_entry *save) {
-	if (errno == EMFILE && cache->lru_tail && cache->lru_tail != save) {
-		// Too many open files, shrink the LRU cache
-		dircache_entry_close(cache, cache->lru_tail);
-		--cache->lru_remaining;
+	if (errno == EMFILE && cache->size > 1) {
+		// Too many open files, shrink the cache
+		struct dircache_entry *entry = cache->heap[0];
+		if (entry == save) {
+			entry = cache->heap[1];
+		}
+
+		dircache_pop(cache, entry);
+		cache->capacity = cache->size;
 		return true;
 	} else {
 		return false;
 	}
 }
+
+static size_t misses = 0;
+static size_t total = 0;
 
 /**
  * Open a dircache_entry.
@@ -326,15 +383,22 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
  *         The opened DIR *, or NULL on error.
  */
 static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
-	assert(!entry->fd);
+	assert(entry->fd < 0);
 
-	if (cache->lru_remaining == 0) {
-		dircache_entry_close(cache, cache->lru_tail);
+	if (cache->size == cache->capacity) {
+		dircache_pop(cache, cache->heap[0]);
 	}
 
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
 	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
+
+	++total;
+	struct dircache_entry *asdf = entry;
+	do {
+		++misses;
+		asdf = asdf->parent;
+	} while (asdf != base);
 
 	int flags = O_DIRECTORY;
 	int fd = openat(at_fd, at_path, flags);
@@ -347,7 +411,7 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 	}
 
 	entry->fd = fd;
-	dircache_lru_add(cache, entry);
+	dircache_push(cache, entry);
 
 	// Now we dup() the fd and pass it to fdopendir().  This way we can
 	// close the DIR* as soon as we're done with it, reducing the memory
@@ -375,8 +439,8 @@ static void dircache_entry_free(struct dircache *cache, struct dircache_entry *e
 	if (entry) {
 		assert(entry->refcount == 0);
 
-		if (entry->fd) {
-			dircache_entry_close(cache, entry);
+		if (entry->fd >= 0) {
+			dircache_pop(cache, entry);
 		}
 
 		free(entry);
@@ -398,26 +462,21 @@ struct dirqueue {
 };
 
 /** Initialize a dirqueue. */
-static void dirqueue_init(struct dirqueue *queue) {
-	queue->entries = NULL;
-	queue->mask = 0;
+static int dirqueue_init(struct dirqueue *queue) {
+	size_t size = 256;
+	queue->entries = malloc(size*sizeof(struct dircache_entry *));
+	if (!queue->entries) {
+		return -1;
+	}
+
+	queue->mask = size - 1;
 	queue->front = 0;
 	queue->back = 0;
+	return 0;
 }
 
 /** Add an entry to the dirqueue. */
 static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
-	if (!queue->entries) {
-		size_t size = 256;
-
-		queue->entries = malloc(size*sizeof(struct dircache_entry *));
-		if (!queue->entries) {
-			return -1;
-		}
-
-		queue->mask = size - 1;
-	}
-
 	size_t back = queue->back;
 
 	queue->entries[back] = entry;
@@ -577,25 +636,34 @@ struct bftw_state {
 /**
  * Initialize the bftw() state.
  */
-static void bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+static int bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
 	state->fn = fn;
 	state->flags = flags;
 	state->ptr = ptr;
 
 	state->error = 0;
 
-	size_t lru_size = nopenfd;
-	if (lru_size > 1) {
-		// 1 extra to account for dup()
-		--lru_size;
+	if (nopenfd < 2) {
+		errno = EMFILE;
+		return -1;
 	}
-	dircache_init(&state->cache, lru_size);
 
-	dirqueue_init(&state->queue);
+	// -1 to account for dup()
+	if (dircache_init(&state->cache, nopenfd - 1) != 0) {
+		return -1;
+	}
+
+	if (dirqueue_init(&state->queue) != 0) {
+		dircache_free(&state->cache);
+		return -1;
+	}
+
 	state->current = NULL;
 	state->status = BFTW_CURRENT;
 
 	dynstr_init(&state->path);
+
+	return 0;
 }
 
 /**
@@ -792,7 +860,8 @@ static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 		struct dircache_entry *current = entry;
 		entry = entry->parent;
 
-		if (--current->refcount > 0) {
+		dircache_entry_decref(&state->cache, current);
+		if (current->refcount > 0) {
 			continue;
 		}
 
@@ -839,6 +908,8 @@ static void bftw_state_free(struct bftw_state *state) {
 		bftw_pop(state, false);
 	}
 
+	dircache_free(&state->cache);
+
 	dynstr_free(&state->path);
 }
 
@@ -846,7 +917,9 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 	int ret = -1;
 
 	struct bftw_state state;
-	bftw_state_init(&state, fn, nopenfd, flags, ptr);
+	if (bftw_state_init(&state, fn, nopenfd, flags, ptr) != 0) {
+		return -1;
+	}
 
 	// Handle 'path' itself first
 
