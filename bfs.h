@@ -111,12 +111,13 @@ enum timeunit {
 };
 
 struct expr {
+	/** The function that evaluates this expression. */
+	eval_fn *eval;
+
 	/** The left hand side of the expression. */
 	struct expr *lhs;
 	/** The right hand side of the expression. */
 	struct expr *rhs;
-	/** The function that evaluates this expression. */
-	eval_fn *eval;
 
 	/** The optional comparison flag. */
 	enum cmpflag cmp;
@@ -138,6 +139,9 @@ struct expr {
 
 	/** Optional string data for this expression. */
 	const char *sdata;
+
+	/** Whether this expression has no side effects. */
+	bool pure;
 };
 
 /**

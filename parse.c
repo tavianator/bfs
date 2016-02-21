@@ -26,37 +26,23 @@
 #include <unistd.h>
 
 /**
- * Create a new expression.
- */
-static struct expr *new_expr(eval_fn *eval) {
-	struct expr *expr = malloc(sizeof(struct expr));
-	if (!expr) {
-		perror("malloc()");
-		return NULL;
-	}
-
-	expr->lhs = NULL;
-	expr->rhs = NULL;
-	expr->eval = eval;
-	return expr;
-}
-
-/**
  * Singleton true expression instance.
  */
 static struct expr expr_true = {
+	.eval = eval_true,
 	.lhs = NULL,
 	.rhs = NULL,
-	.eval = eval_true,
+	.pure = true,
 };
 
 /**
  * Singleton false expression instance.
  */
 static struct expr expr_false = {
+	.eval = eval_false,
 	.lhs = NULL,
 	.rhs = NULL,
-	.eval = eval_false,
+	.pure = true,
 };
 
 /**
@@ -71,35 +57,36 @@ static void free_expr(struct expr *expr) {
 }
 
 /**
- * Create a new unary expression.
+ * Create a new expression.
  */
-static struct expr *new_unary_expr(struct expr *rhs, eval_fn *eval) {
-	struct expr *expr = new_expr(eval);
+static struct expr *new_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, bool pure) {
+	struct expr *expr = malloc(sizeof(struct expr));
 	if (!expr) {
-		free_expr(rhs);
-		return NULL;
-	}
-
-	expr->rhs = rhs;
-	expr->eval = eval;
-	return expr;
-}
-
-/**
- * Create a new binary expression.
- */
-static struct expr *new_binary_expr(struct expr *lhs, struct expr *rhs, eval_fn *eval) {
-	struct expr *expr = new_expr(eval);
-	if (!expr) {
+		perror("malloc()");
 		free_expr(rhs);
 		free_expr(lhs);
 		return NULL;
 	}
 
+	expr->eval = eval;
 	expr->lhs = lhs;
 	expr->rhs = rhs;
-	expr->eval = eval;
+	expr->pure = pure;
 	return expr;
+}
+
+/**
+ * Create a new unary expression.
+ */
+static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs) {
+	return new_expr(eval, NULL, rhs, rhs->pure);
+}
+
+/**
+ * Create a new binary expression.
+ */
+static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs) {
+	return new_expr(eval, lhs, rhs, lhs->pure && rhs->pure);
 }
 
 /**
@@ -271,7 +258,7 @@ static struct expr *new_positional_option(struct parser_state *state) {
  */
 static struct expr *new_test(struct parser_state *state, eval_fn *eval) {
 	state->non_option_seen = true;
-	return new_expr(eval);
+	return new_expr(eval, NULL, NULL, true);
 }
 
 /**
@@ -306,7 +293,7 @@ static struct expr *new_action(struct parser_state *state, eval_fn *eval) {
 
 	state->non_option_seen = true;
 
-	return new_expr(eval);
+	return new_expr(eval, NULL, NULL, false);
 }
 
 /**
@@ -923,7 +910,7 @@ static struct expr *new_not_expr(struct expr *rhs) {
 	} else if (rhs == &expr_false) {
 		return &expr_true;
 	} else {
-		return new_unary_expr(rhs, eval_not);
+		return new_unary_expr(eval_not, rhs);
 	}
 }
 
@@ -980,8 +967,11 @@ static struct expr *new_and_expr(struct expr *lhs, struct expr *rhs) {
 		return lhs;
 	} else if (rhs == &expr_true) {
 		return lhs;
+	} else if (rhs == &expr_false && lhs->pure) {
+		free_expr(lhs);
+		return rhs;
 	} else {
-		return new_binary_expr(lhs, rhs, eval_and);
+		return new_binary_expr(eval_and, lhs, rhs);
 	}
 }
 
@@ -1032,10 +1022,13 @@ static struct expr *new_or_expr(struct expr *lhs, struct expr *rhs) {
 		return lhs;
 	} else if (lhs == &expr_false) {
 		return rhs;
+	} else if (rhs == &expr_true && lhs->pure) {
+		free_expr(lhs);
+		return rhs;
 	} else if (rhs == &expr_false) {
 		return lhs;
 	} else {
-		return new_binary_expr(lhs, rhs, eval_or);
+		return new_binary_expr(eval_or, lhs, rhs);
 	}
 }
 
@@ -1076,10 +1069,11 @@ static struct expr *parse_clause(struct parser_state *state) {
  * Create a "comma" expression.
  */
 static struct expr *new_comma_expr(struct expr *lhs, struct expr *rhs) {
-	if (lhs == &expr_true || lhs == &expr_false) {
+	if (lhs->pure) {
+		free_expr(lhs);
 		return rhs;
 	} else {
-		return new_binary_expr(lhs, rhs, eval_comma);
+		return new_binary_expr(eval_comma, lhs, rhs);
 	}
 }
 
@@ -1168,7 +1162,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (state.implicit_print) {
-		struct expr *print = new_expr(eval_print);
+		struct expr *print = new_action(&state, eval_print);
 		if (!print) {
 			goto fail;
 		}
