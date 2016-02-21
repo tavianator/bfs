@@ -484,32 +484,39 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * Evaluate an expression.
+ */
+static bool eval_expr(const struct expr *expr, struct eval_state *state) {
+	return expr->eval(expr, state);
+}
+
+/**
  * Evaluate a negation.
  */
 bool eval_not(const struct expr *expr, struct eval_state *state) {
-	return !expr->rhs->eval(expr, state);
+	return !eval_expr(expr->rhs, state);
 }
 
 /**
  * Evaluate a conjunction.
  */
 bool eval_and(const struct expr *expr, struct eval_state *state) {
-	return expr->lhs->eval(expr->lhs, state) && expr->rhs->eval(expr->rhs, state);
+	return eval_expr(expr->lhs, state) && eval_expr(expr->rhs, state);
 }
 
 /**
  * Evaluate a disjunction.
  */
 bool eval_or(const struct expr *expr, struct eval_state *state) {
-	return expr->lhs->eval(expr->lhs, state) || expr->rhs->eval(expr->rhs, state);
+	return eval_expr(expr->lhs, state) || eval_expr(expr->rhs, state);
 }
 
 /**
  * Evaluate the comma operator.
  */
 bool eval_comma(const struct expr *expr, struct eval_state *state) {
-	expr->lhs->eval(expr->lhs, state);
-	return expr->rhs->eval(expr->rhs, state);
+	eval_expr(expr->lhs, state);
+	return eval_expr(expr->rhs, state);
 }
 
 /**
@@ -557,7 +564,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	if (ftwbuf->visit == expected_visit
 	    && ftwbuf->depth >= cmdline->mindepth
 	    && ftwbuf->depth <= cmdline->maxdepth) {
-		cmdline->expr->eval(cmdline->expr, &state);
+		eval_expr(cmdline->expr, &state);
 	}
 
 	args->ret = state.ret;
