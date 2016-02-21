@@ -909,6 +909,11 @@ static struct expr *new_not_expr(struct expr *rhs) {
 		return &expr_false;
 	} else if (rhs == &expr_false) {
 		return &expr_true;
+	} else if (rhs->eval == eval_not) {
+		struct expr *expr = rhs->rhs;
+		rhs->rhs = NULL;
+		free_expr(rhs);
+		return expr;
 	} else {
 		return new_unary_expr(eval_not, rhs);
 	}
