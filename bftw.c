@@ -399,7 +399,7 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 		asdf = asdf->parent;
 	} while (asdf != base);
 
-	int flags = O_DIRECTORY;
+	int flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
 	int fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && dircache_should_retry(cache, base)) {
@@ -417,10 +417,10 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 	// footprint significantly, while keeping the fd around for future
 	// openat() calls.
 
-	fd = dup(entry->fd);
+	fd = fcntl(entry->fd, F_DUPFD_CLOEXEC, 0);
 
 	if (fd < 0 && dircache_should_retry(cache, entry)) {
-		fd = dup(entry->fd);
+		fd = fcntl(entry->fd, F_DUPFD_CLOEXEC, 0);
 	}
 	if (fd < 0) {
 		return NULL;
