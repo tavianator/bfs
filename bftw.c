@@ -725,9 +725,12 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		if (state->status == BFTW_CHILD) {
 			ftwbuf->nameoff += current->namelen;
 			++ftwbuf->depth;
-		}
 
-		dircache_entry_base(&state->cache, current, &ftwbuf->at_fd, &ftwbuf->at_path);
+			ftwbuf->at_fd = current->fd;
+			ftwbuf->at_path += ftwbuf->nameoff;
+		} else {
+			dircache_entry_base(&state->cache, current, &ftwbuf->at_fd, &ftwbuf->at_path);
+		}
 	} else {
 		ftwbuf->nameoff = basename_offset(ftwbuf->path);
 		ftwbuf->depth = 0;
