@@ -520,6 +520,33 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * Debug stat() calls.
+ */
+void debug_stat(const struct eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+
+	fprintf(stderr, "fstatat(");
+	if (ftwbuf->at_fd == AT_FDCWD) {
+		fprintf(stderr, "AT_FDCWD");
+	} else {
+		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);
+		fprintf(stderr, "\"");
+		fwrite(ftwbuf->path, 1, baselen, stderr);
+		fprintf(stderr, "\"");
+	}
+
+	fprintf(stderr, ", \"%s\", ", ftwbuf->at_path);
+
+	if (ftwbuf->at_flags == AT_SYMLINK_NOFOLLOW) {
+		fprintf(stderr, "AT_SYMLINK_NOFOLLOW");
+	} else {
+		fprintf(stderr, "%d", ftwbuf->at_flags);
+	}
+
+	fprintf(stderr, ")\n");
+}
+
+/**
  * Type passed as the argument to the bftw() callback.
  */
 struct callback_args {
@@ -565,6 +592,10 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	    && ftwbuf->depth >= cmdline->mindepth
 	    && ftwbuf->depth <= cmdline->maxdepth) {
 		eval_expr(cmdline->expr, &state);
+	}
+
+	if ((cmdline->debug & DEBUG_STAT) && ftwbuf->statbuf) {
+		debug_stat(&state);
 	}
 
 	args->ret = state.ret;

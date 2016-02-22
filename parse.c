@@ -336,6 +336,39 @@ static struct expr *parse_test_sdata(struct parser_state *state, const char *tes
 }
 
 /**
+ * Parse -D FLAG.
+ */
+static struct expr *parse_debug(struct parser_state *state, const char *option) {
+	struct cmdline *cmdline = state->cmdline;
+
+	const char *arg = state->argv[state->i];
+	if (!arg) {
+		pretty_error(cmdline->stderr_colors,
+		             "error: %s needs a flag.\n", option);
+		return NULL;
+	}
+
+	++state->i;
+
+	if (strcmp(arg, "help") == 0) {
+		printf("Supported debug flags:\n\n");
+
+		printf("  help:  This message.\n");
+		printf("  stat:  Trace all stat() calls.\n");
+
+		state->just_info = true;
+		return NULL;
+	} else if (strcmp(arg, "stat") == 0) {
+		cmdline->debug |= DEBUG_STAT;
+	} else {
+		pretty_warning(cmdline->stderr_colors,
+		               "warning: Unrecognized debug flag '%s'.\n\n", arg);
+	}
+
+	return new_positional_option(state);
+}
+
+/**
  * Parse -[acm]{min,time}.
  */
 static struct expr *parse_acmtime(struct parser_state *state, const char *option, enum timefield field, enum timeunit unit) {
@@ -670,6 +703,12 @@ static struct expr *parse_literal(struct parser_state *state) {
 	}
 
 	switch (arg[1]) {
+	case 'D':
+		if (strcmp(arg, "-D") == 0) {
+			return parse_debug(state, arg);
+		}
+		break;
+
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
@@ -1128,6 +1167,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
+	cmdline->debug = 0;
 	cmdline->expr = &expr_true;
 
 	cmdline->colors = parse_colors(getenv("LS_COLORS"));

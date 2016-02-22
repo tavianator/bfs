@@ -49,6 +49,14 @@ struct eval_state;
 typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
 
 /**
+ * Various debugging flags.
+ */
+enum debugflags {
+	/** Trace all stat() calls. */
+	DEBUG_STAT = 1 << 0,
+};
+
+/**
  * The parsed command line.
  */
 struct cmdline {
@@ -70,7 +78,10 @@ struct cmdline {
 	int maxdepth;
 
 	/** bftw() flags. */
-	int flags;
+	enum bftw_flags flags;
+
+	/** Debugging flags. */
+	enum debugflags debug;
 
 	/** The command line expression. */
 	struct expr *expr;
