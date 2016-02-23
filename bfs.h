@@ -54,6 +54,8 @@ typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
 enum debugflags {
 	/** Trace all stat() calls. */
 	DEBUG_STAT = 1 << 0,
+	/** Print the parse tree. */
+	DEBUG_TREE = 1 << 1,
 };
 
 /**
@@ -130,6 +132,14 @@ struct expr {
 	/** The right hand side of the expression. */
 	struct expr *rhs;
 
+	/** Whether this expression has no side effects. */
+	bool pure;
+
+	/** The command line arguments resulting in this expression. */
+	char **args;
+	/** The number of command line arguments. */
+	size_t nargs;
+
 	/** The optional comparison flag. */
 	enum cmpflag cmp;
 
@@ -150,9 +160,6 @@ struct expr {
 
 	/** Optional string data for this expression. */
 	const char *sdata;
-
-	/** Whether this expression has no side effects. */
-	bool pure;
 };
 
 /**

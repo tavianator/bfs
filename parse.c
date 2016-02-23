@@ -25,6 +25,12 @@
 #include <time.h>
 #include <unistd.h>
 
+// Strings printed by -D tree for "fake" expressions
+static char *fake_and_arg = "-a";
+static char *fake_false_arg = "-false";
+static char *fake_print_arg = "-print";
+static char *fake_true_arg = "-true";
+
 /**
  * Singleton true expression instance.
  */
@@ -33,6 +39,8 @@ static struct expr expr_true = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.pure = true,
+	.args = &fake_true_arg,
+	.nargs = 1,
 };
 
 /**
@@ -43,6 +51,8 @@ static struct expr expr_false = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.pure = true,
+	.args = &fake_false_arg,
+	.nargs = 1,
 };
 
 /**
@@ -59,34 +69,47 @@ static void free_expr(struct expr *expr) {
 /**
  * Create a new expression.
  */
-static struct expr *new_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, bool pure) {
+static struct expr *new_expr(eval_fn *eval, bool pure, char **args, size_t nargs) {
 	struct expr *expr = malloc(sizeof(struct expr));
-	if (!expr) {
-		perror("malloc()");
-		free_expr(rhs);
-		free_expr(lhs);
-		return NULL;
+	if (expr) {
+		expr->eval = eval;
+		expr->lhs = NULL;
+		expr->rhs = NULL;
+		expr->pure = pure;
+		expr->args = args;
+		expr->nargs = nargs;
 	}
-
-	expr->eval = eval;
-	expr->lhs = lhs;
-	expr->rhs = rhs;
-	expr->pure = pure;
 	return expr;
 }
 
 /**
  * Create a new unary expression.
  */
-static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs) {
-	return new_expr(eval, NULL, rhs, rhs->pure);
+static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **args) {
+	struct expr *expr = new_expr(eval, rhs->pure, args, 1);
+	if (!expr) {
+		free_expr(rhs);
+		return NULL;
+	}
+
+	expr->rhs = rhs;
+	return expr;
 }
 
 /**
  * Create a new binary expression.
  */
-static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs) {
-	return new_expr(eval, lhs, rhs, lhs->pure && rhs->pure);
+static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, char **args) {
+	struct expr *expr = new_expr(eval, lhs->pure && rhs->pure, args, 1);
+	if (!expr) {
+		free_expr(rhs);
+		free_expr(lhs);
+		return NULL;
+	}
+
+	expr->lhs = lhs;
+	expr->rhs = rhs;
+	return expr;
 }
 
 /**
@@ -121,12 +144,12 @@ static bool cmdline_add_root(struct cmdline *cmdline, const char *root) {
  * Ephemeral state for parsing the command line.
  */
 struct parser_state {
-	/** The command line being parsed. */
+	/** The command line being constructed. */
 	struct cmdline *cmdline;
-	/** The command line arguments. */
-	char **argv;
-	/** Current argument index. */
-	int i;
+	/** The command line arguments being parsed. */
+	char **args;
+	/** The name of this program. */
+	const char *command;
 
 	/** Whether a -print action is implied. */
 	bool implicit_print;
@@ -169,7 +192,7 @@ static struct expr *parse_expr(struct parser_state *state);
  */
 static const char *skip_paths(struct parser_state *state) {
 	while (true) {
-		const char *arg = state->argv[state->i];
+		const char *arg = state->args[0];
 		if (!arg
 		    || arg[0] == '-'
 		    || strcmp(arg, "(") == 0
@@ -183,7 +206,7 @@ static const char *skip_paths(struct parser_state *state) {
 			return NULL;
 		}
 
-		++state->i;
+		++state->args;
 	}
 }
 
@@ -233,146 +256,189 @@ static bool parse_icmp(const struct parser_state *state, const char *str, struct
 }
 
 /**
- * Create a new option expression.
+ * Parse a single option.
  */
-static struct expr *new_option(struct parser_state *state, const char *option) {
+static struct expr *parse_option(struct parser_state *state, size_t nargs) {
+	const char *arg = state->args[0];
+	state->args += nargs;
+
 	if (state->warn && state->non_option_seen) {
 		pretty_warning(state->cmdline->stderr_colors,
 		               "warning: The '%s' option applies to the entire command line.  For clarity, place\n"
 		               "it before any non-option arguments.\n\n",
-		               option);
+		               arg);
 	}
+
 
 	return &expr_true;
 }
 
 /**
- * Create a new positional option expression.
+ * Parse an option that doesn't take a value.
  */
-static struct expr *new_positional_option(struct parser_state *state) {
+static struct expr *parse_nullary_option(struct parser_state *state) {
+	return parse_option(state, 1);
+}
+
+/**
+ * Parse an option that takes a value.
+ */
+static struct expr *parse_unary_option(struct parser_state *state) {
+	return parse_option(state, 2);
+}
+
+/**
+ * Parse a single positional option.
+ */
+static struct expr *parse_positional_option(struct parser_state *state, size_t nargs) {
+	state->args += nargs;
 	return &expr_true;
 }
 
 /**
- * Create a new test expression.
+ * Parse a positional option that doesn't take a value.
  */
-static struct expr *new_test(struct parser_state *state, eval_fn *eval) {
-	state->non_option_seen = true;
-	return new_expr(eval, NULL, NULL, true);
+static struct expr *parse_nullary_positional_option(struct parser_state *state) {
+	return parse_positional_option(state, 1);
 }
 
 /**
- * Create a new test expression with integer data.
+ * Parse a positional option that takes a value.
  */
-static struct expr *new_test_idata(struct parser_state *state, eval_fn *eval, int idata) {
-	struct expr *test = new_test(state, eval);
-	if (test) {
-		test->idata = idata;
-	}
-	return test;
+static struct expr *parse_unary_positional_option(struct parser_state *state) {
+	return parse_positional_option(state, 2);
 }
 
 /**
- * Create a new test expression with string data.
+ * Parse a non-option argument.
  */
-static struct expr *new_test_sdata(struct parser_state *state, eval_fn *eval, const char *sdata) {
-	struct expr *test = new_test(state, eval);
-	if (test) {
-		test->sdata = sdata;
-	}
-	return test;
-}
-
-/**
- * Create a new action expression.
- */
-static struct expr *new_action(struct parser_state *state, eval_fn *eval) {
-	if (eval != eval_nohidden && eval != eval_prune) {
-		state->implicit_print = false;
-	}
-
+static struct expr *parse_non_option(struct parser_state *state, eval_fn *eval, bool pure, size_t nargs) {
 	state->non_option_seen = true;
 
-	return new_expr(eval, NULL, NULL, false);
+	char **args = state->args;
+	state->args += nargs;
+	return new_expr(eval, pure, args, nargs);
 }
 
 /**
- * Parse a test expression with integer data and a comparison flag.
+ * Parse a single test.
  */
-static struct expr *parse_test_icmp(struct parser_state *state, const char *test, eval_fn *eval) {
-	const char *arg = state->argv[state->i];
-	if (!arg) {
+static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t nargs) {
+	return parse_non_option(state, eval, true, nargs);
+}
+
+/**
+ * Parse a test that doesn't take a value.
+ */
+static struct expr *parse_nullary_test(struct parser_state *state, eval_fn *eval) {
+	return parse_test(state, eval, 1);
+}
+
+/**
+ * Parse a test that takes a value.
+ */
+static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) {
+	const char *arg = state->args[0];
+	const char *value = state->args[1];
+	if (!*value) {
 		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", test);
+		             "error: %s needs a value.\n", arg);
 		return NULL;
 	}
 
-	++state->i;
-
-	struct expr *expr = new_test(state, eval);
+	struct expr *expr = parse_test(state, eval, 2);
 	if (expr) {
-		if (!parse_icmp(state, arg, expr)) {
-			free_expr(expr);
-			expr = NULL;
-		}
+		expr->sdata = value;
 	}
 	return expr;
 }
 
 /**
- * Parse a test that takes a string argument.
+ * Parse a single action.
  */
-static struct expr *parse_test_sdata(struct parser_state *state, const char *test, eval_fn *eval) {
-	const char *arg = state->argv[state->i];
-	if (!arg) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", test);
+static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t nargs) {
+	if (eval != eval_nohidden && eval != eval_prune) {
+		state->implicit_print = false;
+	}
+
+	return parse_non_option(state, eval, false, nargs);
+}
+
+/**
+ * Parse an action that takes no arguments.
+ */
+static struct expr *parse_nullary_action(struct parser_state *state, eval_fn *eval) {
+	return parse_action(state, eval, 1);
+}
+
+/**
+ * Parse a test expression with integer data and a comparison flag.
+ */
+static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
+	struct expr *expr = parse_unary_test(state, eval);
+	if (!expr) {
 		return NULL;
 	}
 
-	++state->i;
+	if (!parse_icmp(state, expr->sdata, expr)) {
+		free_expr(expr);
+		return NULL;
+	}
 
-	return new_test_sdata(state, eval, arg);
+	return expr;
 }
 
 /**
  * Parse -D FLAG.
  */
-static struct expr *parse_debug(struct parser_state *state, const char *option) {
+static struct expr *parse_debug(struct parser_state *state) {
 	struct cmdline *cmdline = state->cmdline;
 
-	const char *arg = state->argv[state->i];
-	if (!arg) {
+	const char *arg = state->args[0];
+	const char *flag = state->args[1];
+	if (!flag) {
 		pretty_error(cmdline->stderr_colors,
-		             "error: %s needs a flag.\n", option);
+		             "error: %s needs a flag.\n", arg);
 		return NULL;
 	}
 
-	++state->i;
-
-	if (strcmp(arg, "help") == 0) {
+	if (strcmp(flag, "help") == 0) {
 		printf("Supported debug flags:\n\n");
 
 		printf("  help:  This message.\n");
 		printf("  stat:  Trace all stat() calls.\n");
+		printf("  tree:  Print the parse tree.\n");
 
 		state->just_info = true;
 		return NULL;
-	} else if (strcmp(arg, "stat") == 0) {
+	} else if (strcmp(flag, "stat") == 0) {
 		cmdline->debug |= DEBUG_STAT;
+	} else if (strcmp(flag, "tree") == 0) {
+		cmdline->debug |= DEBUG_TREE;
 	} else {
 		pretty_warning(cmdline->stderr_colors,
-		               "warning: Unrecognized debug flag '%s'.\n\n", arg);
+		               "warning: Unrecognized debug flag '%s'.\n\n", flag);
 	}
 
-	return new_positional_option(state);
+	return parse_unary_positional_option(state);
+}
+
+/**
+ * Parse -executable, -readable, -writable
+ */
+static struct expr *parse_access(struct parser_state *state, int flag) {
+	struct expr *expr = parse_nullary_test(state, eval_access);
+	if (expr) {
+		expr->idata = flag;
+	}
+	return expr;
 }
 
 /**
  * Parse -[acm]{min,time}.
  */
-static struct expr *parse_acmtime(struct parser_state *state, const char *option, enum timefield field, enum timeunit unit) {
-	struct expr *expr = parse_test_icmp(state, option, eval_acmtime);
+static struct expr *parse_acmtime(struct parser_state *state, enum timefield field, enum timeunit unit) {
+	struct expr *expr = parse_test_icmp(state, eval_acmtime);
 	if (expr) {
 		expr->reftime = state->now;
 		expr->timefield = field;
@@ -384,8 +450,8 @@ static struct expr *parse_acmtime(struct parser_state *state, const char *option
 /**
  * Parse -[ac]?newer.
  */
-static struct expr *parse_acnewer(struct parser_state *state, const char *option, enum timefield field) {
-	struct expr *expr = parse_test_sdata(state, option, eval_acnewer);
+static struct expr *parse_acnewer(struct parser_state *state, enum timefield field) {
+	struct expr *expr = parse_unary_test(state, eval_acnewer);
 	if (!expr) {
 		return NULL;
 	}
@@ -427,34 +493,35 @@ static struct expr *parse_daystart(struct parser_state *state) {
 	state->now.tv_sec = time;
 	state->now.tv_nsec = 0;
 
-	return new_positional_option(state);
+	return parse_nullary_positional_option(state);
 }
 
 /**
  * Parse -{min,max}depth N.
  */
-static struct expr *parse_depth(struct parser_state *state, const char *option, int *depth) {
-	const char *arg = state->argv[state->i];
-	if (!arg) {
+static struct expr *parse_depth(struct parser_state *state, int *depth) {
+	const char *arg = state->args[0];
+	const char *value = state->args[1];
+	if (!value) {
 		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", option);
+		             "error: %s needs a value.\n", arg);
 		return NULL;
 	}
 
-	++state->i;
-
-	if (!parse_int(state, arg, depth)) {
+	if (!parse_int(state, value, depth)) {
 		return NULL;
 	}
 
-	return new_option(state, option);
+	return parse_unary_option(state);
 }
 
 /**
  * Parse -group.
  */
-static struct expr *parse_group(struct parser_state *state, const char *option) {
-	struct expr *expr = parse_test_sdata(state, option, eval_gid);
+static struct expr *parse_group(struct parser_state *state) {
+	const char *arg = state->args[0];
+
+	struct expr *expr = parse_unary_test(state, eval_gid);
 	if (!expr) {
 		return NULL;
 	}
@@ -482,7 +549,7 @@ static struct expr *parse_group(struct parser_state *state, const char *option) 
 
 error:
 	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: %s\n", option, expr->sdata, error);
+	             "error: %s %s: %s\n", arg, expr->sdata, error);
 
 fail:
 	free_expr(expr);
@@ -492,8 +559,10 @@ fail:
 /**
  * Parse -user.
  */
-static struct expr *parse_user(struct parser_state *state, const char *option) {
-	struct expr *expr = parse_test_sdata(state, option, eval_uid);
+static struct expr *parse_user(struct parser_state *state) {
+	const char *arg = state->args[0];
+
+	struct expr *expr = parse_unary_test(state, eval_uid);
 	if (!expr) {
 		return NULL;
 	}
@@ -521,7 +590,7 @@ static struct expr *parse_user(struct parser_state *state, const char *option) {
 
 error:
 	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: %s\n", option, expr->sdata, error);
+	             "error: %s %s: %s\n", arg, expr->sdata, error);
 
 fail:
 	free_expr(expr);
@@ -531,16 +600,16 @@ fail:
 /**
  * Set the FNM_CASEFOLD flag, if supported.
  */
-static struct expr *set_fnm_casefold(const struct parser_state *state, const char *option, struct expr *expr, bool casefold) {
+static struct expr *set_fnm_casefold(const struct parser_state *state, struct expr *expr, bool casefold) {
 	if (expr) {
 		if (casefold) {
 #ifdef FNM_CASEFOLD
 			expr->idata = FNM_CASEFOLD;
 #else
 			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s is missing platform support.\n", option);
+			             "error: %s is missing platform support.\n", expr->args[0]);
 			free(expr);
-			expr = NULL;
+			return NULL;
 #endif
 		} else {
 			expr->idata = 0;
@@ -552,45 +621,45 @@ static struct expr *set_fnm_casefold(const struct parser_state *state, const cha
 /**
  * Parse -i?name.
  */
-static struct expr *parse_name(struct parser_state *state, const char *option, bool casefold) {
-	struct expr *expr = parse_test_sdata(state, option, eval_name);
-	return set_fnm_casefold(state, option, expr, casefold);
+static struct expr *parse_name(struct parser_state *state, bool casefold) {
+	struct expr *expr = parse_unary_test(state, eval_name);
+	return set_fnm_casefold(state, expr, casefold);
 }
 
 /**
  * Parse -i?path, -i?wholename.
  */
-static struct expr *parse_path(struct parser_state *state, const char *option, bool casefold) {
-	struct expr *expr = parse_test_sdata(state, option, eval_path);
-	return set_fnm_casefold(state, option, expr, casefold);
+static struct expr *parse_path(struct parser_state *state, bool casefold) {
+	struct expr *expr = parse_unary_test(state, eval_path);
+	return set_fnm_casefold(state, expr, casefold);
 }
 
 /**
  * Parse -i?lname.
  */
-static struct expr *parse_lname(struct parser_state *state, const char *option, bool casefold) {
-	struct expr *expr = parse_test_sdata(state, option, eval_lname);
-	return set_fnm_casefold(state, option, expr, casefold);
+static struct expr *parse_lname(struct parser_state *state, bool casefold) {
+	struct expr *expr = parse_unary_test(state, eval_lname);
+	return set_fnm_casefold(state, expr, casefold);
 }
 
 /**
  * Parse -noleaf.
  */
-static struct expr *parse_noleaf(struct parser_state *state, const char *option) {
+static struct expr *parse_noleaf(struct parser_state *state) {
 	if (state->warn) {
 		pretty_warning(state->cmdline->stderr_colors,
 		               "warning: bfs does not apply the optimization that %s inhibits.\n\n",
-		               option);
+		               state->args[0]);
 	}
 
-	return new_option(state, option);
+	return parse_nullary_option(state);
 }
 
 /**
  * Parse -samefile FILE.
  */
-static struct expr *parse_samefile(struct parser_state *state, const char *option) {
-	struct expr *expr = parse_test_sdata(state, option, eval_samefile);
+static struct expr *parse_samefile(struct parser_state *state) {
+	struct expr *expr = parse_unary_test(state, eval_samefile);
 	if (!expr) {
 		return NULL;
 	}
@@ -609,17 +678,15 @@ static struct expr *parse_samefile(struct parser_state *state, const char *optio
 /**
  * Parse -x?type [bcdpfls].
  */
-static struct expr *parse_type(struct parser_state *state, const char *option, eval_fn *eval) {
-	const char *arg = state->argv[state->i];
-	if (!arg) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", option);
+static struct expr *parse_type(struct parser_state *state, eval_fn *eval) {
+	struct expr *expr = parse_unary_test(state, eval);
+	if (!expr) {
 		return NULL;
 	}
 
 	int typeflag = BFTW_UNKNOWN;
 
-	switch (arg[0]) {
+	switch (expr->sdata[0]) {
 	case 'b':
 		typeflag = BFTW_BLK;
 		break;
@@ -643,22 +710,22 @@ static struct expr *parse_type(struct parser_state *state, const char *option, e
 		break;
 	}
 
-	if (typeflag == BFTW_UNKNOWN || arg[1] != '\0') {
+	if (typeflag == BFTW_UNKNOWN || expr->sdata[1] != '\0') {
 		pretty_error(state->cmdline->stderr_colors,
-		             "error: Unknown type flag '%s'.\n", arg);
+		             "error: Unknown type flag '%s'.\n", expr->sdata);
+		free_expr(expr);
 		return NULL;
 	}
 
-	++state->i;
-
-	return new_test_idata(state, eval, typeflag);
+	expr->idata = typeflag;
+	return expr;
 }
 
 /**
  * "Parse" -help.
  */
 static struct expr *parse_help(struct parser_state *state) {
-	printf("Usage: %s [arguments...]\n\n", state->argv[0]);
+	printf("Usage: %s [arguments...]\n\n", state->command);
 
 	printf("bfs is compatible with find; see find -help or man find for help with find-\n"
 	       "compatible options :)\n\n");
@@ -694,7 +761,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 	struct cmdline *cmdline = state->cmdline;
 
 	// Paths are already skipped at this point
-	const char *arg = state->argv[state->i++];
+	const char *arg = state->args[0];
 
 	if (arg[0] != '-') {
 		pretty_error(cmdline->stderr_colors,
@@ -705,14 +772,14 @@ static struct expr *parse_literal(struct parser_state *state) {
 	switch (arg[1]) {
 	case 'D':
 		if (strcmp(arg, "-D") == 0) {
-			return parse_debug(state, arg);
+			return parse_debug(state);
 		}
 		break;
 
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
-			return new_positional_option(state);
+			return parse_nullary_positional_option(state);
 		}
 		break;
 
@@ -720,38 +787,38 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-H") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
 			cmdline->flags |= BFTW_FOLLOW_ROOT;
-			return new_positional_option(state);
+			return parse_nullary_positional_option(state);
 		}
 		break;
 
 	case 'L':
 		if (strcmp(arg, "-L") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return new_positional_option(state);
+			return parse_nullary_positional_option(state);
 		}
 		break;
 
 	case 'a':
 		if (strcmp(arg, "-amin") == 0) {
-			return parse_acmtime(state, arg, ATIME, MINUTES);
+			return parse_acmtime(state, ATIME, MINUTES);
 		} else if (strcmp(arg, "-atime") == 0) {
-			return parse_acmtime(state, arg, ATIME, DAYS);
+			return parse_acmtime(state, ATIME, DAYS);
 		} else if (strcmp(arg, "-anewer") == 0) {
-			return parse_acnewer(state, arg, ATIME);
+			return parse_acnewer(state, ATIME);
 		}
 		break;
 
 	case 'c':
 		if (strcmp(arg, "-cmin") == 0) {
-			return parse_acmtime(state, arg, CTIME, MINUTES);
+			return parse_acmtime(state, CTIME, MINUTES);
 		} else if (strcmp(arg, "-ctime") == 0) {
-			return parse_acmtime(state, arg, CTIME, DAYS);
+			return parse_acmtime(state, CTIME, DAYS);
 		} else if (strcmp(arg, "-cnewer") == 0) {
-			return parse_acnewer(state, arg, CTIME);
+			return parse_acnewer(state, CTIME);
 		} else if (strcmp(arg, "-color") == 0) {
 			cmdline->stdout_colors = cmdline->colors;
 			cmdline->stderr_colors = cmdline->colors;
-			return new_option(state, arg);
+			return parse_nullary_option(state);
 		}
 		break;
 
@@ -760,35 +827,36 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return parse_daystart(state);
 		} else if (strcmp(arg, "-delete") == 0) {
 			cmdline->flags |= BFTW_DEPTH;
-			return new_action(state, eval_delete);
+			return parse_nullary_action(state, eval_delete);
 		} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
 			cmdline->flags |= BFTW_DEPTH;
-			return new_option(state, arg);
+			return parse_nullary_option(state);
 		}
 		break;
 
 	case 'e':
 		if (strcmp(arg, "-empty") == 0) {
-			return new_test(state, eval_empty);
+			return parse_nullary_test(state, eval_empty);
 		} else if (strcmp(arg, "-executable") == 0) {
-			return new_test_idata(state, eval_access, X_OK);
+			return parse_access(state, X_OK);
 		}
 		break;
 
 	case 'f':
 		if (strcmp(arg, "-false") == 0) {
+			++state->args;
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return new_positional_option(state);
+			return parse_nullary_positional_option(state);
 		}
 		break;
 
 	case 'g':
 		if (strcmp(arg, "-gid") == 0) {
-			return parse_test_icmp(state, arg, eval_gid);
+			return parse_test_icmp(state, eval_gid);
 		} else if (strcmp(arg, "-group") == 0) {
-			return parse_group(state, arg);
+			return parse_group(state);
 		}
 		break;
 
@@ -796,107 +864,108 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-help") == 0) {
 			return parse_help(state);
 		} else if (strcmp(arg, "-hidden") == 0) {
-			return new_test(state, eval_hidden);
+			return parse_nullary_test(state, eval_hidden);
 		}
 		break;
 
 	case 'i':
 		if (strcmp(arg, "-ilname") == 0) {
-			return parse_lname(state, arg, true);
+			return parse_lname(state, true);
 		} if (strcmp(arg, "-iname") == 0) {
-			return parse_name(state, arg, true);
+			return parse_name(state, true);
 		} else if (strcmp(arg, "-inum") == 0) {
-			return parse_test_icmp(state, arg, eval_inum);
+			return parse_test_icmp(state, eval_inum);
 		} else if (strcmp(arg, "-ipath") == 0 || strcmp(arg, "-iwholename") == 0) {
-			return parse_path(state, arg, true);
+			return parse_path(state, true);
 		}
 		break;
 
 	case 'l':
 		if (strcmp(arg, "-links") == 0) {
-			return parse_test_icmp(state, arg, eval_links);
+			return parse_test_icmp(state, eval_links);
 		} else if (strcmp(arg, "-lname") == 0) {
-			return parse_lname(state, arg, false);
+			return parse_lname(state, false);
 		}
 		break;
 
 	case 'm':
 		if (strcmp(arg, "-mindepth") == 0) {
-			return parse_depth(state, arg, &cmdline->mindepth);
+			return parse_depth(state, &cmdline->mindepth);
 		} else if (strcmp(arg, "-maxdepth") == 0) {
-			return parse_depth(state, arg, &cmdline->maxdepth);
+			return parse_depth(state, &cmdline->maxdepth);
 		} else if (strcmp(arg, "-mmin") == 0) {
-			return parse_acmtime(state, arg, MTIME, MINUTES);
+			return parse_acmtime(state, MTIME, MINUTES);
 		} else if (strcmp(arg, "-mount") == 0) {
 			cmdline->flags |= BFTW_MOUNT;
-			return new_option(state, arg);
+			return parse_nullary_option(state);
 		} else if (strcmp(arg, "-mtime") == 0) {
-			return parse_acmtime(state, arg, MTIME, DAYS);
+			return parse_acmtime(state, MTIME, DAYS);
 		}
 		break;
 
 	case 'n':
 		if (strcmp(arg, "-name") == 0) {
-			return parse_name(state, arg, false);
+			return parse_name(state, false);
 		} else if (strcmp(arg, "-newer") == 0) {
-			return parse_acnewer(state, arg, MTIME);
+			return parse_acnewer(state, MTIME);
 		} else if (strcmp(arg, "-nocolor") == 0) {
 			cmdline->stdout_colors = NULL;
 			cmdline->stderr_colors = NULL;
-			return new_option(state, arg);
+			return parse_nullary_option(state);
 		} else if (strcmp(arg, "-nohidden") == 0) {
-			return new_action(state, eval_nohidden);
+			return parse_nullary_action(state, eval_nohidden);
 		} else if (strcmp(arg, "-noleaf") == 0) {
-			return parse_noleaf(state, arg);
+			return parse_noleaf(state);
 		} else if (strcmp(arg, "-nowarn") == 0) {
 			state->warn = false;
-			return new_positional_option(state);
+			return parse_nullary_positional_option(state);
 		}
 		break;
 
 	case 'p':
 		if (strcmp(arg, "-path") == 0) {
-			return parse_path(state, arg, false);
+			return parse_path(state, false);
 		} else if (strcmp(arg, "-print") == 0) {
-			return new_action(state, eval_print);
+			return parse_nullary_action(state, eval_print);
 		} else if (strcmp(arg, "-print0") == 0) {
-			return new_action(state, eval_print0);
+			return parse_nullary_action(state, eval_print0);
 		} else if (strcmp(arg, "-prune") == 0) {
-			return new_action(state, eval_prune);
+			return parse_nullary_action(state, eval_prune);
 		}
 		break;
 
 	case 'q':
 		if (strcmp(arg, "-quit") == 0) {
-			return new_action(state, eval_quit);
+			return parse_nullary_action(state, eval_quit);
 		}
 		break;
 
 	case 'r':
 		if (strcmp(arg, "-readable") == 0) {
-			return new_test_idata(state, eval_access, R_OK);
+			return parse_access(state, R_OK);
 		}
 		break;
 
 	case 's':
 		if (strcmp(arg, "-samefile") == 0) {
-			return parse_samefile(state, arg);
+			return parse_samefile(state);
 		}
 		break;
 
 	case 't':
 		if (strcmp(arg, "-true") == 0) {
+			++state->args;
 			return &expr_true;
 		} else if (strcmp(arg, "-type") == 0) {
-			return parse_type(state, arg, eval_type);
+			return parse_type(state, eval_type);
 		}
 		break;
 
 	case  'u':
 		if (strcmp(arg, "-uid") == 0) {
-			return parse_test_icmp(state, arg, eval_uid);
+			return parse_test_icmp(state, eval_uid);
 		} else if (strcmp(arg, "-user") == 0) {
-			return parse_user(state, arg);
+			return parse_user(state);
 		}
 		break;
 
@@ -909,20 +978,20 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'w':
 		if (strcmp(arg, "-warn") == 0) {
 			state->warn = true;
-			return new_positional_option(state);
+			return parse_nullary_positional_option(state);
 		} else if (strcmp(arg, "-wholename") == 0) {
-			return parse_path(state, arg, false);
+			return parse_path(state, false);
 		} else if (strcmp(arg, "-writable") == 0) {
-			return new_test_idata(state, eval_access, W_OK);
+			return parse_access(state, W_OK);
 		}
 		break;
 
 	case 'x':
 		if (strcmp(arg, "-xdev") == 0) {
 			cmdline->flags |= BFTW_MOUNT;
-			return new_option(state, arg);
+			return parse_nullary_option(state);
 		} else if (strcmp(arg, "-xtype") == 0) {
-			return parse_type(state, arg, eval_xtype);
+			return parse_type(state, eval_xtype);
 		}
 		break;
 
@@ -943,7 +1012,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 /**
  * Create a "not" expression.
  */
-static struct expr *new_not_expr(struct expr *rhs) {
+static struct expr *new_not_expr(struct expr *rhs, char **args) {
 	if (rhs == &expr_true) {
 		return &expr_false;
 	} else if (rhs == &expr_false) {
@@ -954,7 +1023,7 @@ static struct expr *new_not_expr(struct expr *rhs) {
 		free_expr(rhs);
 		return expr;
 	} else {
-		return new_unary_expr(eval_not, rhs);
+		return new_unary_expr(eval_not, rhs, args);
 	}
 }
 
@@ -971,7 +1040,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 	}
 
 	if (strcmp(arg, "(") == 0) {
-		++state->i;
+		++state->args;
 		struct expr *expr = parse_expr(state);
 		if (!expr) {
 			return NULL;
@@ -983,18 +1052,18 @@ static struct expr *parse_factor(struct parser_state *state) {
 			free_expr(expr);
 			return NULL;
 		}
-		++state->i;
+		++state->args;
 
 		return expr;
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
-		++state->i;
+		char **args = state->args++;
 
 		struct expr *factor = parse_factor(state);
 		if (!factor) {
 			return NULL;
 		}
 
-		return new_not_expr(factor);
+		return new_not_expr(factor, args);
 	} else {
 		return parse_literal(state);
 	}
@@ -1003,7 +1072,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 /**
  * Create an "and" expression.
  */
-static struct expr *new_and_expr(struct expr *lhs, struct expr *rhs) {
+static struct expr *new_and_expr(struct expr *lhs, struct expr *rhs, char **args) {
 	if (lhs == &expr_true) {
 		return rhs;
 	} else if (lhs == &expr_false) {
@@ -1015,7 +1084,7 @@ static struct expr *new_and_expr(struct expr *lhs, struct expr *rhs) {
 		free_expr(lhs);
 		return rhs;
 	} else {
-		return new_binary_expr(eval_and, lhs, rhs);
+		return new_binary_expr(eval_and, lhs, rhs, args);
 	}
 }
 
@@ -1040,8 +1109,9 @@ static struct expr *parse_term(struct parser_state *state) {
 			break;
 		}
 
+		char **args = &fake_and_arg;
 		if (strcmp(arg, "-a") == 0 || strcmp(arg, "-and") == 0) {
-			++state->i;
+			args = state->args++;
 		}
 
 		struct expr *lhs = term;
@@ -1051,7 +1121,7 @@ static struct expr *parse_term(struct parser_state *state) {
 			return NULL;
 		}
 
-		term = new_and_expr(lhs, rhs);
+		term = new_and_expr(lhs, rhs, args);
 	}
 
 	return term;
@@ -1060,7 +1130,7 @@ static struct expr *parse_term(struct parser_state *state) {
 /**
  * Create an "or" expression.
  */
-static struct expr *new_or_expr(struct expr *lhs, struct expr *rhs) {
+static struct expr *new_or_expr(struct expr *lhs, struct expr *rhs, char **args) {
 	if (lhs == &expr_true) {
 		free_expr(rhs);
 		return lhs;
@@ -1072,7 +1142,7 @@ static struct expr *new_or_expr(struct expr *lhs, struct expr *rhs) {
 	} else if (rhs == &expr_false) {
 		return lhs;
 	} else {
-		return new_binary_expr(eval_or, lhs, rhs);
+		return new_binary_expr(eval_or, lhs, rhs, args);
 	}
 }
 
@@ -1094,7 +1164,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 			break;
 		}
 
-		++state->i;
+		char **args = state->args++;
 
 		struct expr *lhs = clause;
 		struct expr *rhs = parse_term(state);
@@ -1103,7 +1173,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 			return NULL;
 		}
 
-		clause = new_or_expr(lhs, rhs);
+		clause = new_or_expr(lhs, rhs, args);
 	}
 
 	return clause;
@@ -1112,12 +1182,12 @@ static struct expr *parse_clause(struct parser_state *state) {
 /**
  * Create a "comma" expression.
  */
-static struct expr *new_comma_expr(struct expr *lhs, struct expr *rhs) {
+static struct expr *new_comma_expr(struct expr *lhs, struct expr *rhs, char **args) {
 	if (lhs->pure) {
 		free_expr(lhs);
 		return rhs;
 	} else {
-		return new_binary_expr(eval_comma, lhs, rhs);
+		return new_binary_expr(eval_comma, lhs, rhs, args);
 	}
 }
 
@@ -1138,7 +1208,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 			break;
 		}
 
-		++state->i;
+		char **args = state->args++;
 
 		struct expr *lhs = expr;
 		struct expr *rhs = parse_clause(state);
@@ -1147,10 +1217,82 @@ static struct expr *parse_expr(struct parser_state *state) {
 			return NULL;
 		}
 
-		expr = new_comma_expr(lhs, rhs);
+		expr = new_comma_expr(lhs, rhs, args);
 	}
 
 	return expr;
+}
+
+/**
+ * Dump the parsed expression tree, for debugging.
+ */
+static void dump_expr(const struct expr *expr) {
+	fputs("(", stderr);
+
+	for (size_t i = 0; i < expr->nargs; ++i) {
+		if (i > 0) {
+			fputs(" ", stderr);
+		}
+		fputs(expr->args[i], stderr);
+	}
+
+	if (expr->lhs) {
+		fputs(" ", stderr);
+		dump_expr(expr->lhs);
+	}
+
+	if (expr->rhs) {
+		fputs(" ", stderr);
+		dump_expr(expr->rhs);
+	}
+
+	fputs(")", stderr);
+}
+
+/**
+ * Dump the parsed form of the command line, for debugging.
+ */
+static void dump_cmdline(const struct cmdline *cmdline) {
+	if (cmdline->flags & BFTW_FOLLOW_NONROOT) {
+		fputs("-L ", stderr);
+	} else if (cmdline->flags & BFTW_FOLLOW_ROOT) {
+		fputs("-H ", stderr);
+	} else {
+		fputs("-P ", stderr);
+	}
+
+	if (cmdline->debug & DEBUG_STAT) {
+		fputs("-D stat ", stderr);
+	}
+	if (cmdline->debug & DEBUG_TREE) {
+		fputs("-D tree ", stderr);
+	}
+
+	for (size_t i = 0; i < cmdline->nroots; ++i) {
+		fprintf(stderr, "%s ", cmdline->roots[i]);
+	}
+
+	if (cmdline->flags & BFTW_DEPTH) {
+		fputs("-depth ", stderr);
+	}
+	if (cmdline->flags & BFTW_MOUNT) {
+		fputs("-mount ", stderr);
+	}
+	if (cmdline->mindepth != 0) {
+		fprintf(stderr, "-mindepth %d ", cmdline->mindepth);
+	}
+	if (cmdline->maxdepth != INT_MAX) {
+		fprintf(stderr, "-maxdepth %d ", cmdline->maxdepth);
+	}
+	if (cmdline->stdout_colors) {
+		fputs("-color ", stderr);
+	} else {
+		fputs("-nocolor ", stderr);
+	}
+
+	dump_expr(cmdline->expr);
+
+	fputs("\n", stderr);
 }
 
 /**
@@ -1176,8 +1318,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	struct parser_state state = {
 		.cmdline = cmdline,
-		.argv = argv,
-		.i = 1,
+		.args = argv + 1,
+		.command = argv[0],
 		.implicit_print = true,
 		.warn = true,
 		.non_option_seen = false,
@@ -1200,19 +1342,19 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
-	if (state.i < argc) {
+	if (state.args[0]) {
 		pretty_error(cmdline->stderr_colors,
-		             "error: Unexpected argument '%s'.\n", argv[state.i]);
+		             "error: Unexpected argument '%s'.\n", state.args[0]);
 		goto fail;
 	}
 
 	if (state.implicit_print) {
-		struct expr *print = new_action(&state, eval_print);
+		struct expr *print = new_expr(eval_print, false, &fake_print_arg, 1);
 		if (!print) {
 			goto fail;
 		}
 
-		cmdline->expr = new_and_expr(cmdline->expr, print);
+		cmdline->expr = new_and_expr(cmdline->expr, print, &fake_and_arg);
 		if (!cmdline->expr) {
 			goto fail;
 		}
@@ -1222,6 +1364,10 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		if (!cmdline_add_root(cmdline, ".")) {
 			goto fail;
 		}
+	}
+
+	if (cmdline->debug & DEBUG_TREE) {
+		dump_cmdline(cmdline);
 	}
 
 done:
