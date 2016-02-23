@@ -763,7 +763,8 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, ftwbuf->at_flags);
 		if (ret != 0 && follow && errno == ENOENT) {
 			// Could be a broken symlink, retry without following
-			ret = ftwbuf_stat(ftwbuf, &state->statbuf, AT_SYMLINK_NOFOLLOW);
+			ftwbuf->at_flags = AT_SYMLINK_NOFOLLOW;
+			ret = ftwbuf_stat(ftwbuf, &state->statbuf, ftwbuf->at_flags);
 		}
 
 		if (ret != 0) {
