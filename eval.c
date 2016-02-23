@@ -651,6 +651,10 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		return 0;
 	}
 
+	if (cmdline->optlevel >= 3 && cmdline->expr->eval == eval_false) {
+		return 0;
+	}
+
 	int nopenfd = infer_fdlimit();
 
 	struct callback_args args = {

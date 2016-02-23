@@ -151,6 +151,9 @@ struct parser_state {
 	/** The name of this program. */
 	const char *command;
 
+	/** The optimization level. */
+	int optlevel;
+
 	/** Whether a -print action is implied. */
 	bool implicit_print;
 	/** Whether warnings are enabled (see -warn, -nowarn). */
@@ -421,6 +424,17 @@ static struct expr *parse_debug(struct parser_state *state) {
 	}
 
 	return parse_unary_positional_option(state);
+}
+
+/**
+ * Parse -On.
+ */
+static struct expr *parse_optlevel(struct parser_state *state) {
+	if (!parse_int(state, state->args[0] + 2, &state->cmdline->optlevel)) {
+		return NULL;
+	}
+
+	return parse_nullary_positional_option(state);
 }
 
 /**
@@ -776,6 +790,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 		}
 		break;
 
+	case 'O':
+		return parse_optlevel(state);
+
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
@@ -1012,19 +1029,21 @@ static struct expr *parse_literal(struct parser_state *state) {
 /**
  * Create a "not" expression.
  */
-static struct expr *new_not_expr(struct expr *rhs, char **args) {
-	if (rhs == &expr_true) {
-		return &expr_false;
-	} else if (rhs == &expr_false) {
-		return &expr_true;
-	} else if (rhs->eval == eval_not) {
-		struct expr *expr = rhs->rhs;
-		rhs->rhs = NULL;
-		free_expr(rhs);
-		return expr;
-	} else {
-		return new_unary_expr(eval_not, rhs, args);
+static struct expr *new_not_expr(const struct parser_state *state, struct expr *rhs, char **args) {
+	if (state->cmdline->optlevel >= 1) {
+		if (rhs == &expr_true) {
+			return &expr_false;
+		} else if (rhs == &expr_false) {
+			return &expr_true;
+		} else if (rhs->eval == eval_not) {
+			struct expr *expr = rhs->rhs;
+			rhs->rhs = NULL;
+			free_expr(rhs);
+			return expr;
+		}
 	}
+
+	return new_unary_expr(eval_not, rhs, args);
 }
 
 /**
@@ -1063,7 +1082,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 			return NULL;
 		}
 
-		return new_not_expr(factor, args);
+		return new_not_expr(state, factor, args);
 	} else {
 		return parse_literal(state);
 	}
@@ -1072,20 +1091,22 @@ static struct expr *parse_factor(struct parser_state *state) {
 /**
  * Create an "and" expression.
  */
-static struct expr *new_and_expr(struct expr *lhs, struct expr *rhs, char **args) {
-	if (lhs == &expr_true) {
-		return rhs;
-	} else if (lhs == &expr_false) {
-		free_expr(rhs);
-		return lhs;
-	} else if (rhs == &expr_true) {
-		return lhs;
-	} else if (rhs == &expr_false && lhs->pure) {
-		free_expr(lhs);
-		return rhs;
-	} else {
-		return new_binary_expr(eval_and, lhs, rhs, args);
+static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **args) {
+	if (state->cmdline->optlevel >= 1) {
+		if (lhs == &expr_true) {
+			return rhs;
+		} else if (lhs == &expr_false) {
+			free_expr(rhs);
+			return lhs;
+		} else if (rhs == &expr_true) {
+			return lhs;
+		} else if (rhs == &expr_false && lhs->pure) {
+			free_expr(lhs);
+			return rhs;
+		}
 	}
+
+	return new_binary_expr(eval_and, lhs, rhs, args);
 }
 
 /**
@@ -1121,7 +1142,7 @@ static struct expr *parse_term(struct parser_state *state) {
 			return NULL;
 		}
 
-		term = new_and_expr(lhs, rhs, args);
+		term = new_and_expr(state, lhs, rhs, args);
 	}
 
 	return term;
@@ -1130,20 +1151,22 @@ static struct expr *parse_term(struct parser_state *state) {
 /**
  * Create an "or" expression.
  */
-static struct expr *new_or_expr(struct expr *lhs, struct expr *rhs, char **args) {
-	if (lhs == &expr_true) {
-		free_expr(rhs);
-		return lhs;
-	} else if (lhs == &expr_false) {
-		return rhs;
-	} else if (rhs == &expr_true && lhs->pure) {
-		free_expr(lhs);
-		return rhs;
-	} else if (rhs == &expr_false) {
-		return lhs;
-	} else {
-		return new_binary_expr(eval_or, lhs, rhs, args);
+static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **args) {
+	if (state->cmdline->optlevel >= 1) {
+		if (lhs == &expr_true) {
+			free_expr(rhs);
+			return lhs;
+		} else if (lhs == &expr_false) {
+			return rhs;
+		} else if (rhs == &expr_true && lhs->pure) {
+			free_expr(lhs);
+			return rhs;
+		} else if (rhs == &expr_false) {
+			return lhs;
+		}
 	}
+
+	return new_binary_expr(eval_or, lhs, rhs, args);
 }
 
 /**
@@ -1173,7 +1196,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 			return NULL;
 		}
 
-		clause = new_or_expr(lhs, rhs, args);
+		clause = new_or_expr(state, lhs, rhs, args);
 	}
 
 	return clause;
@@ -1182,13 +1205,15 @@ static struct expr *parse_clause(struct parser_state *state) {
 /**
  * Create a "comma" expression.
  */
-static struct expr *new_comma_expr(struct expr *lhs, struct expr *rhs, char **args) {
-	if (lhs->pure) {
-		free_expr(lhs);
-		return rhs;
-	} else {
-		return new_binary_expr(eval_comma, lhs, rhs, args);
+static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **args) {
+	if (state->cmdline->optlevel >= 1) {
+		if (lhs->pure) {
+			free_expr(lhs);
+			return rhs;
+		}
 	}
+
+	return new_binary_expr(eval_comma, lhs, rhs, args);
 }
 
 /**
@@ -1217,7 +1242,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 			return NULL;
 		}
 
-		expr = new_comma_expr(lhs, rhs, args);
+		expr = new_comma_expr(state, lhs, rhs, args);
 	}
 
 	return expr;
@@ -1259,6 +1284,10 @@ static void dump_cmdline(const struct cmdline *cmdline) {
 		fputs("-H ", stderr);
 	} else {
 		fputs("-P ", stderr);
+	}
+
+	if (cmdline->optlevel != 1) {
+		fprintf(stderr, "-O%d ", cmdline->optlevel);
 	}
 
 	if (cmdline->debug & DEBUG_STAT) {
@@ -1309,6 +1338,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
+	cmdline->optlevel = 1;
 	cmdline->debug = 0;
 	cmdline->expr = &expr_true;
 
@@ -1354,7 +1384,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 			goto fail;
 		}
 
-		cmdline->expr = new_and_expr(cmdline->expr, print, &fake_and_arg);
+		cmdline->expr = new_and_expr(&state, cmdline->expr, print, &fake_and_arg);
 		if (!cmdline->expr) {
 			goto fail;
 		}

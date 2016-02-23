@@ -82,6 +82,8 @@ struct cmdline {
 	/** bftw() flags. */
 	enum bftw_flags flags;
 
+	/** Optimization level. */
+	int optlevel;
 	/** Debugging flags. */
 	enum debugflags debug;
 
