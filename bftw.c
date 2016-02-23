@@ -511,7 +511,6 @@ static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
 /** Remove an entry from the dirqueue. */
 static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
 	if (queue->front == queue->back) {
-		free(queue->entries);
 		return NULL;
 	}
 
@@ -520,6 +519,11 @@ static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
 	queue->front &= queue->mask;
 
 	return entry;
+}
+
+/** Destroy a dirqueue. */
+static void dirqueue_free(struct dirqueue *queue) {
+	free(queue->entries);
 }
 
 /** Fill in ftwbuf fields with information from a struct dirent. */
@@ -909,6 +913,7 @@ static void bftw_state_free(struct bftw_state *state) {
 	while (state->current) {
 		bftw_pop(state, false);
 	}
+	dirqueue_free(&state->queue);
 
 	dircache_free(&state->cache);
 
