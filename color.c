@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 struct ext_color {
 	const char *ext;
@@ -210,7 +211,8 @@ done:
 	return colors;
 }
 
-static const char *file_color(const struct colors *colors, const char *filename, const struct stat *sb) {
+static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
+	const struct stat *sb = ftwbuf->statbuf;
 	if (!sb) {
 		return colors->orphan;
 	}
@@ -262,8 +264,13 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFLNK:
-		color = colors->link;
+		if (faccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK, 0) == 0) {
+			color = colors->link;
+		} else {
+			color = colors->orphan;
+		}
 		break;
+
 	case S_IFBLK:
 		color = colors->block;
 		break;
@@ -309,7 +316,7 @@ void pretty_print(const struct colors *colors, const struct BFTW *ftwbuf) {
 		print_esc(colors->reset, stdout);
 	}
 
-	const char *color = file_color(colors, filename, ftwbuf->statbuf);
+	const char *color = file_color(colors, filename, ftwbuf);
 	if (color) {
 		print_esc(color, stdout);
 	}
