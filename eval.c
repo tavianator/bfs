@@ -554,6 +554,8 @@ struct callback_args {
 	const struct cmdline *cmdline;
 	/** Eventual return value from eval_cmdline(). */
 	int ret;
+	/** The last error code seen. */
+	int last_error;
 };
 
 /**
@@ -565,6 +567,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	const struct cmdline *cmdline = args->cmdline;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
+		args->last_error = ftwbuf->error;
 		pretty_error(cmdline->stderr_colors, "'%s': %s\n", ftwbuf->path, strerror(ftwbuf->error));
 		return BFTW_SKIP_SUBTREE;
 	}
@@ -663,9 +666,14 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	};
 
 	for (size_t i = 0; i < cmdline->nroots; ++i) {
+		args.last_error = 0;
+
 		if (bftw(cmdline->roots[i], cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
 			args.ret = -1;
-			perror("bftw()");
+
+			if (errno != args.last_error) {
+				perror("bftw()");
+			}
 		}
 	}
 
