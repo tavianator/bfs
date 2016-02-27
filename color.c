@@ -86,6 +86,7 @@ struct colors *parse_colors(const char *ls_colors) {
 	colors->warning    = "40;33;01";
 	colors->error      = "40;31;01";
 	colors->ext_list   = NULL;
+	colors->data       = NULL;
 
 	if (ls_colors) {
 		colors->data = strdup(ls_colors);
