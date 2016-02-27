@@ -315,36 +315,41 @@ bool eval_links(const struct expr *expr, struct eval_state *state) {
  * -i?lname test.
  */
 bool eval_lname(const struct expr *expr, struct eval_state *state) {
+	bool ret = false;
+	char *name = NULL;
+
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (ftwbuf->typeflag != BFTW_LNK) {
-		return false;
+		goto done;
 	}
 
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
-		return false;
+		goto done;
 	}
 
 	size_t size = statbuf->st_size + 1;
-	char *name = malloc(size);
+	name = malloc(size);
 	if (!name) {
 		eval_error(state);
-		return false;
+		goto done;
 	}
 
-	ssize_t ret = readlinkat(ftwbuf->at_fd, ftwbuf->at_path, name, size);
-	if (ret < 0) {
+	ssize_t len = readlinkat(ftwbuf->at_fd, ftwbuf->at_path, name, size);
+	if (len < 0) {
 		eval_error(state);
-		return false;
-	} else if (ret >= size) {
-		return false;
+		goto done;
+	} else if (len >= size) {
+		goto done;
 	}
 
-	name[ret] = '\0';
+	name[len] = '\0';
 
-	bool match = fnmatch(expr->sdata, name, expr->idata) == 0;
+	ret = fnmatch(expr->sdata, name, expr->idata) == 0;
+
+done:
 	free(name);
-	return match;
+	return ret;
 }
 
 /**
