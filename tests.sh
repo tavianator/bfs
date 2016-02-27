@@ -256,14 +256,18 @@ function test_0046() {
 }
 
 function test_0047() {
-    find_diff -L "$basic" -daystart -mtime 0
+    find_diff "$basic" -daystart -mtime 0
 }
 
 function test_0048() {
-    find_diff -L "$basic" -daystart -daystart -mtime 0
+    find_diff "$basic" -daystart -daystart -mtime 0
 }
 
-for i in {1..48}; do
+function test_0049() {
+    find_diff "$basic" -newermc "$basic/e/f"
+}
+
+for i in {1..49}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

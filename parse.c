@@ -660,6 +660,85 @@ static struct expr *parse_lname(struct parser_state *state, bool casefold) {
 }
 
 /**
+ * Parse -newerXY.
+ */
+static struct expr *parse_newerxy(struct parser_state *state) {
+	const char *arg = state->args[0];
+	if (strlen(arg) != 8) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: Expected -newerXY; found %s.\n", arg);
+		return NULL;
+	}
+
+	struct expr *expr = parse_unary_test(state, eval_acnewer);
+	if (!expr) {
+		return NULL;
+	}
+
+	switch (arg[6]) {
+	case 'a':
+		expr->timefield = ATIME;
+		break;
+	case 'c':
+		expr->timefield = CTIME;
+		break;
+	case 'm':
+		expr->timefield = MTIME;
+		break;
+
+	case 'B':
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s: File birth times ('B') are not supported.\n", arg);
+		free(expr);
+		return NULL;
+
+	default:
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.\n", arg);
+		free(expr);
+		return NULL;
+	}
+
+	if (arg[7] == 't') {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s: Explicit reference times ('t') are not supported.\n", arg);
+		free(expr);
+		return NULL;
+	} else {
+		struct stat sb;
+		if (stat_arg(state, expr, &sb) != 0) {
+			return NULL;
+		}
+
+		switch (arg[7]) {
+		case 'a':
+			expr->reftime = sb.st_atim;
+			break;
+		case 'c':
+			expr->reftime = sb.st_ctim;
+			break;
+		case 'm':
+			expr->reftime = sb.st_mtim;
+			break;
+
+		case 'B':
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s: File birth times ('B') are not supported.\n", arg);
+			free(expr);
+			return NULL;
+
+		default:
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.\n", arg);
+			free(expr);
+			return NULL;
+		}
+	}
+
+	return expr;
+}
+
+/**
  * Parse -noleaf.
  */
 static struct expr *parse_noleaf(struct parser_state *state) {
@@ -928,6 +1007,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 			return parse_name(state, false);
 		} else if (strcmp(arg, "-newer") == 0) {
 			return parse_acnewer(state, MTIME);
+		} else if (strncmp(arg, "-newer", 6) == 0) {
+			return parse_newerxy(state);
 		} else if (strcmp(arg, "-nocolor") == 0) {
 			cmdline->stdout_colors = NULL;
 			cmdline->stderr_colors = NULL;
