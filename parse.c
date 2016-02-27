@@ -343,7 +343,7 @@ static struct expr *parse_nullary_test(struct parser_state *state, eval_fn *eval
 static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) {
 	const char *arg = state->args[0];
 	const char *value = state->args[1];
-	if (!*value) {
+	if (!value) {
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: %s needs a value.\n", arg);
 		return NULL;
