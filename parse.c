@@ -494,10 +494,13 @@ static struct expr *parse_daystart(struct parser_state *state) {
 		return NULL;
 	}
 
-	tm.tm_sec = 0;
-	tm.tm_min = 0;
+	if (tm.tm_hour || tm.tm_min || tm.tm_sec || state->now.tv_nsec) {
+		++tm.tm_mday;
+	}
 	tm.tm_hour = 0;
-	++tm.tm_mday;
+	tm.tm_min = 0;
+	tm.tm_sec = 0;
+
 	time_t time = mktime(&tm);
 	if (time == -1) {
 		perror("mktime()");

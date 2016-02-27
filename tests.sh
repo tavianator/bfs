@@ -255,7 +255,15 @@ function test_0046() {
     find_diff -L "$basic" -group "$(id -g)"
 }
 
-for i in {1..46}; do
+function test_0047() {
+    find_diff -L "$basic" -daystart -mtime 0
+}
+
+function test_0048() {
+    find_diff -L "$basic" -daystart -daystart -mtime 0
+}
+
+for i in {1..48}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?
