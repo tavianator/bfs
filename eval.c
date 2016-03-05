@@ -174,6 +174,21 @@ bool eval_acnewer(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -used test.
+ */
+bool eval_used(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(&statbuf->st_atim, &statbuf->st_ctim);
+	diff /= 60*60*24;
+	printf("%d\n", (int)diff);
+	return do_cmp(expr, diff);
+}
+
+/**
  * -gid test.
  */
 bool eval_gid(const struct expr *expr, struct eval_state *state) {

@@ -1065,6 +1065,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case  'u':
 		if (strcmp(arg, "-uid") == 0) {
 			return parse_test_icmp(state, eval_uid);
+		} else if (strcmp(arg, "-used") == 0) {
+			return parse_test_icmp(state, eval_used);
 		} else if (strcmp(arg, "-user") == 0) {
 			return parse_user(state);
 		}
