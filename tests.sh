@@ -267,7 +267,23 @@ function test_0049() {
     find_diff "$basic" -newermc "$basic/e/f"
 }
 
-for i in {1..49}; do
+function test_0050() {
+    find_diff "$basic" -size 0
+}
+
+function test_0051() {
+    find_diff "$basic" -size +0
+}
+
+function test_0052() {
+    find_diff "$basic" -size +0c
+}
+
+function test_0053() {
+    find_diff "$basic" -size 9223372036854775807
+}
+
+for i in {1..53}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

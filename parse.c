@@ -213,34 +213,72 @@ static const char *skip_paths(struct parser_state *state) {
 	}
 }
 
+/** Integer parsing flags. */
+enum intflags {
+	IF_INT         = 0,
+	IF_LONG        = 1,
+	IF_LONG_LONG   = 2,
+	IF_SIZE_MASK   = 0x3,
+	IF_UNSIGNED    = 1 << 2,
+	IF_PARTIAL_OK  = 1 << 3,
+};
+
 /**
  * Parse an integer.
  */
-static bool parse_int(const struct parser_state *state, const char *str, int *value) {
+static const char *parse_int(const struct parser_state *state, const char *str, void *result, enum intflags flags) {
 	char *endptr;
-	long result = strtol(str, &endptr, 10);
 
-	if (*str == '\0' || *endptr != '\0') {
+	errno = 0;
+	long long value = strtoll(str, &endptr, 10);
+	if (errno != 0) {
 		goto bad;
 	}
 
-	if (result < INT_MIN || result > INT_MAX) {
+	if (endptr == str) {
 		goto bad;
 	}
 
-	*value = result;
-	return true;
+	if (!(flags & IF_PARTIAL_OK) && *endptr != '\0') {
+		goto bad;
+	}
+
+	if ((flags & IF_UNSIGNED) && value < 0) {
+		goto bad;
+	}
+
+	switch (flags & IF_SIZE_MASK) {
+	case IF_INT:
+		if (value < INT_MIN || value > INT_MAX) {
+			goto bad;
+		}
+		*(int *)result = value;
+		break;
+
+	case IF_LONG:
+		if (value < LONG_MIN || value > LONG_MAX) {
+			goto bad;
+		}
+		*(long *)result = value;
+		break;
+
+	case IF_LONG_LONG:
+		*(long long *)result = value;
+		break;
+	}
+
+	return endptr;
 
 bad:
 	pretty_error(state->cmdline->stderr_colors,
 	             "error: '%s' is not a valid integer.\n", str);
-	return false;
+	return NULL;
 }
 
 /**
  * Parse an integer and a comparison flag.
  */
-static bool parse_icmp(const struct parser_state *state, const char *str, struct expr *expr) {
+static const char *parse_icmp(const struct parser_state *state, const char *str, struct expr *expr, enum intflags flags) {
 	switch (str[0]) {
 	case '-':
 		expr->cmp = CMP_LESS;
@@ -255,7 +293,7 @@ static bool parse_icmp(const struct parser_state *state, const char *str, struct
 		break;
 	}
 
-	return parse_int(state, str, &expr->idata);
+	return parse_int(state, str, &expr->idata, flags | IF_LONG_LONG | IF_UNSIGNED);
 }
 
 /**
@@ -383,7 +421,7 @@ static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
 		return NULL;
 	}
 
-	if (!parse_icmp(state, expr->sdata, expr)) {
+	if (!parse_icmp(state, expr->sdata, expr, 0)) {
 		free_expr(expr);
 		return NULL;
 	}
@@ -430,7 +468,7 @@ static struct expr *parse_debug(struct parser_state *state) {
  * Parse -On.
  */
 static struct expr *parse_optlevel(struct parser_state *state) {
-	if (!parse_int(state, state->args[0] + 2, &state->cmdline->optlevel)) {
+	if (!parse_int(state, state->args[0] + 2, &state->cmdline->optlevel, IF_INT)) {
 		return NULL;
 	}
 
@@ -525,7 +563,7 @@ static struct expr *parse_depth(struct parser_state *state, int *depth) {
 		return NULL;
 	}
 
-	if (!parse_int(state, value, depth)) {
+	if (!parse_int(state, value, depth, IF_INT)) {
 		return NULL;
 	}
 
@@ -553,7 +591,7 @@ static struct expr *parse_group(struct parser_state *state) {
 		error = strerror(errno);
 		goto error;
 	} else if (isdigit(expr->sdata[0])) {
-		if (!parse_int(state, expr->sdata, &expr->idata)) {
+		if (!parse_int(state, expr->sdata, &expr->idata, IF_LONG_LONG)) {
 			goto fail;
 		}
 	} else {
@@ -594,7 +632,7 @@ static struct expr *parse_user(struct parser_state *state) {
 		error = strerror(errno);
 		goto error;
 	} else if (isdigit(expr->sdata[0])) {
-		if (!parse_int(state, expr->sdata, &expr->idata)) {
+		if (!parse_int(state, expr->sdata, &expr->idata, IF_LONG_LONG)) {
 			goto fail;
 		}
 	} else {
@@ -769,6 +807,60 @@ static struct expr *parse_samefile(struct parser_state *state) {
 	expr->ino = sb.st_ino;
 
 	return expr;
+}
+
+/**
+ * Parse -size N[bcwkMG]?.
+ */
+static struct expr *parse_size(struct parser_state *state) {
+	struct expr *expr = parse_unary_test(state, eval_size);
+	if (!expr) {
+		return NULL;
+	}
+
+	const char *unit = parse_icmp(state, expr->sdata, expr, IF_PARTIAL_OK);
+	if (!unit) {
+		goto fail;
+	}
+
+	if (strlen(unit) > 1) {
+		goto bad_unit;
+	}
+
+	switch (*unit) {
+	case '\0':
+	case 'b':
+		expr->sizeunit = SIZE_BLOCKS;
+		break;
+	case 'c':
+		expr->sizeunit = SIZE_BYTES;
+		break;
+	case 'w':
+		expr->sizeunit = SIZE_WORDS;
+		break;
+	case 'k':
+		expr->sizeunit = SIZE_KB;
+		break;
+	case 'M':
+		expr->sizeunit = SIZE_MB;
+		break;
+	case 'G':
+		expr->sizeunit = SIZE_GB;
+		break;
+
+	default:
+		goto bad_unit;
+	}
+
+	return expr;
+
+bad_unit:
+	pretty_error(state->cmdline->stderr_colors,
+	             "error: %s %s: Expected a size unit of 'b', 'c', 'w', 'k', 'M', or 'G'; found %s.\n",
+	             expr->args[0], expr->args[1], unit);
+fail:
+	free(expr);
+	return NULL;
 }
 
 /**
@@ -1050,6 +1142,8 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 's':
 		if (strcmp(arg, "-samefile") == 0) {
 			return parse_samefile(state);
+		} else if (strcmp(arg, "-size") == 0) {
+			return parse_size(state);
 		}
 		break;
 

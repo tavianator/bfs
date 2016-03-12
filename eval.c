@@ -75,7 +75,7 @@ static time_t timespec_diff(const struct timespec *lhs, const struct timespec *r
 /**
  * Perform a comparison.
  */
-static bool do_cmp(const struct expr *expr, int n) {
+static bool do_cmp(const struct expr *expr, long long n) {
 	switch (expr->cmp) {
 	case CMP_EXACT:
 		return n == expr->idata;
@@ -446,6 +446,29 @@ bool eval_samefile(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return statbuf->st_dev == expr->dev && statbuf->st_ino == expr->ino;
+}
+
+/**
+ * -size test.
+ */
+bool eval_size(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	static off_t scales[] = {
+		[SIZE_BLOCKS] = 512,
+		[SIZE_BYTES] = 1,
+		[SIZE_WORDS] = 2,
+		[SIZE_KB] = 1024,
+		[SIZE_MB] = 1024*1024,
+		[SIZE_GB] = 1024*1024*1024,
+	};
+
+	off_t scale = scales[expr->sizeunit];
+	off_t size = (statbuf->st_size + scale - 1)/scale; // Round up
+	return do_cmp(expr, size);
 }
 
 /**

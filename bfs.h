@@ -125,6 +125,24 @@ enum timeunit {
 	DAYS,
 };
 
+/**
+ * Possible file size units.
+ */
+enum sizeunit {
+	/** 512-byte blocks. */
+	SIZE_BLOCKS,
+	/** Single bytes. */
+	SIZE_BYTES,
+	/** Two-byte words. */
+	SIZE_WORDS,
+	/** Kibibytes. */
+	SIZE_KB,
+	/** Mebibytes. */
+	SIZE_MB,
+	/** Gibibytes. */
+	SIZE_GB,
+};
+
 struct expr {
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
@@ -152,13 +170,16 @@ struct expr {
 	/** The optional time unit. */
 	enum timeunit timeunit;
 
+	/** The optional size unit. */
+	enum sizeunit sizeunit;
+
 	/** Optional device number for a target file. */
 	dev_t dev;
 	/** Optional inode number for a target file. */
 	ino_t ino;
 
 	/** Optional integer data for this expression. */
-	int idata;
+	long long idata;
 
 	/** Optional string data for this expression. */
 	const char *sdata;
@@ -197,6 +218,7 @@ bool eval_hidden(const struct expr *expr, struct eval_state *state);
 bool eval_inum(const struct expr *expr, struct eval_state *state);
 bool eval_links(const struct expr *expr, struct eval_state *state);
 bool eval_samefile(const struct expr *expr, struct eval_state *state);
+bool eval_size(const struct expr *expr, struct eval_state *state);
 bool eval_type(const struct expr *expr, struct eval_state *state);
 bool eval_xtype(const struct expr *expr, struct eval_state *state);
 
