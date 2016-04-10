@@ -184,7 +184,6 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
 
 	time_t diff = timespec_diff(&statbuf->st_atim, &statbuf->st_ctim);
 	diff /= 60*60*24;
-	printf("%d\n", (int)diff);
 	return do_cmp(expr, diff);
 }
 
