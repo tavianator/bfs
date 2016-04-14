@@ -21,6 +21,7 @@
  */
 
 #include "bftw.h"
+#include "dstring.h"
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -33,56 +34,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-/**
- * Simple dynamically-sized string type.
- */
-struct dynstr {
-	char *str;
-	size_t length;
-	size_t capacity;
-};
-
-/** Initialize a dynstr. */
-static void dynstr_init(struct dynstr *dstr) {
-	dstr->str = NULL;
-	dstr->length = 0;
-	dstr->capacity = 0;
-}
-
-/** Grow a dynstr to the given capacity if necessary. */
-static int dynstr_grow(struct dynstr *dstr, size_t length) {
-	if (length >= dstr->capacity) {
-		size_t new_capacity = 3*(length + 1)/2;
-		char *new_str = realloc(dstr->str, new_capacity);
-		if (!new_str) {
-			return -1;
-		}
-
-		dstr->str = new_str;
-		dstr->capacity = new_capacity;
-	}
-
-	return 0;
-}
-
-/** Concatenate a string to a dynstr at the given position. */
-static int dynstr_concat(struct dynstr *dstr, size_t pos, const char *more) {
-	size_t morelen = strlen(more);
-	size_t length = pos + morelen;
-	if (dynstr_grow(dstr, length) != 0) {
-		return -1;
-	}
-
-	memcpy(dstr->str + pos, more, morelen + 1);
-	dstr->length = length;
-	return 0;
-}
-
-/** Free a dynstr. */
-static void dynstr_free(struct dynstr *dstr) {
-	free(dstr->str);
-}
 
 /**
  * A single entry in the dircache.
@@ -292,20 +243,17 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
  * @param[out] path
  *         Will hold the full path to the entry, with a trailing '/'.
  */
-static int dircache_entry_path(const struct dircache_entry *entry, struct dynstr *path) {
+static int dircache_entry_path(const struct dircache_entry *entry, char **path) {
 	size_t namelen = entry->namelen;
 	size_t pathlen = entry->nameoff + namelen;
 
-	if (dynstr_grow(path, pathlen) != 0) {
+	if (dstresize(path, pathlen) != 0) {
 		return -1;
 	}
-	path->length = pathlen;
 
 	// Build the path backwards
-	path->str[pathlen] = '\0';
-
 	do {
-		char *segment = path->str + entry->nameoff;
+		char *segment = *path + entry->nameoff;
 		namelen = entry->namelen;
 		memcpy(segment, entry->name, namelen);
 		entry = entry->parent;
@@ -628,7 +576,7 @@ struct bftw_state {
 	enum bftw_status status;
 
 	/** The current path being explored. */
-	struct dynstr path;
+	char *path;
 
 	/** Extra data about the current file. */
 	struct BFTW ftwbuf;
@@ -653,20 +601,29 @@ static int bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, i
 
 	// -1 to account for dup()
 	if (dircache_init(&state->cache, nopenfd - 1) != 0) {
-		return -1;
+		goto err;
 	}
 
 	if (dirqueue_init(&state->queue) != 0) {
-		dircache_free(&state->cache);
-		return -1;
+		goto err_cache;
 	}
 
 	state->current = NULL;
 	state->status = BFTW_CURRENT;
 
-	dynstr_init(&state->path);
+	state->path = dstralloc(0);
+	if (!state->path) {
+		goto err_queue;
+	}
 
 	return 0;
+
+err_queue:
+	dirqueue_free(&state->queue);
+err_cache:
+	dircache_free(&state->cache);
+err:
+	return -1;
 }
 
 /**
@@ -682,7 +639,7 @@ static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 
 	state->status = BFTW_CHILD;
 
-	return dynstr_concat(&state->path, nameoff, subpath);
+	return dstrcatat(&state->path, nameoff, subpath);
 }
 
 /**
@@ -714,7 +671,7 @@ static size_t basename_offset(const char *path) {
  */
 static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de) {
 	struct BFTW *ftwbuf = &state->ftwbuf;
-	ftwbuf->path = state->path.str;
+	ftwbuf->path = state->path;
 	ftwbuf->error = 0;
 	ftwbuf->visit = (state->status == BFTW_GC ? BFTW_POST : BFTW_PRE);
 	ftwbuf->statbuf = NULL;
@@ -873,12 +830,12 @@ static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 		}
 
 		if (invoke_callback) {
-			size_t offset = current->nameoff + current->namelen;
-			state->path.str[offset] = '\0';
+			size_t length = current->nameoff + current->namelen;
 			if (current->namelen > 1) {
 				// Trim the trailing slash
-				state->path.str[offset - 1] = '\0';
+				--length;
 			}
+			dstresize(&state->path, length);
 
 			state->current = current;
 			bftw_init_buffers(state, NULL);
@@ -918,7 +875,7 @@ static void bftw_state_free(struct bftw_state *state) {
 
 	dircache_free(&state->cache);
 
-	dynstr_free(&state->path);
+	dstrfree(state->path);
 }
 
 int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void *ptr) {
@@ -966,7 +923,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 			goto fail;
 		}
 
-		DIR *dir = dircache_entry_open(&state.cache, state.current, state.path.str);
+		DIR *dir = dircache_entry_open(&state.cache, state.current, state.path);
 		if (!dir) {
 			int error = errno;
 
