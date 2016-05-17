@@ -314,9 +314,6 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
 	}
 }
 
-static size_t misses = 0;
-static size_t total = 0;
-
 /**
  * Open a dircache_entry.
  *
@@ -339,13 +336,6 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
 	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
-
-	++total;
-	struct dircache_entry *asdf = entry;
-	do {
-		++misses;
-		asdf = asdf->parent;
-	} while (asdf != base);
 
 	int flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
 	int fd = openat(at_fd, at_path, flags);
