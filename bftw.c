@@ -422,27 +422,25 @@ static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
 
 	if (back == queue->front) {
 		size_t old_size = queue->mask + 1;
-		struct dircache_entry **old_entries = queue->entries;
-
 		size_t new_size = 2*old_size;
-		struct dircache_entry **new_entries = malloc(new_size*sizeof(struct dircache_entry *));
-		if (!new_entries) {
+
+		struct dircache_entry **entries = realloc(queue->entries, new_size*sizeof(struct dircache_entry *));
+		if (!entries) {
 			return -1;
 		}
 
-		size_t mid = old_size - back;
-		memcpy(new_entries, old_entries + back, mid*sizeof(struct dircache_entry *));
-		memcpy(new_entries + mid, old_entries, back*sizeof(struct dircache_entry *));
-		free(old_entries);
+		size_t old_front = queue->front;
+		size_t new_front = old_size + old_front;
+		size_t tail_size = old_size - old_front;
 
-		queue->entries = new_entries;
+		memcpy(entries + new_front, entries + old_front, tail_size*sizeof(struct dircache_entry *));
+
+		queue->entries = entries;
 		queue->mask = new_size - 1;
-		queue->front = 0;
-		queue->back = old_size;
-	} else {
-		queue->back = back;
+		queue->front = new_front;
 	}
 
+	queue->back = back;
 	return 0;
 }
 
