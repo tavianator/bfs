@@ -627,7 +627,10 @@ static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 
 	state->status = BFTW_CHILD;
 
-	return dstrcatat(&state->path, nameoff, subpath);
+	if (dstresize(&state->path, nameoff) != 0) {
+		return -1;
+	}
+	return dstrcat(&state->path, subpath);
 }
 
 /**

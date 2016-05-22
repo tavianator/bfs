@@ -75,21 +75,24 @@ int dstresize(char **dstr, size_t length) {
 	return 0;
 }
 
-int dstrcat(char **dest, const char *src) {
-	struct dstring *header = dstrheader(*dest);
-	return dstrcatat(dest, header->length, src);
-}
+static int dstrcat_impl(char **dest, const char *src, size_t srclen) {
+	size_t oldlen = dstrlen(*dest);
+	size_t newlen = oldlen + srclen;
 
-int dstrcatat(char **dest, size_t pos, const char *src) {
-	size_t srclen = strlen(src);
-	size_t destlen = pos + srclen;
-
-	if (dstresize(dest, destlen) != 0) {
+	if (dstresize(dest, newlen) != 0) {
 		return -1;
 	}
 
-	memcpy(*dest + pos, src, srclen);
+	memcpy(*dest + oldlen, src, srclen);
 	return 0;
+}
+
+int dstrcat(char **dest, const char *src) {
+	return dstrcat_impl(dest, src, strlen(src));
+}
+
+int dstrncat(char **dest, const char *src, size_t n) {
+	return dstrcat_impl(dest, src, strnlen(src, n));
 }
 
 void dstrfree(char *dstr) {

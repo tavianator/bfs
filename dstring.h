@@ -65,17 +65,17 @@ int dstresize(char **dstr, size_t length);
 int dstrcat(char **dest, const char *src);
 
 /**
- * Append to a dynamic string at a particular offset.
+ * Append to a dynamic string.
  *
  * @param dest
  *         The destination dynamic string.
- * @param pos
- *         The offset at which to append.
  * @param src
  *         The string to append.
+ * @param n
+ *         The maximum number of characters to take from src.
  * @return 0 on success, -1 on failure.
  */
-int dstrcatat(char **dest, size_t pos, const char *src);
+int dstrncat(char **dest, const char *src, size_t n);
 
 /**
  * Free a dynamic string.
