@@ -593,7 +593,7 @@ static struct expr *parse_exec(struct parser_state *state, enum execflags flags)
 
 	if (flags & EXEC_MULTI) {
 		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s ... {} + is not supported yet\n", state->argv[0]);
+		             "error: %s ... {} + is not supported yet.\n", state->argv[0]);
 		return NULL;
 	}
 
@@ -638,7 +638,7 @@ static struct expr *parse_group(struct parser_state *state) {
 
 error:
 	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: %s\n", arg, expr->sdata, error);
+	             "error: %s %s: %s.\n", arg, expr->sdata, error);
 
 fail:
 	free_expr(expr);
@@ -679,7 +679,7 @@ static struct expr *parse_user(struct parser_state *state) {
 
 error:
 	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: %s\n", arg, expr->sdata, error);
+	             "error: %s %s: %s.\n", arg, expr->sdata, error);
 
 fail:
 	free_expr(expr);
