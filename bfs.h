@@ -167,10 +167,10 @@ struct expr {
 	/** Whether this expression has no side effects. */
 	bool pure;
 
-	/** The command line arguments resulting in this expression. */
-	char **args;
-	/** The number of command line arguments. */
-	size_t nargs;
+	/** The number of command line arguments for this expression. */
+	size_t argc;
+	/** The command line arguments comprising this expression. */
+	char **argv;
 
 	/** The optional comparison flag. */
 	enum cmpflag cmpflag;

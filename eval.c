@@ -307,25 +307,25 @@ err:
 	return NULL;
 }
 
-static void exec_free_argv(size_t argc, char **argv, char **args) {
+static void exec_free_argv(size_t argc, char **argv, char **template) {
 	for (size_t i = 0; i < argc; ++i) {
-		if (argv[i] != args[i]) {
+		if (argv[i] != template[i]) {
 			dstrfree(argv[i]);
 		}
 	}
 	free(argv);
 }
 
-static char **exec_format_argv(size_t argc, char **args, const char *path) {
+static char **exec_format_argv(size_t argc, char **template, const char *path) {
 	char **argv = malloc((argc + 1)*sizeof(char *));
 	if (!argv) {
 		return NULL;
 	}
 
 	for (size_t i = 0; i < argc; ++i) {
-		argv[i] = exec_format_arg(args[i], path);
+		argv[i] = exec_format_arg(template[i], path);
 		if (!argv[i]) {
-			exec_free_argv(i, argv, args);
+			exec_free_argv(i, argv, template);
 			return NULL;
 		}
 	}
@@ -382,9 +382,9 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 		goto out;
 	}
 
-	size_t argc = expr->nargs - 2;
-	char **args = expr->args + 1;
-	char **argv = exec_format_argv(argc, args, path);
+	size_t argc = expr->argc - 2;
+	char **template = expr->argv + 1;
+	char **argv = exec_format_argv(argc, template, path);
 	if (!argv) {
 		goto out_path;
 	}
@@ -430,7 +430,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	}
 
 out_argv:
-	exec_free_argv(argc, argv, args);
+	exec_free_argv(argc, argv, template);
 out_path:
 	exec_free_path(path, ftwbuf);
 out:

@@ -39,8 +39,8 @@ static struct expr expr_true = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.pure = true,
-	.args = &fake_true_arg,
-	.nargs = 1,
+	.argc = 1,
+	.argv = &fake_true_arg,
 };
 
 /**
@@ -51,8 +51,8 @@ static struct expr expr_false = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.pure = true,
-	.args = &fake_false_arg,
-	.nargs = 1,
+	.argc = 1,
+	.argv = &fake_false_arg,
 };
 
 /**
@@ -69,15 +69,15 @@ static void free_expr(struct expr *expr) {
 /**
  * Create a new expression.
  */
-static struct expr *new_expr(eval_fn *eval, bool pure, char **args, size_t nargs) {
+static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv) {
 	struct expr *expr = malloc(sizeof(struct expr));
 	if (expr) {
 		expr->eval = eval;
 		expr->lhs = NULL;
 		expr->rhs = NULL;
 		expr->pure = pure;
-		expr->args = args;
-		expr->nargs = nargs;
+		expr->argc = argc;
+		expr->argv = argv;
 	}
 	return expr;
 }
@@ -85,8 +85,8 @@ static struct expr *new_expr(eval_fn *eval, bool pure, char **args, size_t nargs
 /**
  * Create a new unary expression.
  */
-static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **args) {
-	struct expr *expr = new_expr(eval, rhs->pure, args, 1);
+static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **argv) {
+	struct expr *expr = new_expr(eval, rhs->pure, 1, argv);
 	if (!expr) {
 		free_expr(rhs);
 		return NULL;
@@ -99,8 +99,8 @@ static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **args)
 /**
  * Create a new binary expression.
  */
-static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, char **args) {
-	struct expr *expr = new_expr(eval, lhs->pure && rhs->pure, args, 1);
+static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, char **argv) {
+	struct expr *expr = new_expr(eval, lhs->pure && rhs->pure, 1, argv);
 	if (!expr) {
 		free_expr(rhs);
 		free_expr(lhs);
@@ -147,7 +147,7 @@ struct parser_state {
 	/** The command line being constructed. */
 	struct cmdline *cmdline;
 	/** The command line arguments being parsed. */
-	char **args;
+	char **argv;
 	/** The name of this program. */
 	const char *command;
 
@@ -195,7 +195,7 @@ static struct expr *parse_expr(struct parser_state *state);
  */
 static const char *skip_paths(struct parser_state *state) {
 	while (true) {
-		const char *arg = state->args[0];
+		const char *arg = state->argv[0];
 		if (!arg
 		    || arg[0] == '-'
 		    || strcmp(arg, "(") == 0
@@ -209,7 +209,7 @@ static const char *skip_paths(struct parser_state *state) {
 			return NULL;
 		}
 
-		++state->args;
+		++state->argv;
 	}
 }
 
@@ -299,9 +299,9 @@ static const char *parse_icmp(const struct parser_state *state, const char *str,
 /**
  * Parse a single option.
  */
-static struct expr *parse_option(struct parser_state *state, size_t nargs) {
-	const char *arg = state->args[0];
-	state->args += nargs;
+static struct expr *parse_option(struct parser_state *state, size_t argc) {
+	const char *arg = state->argv[0];
+	state->argv += argc;
 
 	if (state->warn && state->non_option_seen) {
 		pretty_warning(state->cmdline->stderr_colors,
@@ -331,8 +331,8 @@ static struct expr *parse_unary_option(struct parser_state *state) {
 /**
  * Parse a single positional option.
  */
-static struct expr *parse_positional_option(struct parser_state *state, size_t nargs) {
-	state->args += nargs;
+static struct expr *parse_positional_option(struct parser_state *state, size_t argc) {
+	state->argv += argc;
 	return &expr_true;
 }
 
@@ -353,19 +353,19 @@ static struct expr *parse_unary_positional_option(struct parser_state *state) {
 /**
  * Parse a non-option argument.
  */
-static struct expr *parse_non_option(struct parser_state *state, eval_fn *eval, bool pure, size_t nargs) {
+static struct expr *parse_non_option(struct parser_state *state, eval_fn *eval, bool pure, size_t argc) {
 	state->non_option_seen = true;
 
-	char **args = state->args;
-	state->args += nargs;
-	return new_expr(eval, pure, args, nargs);
+	char **argv = state->argv;
+	state->argv += argc;
+	return new_expr(eval, pure, argc, argv);
 }
 
 /**
  * Parse a single test.
  */
-static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t nargs) {
-	return parse_non_option(state, eval, true, nargs);
+static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t argc) {
+	return parse_non_option(state, eval, true, argc);
 }
 
 /**
@@ -379,8 +379,8 @@ static struct expr *parse_nullary_test(struct parser_state *state, eval_fn *eval
  * Parse a test that takes a value.
  */
 static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) {
-	const char *arg = state->args[0];
-	const char *value = state->args[1];
+	const char *arg = state->argv[0];
+	const char *value = state->argv[1];
 	if (!value) {
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: %s needs a value.\n", arg);
@@ -397,12 +397,12 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
 /**
  * Parse a single action.
  */
-static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t nargs) {
+static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t argc) {
 	if (eval != eval_nohidden && eval != eval_prune) {
 		state->implicit_print = false;
 	}
 
-	return parse_non_option(state, eval, false, nargs);
+	return parse_non_option(state, eval, false, argc);
 }
 
 /**
@@ -435,8 +435,8 @@ static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
 static struct expr *parse_debug(struct parser_state *state) {
 	struct cmdline *cmdline = state->cmdline;
 
-	const char *arg = state->args[0];
-	const char *flag = state->args[1];
+	const char *arg = state->argv[0];
+	const char *flag = state->argv[1];
 	if (!flag) {
 		pretty_error(cmdline->stderr_colors,
 		             "error: %s needs a flag.\n", arg);
@@ -468,7 +468,7 @@ static struct expr *parse_debug(struct parser_state *state) {
  * Parse -On.
  */
 static struct expr *parse_optlevel(struct parser_state *state) {
-	if (!parse_int(state, state->args[0] + 2, &state->cmdline->optlevel, IF_INT)) {
+	if (!parse_int(state, state->argv[0] + 2, &state->cmdline->optlevel, IF_INT)) {
 		return NULL;
 	}
 
@@ -555,8 +555,8 @@ static struct expr *parse_daystart(struct parser_state *state) {
  * Parse -{min,max}depth N.
  */
 static struct expr *parse_depth(struct parser_state *state, int *depth) {
-	const char *arg = state->args[0];
-	const char *value = state->args[1];
+	const char *arg = state->argv[0];
+	const char *value = state->argv[1];
 	if (!value) {
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: %s needs a value.\n", arg);
@@ -576,7 +576,7 @@ static struct expr *parse_depth(struct parser_state *state, int *depth) {
 static struct expr *parse_exec(struct parser_state *state, enum execflags flags) {
 	size_t i = 1;
 	const char *arg;
-	while ((arg = state->args[i++])) {
+	while ((arg = state->argv[i++])) {
 		if (strcmp(arg, ";") == 0) {
 			break;
 		} else if (strcmp(arg, "+") == 0) {
@@ -587,13 +587,13 @@ static struct expr *parse_exec(struct parser_state *state, enum execflags flags)
 
 	if (!arg) {
 		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s: Expected ';' or '+'.\n", state->args[0]);
+		             "error: %s: Expected ';' or '+'.\n", state->argv[0]);
 		return NULL;
 	}
 
 	if (flags & EXEC_MULTI) {
 		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s ... {} + is not supported yet\n", state->args[0]);
+		             "error: %s ... {} + is not supported yet\n", state->argv[0]);
 		return NULL;
 	}
 
@@ -608,7 +608,7 @@ static struct expr *parse_exec(struct parser_state *state, enum execflags flags)
  * Parse -group.
  */
 static struct expr *parse_group(struct parser_state *state) {
-	const char *arg = state->args[0];
+	const char *arg = state->argv[0];
 
 	struct expr *expr = parse_unary_test(state, eval_gid);
 	if (!expr) {
@@ -649,7 +649,7 @@ fail:
  * Parse -user.
  */
 static struct expr *parse_user(struct parser_state *state) {
-	const char *arg = state->args[0];
+	const char *arg = state->argv[0];
 
 	struct expr *expr = parse_unary_test(state, eval_uid);
 	if (!expr) {
@@ -696,7 +696,7 @@ static struct expr *set_fnm_casefold(const struct parser_state *state, struct ex
 			expr->idata = FNM_CASEFOLD;
 #else
 			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s is missing platform support.\n", expr->args[0]);
+			             "error: %s is missing platform support.\n", expr->argv[0]);
 			free(expr);
 			return NULL;
 #endif
@@ -735,7 +735,7 @@ static struct expr *parse_lname(struct parser_state *state, bool casefold) {
  * Parse -newerXY.
  */
 static struct expr *parse_newerxy(struct parser_state *state) {
-	const char *arg = state->args[0];
+	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: Expected -newerXY; found %s.\n", arg);
@@ -817,7 +817,7 @@ static struct expr *parse_noleaf(struct parser_state *state) {
 	if (state->warn) {
 		pretty_warning(state->cmdline->stderr_colors,
 		               "warning: bfs does not apply the optimization that %s inhibits.\n\n",
-		               state->args[0]);
+		               state->argv[0]);
 	}
 
 	return parse_nullary_option(state);
@@ -891,7 +891,7 @@ static struct expr *parse_size(struct parser_state *state) {
 bad_unit:
 	pretty_error(state->cmdline->stderr_colors,
 	             "error: %s %s: Expected a size unit of 'b', 'c', 'w', 'k', 'M', or 'G'; found %s.\n",
-	             expr->args[0], expr->args[1], unit);
+	             expr->argv[0], expr->argv[1], unit);
 fail:
 	free(expr);
 	return NULL;
@@ -983,7 +983,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 	struct cmdline *cmdline = state->cmdline;
 
 	// Paths are already skipped at this point
-	const char *arg = state->args[0];
+	const char *arg = state->argv[0];
 
 	if (arg[0] != '-') {
 		pretty_error(cmdline->stderr_colors,
@@ -1073,7 +1073,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'f':
 		if (strcmp(arg, "-false") == 0) {
-			++state->args;
+			++state->argv;
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
@@ -1195,7 +1195,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 't':
 		if (strcmp(arg, "-true") == 0) {
-			++state->args;
+			++state->argv;
 			return &expr_true;
 		} else if (strcmp(arg, "-type") == 0) {
 			return parse_type(state, eval_type);
@@ -1255,7 +1255,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 /**
  * Create a "not" expression.
  */
-static struct expr *new_not_expr(const struct parser_state *state, struct expr *rhs, char **args) {
+static struct expr *new_not_expr(const struct parser_state *state, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (rhs == &expr_true) {
 			return &expr_false;
@@ -1269,7 +1269,7 @@ static struct expr *new_not_expr(const struct parser_state *state, struct expr *
 		}
 	}
 
-	return new_unary_expr(eval_not, rhs, args);
+	return new_unary_expr(eval_not, rhs, argv);
 }
 
 /**
@@ -1285,7 +1285,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 	}
 
 	if (strcmp(arg, "(") == 0) {
-		++state->args;
+		++state->argv;
 		struct expr *expr = parse_expr(state);
 		if (!expr) {
 			return NULL;
@@ -1297,18 +1297,18 @@ static struct expr *parse_factor(struct parser_state *state) {
 			free_expr(expr);
 			return NULL;
 		}
-		++state->args;
+		++state->argv;
 
 		return expr;
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
-		char **args = state->args++;
+		char **argv = state->argv++;
 
 		struct expr *factor = parse_factor(state);
 		if (!factor) {
 			return NULL;
 		}
 
-		return new_not_expr(state, factor, args);
+		return new_not_expr(state, factor, argv);
 	} else {
 		return parse_literal(state);
 	}
@@ -1317,7 +1317,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 /**
  * Create an "and" expression.
  */
-static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **args) {
+static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (lhs == &expr_true) {
 			return rhs;
@@ -1332,7 +1332,7 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 		}
 	}
 
-	return new_binary_expr(eval_and, lhs, rhs, args);
+	return new_binary_expr(eval_and, lhs, rhs, argv);
 }
 
 /**
@@ -1356,9 +1356,9 @@ static struct expr *parse_term(struct parser_state *state) {
 			break;
 		}
 
-		char **args = &fake_and_arg;
+		char **argv = &fake_and_arg;
 		if (strcmp(arg, "-a") == 0 || strcmp(arg, "-and") == 0) {
-			args = state->args++;
+			argv = state->argv++;
 		}
 
 		struct expr *lhs = term;
@@ -1368,7 +1368,7 @@ static struct expr *parse_term(struct parser_state *state) {
 			return NULL;
 		}
 
-		term = new_and_expr(state, lhs, rhs, args);
+		term = new_and_expr(state, lhs, rhs, argv);
 	}
 
 	return term;
@@ -1377,7 +1377,7 @@ static struct expr *parse_term(struct parser_state *state) {
 /**
  * Create an "or" expression.
  */
-static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **args) {
+static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (lhs == &expr_true) {
 			free_expr(rhs);
@@ -1392,7 +1392,7 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 		}
 	}
 
-	return new_binary_expr(eval_or, lhs, rhs, args);
+	return new_binary_expr(eval_or, lhs, rhs, argv);
 }
 
 /**
@@ -1413,7 +1413,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 			break;
 		}
 
-		char **args = state->args++;
+		char **argv = state->argv++;
 
 		struct expr *lhs = clause;
 		struct expr *rhs = parse_term(state);
@@ -1422,7 +1422,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 			return NULL;
 		}
 
-		clause = new_or_expr(state, lhs, rhs, args);
+		clause = new_or_expr(state, lhs, rhs, argv);
 	}
 
 	return clause;
@@ -1431,7 +1431,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 /**
  * Create a "comma" expression.
  */
-static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **args) {
+static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (lhs->pure) {
 			free_expr(lhs);
@@ -1439,7 +1439,7 @@ static struct expr *new_comma_expr(const struct parser_state *state, struct expr
 		}
 	}
 
-	return new_binary_expr(eval_comma, lhs, rhs, args);
+	return new_binary_expr(eval_comma, lhs, rhs, argv);
 }
 
 /**
@@ -1459,7 +1459,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 			break;
 		}
 
-		char **args = state->args++;
+		char **argv = state->argv++;
 
 		struct expr *lhs = expr;
 		struct expr *rhs = parse_clause(state);
@@ -1468,7 +1468,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 			return NULL;
 		}
 
-		expr = new_comma_expr(state, lhs, rhs, args);
+		expr = new_comma_expr(state, lhs, rhs, argv);
 	}
 
 	return expr;
@@ -1480,11 +1480,11 @@ static struct expr *parse_expr(struct parser_state *state) {
 static void dump_expr(const struct expr *expr) {
 	fputs("(", stderr);
 
-	for (size_t i = 0; i < expr->nargs; ++i) {
+	for (size_t i = 0; i < expr->argc; ++i) {
 		if (i > 0) {
 			fputs(" ", stderr);
 		}
-		fputs(expr->args[i], stderr);
+		fputs(expr->argv[i], stderr);
 	}
 
 	if (expr->lhs) {
@@ -1574,7 +1574,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	struct parser_state state = {
 		.cmdline = cmdline,
-		.args = argv + 1,
+		.argv = argv + 1,
 		.command = argv[0],
 		.implicit_print = true,
 		.warn = true,
@@ -1598,14 +1598,14 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
-	if (state.args[0]) {
+	if (state.argv[0]) {
 		pretty_error(cmdline->stderr_colors,
-		             "error: Unexpected argument '%s'.\n", state.args[0]);
+		             "error: Unexpected argument '%s'.\n", state.argv[0]);
 		goto fail;
 	}
 
 	if (state.implicit_print) {
-		struct expr *print = new_expr(eval_print, false, &fake_print_arg, 1);
+		struct expr *print = new_expr(eval_print, false, 1, &fake_print_arg);
 		if (!print) {
 			goto fail;
 		}
