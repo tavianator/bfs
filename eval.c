@@ -11,6 +11,7 @@
 
 #include "bfs.h"
 #include "bftw.h"
+#include "dstring.h"
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -21,6 +22,7 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -76,7 +78,7 @@ static time_t timespec_diff(const struct timespec *lhs, const struct timespec *r
  * Perform a comparison.
  */
 static bool do_cmp(const struct expr *expr, long long n) {
-	switch (expr->cmp) {
+	switch (expr->cmpflag) {
 	case CMP_EXACT:
 		return n == expr->idata;
 	case CMP_LESS:
@@ -228,6 +230,211 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return true;
+}
+
+static const char *exec_format_path(const struct expr *expr, const struct BFTW *ftwbuf) {
+	if (!(expr->execflags & EXEC_CHDIR)) {
+		return ftwbuf->path;
+	}
+
+	// For compatibility with GNU find, use './name' instead of just 'name'
+	const char *name = ftwbuf->path + ftwbuf->nameoff;
+
+	char *path = dstralloc(2 + strlen(name));
+	if (!path) {
+		perror("dstralloc()");
+		return NULL;
+	}
+
+	if (dstrcat(&path, "./") != 0) {
+		perror("dstrcat()");
+		goto err;
+	}
+	if (dstrcat(&path, name) != 0) {
+		perror("dstrcat()");
+		goto err;
+	}
+
+	return path;
+
+err:
+	dstrfree(path);
+	return NULL;
+}
+
+static void exec_free_path(const char *path, const struct BFTW *ftwbuf) {
+	if (path != ftwbuf->path) {
+		dstrfree((char *)path);
+	}
+}
+
+static char *exec_format_arg(char *arg, const char *path) {
+	char *match = strstr(arg, "{}");
+	if (!match) {
+		return arg;
+	}
+
+	char *ret = dstralloc(0);
+	if (!ret) {
+		perror("dstralloc()");
+		return NULL;
+	}
+
+	char *last = arg;
+	do {
+		if (dstrncat(&ret, last, match - last) != 0) {
+			perror("dstrncat()");
+			goto err;
+		}
+		if (dstrcat(&ret, path) != 0) {
+			perror("dstrcat()");
+			goto err;
+		}
+
+		last = match + 2;
+		match = strstr(last, "{}");
+	} while (match);
+
+	if (dstrcat(&ret, last) != 0) {
+		perror("dstrcat()");
+		goto err;
+	}
+
+	return ret;
+
+err:
+	dstrfree(ret);
+	return NULL;
+}
+
+static void exec_free_argv(size_t argc, char **argv, char **args) {
+	for (size_t i = 0; i < argc; ++i) {
+		if (argv[i] != args[i]) {
+			dstrfree(argv[i]);
+		}
+	}
+	free(argv);
+}
+
+static char **exec_format_argv(size_t argc, char **args, const char *path) {
+	char **argv = malloc((argc + 1)*sizeof(char *));
+	if (!argv) {
+		return NULL;
+	}
+
+	for (size_t i = 0; i < argc; ++i) {
+		argv[i] = exec_format_arg(args[i], path);
+		if (!argv[i]) {
+			exec_free_argv(i, argv, args);
+			return NULL;
+		}
+	}
+	argv[argc] = NULL;
+
+	return argv;
+}
+
+static void exec_chdir(const struct BFTW *ftwbuf) {
+	if (ftwbuf->at_fd != AT_FDCWD) {
+		if (fchdir(ftwbuf->at_fd) != 0) {
+			perror("fchdir()");
+			_Exit(EXIT_FAILURE);
+		}
+		return;
+	}
+
+	char *path = strdup(ftwbuf->path);
+	if (!path) {
+		perror("strdup()");
+		_Exit(EXIT_FAILURE);
+	}
+
+	// Skip trailing slashes
+	char *end = path + strlen(path);
+	while (end > path && end[-1] == '/') {
+		--end;
+	}
+
+	// Remove the last component
+	while (end > path && end[-1] != '/') {
+		--end;
+	}
+	if (end > path) {
+		*end = '\0';
+	}
+
+	if (chdir(path) != 0) {
+		perror("chdir()");
+		_Exit(EXIT_FAILURE);
+	}
+}
+
+/**
+ * -exec[dir]/-ok[dir] actions.
+ */
+bool eval_exec(const struct expr *expr, struct eval_state *state) {
+	bool ret = false;
+
+	const struct BFTW *ftwbuf = state->ftwbuf;
+
+	const char *path = exec_format_path(expr, ftwbuf);
+	if (!path) {
+		goto out;
+	}
+
+	size_t argc = expr->nargs - 2;
+	char **args = expr->args + 1;
+	char **argv = exec_format_argv(argc, args, path);
+	if (!argv) {
+		goto out_path;
+	}
+
+	if (expr->execflags & EXEC_CONFIRM) {
+		for (size_t i = 0; i < argc; ++i) {
+			fprintf(stderr, "%s ", argv[i]);
+		}
+		fprintf(stderr, "? ");
+		fflush(stderr);
+
+		int c = getchar();
+		bool exec = c == 'y' || c == 'Y';
+		while (c != '\n' && c != EOF) {
+			c = getchar();
+		}
+		if (!exec) {
+			goto out_argv;
+		}
+	}
+
+	pid_t pid = fork();
+
+	if (pid < 0) {
+		perror("fork()");
+		goto out_argv;
+	} else if (pid > 0) {
+		int status;
+		if (waitpid(pid, &status, 0) < 0) {
+			perror("waitpid()");
+			return false;
+		}
+
+		ret = WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS;
+	} else {
+		if (expr->execflags & EXEC_CHDIR) {
+			exec_chdir(ftwbuf);
+		}
+
+		execvp(argv[0], argv);
+		perror("execvp()");
+		_Exit(EXIT_FAILURE);
+	}
+
+out_argv:
+	exec_free_argv(argc, argv, args);
+out_path:
+	exec_free_path(path, ftwbuf);
+out:
+	return ret;
 }
 
 /**

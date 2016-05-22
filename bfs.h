@@ -143,6 +143,18 @@ enum sizeunit {
 	SIZE_GB,
 };
 
+/**
+ * Flags for the -exec actions.
+ */
+enum execflags {
+	/** Prompt the user before executing (-ok, -okdir). */
+	EXEC_CONFIRM = 1 << 0,
+	/** Run the command in the file's parent directory (-execdir, -okdir). */
+	EXEC_CHDIR   = 1 << 1,
+	/** Pass multiple files at once to the command (-exec ... {} +). */
+	EXEC_MULTI   = 1 << 2,
+};
+
 struct expr {
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
@@ -161,7 +173,7 @@ struct expr {
 	size_t nargs;
 
 	/** The optional comparison flag. */
-	enum cmpflag cmp;
+	enum cmpflag cmpflag;
 
 	/** The optional reference time. */
 	struct timespec reftime;
@@ -177,6 +189,9 @@ struct expr {
 	dev_t dev;
 	/** Optional inode number for a target file. */
 	ino_t ino;
+
+	/** Optional -exec flags. */
+	enum execflags execflags;
 
 	/** Optional integer data for this expression. */
 	long long idata;
@@ -227,6 +242,7 @@ bool eval_name(const struct expr *expr, struct eval_state *state);
 bool eval_path(const struct expr *expr, struct eval_state *state);
 
 bool eval_delete(const struct expr *expr, struct eval_state *state);
+bool eval_exec(const struct expr *expr, struct eval_state *state);
 bool eval_nohidden(const struct expr *expr, struct eval_state *state);
 bool eval_print(const struct expr *expr, struct eval_state *state);
 bool eval_print0(const struct expr *expr, struct eval_state *state);

@@ -283,7 +283,27 @@ function test_0053() {
     find_diff "$basic" -size 9223372036854775807
 }
 
-for i in {1..53}; do
+function test_0054() {
+    find_diff "$basic" -exec echo '{}' ';'
+}
+
+function test_0055() {
+    find_diff "$basic" -exec echo '-{}-' ';'
+}
+
+function test_0056() {
+    find_diff "$basic" -execdir pwd ';'
+}
+
+function test_0057() {
+    find_diff "$basic" -execdir echo '{}' ';'
+}
+
+function test_0058() {
+    find_diff "$basic" -execdir echo '-{}-' ';'
+}
+
+for i in {1..58}; do
     test="test_$(printf '%04d' $i)"
     "$test" "$dir"
     status=$?

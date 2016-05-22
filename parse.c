@@ -281,15 +281,15 @@ bad:
 static const char *parse_icmp(const struct parser_state *state, const char *str, struct expr *expr, enum intflags flags) {
 	switch (str[0]) {
 	case '-':
-		expr->cmp = CMP_LESS;
+		expr->cmpflag = CMP_LESS;
 		++str;
 		break;
 	case '+':
-		expr->cmp = CMP_GREATER;
+		expr->cmpflag = CMP_GREATER;
 		++str;
 		break;
 	default:
-		expr->cmp = CMP_EXACT;
+		expr->cmpflag = CMP_EXACT;
 		break;
 	}
 
@@ -571,6 +571,40 @@ static struct expr *parse_depth(struct parser_state *state, int *depth) {
 }
 
 /**
+ * Parse -exec[dir]/-ok[dir].
+ */
+static struct expr *parse_exec(struct parser_state *state, enum execflags flags) {
+	size_t i = 1;
+	const char *arg;
+	while ((arg = state->args[i++])) {
+		if (strcmp(arg, ";") == 0) {
+			break;
+		} else if (strcmp(arg, "+") == 0) {
+			flags |= EXEC_MULTI;
+			break;
+		}
+	}
+
+	if (!arg) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s: Expected ';' or '+'.\n", state->args[0]);
+		return NULL;
+	}
+
+	if (flags & EXEC_MULTI) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s ... {} + is not supported yet\n", state->args[0]);
+		return NULL;
+	}
+
+	struct expr *expr = parse_action(state, eval_exec, i);
+	if (expr) {
+		expr->execflags = flags;
+	}
+	return expr;
+}
+
+/**
  * Parse -group.
  */
 static struct expr *parse_group(struct parser_state *state) {
@@ -599,7 +633,7 @@ static struct expr *parse_group(struct parser_state *state) {
 		goto error;
 	}
 
-	expr->cmp = CMP_EXACT;
+	expr->cmpflag = CMP_EXACT;
 	return expr;
 
 error:
@@ -640,7 +674,7 @@ static struct expr *parse_user(struct parser_state *state) {
 		goto error;
 	}
 
-	expr->cmp = CMP_EXACT;
+	expr->cmpflag = CMP_EXACT;
 	return expr;
 
 error:
@@ -1028,6 +1062,10 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'e':
 		if (strcmp(arg, "-empty") == 0) {
 			return parse_nullary_test(state, eval_empty);
+		} else if (strcmp(arg, "-exec") == 0) {
+			return parse_exec(state, 0);
+		} else if (strcmp(arg, "-execdir") == 0) {
+			return parse_exec(state, EXEC_CHDIR);
 		} else if (strcmp(arg, "-executable") == 0) {
 			return parse_access(state, X_OK);
 		}
@@ -1112,6 +1150,14 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-nowarn") == 0) {
 			state->warn = false;
 			return parse_nullary_positional_option(state);
+		}
+		break;
+
+	case 'o':
+		if (strcmp(arg, "-ok") == 0) {
+			return parse_exec(state, EXEC_CONFIRM);
+		} else if (strcmp(arg, "-okdir") == 0) {
+			return parse_exec(state, EXEC_CONFIRM | EXEC_CHDIR);
 		}
 		break;
 
