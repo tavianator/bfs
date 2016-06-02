@@ -415,7 +415,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 		int status;
 		if (waitpid(pid, &status, 0) < 0) {
 			perror("waitpid()");
-			return false;
+			goto out_argv;
 		}
 
 		ret = WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS;
