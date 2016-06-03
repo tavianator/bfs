@@ -70,7 +70,7 @@ struct colors *parse_colors(const char *ls_colors) {
 	colors->file       = NULL;
 	colors->dir        = "01;34";
 	colors->link       = "01;36";
-	colors->multi_hard = "00";
+	colors->multi_hard = NULL;
 	colors->pipe       = "40;33";
 	colors->socket     = "01;35";
 	colors->door       = "01;35";
@@ -111,6 +111,11 @@ struct colors *parse_colors(const char *ls_colors) {
 
 		const char *key = start;
 		const char *value = equals + 1;
+
+		// Ignore all-zero values
+		if (strspn(value, "0") == strlen(value)) {
+			continue;
+		}
 
 		switch (key[0]) {
 		case 'b':
