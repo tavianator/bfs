@@ -867,14 +867,15 @@ static int infer_fdlimit() {
 		}
 	}
 
-	// Account for std{in,out,err}, and allow an extra fd for the predicates
-	int nopen = 4;
+	// std{in,out,err}
+	int nopen = 3;
 
 	// Check /dev/fd for the current number of open fds, if possible (we may
 	// have inherited more than just the standard ones)
 	DIR *dir = opendir("/dev/fd");
 	if (dir) {
-		nopen = 0;
+		// Account for 'dir' itself
+		nopen = -1;
 
 		struct dirent *de;
 		while ((de = readdir(dir)) != NULL) {
@@ -886,8 +887,11 @@ static int infer_fdlimit() {
 		closedir(dir);
 	}
 
-	if (ret > nopen) {
-		ret -= nopen;
+	// Extra fd needed by -empty
+	int reserved = nopen + 1;
+
+	if (ret > reserved) {
+		ret -= reserved;
 	} else {
 		ret = 1;
 	}
