@@ -40,6 +40,7 @@ struct colors {
 	const char *block;
 	const char *chardev;
 	const char *orphan;
+	const char *missing;
 	const char *socket;
 	const char *setuid;
 	const char *setgid;
@@ -130,7 +131,7 @@ struct colors *parse_colors(const char *ls_colors) {
 			if (strcmp(key, "di") == 0) {
 				colors->dir = value;
 			} else if (strcmp(key, "do") == 0) {
-				colors->socket = value;
+				colors->door = value;
 			}
 			break;
 
@@ -149,6 +150,14 @@ struct colors *parse_colors(const char *ls_colors) {
 		case 'l':
 			if (strcmp(key, "ln") == 0) {
 				colors->link = value;
+			}
+			break;
+
+		case 'm':
+			if (strcmp(key, "mh") == 0) {
+				colors->multi_hard = value;
+			} else if (strcmp(key, "mi") == 0) {
+				colors->missing = value;
 			}
 			break;
 
@@ -228,6 +237,10 @@ static const char *file_color(const struct colors *colors, const char *filename,
 			color = colors->setgid;
 		} else if (sb->st_mode & 0111) {
 			color = colors->exec;
+		}
+
+		if (!color && sb->st_nlink > 1) {
+			color = colors->multi_hard;
 		}
 
 		if (!color) {
