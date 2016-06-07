@@ -1616,6 +1616,11 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
+	if (cmdline->optlevel >= 3 && cmdline->expr->pure) {
+		free_expr(cmdline->expr);
+		cmdline->expr = &expr_false;
+	}
+
 	if (cmdline->nroots == 0) {
 		if (!cmdline_add_root(cmdline, ".")) {
 			goto fail;
