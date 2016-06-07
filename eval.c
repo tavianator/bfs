@@ -908,6 +908,9 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	}
 
 	if (cmdline->optlevel >= 3 && cmdline->expr->eval == eval_false) {
+		if (cmdline->debug & DEBUG_OPT) {
+			fputs("-O3: skipping evaluation of top-level -false\n", stderr);
+		}
 		return 0;
 	}
 

@@ -17,6 +17,7 @@
 #include <grp.h>
 #include <limits.h>
 #include <pwd.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,6 +114,32 @@ static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr
 }
 
 /**
+ * Dump the parsed expression tree, for debugging.
+ */
+static void dump_expr(const struct expr *expr) {
+	fputs("(", stderr);
+
+	for (size_t i = 0; i < expr->argc; ++i) {
+		if (i > 0) {
+			fputs(" ", stderr);
+		}
+		fputs(expr->argv[i], stderr);
+	}
+
+	if (expr->lhs) {
+		fputs(" ", stderr);
+		dump_expr(expr->lhs);
+	}
+
+	if (expr->rhs) {
+		fputs(" ", stderr);
+		dump_expr(expr->rhs);
+	}
+
+	fputs(")", stderr);
+}
+
+/**
  * Free the parsed command line.
  */
 void free_cmdline(struct cmdline *cmdline) {
@@ -166,6 +193,40 @@ struct parser_state {
 	/** The current time. */
 	struct timespec now;
 };
+
+/**
+ * Log an optimization.
+ */
+static void debug_opt(const struct parser_state *state, const char *format, ...) {
+	if (!(state->cmdline->debug & DEBUG_OPT)) {
+		return;
+	}
+
+	va_list args;
+	va_start(args, format);
+
+	for (const char *i = format; *i != '\0'; ++i) {
+		if (*i == '%') {
+			switch (*++i) {
+			case '%':
+				fputc('%', stderr);
+				break;
+
+			case 's':
+				fputs(va_arg(args, const char *), stderr);
+				break;
+
+			case 'e':
+				dump_expr(va_arg(args, const struct expr *));
+				break;
+			}
+		} else {
+			fputc(*i, stderr);
+		}
+	}
+
+	va_end(args);
+}
 
 /**
  * Invoke stat() on an argument.
@@ -447,11 +508,14 @@ static struct expr *parse_debug(struct parser_state *state) {
 		printf("Supported debug flags:\n\n");
 
 		printf("  help:  This message.\n");
+		printf("  opt:   Print optimization details.\n");
 		printf("  stat:  Trace all stat() calls.\n");
 		printf("  tree:  Print the parse tree.\n");
 
 		state->just_info = true;
 		return NULL;
+	} else if (strcmp(flag, "opt") == 0) {
+		cmdline->debug |= DEBUG_OPT;
 	} else if (strcmp(flag, "stat") == 0) {
 		cmdline->debug |= DEBUG_STAT;
 	} else if (strcmp(flag, "tree") == 0) {
@@ -1258,11 +1322,14 @@ static struct expr *parse_literal(struct parser_state *state) {
 static struct expr *new_not_expr(const struct parser_state *state, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (rhs == &expr_true) {
+			debug_opt(state, "-O1: constant propagation: (%s %e) <==> %e\n", argv[0], rhs, &expr_false);
 			return &expr_false;
 		} else if (rhs == &expr_false) {
+			debug_opt(state, "-O1: constant propagation: (%s %e) <==> %e\n", argv[0], rhs, &expr_true);
 			return &expr_true;
 		} else if (rhs->eval == eval_not) {
 			struct expr *expr = rhs->rhs;
+			debug_opt(state, "-O1: double negation: (%s %e) <==> %e\n", argv[0], rhs, expr);
 			rhs->rhs = NULL;
 			free_expr(rhs);
 			return expr;
@@ -1320,13 +1387,17 @@ static struct expr *parse_factor(struct parser_state *state) {
 static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (lhs == &expr_true) {
+			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			return rhs;
 		} else if (lhs == &expr_false) {
+			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			free_expr(rhs);
 			return lhs;
 		} else if (rhs == &expr_true) {
+			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
 		} else if (rhs == &expr_false && lhs->pure) {
+			debug_opt(state, "-O1: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
 		}
@@ -1380,14 +1451,18 @@ static struct expr *parse_term(struct parser_state *state) {
 static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (lhs == &expr_true) {
+			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			free_expr(rhs);
 			return lhs;
 		} else if (lhs == &expr_false) {
+			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			return rhs;
 		} else if (rhs == &expr_true && lhs->pure) {
+			debug_opt(state, "-O1: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
 		} else if (rhs == &expr_false) {
+			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
 		}
 	}
@@ -1434,6 +1509,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	if (state->cmdline->optlevel >= 1) {
 		if (lhs->pure) {
+			debug_opt(state, "-O1: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
 		}
@@ -1475,32 +1551,6 @@ static struct expr *parse_expr(struct parser_state *state) {
 }
 
 /**
- * Dump the parsed expression tree, for debugging.
- */
-static void dump_expr(const struct expr *expr) {
-	fputs("(", stderr);
-
-	for (size_t i = 0; i < expr->argc; ++i) {
-		if (i > 0) {
-			fputs(" ", stderr);
-		}
-		fputs(expr->argv[i], stderr);
-	}
-
-	if (expr->lhs) {
-		fputs(" ", stderr);
-		dump_expr(expr->lhs);
-	}
-
-	if (expr->rhs) {
-		fputs(" ", stderr);
-		dump_expr(expr->rhs);
-	}
-
-	fputs(")", stderr);
-}
-
-/**
  * Dump the parsed form of the command line, for debugging.
  */
 static void dump_cmdline(const struct cmdline *cmdline) {
@@ -1516,6 +1566,9 @@ static void dump_cmdline(const struct cmdline *cmdline) {
 		fprintf(stderr, "-O%d ", cmdline->optlevel);
 	}
 
+	if (cmdline->debug & DEBUG_OPT) {
+		fputs("-D opt ", stderr);
+	}
 	if (cmdline->debug & DEBUG_STAT) {
 		fputs("-D stat ", stderr);
 	}
@@ -1616,7 +1669,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
-	if (cmdline->optlevel >= 3 && cmdline->expr->pure) {
+	if (cmdline->optlevel >= 3 && cmdline->expr->pure && cmdline->expr != &expr_false) {
+		debug_opt(&state, "-O3: top-level purity: %e <==> %e\n", cmdline->expr, &expr_false);
 		free_expr(cmdline->expr);
 		cmdline->expr = &expr_false;
 	}
