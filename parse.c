@@ -1385,7 +1385,8 @@ static struct expr *parse_factor(struct parser_state *state) {
  * Create an "and" expression.
  */
 static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	if (state->cmdline->optlevel >= 1) {
+	int optlevel = state->cmdline->optlevel;
+	if (optlevel >= 1) {
 		if (lhs == &expr_true) {
 			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			return rhs;
@@ -1396,8 +1397,8 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 		} else if (rhs == &expr_true) {
 			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
-		} else if (rhs == &expr_false && lhs->pure) {
-			debug_opt(state, "-O1: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
+		} else if (optlevel >= 2 && rhs == &expr_false && lhs->pure) {
+			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
 		}
@@ -1449,7 +1450,8 @@ static struct expr *parse_term(struct parser_state *state) {
  * Create an "or" expression.
  */
 static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	if (state->cmdline->optlevel >= 1) {
+	int optlevel = state->cmdline->optlevel;
+	if (optlevel >= 1) {
 		if (lhs == &expr_true) {
 			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			free_expr(rhs);
@@ -1457,8 +1459,8 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 		} else if (lhs == &expr_false) {
 			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			return rhs;
-		} else if (rhs == &expr_true && lhs->pure) {
-			debug_opt(state, "-O1: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
+		} else if (optlevel >= 2 && rhs == &expr_true && lhs->pure) {
+			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
 		} else if (rhs == &expr_false) {
@@ -1507,9 +1509,9 @@ static struct expr *parse_clause(struct parser_state *state) {
  * Create a "comma" expression.
  */
 static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	if (state->cmdline->optlevel >= 1) {
+	if (state->cmdline->optlevel >= 2) {
 		if (lhs->pure) {
-			debug_opt(state, "-O1: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
+			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
 		}
@@ -1562,7 +1564,7 @@ static void dump_cmdline(const struct cmdline *cmdline) {
 		fputs("-P ", stderr);
 	}
 
-	if (cmdline->optlevel != 1) {
+	if (cmdline->optlevel != 2) {
 		fprintf(stderr, "-O%d ", cmdline->optlevel);
 	}
 
@@ -1617,7 +1619,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
-	cmdline->optlevel = 1;
+	cmdline->optlevel = 2;
 	cmdline->debug = 0;
 	cmdline->expr = &expr_true;
 
