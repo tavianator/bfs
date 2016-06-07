@@ -29,6 +29,7 @@
 // Strings printed by -D tree for "fake" expressions
 static char *fake_and_arg = "-a";
 static char *fake_false_arg = "-false";
+static char *fake_or_arg = "-o";
 static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
 
@@ -1316,6 +1317,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 	return NULL;
 }
 
+static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv);
+static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv);
+
 /**
  * Create a "not" expression.
  */
@@ -1333,6 +1337,31 @@ static struct expr *new_not_expr(const struct parser_state *state, struct expr *
 			rhs->rhs = NULL;
 			free_expr(rhs);
 			return expr;
+		} else if ((rhs->eval == eval_and || rhs->eval == eval_or)
+			   && (rhs->lhs->eval == eval_not || rhs->rhs->eval == eval_not)) {
+			bool other_and = rhs->eval == eval_or;
+			char **other_arg = other_and ? &fake_and_arg : &fake_or_arg;
+
+			debug_opt(state, "-O1: De Morgan's laws: (%s %e) <==> (%s (%s %e) (%s %e))\n",
+				  argv[0], rhs,
+				  *other_arg, argv[0], rhs->lhs, argv[0], rhs->rhs);
+
+			struct expr *other_lhs = new_not_expr(state, rhs->lhs, argv);
+			struct expr *other_rhs = new_not_expr(state, rhs->rhs, argv);
+			rhs->rhs = NULL;
+			rhs->lhs = NULL;
+			free_expr(rhs);
+			if (!other_lhs || !other_rhs) {
+				free_expr(other_rhs);
+				free_expr(other_lhs);
+				return NULL;
+			}
+
+			if (other_and) {
+				return new_and_expr(state, other_lhs, other_rhs, other_arg);
+			} else {
+				return new_or_expr(state, other_lhs, other_rhs, other_arg);
+			}
 		}
 	}
 
@@ -1404,6 +1433,22 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
+		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
+			char **not_arg = lhs->argv;
+			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
+			          argv[0], lhs, rhs,
+				  *not_arg, fake_or_arg, lhs->rhs, rhs->rhs);
+
+			struct expr *or_expr = new_or_expr(state, lhs->rhs, rhs->rhs, &fake_or_arg);
+			rhs->rhs = NULL;
+			lhs->rhs = NULL;
+			free_expr(rhs);
+			free_expr(lhs);
+			if (!or_expr) {
+				return NULL;
+			}
+
+			return new_not_expr(state, or_expr, not_arg);
 		}
 	}
 
@@ -1470,6 +1515,22 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 		} else if (rhs == &expr_false) {
 			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
+		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
+			char **not_arg = lhs->argv;
+			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
+			          argv[0], lhs, rhs,
+				  *not_arg, fake_and_arg, lhs->rhs, rhs->rhs);
+
+			struct expr *and_expr = new_and_expr(state, lhs->rhs, rhs->rhs, &fake_and_arg);
+			rhs->rhs = NULL;
+			lhs->rhs = NULL;
+			free_expr(rhs);
+			free_expr(lhs);
+			if (!and_expr) {
+				return NULL;
+			}
+
+			return new_not_expr(state, and_expr, not_arg);
 		}
 	}
 
