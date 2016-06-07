@@ -1620,6 +1620,33 @@ static struct expr *parse_expr(struct parser_state *state) {
 }
 
 /**
+ * Apply top-level optimizations.
+ */
+static struct expr *optimize_whole_expr(const struct parser_state *state, struct expr *expr) {
+	int optlevel = state->cmdline->optlevel;
+
+	if (optlevel >= 2) {
+		while ((expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
+		       && expr->rhs->pure) {
+			debug_opt(state, "-O2: top-level purity: %e <==> %e\n", expr, expr->lhs);
+
+			struct expr *old = expr;
+			expr = old->lhs;
+			old->lhs = NULL;
+			free_expr(old);
+		}
+	}
+
+	if (optlevel >= 3 && expr->pure && expr != &expr_false) {
+		debug_opt(state, "-O3: top-level purity: %e <==> %e\n", expr, &expr_false);
+		free_expr(expr);
+		expr = &expr_false;
+	}
+
+	return expr;
+}
+
+/**
  * Dump the parsed form of the command line, for debugging.
  */
 static void dump_cmdline(const struct cmdline *cmdline) {
@@ -1738,11 +1765,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
-	if (cmdline->optlevel >= 3 && cmdline->expr->pure && cmdline->expr != &expr_false) {
-		debug_opt(&state, "-O3: top-level purity: %e <==> %e\n", cmdline->expr, &expr_false);
-		free_expr(cmdline->expr);
-		cmdline->expr = &expr_false;
-	}
+	cmdline->expr = optimize_whole_expr(&state, cmdline->expr);
 
 	if (cmdline->nroots == 0) {
 		if (!cmdline_add_root(cmdline, ".")) {
