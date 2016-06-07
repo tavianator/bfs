@@ -1353,6 +1353,8 @@ static struct expr *parse_factor(struct parser_state *state) {
 
 	if (strcmp(arg, "(") == 0) {
 		++state->argv;
+		state->non_option_seen = true;
+
 		struct expr *expr = parse_expr(state);
 		if (!expr) {
 			return NULL;
@@ -1369,6 +1371,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 		return expr;
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
 		char **argv = state->argv++;
+		state->non_option_seen = true;
 
 		struct expr *factor = parse_factor(state);
 		if (!factor) {
@@ -1431,6 +1434,7 @@ static struct expr *parse_term(struct parser_state *state) {
 		char **argv = &fake_and_arg;
 		if (strcmp(arg, "-a") == 0 || strcmp(arg, "-and") == 0) {
 			argv = state->argv++;
+			state->non_option_seen = true;
 		}
 
 		struct expr *lhs = term;
@@ -1491,6 +1495,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 		}
 
 		char **argv = state->argv++;
+		state->non_option_seen = true;
 
 		struct expr *lhs = clause;
 		struct expr *rhs = parse_term(state);
@@ -1538,6 +1543,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 		}
 
 		char **argv = state->argv++;
+		state->non_option_seen = true;
 
 		struct expr *lhs = expr;
 		struct expr *rhs = parse_clause(state);
