@@ -1604,8 +1604,20 @@ static struct expr *parse_clause(struct parser_state *state) {
  * Create a "comma" expression.
  */
 static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	if (state->cmdline->optlevel >= 2) {
-		if (lhs->pure) {
+	int optlevel = state->cmdline->optlevel;
+	if (optlevel >= 1) {
+		if (lhs->eval == eval_not) {
+			debug_opt(state, "-O1: ignored result: (%s %e %e) <==> (%s %e %e)\n",
+			          argv[0], lhs, rhs,
+				  argv[0], lhs->rhs, rhs);
+
+			struct expr *old = lhs;
+			lhs = old->rhs;
+			old->rhs = NULL;
+			free_expr(old);
+		}
+
+		if (optlevel >= 2 && lhs->pure) {
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
