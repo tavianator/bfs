@@ -48,17 +48,41 @@ function make_links() {
 links="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.links.XXXXXXXXXX)"
 make_links "$links"
 
+# Creates a file+directory structure with various weird file/directory names
+function make_weirdnames() {
+    touchp "$1/-/a"
+    touchp "$1/(/b"
+    touchp "$1/(-/c"
+    touchp "$1/!/d"
+    touchp "$1/!-/e"
+    touchp "$1/,/f"
+    touchp "$1/)/g"
+}
+
+weirdnames="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.weirdnames.XXXXXXXXXX)"
+make_weirdnames "$weirdnames"
+
 # Clean up temporary directories on exit
 function cleanup() {
+    rm -rf "$weirdnames"
     rm -rf "$links"
     rm -rf "$perms"
     rm -rf "$basic"
 }
 trap cleanup EXIT
 
+function _realpath() {
+    (
+        cd "${1%/*}"
+        echo "$PWD/${1##*/}"
+    )
+}
+
+BFS="$(_realpath ./bfs)"
+
 # Checks for any (order-independent) differences between bfs and find
 function find_diff() {
-    diff -u <(./bfs "$@" | sort) <(find "$@" | sort)
+    diff -u <("$BFS" "$@" | sort) <(find "$@" | sort)
 }
 
 # Test cases
@@ -303,9 +327,22 @@ function test_0058() {
     find_diff "$basic" -execdir echo '-{}-' ';'
 }
 
-for i in {1..58}; do
+function test_0059() {
+    find_diff "$basic" \( -name '*f*' \)
+}
+
+function test_0060() {
+    find_diff "$basic" -name '*f*' -print , -print
+}
+
+function test_0061() {
+    cd "$weirdnames"
+    find_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
+}
+
+for i in {1..61}; do
     test="test_$(printf '%04d' $i)"
-    "$test" "$dir"
+    ("$test" "$dir")
     status=$?
     if [ $status -ne 0 ]; then
         echo "$test failed!" >&2

@@ -186,6 +186,8 @@ struct parser_state {
 	bool implicit_print;
 	/** Whether warnings are enabled (see -warn, -nowarn). */
 	bool warn;
+	/** Whether any non-path arguments have been encountered. */
+	bool non_path_seen;
 	/** Whether any non-option arguments have been encountered. */
 	bool non_option_seen;
 	/** Whether an information option like -help or -version was passed. */
@@ -193,6 +195,22 @@ struct parser_state {
 
 	/** The current time. */
 	struct timespec now;
+};
+
+/**
+ * Possible token types.
+ */
+enum token_type {
+	/** A root path. */
+	T_PATH,
+	/** An option. */
+	T_OPTION,
+	/** A test. */
+	T_TEST,
+	/** An action. */
+	T_ACTION,
+	/** An operator. */
+	T_OPERATOR,
 };
 
 /**
@@ -253,25 +271,50 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 static struct expr *parse_expr(struct parser_state *state);
 
 /**
+ * Advance by a single token.
+ */
+static char **parser_advance(struct parser_state *state, enum token_type type, size_t argc) {
+	if (type != T_PATH) {
+		state->non_path_seen = true;
+
+		if (type != T_OPTION) {
+			state->non_option_seen = true;
+		}
+	}
+
+	char **argv = state->argv;
+	state->argv += argc;
+	return argv;
+}
+
+/**
  * While parsing an expression, skip any paths and add them to the cmdline.
  */
 static const char *skip_paths(struct parser_state *state) {
 	while (true) {
 		const char *arg = state->argv[0];
+
+		// By POSIX, these are always options
 		if (!arg
-		    || arg[0] == '-'
+		    || (arg[0] == '-' && arg[1])
 		    || strcmp(arg, "(") == 0
-		    || strcmp(arg, ")") == 0
-		    || strcmp(arg, "!") == 0
-		    || strcmp(arg, ",") == 0) {
+		    || strcmp(arg, "!") == 0) {
 			return arg;
+		}
+
+		if (state->non_path_seen) {
+			// By POSIX, these can be paths.  We only treat them as
+			// such at the beginning of the command line
+			if (strcmp(arg, ")") == 0 || strcmp(arg, ",") == 0) {
+				return arg;
+			}
 		}
 
 		if (!cmdline_add_root(state->cmdline, arg)) {
 			return NULL;
 		}
 
-		++state->argv;
+		parser_advance(state, T_PATH, 1);
 	}
 }
 
@@ -362,8 +405,7 @@ static const char *parse_icmp(const struct parser_state *state, const char *str,
  * Parse a single option.
  */
 static struct expr *parse_option(struct parser_state *state, size_t argc) {
-	const char *arg = state->argv[0];
-	state->argv += argc;
+	const char *arg = *parser_advance(state, T_OPTION, argc);
 
 	if (state->warn && state->non_option_seen) {
 		pretty_warning(state->cmdline->stderr_colors,
@@ -394,7 +436,7 @@ static struct expr *parse_unary_option(struct parser_state *state) {
  * Parse a single positional option.
  */
 static struct expr *parse_positional_option(struct parser_state *state, size_t argc) {
-	state->argv += argc;
+	parser_advance(state, T_OPTION, argc);
 	return &expr_true;
 }
 
@@ -413,21 +455,11 @@ static struct expr *parse_unary_positional_option(struct parser_state *state) {
 }
 
 /**
- * Parse a non-option argument.
- */
-static struct expr *parse_non_option(struct parser_state *state, eval_fn *eval, bool pure, size_t argc) {
-	state->non_option_seen = true;
-
-	char **argv = state->argv;
-	state->argv += argc;
-	return new_expr(eval, pure, argc, argv);
-}
-
-/**
  * Parse a single test.
  */
 static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t argc) {
-	return parse_non_option(state, eval, true, argc);
+	char **argv = parser_advance(state, T_TEST, argc);
+	return new_expr(eval, true, argc, argv);
 }
 
 /**
@@ -464,7 +496,8 @@ static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size
 		state->implicit_print = false;
 	}
 
-	return parse_non_option(state, eval, false, argc);
+	char **argv = parser_advance(state, T_ACTION, argc);
+	return new_expr(eval, false, argc, argv);
 }
 
 /**
@@ -1138,7 +1171,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 'f':
 		if (strcmp(arg, "-false") == 0) {
-			++state->argv;
+			parser_advance(state, T_TEST, 1);
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
@@ -1260,7 +1293,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	case 't':
 		if (strcmp(arg, "-true") == 0) {
-			++state->argv;
+			parser_advance(state, T_TEST, 1);
 			return &expr_true;
 		} else if (strcmp(arg, "-type") == 0) {
 			return parse_type(state, eval_type);
@@ -1381,8 +1414,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 	}
 
 	if (strcmp(arg, "(") == 0) {
-		++state->argv;
-		state->non_option_seen = true;
+		parser_advance(state, T_OPERATOR, 1);
 
 		struct expr *expr = parse_expr(state);
 		if (!expr) {
@@ -1395,12 +1427,11 @@ static struct expr *parse_factor(struct parser_state *state) {
 			free_expr(expr);
 			return NULL;
 		}
-		++state->argv;
+		parser_advance(state, T_OPERATOR, 1);
 
 		return expr;
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
-		char **argv = state->argv++;
-		state->non_option_seen = true;
+		char **argv = parser_advance(state, T_OPERATOR, 1);
 
 		struct expr *factor = parse_factor(state);
 		if (!factor) {
@@ -1478,8 +1509,7 @@ static struct expr *parse_term(struct parser_state *state) {
 
 		char **argv = &fake_and_arg;
 		if (strcmp(arg, "-a") == 0 || strcmp(arg, "-and") == 0) {
-			argv = state->argv++;
-			state->non_option_seen = true;
+			argv = parser_advance(state, T_OPERATOR, 1);
 		}
 
 		struct expr *lhs = term;
@@ -1555,8 +1585,7 @@ static struct expr *parse_clause(struct parser_state *state) {
 			break;
 		}
 
-		char **argv = state->argv++;
-		state->non_option_seen = true;
+		char **argv = parser_advance(state, T_OPERATOR, 1);
 
 		struct expr *lhs = clause;
 		struct expr *rhs = parse_term(state);
@@ -1603,8 +1632,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 			break;
 		}
 
-		char **argv = state->argv++;
-		state->non_option_seen = true;
+		char **argv = parser_advance(state, T_OPERATOR, 1);
 
 		struct expr *lhs = expr;
 		struct expr *rhs = parse_clause(state);
