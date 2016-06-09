@@ -609,8 +609,18 @@ static struct expr *parse_debug(struct parser_state *state) {
  * Parse -On.
  */
 static struct expr *parse_optlevel(struct parser_state *state) {
-	if (!parse_int(state, state->argv[0] + 2, &state->cmdline->optlevel, IF_INT)) {
+	int *optlevel = &state->cmdline->optlevel;
+
+	if (strcmp(state->argv[0], "-Ofast") == 0) {
+		*optlevel = 4;
+	} else if (!parse_int(state, state->argv[0] + 2, optlevel, IF_INT)) {
 		return NULL;
+	}
+
+	if (*optlevel > 4) {
+		pretty_warning(state->cmdline->stderr_colors,
+		               "warning: %s is the same as -O4.\n\n",
+		               state->argv[0]);
 	}
 
 	return parse_nullary_flag(state);
@@ -1777,8 +1787,8 @@ static struct expr *optimize_whole_expr(const struct parser_state *state, struct
 		}
 	}
 
-	if (optlevel >= 3 && expr->pure && expr != &expr_false) {
-		debug_opt(state, "-O3: top-level purity: %e <==> %e\n", expr, &expr_false);
+	if (optlevel >= 4 && expr->pure && expr != &expr_false) {
+		debug_opt(state, "-O4: top-level purity: %e <==> %e\n", expr, &expr_false);
 		free_expr(expr);
 		expr = &expr_false;
 	}
@@ -1798,7 +1808,7 @@ static void dump_cmdline(const struct cmdline *cmdline) {
 		fputs("-P ", stderr);
 	}
 
-	if (cmdline->optlevel != 2) {
+	if (cmdline->optlevel != 3) {
 		fprintf(stderr, "-O%d ", cmdline->optlevel);
 	}
 
@@ -1853,7 +1863,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
-	cmdline->optlevel = 2;
+	cmdline->optlevel = 3;
 	cmdline->debug = 0;
 	cmdline->expr = &expr_true;
 	cmdline->nopen_files = 0;
