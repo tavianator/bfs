@@ -344,6 +344,21 @@ function test_0061() {
 }
 
 function test_0062() {
+    cd "$weirdnames"
+    find_diff -L '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
+}
+
+function test_0063() {
+    cd "$weirdnames"
+    find_diff -L ',' -true
+}
+
+function test_0064() {
+    cd "$weirdnames"
+    find_diff -follow ',' -true
+}
+
+function test_0065() {
     find "$basic" -fprint "$out/out.find"
     "$BFS" "$basic" -fprint "$out/out.bfs"
 
@@ -352,7 +367,7 @@ function test_0062() {
     diff -u "$out/out.find" "$out/out.bfs"
 }
 
-for i in {1..62}; do
+for i in {1..65}; do
     test="test_$(printf '%04d' $i)"
     ("$test" "$dir")
     status=$?

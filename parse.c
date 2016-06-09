@@ -193,8 +193,8 @@ struct parser_state {
 	bool implicit_print;
 	/** Whether warnings are enabled (see -warn, -nowarn). */
 	bool warn;
-	/** Whether any non-path arguments have been encountered. */
-	bool non_path_seen;
+	/** Whether the expression has started. */
+	bool expr_started;
 	/** Whether any non-option arguments have been encountered. */
 	bool non_option_seen;
 	/** Whether an information option like -help or -version was passed. */
@@ -208,6 +208,8 @@ struct parser_state {
  * Possible token types.
  */
 enum token_type {
+	/** A flag. */
+	T_FLAG,
 	/** A root path. */
 	T_PATH,
 	/** An option. */
@@ -281,8 +283,8 @@ static struct expr *parse_expr(struct parser_state *state);
  * Advance by a single token.
  */
 static char **parser_advance(struct parser_state *state, enum token_type type, size_t argc) {
-	if (type != T_PATH) {
-		state->non_path_seen = true;
+	if (type != T_FLAG && type != T_PATH) {
+		state->expr_started = true;
 
 		if (type != T_OPTION) {
 			state->non_option_seen = true;
@@ -309,7 +311,7 @@ static const char *skip_paths(struct parser_state *state) {
 			return arg;
 		}
 
-		if (state->non_path_seen) {
+		if (state->expr_started) {
 			// By POSIX, these can be paths.  We only treat them as
 			// such at the beginning of the command line
 			if (strcmp(arg, ")") == 0 || strcmp(arg, ",") == 0) {
@@ -409,6 +411,28 @@ static const char *parse_icmp(const struct parser_state *state, const char *str,
 }
 
 /**
+ * Parse a single flag.
+ */
+static struct expr *parse_flag(struct parser_state *state, size_t argc) {
+	parser_advance(state, T_FLAG, argc);
+	return &expr_true;
+}
+
+/**
+ * Parse a flag that doesn't take a value.
+ */
+static struct expr *parse_nullary_flag(struct parser_state *state) {
+	return parse_flag(state, 1);
+}
+
+/**
+ * Parse a flag that takes a single value.
+ */
+static struct expr *parse_unary_flag(struct parser_state *state) {
+	return parse_flag(state, 2);
+}
+
+/**
  * Parse a single option.
  */
 static struct expr *parse_option(struct parser_state *state, size_t argc) {
@@ -452,13 +476,6 @@ static struct expr *parse_positional_option(struct parser_state *state, size_t a
  */
 static struct expr *parse_nullary_positional_option(struct parser_state *state) {
 	return parse_positional_option(state, 1);
-}
-
-/**
- * Parse a positional option that takes a value.
- */
-static struct expr *parse_unary_positional_option(struct parser_state *state) {
-	return parse_positional_option(state, 2);
 }
 
 /**
@@ -585,7 +602,7 @@ static struct expr *parse_debug(struct parser_state *state) {
 		               "warning: Unrecognized debug flag '%s'.\n\n", flag);
 	}
 
-	return parse_unary_positional_option(state);
+	return parse_unary_flag(state);
 }
 
 /**
@@ -596,7 +613,7 @@ static struct expr *parse_optlevel(struct parser_state *state) {
 		return NULL;
 	}
 
-	return parse_nullary_positional_option(state);
+	return parse_nullary_flag(state);
 }
 
 /**
@@ -1181,7 +1198,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 	case 'P':
 		if (strcmp(arg, "-P") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
-			return parse_nullary_positional_option(state);
+			return parse_nullary_flag(state);
 		}
 		break;
 
@@ -1189,14 +1206,14 @@ static struct expr *parse_literal(struct parser_state *state) {
 		if (strcmp(arg, "-H") == 0) {
 			cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
 			cmdline->flags |= BFTW_FOLLOW_ROOT;
-			return parse_nullary_positional_option(state);
+			return parse_nullary_flag(state);
 		}
 		break;
 
 	case 'L':
 		if (strcmp(arg, "-L") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return parse_nullary_positional_option(state);
+			return parse_nullary_flag(state);
 		}
 		break;
 
