@@ -62,8 +62,11 @@ function make_weirdnames() {
 weirdnames="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.weirdnames.XXXXXXXXXX)"
 make_weirdnames "$weirdnames"
 
+out="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.out.XXXXXXXXXX)"
+
 # Clean up temporary directories on exit
 function cleanup() {
+    rm -rf "$out"
     rm -rf "$weirdnames"
     rm -rf "$links"
     rm -rf "$perms"
@@ -340,7 +343,16 @@ function test_0061() {
     find_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
 }
 
-for i in {1..61}; do
+function test_0062() {
+    find "$basic" -fprint "$out/out.find"
+    "$BFS" "$basic" -fprint "$out/out.bfs"
+
+    sort -o "$out/out.find" "$out/out.find"
+    sort -o "$out/out.bfs" "$out/out.bfs"
+    diff -u "$out/out.find" "$out/out.bfs"
+}
+
+for i in {1..62}; do
     test="test_$(printf '%04d' $i)"
     ("$test" "$dir")
     status=$?

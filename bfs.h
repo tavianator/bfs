@@ -15,6 +15,7 @@
 #include "color.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -91,6 +92,9 @@ struct cmdline {
 
 	/** The command line expression. */
 	struct expr *expr;
+
+	/** The number of open files used by the expression tree. */
+	int nopen_files;
 };
 
 /**
@@ -192,6 +196,9 @@ struct expr {
 	/** Optional inode number for a target file. */
 	ino_t ino;
 
+	/** File to output to. */
+	FILE *file;
+
 	/** Optional -exec flags. */
 	enum execflags execflags;
 
@@ -247,6 +254,7 @@ bool eval_delete(const struct expr *expr, struct eval_state *state);
 bool eval_exec(const struct expr *expr, struct eval_state *state);
 bool eval_nohidden(const struct expr *expr, struct eval_state *state);
 bool eval_print(const struct expr *expr, struct eval_state *state);
+bool eval_fprint(const struct expr *expr, struct eval_state *state);
 bool eval_print0(const struct expr *expr, struct eval_state *state);
 bool eval_prune(const struct expr *expr, struct eval_state *state);
 bool eval_quit(const struct expr *expr, struct eval_state *state);

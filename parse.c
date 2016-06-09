@@ -62,6 +62,12 @@ static struct expr expr_false = {
  */
 static void free_expr(struct expr *expr) {
 	if (expr && expr != &expr_true && expr != &expr_false) {
+		if (expr->file && expr->file != stdout && expr->file != stderr) {
+			if (fclose(expr->file) != 0) {
+				perror("fclose()");
+			}
+		}
+
 		free_expr(expr->lhs);
 		free_expr(expr->rhs);
 		free(expr);
@@ -80,6 +86,7 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 		expr->pure = pure;
 		expr->argc = argc;
 		expr->argv = argv;
+		expr->file = NULL;
 	}
 	return expr;
 }
@@ -259,7 +266,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 	int ret = fstatat(AT_FDCWD, expr->sdata, sb, flags);
 	if (ret != 0) {
 		pretty_error(cmdline->stderr_colors,
-		             "'%s': %s\n", expr->sdata, strerror(errno));
+		             "error: '%s': %s\n", expr->sdata, strerror(errno));
 		free_expr(expr);
 	}
 	return ret;
@@ -508,6 +515,25 @@ static struct expr *parse_nullary_action(struct parser_state *state, eval_fn *ev
 }
 
 /**
+ * Parse an action that takes one argument.
+ */
+static struct expr *parse_unary_action(struct parser_state *state, eval_fn *eval) {
+	const char *arg = state->argv[0];
+	const char *value = state->argv[1];
+	if (!value) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a value.\n", arg);
+		return NULL;
+	}
+
+	struct expr *expr = parse_action(state, eval, 2);
+	if (expr) {
+		expr->sdata = value;
+	}
+	return expr;
+}
+
+/**
  * Parse a test expression with integer data and a comparison flag.
  */
 static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
@@ -698,6 +724,59 @@ static struct expr *parse_exec(struct parser_state *state, enum execflags flags)
 	struct expr *expr = parse_action(state, eval_exec, i);
 	if (expr) {
 		expr->execflags = flags;
+	}
+	return expr;
+}
+
+/**
+ * Open a file for an expression.
+ */
+static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
+	expr->file = fopen(path, "wb");
+	if (!expr->file) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: '%s': %s\n", path, strerror(errno));
+		free_expr(expr);
+		return -1;
+	}
+
+	++state->cmdline->nopen_files;
+	return 0;
+}
+
+/**
+ * Parse -fprint FILE.
+ */
+static struct expr *parse_fprint(struct parser_state *state) {
+	struct expr *expr = parse_unary_action(state, eval_fprint);
+	if (expr) {
+		if (expr_open(state, expr, expr->sdata) != 0) {
+			return NULL;
+		}
+	}
+	return expr;
+}
+
+/**
+ * Parse -fprint0 FILE.
+ */
+static struct expr *parse_fprint0(struct parser_state *state) {
+	struct expr *expr = parse_unary_action(state, eval_print0);
+	if (expr) {
+		if (expr_open(state, expr, expr->sdata) != 0) {
+			return NULL;
+		}
+	}
+	return expr;
+}
+
+/**
+ * Parse -print0.
+ */
+static struct expr *parse_print0(struct parser_state *state) {
+	struct expr *expr = parse_nullary_action(state, eval_print0);
+	if (expr) {
+		expr->file = stdout;
 	}
 	return expr;
 }
@@ -1176,6 +1255,10 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-follow") == 0) {
 			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
 			return parse_nullary_positional_option(state);
+		} else if (strcmp(arg, "-fprint") == 0) {
+			return parse_fprint(state);
+		} else if (strcmp(arg, "-fprint0") == 0) {
+			return parse_fprint0(state);
 		}
 		break;
 
@@ -1265,7 +1348,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 		} else if (strcmp(arg, "-print") == 0) {
 			return parse_nullary_action(state, eval_print);
 		} else if (strcmp(arg, "-print0") == 0) {
-			return parse_nullary_action(state, eval_print0);
+			return parse_print0(state);
 		} else if (strcmp(arg, "-prune") == 0) {
 			return parse_nullary_action(state, eval_prune);
 		}
@@ -1756,6 +1839,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->optlevel = 2;
 	cmdline->debug = 0;
 	cmdline->expr = &expr_true;
+	cmdline->nopen_files = 0;
 
 	cmdline->colors = parse_colors(getenv("LS_COLORS"));
 	cmdline->stdout_colors = isatty(STDOUT_FILENO) ? cmdline->colors : NULL;

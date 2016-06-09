@@ -626,11 +626,21 @@ bool eval_print(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -print0 action.
+ * -fprint action.
+ */
+bool eval_fprint(const struct expr *expr, struct eval_state *state) {
+	const char *path = state->ftwbuf->path;
+	fputs(path, expr->file);
+	fputc('\n', expr->file);
+	return true;
+}
+
+/**
+ * -f?print0 action.
  */
 bool eval_print0(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
-	fwrite(path, 1, strlen(path) + 1, stdout);
+	fwrite(path, 1, strlen(path) + 1, expr->file);
 	return true;
 }
 
@@ -857,7 +867,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 /**
  * Infer the number of open file descriptors we're allowed to have.
  */
-static int infer_fdlimit() {
+static int infer_fdlimit(const struct cmdline *cmdline) {
 	int ret = 4096;
 
 	struct rlimit rl;
@@ -867,8 +877,8 @@ static int infer_fdlimit() {
 		}
 	}
 
-	// std{in,out,err}
-	int nopen = 3;
+	// 3 for std{in,out,err}
+	int nopen = 3 + cmdline->nopen_files;
 
 	// Check /dev/fd for the current number of open fds, if possible (we may
 	// have inherited more than just the standard ones)
@@ -914,7 +924,7 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		return 0;
 	}
 
-	int nopenfd = infer_fdlimit();
+	int nopenfd = infer_fdlimit(cmdline);
 
 	struct callback_args args = {
 		.cmdline = cmdline,
