@@ -10,41 +10,14 @@
 62/76 GNU find features supported.
 
 - Rework optimization levels
-  - `-O1` (logical simplification):
-    - Constant propagation (`! -false <==> -true`, `! -true <==> -false`)
-    - Double negation (`! ! X <==> X`)
-    - Conjunction elimination:
-      - `-true -a X <==> X`
-      - `X -a -true <==> X`
-    - Disjunctive syllogism:
-      - `-false -o X <==> X`
-      - `X -o -false <==> X`
-    - Short-circuiting:
-      - `-false -a X <==> -false`
-      - `-true -o X <==> -true`
-    - De Morgan's laws (**new**):
-      - `( ! X -a ! Y ) <==> ! ( X -o Y )`
-      - `( ! X -o ! Y ) <==> ! ( X -a Y )`
-      - `! ( X -a ! Y ) <==> ( ! X -o Y )`
-      - `! ( X -o ! Y ) <==> ( ! X -a Y )`
-      - `! ( ! X -a Y ) <==> ( X -o ! Y )`
-      - `! ( ! X -o Y ) <==> ( X -a ! Y )`
-    - Unused result (**new**): `! X , Y <==> X , Y`
-  - `-O2` (purity):
-    - (These optimizations take the purity of predicates into account, allowing side-effect-free tests like `-name` or `-type` to be moved or removed)
-    - `PURE -a -false <==> -false`
-    - `PURE -o -true <==> -true`
-    - `PURE , X <==> X`
-    - Top-level unused result (**new**): `X (-a|-o|,) PURE <==> X`
-  - `-O3` (cost-based, **default**):
+  - `-O1`
+    - Simple boolean simplification
+  - `-O2`
+    - Purity-based optimizations, allowing side-effect-free tests like `-name` or `-type` to be moved or removed
+  - `-O3` (**default**):
     - Re-order tests to reduce the expected cost (TODO)
-  - `-O4` (aggressive):
-    - (These are very aggressive optimizations that may have surprising effects on warning/error messages and runtime, but still should not affect the resulting output)
-    - Change top-level expressions with no actions to `-false` (**new**):
-      - For example, `bfs -O4 -true -o -print` becomes `-false`, because `-print` is unreachable
-    - Skip the entire traversal if the top-level expression is `-false`
-      - `bfs -O4 -false` (or anything that optimizes to `-false`) will exit immediately
-      - This may cause messages about non-existent files, symbolic link cycles, etc. to be skipped
+  - `-O4`
+    - Aggressive optimizations that may have surprising effects on warning/error messages and runtime, but should not otherwise affect the results
   - `-Ofast`:
     - Always the highest level, currently the same as `-O4`
 - Color files with multiple hard links correctly
