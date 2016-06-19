@@ -328,7 +328,7 @@ static const char *skip_paths(struct parser_state *state) {
 }
 
 /** Integer parsing flags. */
-enum intflags {
+enum int_flags {
 	IF_INT         = 0,
 	IF_LONG        = 1,
 	IF_LONG_LONG   = 2,
@@ -340,7 +340,7 @@ enum intflags {
 /**
  * Parse an integer.
  */
-static const char *parse_int(const struct parser_state *state, const char *str, void *result, enum intflags flags) {
+static const char *parse_int(const struct parser_state *state, const char *str, void *result, enum int_flags flags) {
 	char *endptr;
 
 	errno = 0;
@@ -392,18 +392,18 @@ bad:
 /**
  * Parse an integer and a comparison flag.
  */
-static const char *parse_icmp(const struct parser_state *state, const char *str, struct expr *expr, enum intflags flags) {
+static const char *parse_icmp(const struct parser_state *state, const char *str, struct expr *expr, enum int_flags flags) {
 	switch (str[0]) {
 	case '-':
-		expr->cmpflag = CMP_LESS;
+		expr->cmp_flag = CMP_LESS;
 		++str;
 		break;
 	case '+':
-		expr->cmpflag = CMP_GREATER;
+		expr->cmp_flag = CMP_GREATER;
 		++str;
 		break;
 	default:
-		expr->cmpflag = CMP_EXACT;
+		expr->cmp_flag = CMP_EXACT;
 		break;
 	}
 
@@ -640,12 +640,12 @@ static struct expr *parse_access(struct parser_state *state, int flag) {
 /**
  * Parse -[acm]{min,time}.
  */
-static struct expr *parse_acmtime(struct parser_state *state, enum timefield field, enum timeunit unit) {
+static struct expr *parse_acmtime(struct parser_state *state, enum time_field field, enum time_unit unit) {
 	struct expr *expr = parse_test_icmp(state, eval_acmtime);
 	if (expr) {
 		expr->reftime = state->now;
-		expr->timefield = field;
-		expr->timeunit = unit;
+		expr->time_field = field;
+		expr->time_unit = unit;
 	}
 	return expr;
 }
@@ -653,7 +653,7 @@ static struct expr *parse_acmtime(struct parser_state *state, enum timefield fie
 /**
  * Parse -[ac]?newer.
  */
-static struct expr *parse_acnewer(struct parser_state *state, enum timefield field) {
+static struct expr *parse_acnewer(struct parser_state *state, enum time_field field) {
 	struct expr *expr = parse_unary_test(state, eval_acnewer);
 	if (!expr) {
 		return NULL;
@@ -665,7 +665,7 @@ static struct expr *parse_acnewer(struct parser_state *state, enum timefield fie
 	}
 
 	expr->reftime = sb.st_mtim;
-	expr->timefield = field;
+	expr->time_field = field;
 
 	return expr;
 }
@@ -724,7 +724,7 @@ static struct expr *parse_depth(struct parser_state *state, int *depth) {
 /**
  * Parse -exec[dir]/-ok[dir].
  */
-static struct expr *parse_exec(struct parser_state *state, enum execflags flags) {
+static struct expr *parse_exec(struct parser_state *state, enum exec_flags flags) {
 	size_t i = 1;
 	const char *arg;
 	while ((arg = state->argv[i++])) {
@@ -750,7 +750,7 @@ static struct expr *parse_exec(struct parser_state *state, enum execflags flags)
 
 	struct expr *expr = parse_action(state, eval_exec, i);
 	if (expr) {
-		expr->execflags = flags;
+		expr->exec_flags = flags;
 	}
 	return expr;
 }
@@ -837,7 +837,7 @@ static struct expr *parse_group(struct parser_state *state) {
 		goto error;
 	}
 
-	expr->cmpflag = CMP_EXACT;
+	expr->cmp_flag = CMP_EXACT;
 	return expr;
 
 error:
@@ -878,7 +878,7 @@ static struct expr *parse_user(struct parser_state *state) {
 		goto error;
 	}
 
-	expr->cmpflag = CMP_EXACT;
+	expr->cmp_flag = CMP_EXACT;
 	return expr;
 
 error:
@@ -953,13 +953,13 @@ static struct expr *parse_newerxy(struct parser_state *state) {
 
 	switch (arg[6]) {
 	case 'a':
-		expr->timefield = ATIME;
+		expr->time_field = ATIME;
 		break;
 	case 'c':
-		expr->timefield = CTIME;
+		expr->time_field = CTIME;
 		break;
 	case 'm':
-		expr->timefield = MTIME;
+		expr->time_field = MTIME;
 		break;
 
 	case 'B':
@@ -1068,22 +1068,22 @@ static struct expr *parse_size(struct parser_state *state) {
 	switch (*unit) {
 	case '\0':
 	case 'b':
-		expr->sizeunit = SIZE_BLOCKS;
+		expr->size_unit = SIZE_BLOCKS;
 		break;
 	case 'c':
-		expr->sizeunit = SIZE_BYTES;
+		expr->size_unit = SIZE_BYTES;
 		break;
 	case 'w':
-		expr->sizeunit = SIZE_WORDS;
+		expr->size_unit = SIZE_WORDS;
 		break;
 	case 'k':
-		expr->sizeunit = SIZE_KB;
+		expr->size_unit = SIZE_KB;
 		break;
 	case 'M':
-		expr->sizeunit = SIZE_MB;
+		expr->size_unit = SIZE_MB;
 		break;
 	case 'G':
-		expr->sizeunit = SIZE_GB;
+		expr->size_unit = SIZE_GB;
 		break;
 
 	default:

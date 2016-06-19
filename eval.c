@@ -78,7 +78,7 @@ static time_t timespec_diff(const struct timespec *lhs, const struct timespec *r
  * Perform a comparison.
  */
 static bool do_cmp(const struct expr *expr, long long n) {
-	switch (expr->cmpflag) {
+	switch (expr->cmp_flag) {
 	case CMP_EXACT:
 		return n == expr->idata;
 	case CMP_LESS:
@@ -122,7 +122,7 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 	}
 
 	const struct timespec *time = NULL;
-	switch (expr->timefield) {
+	switch (expr->time_field) {
 	case ATIME:
 		time = &statbuf->st_atim;
 		break;
@@ -136,7 +136,7 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 	assert(time);
 
 	time_t diff = timespec_diff(&expr->reftime, time);
-	switch (expr->timeunit) {
+	switch (expr->time_unit) {
 	case MINUTES:
 		diff /= 60;
 		break;
@@ -158,7 +158,7 @@ bool eval_acnewer(const struct expr *expr, struct eval_state *state) {
 	}
 
 	const struct timespec *time = NULL;
-	switch (expr->timefield) {
+	switch (expr->time_field) {
 	case ATIME:
 		time = &statbuf->st_atim;
 		break;
@@ -233,7 +233,7 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 }
 
 static const char *exec_format_path(const struct expr *expr, const struct BFTW *ftwbuf) {
-	if (!(expr->execflags & EXEC_CHDIR)) {
+	if (!(expr->exec_flags & EXEC_CHDIR)) {
 		return ftwbuf->path;
 	}
 
@@ -389,7 +389,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 		goto out_path;
 	}
 
-	if (expr->execflags & EXEC_CONFIRM) {
+	if (expr->exec_flags & EXEC_CONFIRM) {
 		for (size_t i = 0; i < argc; ++i) {
 			fprintf(stderr, "%s ", argv[i]);
 		}
@@ -420,7 +420,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 
 		ret = WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS;
 	} else {
-		if (expr->execflags & EXEC_CHDIR) {
+		if (expr->exec_flags & EXEC_CHDIR) {
 			exec_chdir(ftwbuf);
 		}
 
@@ -682,7 +682,7 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
 		[SIZE_GB] = 1024*1024*1024,
 	};
 
-	off_t scale = scales[expr->sizeunit];
+	off_t scale = scales[expr->size_unit];
 	off_t size = (statbuf->st_size + scale - 1)/scale; // Round up
 	return do_cmp(expr, size);
 }

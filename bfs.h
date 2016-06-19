@@ -52,7 +52,7 @@ typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
 /**
  * Various debugging flags.
  */
-enum debugflags {
+enum debug_flags {
 	/** Print optimization details. */
 	DEBUG_OPT  = 1 << 0,
 	/** Trace all stat() calls. */
@@ -88,7 +88,7 @@ struct cmdline {
 	/** Optimization level. */
 	int optlevel;
 	/** Debugging flags. */
-	enum debugflags debug;
+	enum debug_flags debug;
 
 	/** The command line expression. */
 	struct expr *expr;
@@ -100,7 +100,7 @@ struct cmdline {
 /**
  * Possible types of numeric comparison.
  */
-enum cmpflag {
+enum cmp_flag {
 	/** Exactly n. */
 	CMP_EXACT,
 	/** Less than n. */
@@ -112,7 +112,7 @@ enum cmpflag {
 /**
  * Available struct stat time fields.
  */
-enum timefield {
+enum time_field {
 	/** Access time. */
 	ATIME,
 	/** Status change time. */
@@ -124,7 +124,7 @@ enum timefield {
 /**
  * Possible time units.
  */
-enum timeunit {
+enum time_unit {
 	/** Minutes. */
 	MINUTES,
 	/** Days. */
@@ -134,7 +134,7 @@ enum timeunit {
 /**
  * Possible file size units.
  */
-enum sizeunit {
+enum size_unit {
 	/** 512-byte blocks. */
 	SIZE_BLOCKS,
 	/** Single bytes. */
@@ -152,7 +152,7 @@ enum sizeunit {
 /**
  * Flags for the -exec actions.
  */
-enum execflags {
+enum exec_flags {
 	/** Prompt the user before executing (-ok, -okdir). */
 	EXEC_CONFIRM = 1 << 0,
 	/** Run the command in the file's parent directory (-execdir, -okdir). */
@@ -179,17 +179,17 @@ struct expr {
 	char **argv;
 
 	/** The optional comparison flag. */
-	enum cmpflag cmpflag;
+	enum cmp_flag cmp_flag;
 
 	/** The optional reference time. */
 	struct timespec reftime;
 	/** The optional time field. */
-	enum timefield timefield;
+	enum time_field time_field;
 	/** The optional time unit. */
-	enum timeunit timeunit;
+	enum time_unit time_unit;
 
 	/** The optional size unit. */
-	enum sizeunit sizeunit;
+	enum size_unit size_unit;
 
 	/** Optional device number for a target file. */
 	dev_t dev;
@@ -200,7 +200,7 @@ struct expr {
 	FILE *file;
 
 	/** Optional -exec flags. */
-	enum execflags execflags;
+	enum exec_flags exec_flags;
 
 	/** Optional integer data for this expression. */
 	long long idata;
