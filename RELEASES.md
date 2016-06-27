@@ -24,6 +24,7 @@
 - Treat `-`, `)`, and `,` as paths when required to by POSIX
   - `)` and `,` are only supported before the expression begins
 - Implement `-D opt`
+- Implement `-D rates`
 - Implement `-fprint`
 - Implement `-fprint0`
 

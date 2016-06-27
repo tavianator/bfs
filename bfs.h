@@ -54,11 +54,13 @@ typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
  */
 enum debug_flags {
 	/** Print optimization details. */
-	DEBUG_OPT  = 1 << 0,
+	DEBUG_OPT   = 1 << 0,
+	/** Print rate information. */
+	DEBUG_RATES = 1 << 1,
 	/** Trace all stat() calls. */
-	DEBUG_STAT = 1 << 1,
+	DEBUG_STAT  = 1 << 2,
 	/** Print the parse tree. */
-	DEBUG_TREE = 1 << 2,
+	DEBUG_TREE  = 1 << 3,
 };
 
 /**
@@ -173,6 +175,13 @@ struct expr {
 	/** Whether this expression has no side effects. */
 	bool pure;
 
+	/** Number of times this predicate was executed. */
+	size_t evaluations;
+	/** Number of times this predicate succeeded. */
+	size_t successes;
+	/** Total time spent running this predicate. */
+	struct timespec elapsed;
+
 	/** The number of command line arguments for this expression. */
 	size_t argc;
 	/** The command line arguments comprising this expression. */
@@ -213,6 +222,11 @@ struct expr {
  * Parse the command line.
  */
 struct cmdline *parse_cmdline(int argc, char *argv[]);
+
+/**
+ * Dump the parsed command line.
+ */
+void dump_cmdline(const struct cmdline *cmdline, bool verbose);
 
 /**
  * Evaluate the command line.

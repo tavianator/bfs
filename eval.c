@@ -743,10 +743,49 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * Record the time that elapsed evaluating an expression.
+ */
+static void add_elapsed(struct expr *expr, const struct timespec *start, const struct timespec *end) {
+	expr->elapsed.tv_sec += end->tv_sec - start->tv_sec;
+	expr->elapsed.tv_nsec += end->tv_nsec - start->tv_nsec;
+	if (expr->elapsed.tv_nsec < 0) {
+		expr->elapsed.tv_nsec += 1000000000L;
+		--expr->elapsed.tv_sec;
+	} else if (expr->elapsed.tv_nsec >= 1000000000L) {
+		expr->elapsed.tv_nsec -= 1000000000L;
+		++expr->elapsed.tv_sec;
+	}
+}
+
+/**
  * Evaluate an expression.
  */
-static bool eval_expr(const struct expr *expr, struct eval_state *state) {
-	return expr->eval(expr, state);
+static bool eval_expr(struct expr *expr, struct eval_state *state) {
+	struct timespec start, end;
+	bool time = state->cmdline->debug & DEBUG_RATES;
+	if (time) {
+		if (clock_gettime(CLOCK_MONOTONIC, &start) != 0) {
+			perror("clock_gettime()");
+			time = false;
+		}
+	}
+
+	bool ret = expr->eval(expr, state);
+
+	if (time) {
+		if (clock_gettime(CLOCK_MONOTONIC, &end) == 0) {
+			add_elapsed(expr, &start, &end);
+		} else {
+			perror("clock_gettime()");
+		}
+	}
+
+	++expr->evaluations;
+	if (ret) {
+		++expr->successes;
+	}
+
+	return ret;
 }
 
 /**
@@ -941,6 +980,10 @@ int eval_cmdline(const struct cmdline *cmdline) {
 				perror("bftw()");
 			}
 		}
+	}
+
+	if (cmdline->debug & DEBUG_RATES) {
+		dump_cmdline(cmdline, true);
 	}
 
 	return args.ret;

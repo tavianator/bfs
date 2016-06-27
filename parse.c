@@ -84,6 +84,10 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 		expr->lhs = NULL;
 		expr->rhs = NULL;
 		expr->pure = pure;
+		expr->evaluations = 0;
+		expr->successes = 0;
+		expr->elapsed.tv_sec = 0;
+		expr->elapsed.tv_nsec = 0;
 		expr->argc = argc;
 		expr->argv = argv;
 		expr->file = NULL;
@@ -124,7 +128,7 @@ static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr
 /**
  * Dump the parsed expression tree, for debugging.
  */
-static void dump_expr(const struct expr *expr) {
+static void dump_expr(const struct expr *expr, bool verbose) {
 	fputs("(", stderr);
 
 	for (size_t i = 0; i < expr->argc; ++i) {
@@ -134,14 +138,23 @@ static void dump_expr(const struct expr *expr) {
 		fputs(expr->argv[i], stderr);
 	}
 
+	if (verbose) {
+		double rate = 0.0, time = 0.0;
+		if (expr->evaluations) {
+			rate = 100.0*expr->successes/expr->evaluations;
+			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
+		}
+		fprintf(stderr, " [%zu/%zu=%g%%; %gns]", expr->successes, expr->evaluations, rate, time);
+	}
+
 	if (expr->lhs) {
 		fputs(" ", stderr);
-		dump_expr(expr->lhs);
+		dump_expr(expr->lhs, verbose);
 	}
 
 	if (expr->rhs) {
 		fputs(" ", stderr);
-		dump_expr(expr->rhs);
+		dump_expr(expr->rhs, verbose);
 	}
 
 	fputs(")", stderr);
@@ -245,7 +258,7 @@ static void debug_opt(const struct parser_state *state, const char *format, ...)
 				break;
 
 			case 'e':
-				dump_expr(va_arg(args, const struct expr *));
+				dump_expr(va_arg(args, const struct expr *), false);
 				break;
 			}
 		} else {
@@ -584,15 +597,18 @@ static struct expr *parse_debug(struct parser_state *state) {
 	if (strcmp(flag, "help") == 0) {
 		printf("Supported debug flags:\n\n");
 
-		printf("  help:  This message.\n");
-		printf("  opt:   Print optimization details.\n");
-		printf("  stat:  Trace all stat() calls.\n");
-		printf("  tree:  Print the parse tree.\n");
+		printf("  help:   This message.\n");
+		printf("  opt:    Print optimization details.\n");
+		printf("  rates:  Print predicate success rates.\n");
+		printf("  stat:   Trace all stat() calls.\n");
+		printf("  tree:   Print the parse tree.\n");
 
 		state->just_info = true;
 		return NULL;
 	} else if (strcmp(flag, "opt") == 0) {
 		cmdline->debug |= DEBUG_OPT;
+	} else if (strcmp(flag, "rates") == 0) {
+		cmdline->debug |= DEBUG_RATES;
 	} else if (strcmp(flag, "stat") == 0) {
 		cmdline->debug |= DEBUG_STAT;
 	} else if (strcmp(flag, "tree") == 0) {
@@ -1799,7 +1815,7 @@ static struct expr *optimize_whole_expr(const struct parser_state *state, struct
 /**
  * Dump the parsed form of the command line, for debugging.
  */
-static void dump_cmdline(const struct cmdline *cmdline) {
+void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	if (cmdline->flags & BFTW_FOLLOW_NONROOT) {
 		fputs("-L ", stderr);
 	} else if (cmdline->flags & BFTW_FOLLOW_ROOT) {
@@ -1814,6 +1830,9 @@ static void dump_cmdline(const struct cmdline *cmdline) {
 
 	if (cmdline->debug & DEBUG_OPT) {
 		fputs("-D opt ", stderr);
+	}
+	if (cmdline->debug & DEBUG_RATES) {
+		fputs("-D rates ", stderr);
 	}
 	if (cmdline->debug & DEBUG_STAT) {
 		fputs("-D stat ", stderr);
@@ -1844,7 +1863,7 @@ static void dump_cmdline(const struct cmdline *cmdline) {
 		fputs("-nocolor ", stderr);
 	}
 
-	dump_expr(cmdline->expr);
+	dump_expr(cmdline->expr, verbose);
 
 	fputs("\n", stderr);
 }
@@ -1925,7 +1944,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (cmdline->debug & DEBUG_TREE) {
-		dump_cmdline(cmdline);
+		dump_cmdline(cmdline, 0);
 	}
 
 done:
