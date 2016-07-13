@@ -27,6 +27,7 @@
 - Implement `-D rates`
 - Implement `-fprint`
 - Implement `-fprint0`
+- Implement BSD's `-f`
 
 
 0.79

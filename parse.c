@@ -787,6 +787,27 @@ static struct expr *parse_exec(struct parser_state *state, enum exec_flags flags
 }
 
 /**
+ * Parse -f PATH.
+ */
+static struct expr *parse_f(struct parser_state *state) {
+	parser_advance(state, T_FLAG, 1);
+
+	const char *path = state->argv[0];
+	if (!path) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: -f requires a path.\n");
+		return NULL;
+	}
+
+	if (!parse_root(state, path)) {
+		return NULL;
+	}
+
+	parser_advance(state, T_PATH, 1);
+	return &expr_true;
+}
+
+/**
  * Open a file for an expression.
  */
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
@@ -1307,7 +1328,9 @@ static struct expr *parse_literal(struct parser_state *state) {
 		break;
 
 	case 'f':
-		if (strcmp(arg, "-false") == 0) {
+		if (strcmp(arg, "-f") == 0) {
+			return parse_f(state);
+		} else if (strcmp(arg, "-false") == 0) {
 			parser_advance(state, T_TEST, 1);
 			return &expr_false;
 		} else if (strcmp(arg, "-follow") == 0) {
@@ -1857,6 +1880,10 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	}
 
 	for (struct root *root = cmdline->roots; root; root = root->next) {
+		char c = root->path[0];
+		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
+			fputs("-f ", stderr);
+		}
 		fprintf(stderr, "%s ", root->path);
 	}
 
