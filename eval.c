@@ -970,10 +970,10 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		.ret = 0,
 	};
 
-	for (size_t i = 0; i < cmdline->nroots; ++i) {
+	for (struct root *root = cmdline->roots; root; root = root->next) {
 		args.last_error = 0;
 
-		if (bftw(cmdline->roots[i], cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
+		if (bftw(root->path, cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
 			args.ret = -1;
 
 			if (errno != args.last_error) {

@@ -166,26 +166,18 @@ static void dump_expr(const struct expr *expr, bool verbose) {
 void free_cmdline(struct cmdline *cmdline) {
 	if (cmdline) {
 		free_expr(cmdline->expr);
+
 		free_colors(cmdline->colors);
-		free(cmdline->roots);
+
+		struct root *root = cmdline->roots;
+		while (root) {
+			struct root *next = root->next;
+			free(root);
+			root = next;
+		}
+
 		free(cmdline);
 	}
-}
-
-/**
- * Add a root path to the cmdline.
- */
-static bool cmdline_add_root(struct cmdline *cmdline, const char *root) {
-	size_t i = cmdline->nroots++;
-	const char **roots = realloc(cmdline->roots, cmdline->nroots*sizeof(const char *));
-	if (!roots) {
-		perror("realloc()");
-		return false;
-	}
-
-	roots[i] = root;
-	cmdline->roots = roots;
-	return true;
 }
 
 /**
@@ -198,6 +190,8 @@ struct parser_state {
 	char **argv;
 	/** The name of this program. */
 	const char *command;
+	/** The current tail of the root path list. */
+	struct root *roots_tail;
 
 	/** The optimization level. */
 	int optlevel;
@@ -310,6 +304,27 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
 }
 
 /**
+ * Parse a root path.
+ */
+static bool parse_root(struct parser_state *state, const char *path) {
+	struct root *root = malloc(sizeof(struct root));
+	if (!root) {
+		perror("malloc()");
+		return false;
+	}
+
+	root->path = path;
+	root->next = NULL;
+	if (state->roots_tail) {
+		state->roots_tail->next = root;
+	} else {
+		state->cmdline->roots = root;
+	}
+	state->roots_tail = root;
+	return true;
+}
+
+/**
  * While parsing an expression, skip any paths and add them to the cmdline.
  */
 static const char *skip_paths(struct parser_state *state) {
@@ -332,7 +347,7 @@ static const char *skip_paths(struct parser_state *state) {
 			}
 		}
 
-		if (!cmdline_add_root(state->cmdline, arg)) {
+		if (!parse_root(state, arg)) {
 			return NULL;
 		}
 
@@ -1841,8 +1856,8 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		fputs("-D tree ", stderr);
 	}
 
-	for (size_t i = 0; i < cmdline->nroots; ++i) {
-		fprintf(stderr, "%s ", cmdline->roots[i]);
+	for (struct root *root = cmdline->roots; root; root = root->next) {
+		fprintf(stderr, "%s ", root->path);
 	}
 
 	if (cmdline->flags & BFTW_DEPTH) {
@@ -1878,7 +1893,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	cmdline->roots = NULL;
-	cmdline->nroots = 0;
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
@@ -1895,6 +1909,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.cmdline = cmdline,
 		.argv = argv + 1,
 		.command = argv[0],
+		.roots_tail = NULL,
 		.implicit_print = true,
 		.warn = true,
 		.non_option_seen = false,
@@ -1937,8 +1952,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	cmdline->expr = optimize_whole_expr(&state, cmdline->expr);
 
-	if (cmdline->nroots == 0) {
-		if (!cmdline_add_root(cmdline, ".")) {
+	if (!cmdline->roots) {
+		if (!parse_root(&state, ".")) {
 			goto fail;
 		}
 	}
