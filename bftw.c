@@ -688,12 +688,11 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		ftwbuf->depth = 0;
 	}
 
+	ftwbuf->typeflag = BFTW_UNKNOWN;
 	if (de) {
 		ftwbuf_use_dirent(ftwbuf, de);
 	} else if (state->status != BFTW_CHILD) {
 		ftwbuf->typeflag = BFTW_DIR;
-	} else {
-		ftwbuf->typeflag = BFTW_UNKNOWN;
 	}
 
 	bool follow = state->flags & (current ? BFTW_FOLLOW_NONROOT : BFTW_FOLLOW_ROOT);
