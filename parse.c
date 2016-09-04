@@ -801,7 +801,7 @@ static struct expr *parse_depth_limit(struct parser_state *state, int is_min, in
 	}
 
 	int *depth = is_min ? &cmdline->mindepth : &cmdline->maxdepth;
-	if (!parse_int(state, value, depth, IF_INT)) {
+	if (!parse_int(state, value, depth, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
 
