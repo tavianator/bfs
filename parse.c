@@ -10,6 +10,7 @@
  *********************************************************************/
 
 #include "bfs.h"
+#include "typo.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -1499,8 +1500,18 @@ static struct expr *parse_literal(struct parser_state *state) {
 		}
 	}
 
+	const struct table_entry *best = NULL;
+	int best_dist;
+	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
+		int dist = typo_distance(arg, entry->arg);
+		if (!best || dist < best_dist) {
+			best = entry;
+			best_dist = dist;
+		}
+	}
+
 	pretty_error(cmdline->stderr_colors,
-	             "error: Unknown argument '%s'.\n", arg);
+	             "error: Unknown argument '-%s'; did you mean '-%s'?\n", arg, best->arg);
 	return NULL;
 }
 
