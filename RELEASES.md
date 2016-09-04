@@ -5,7 +5,7 @@
 0.82
 ----
 
-**Unreleased**
+**September 4, 2016**
 
 62/76 GNU find features supported.
 
@@ -28,7 +28,7 @@
 - Implement `-fprint`
 - Implement `-fprint0`
 - Implement BSD's `-f`
-
+- Suggest fixes for typo'd arguments
 
 0.79
 ----

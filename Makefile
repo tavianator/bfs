@@ -10,7 +10,7 @@
 #####################################################################
 
 ifeq ($(wildcard .git),)
-VERSION := 0.79
+VERSION := 0.82
 else
 VERSION := $(shell git describe --always)
 endif
