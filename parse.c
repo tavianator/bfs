@@ -598,7 +598,7 @@ static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
 /**
  * Parse -D FLAG.
  */
-static struct expr *parse_debug(struct parser_state *state) {
+static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) {
 	struct cmdline *cmdline = state->cmdline;
 
 	const char *arg = state->argv[0];
@@ -639,7 +639,7 @@ static struct expr *parse_debug(struct parser_state *state) {
 /**
  * Parse -On.
  */
-static struct expr *parse_optlevel(struct parser_state *state) {
+static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg2) {
 	int *optlevel = &state->cmdline->optlevel;
 
 	if (strcmp(state->argv[0], "-Ofast") == 0) {
@@ -658,9 +658,23 @@ static struct expr *parse_optlevel(struct parser_state *state) {
 }
 
 /**
+ * Parse -[PHL], -(no)?follow.
+ */
+static struct expr *parse_follow(struct parser_state *state, int flags, int option) {
+	struct cmdline *cmdline = state->cmdline;
+	cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
+	cmdline->flags |= flags;
+	if (option) {
+		return parse_nullary_positional_option(state);
+	} else {
+		return parse_nullary_flag(state);
+	}
+}
+
+/**
  * Parse -executable, -readable, -writable
  */
-static struct expr *parse_access(struct parser_state *state, int flag) {
+static struct expr *parse_access(struct parser_state *state, int flag, int arg2) {
 	struct expr *expr = parse_nullary_test(state, eval_access);
 	if (expr) {
 		expr->idata = flag;
@@ -671,7 +685,7 @@ static struct expr *parse_access(struct parser_state *state, int flag) {
 /**
  * Parse -[acm]{min,time}.
  */
-static struct expr *parse_acmtime(struct parser_state *state, enum time_field field, enum time_unit unit) {
+static struct expr *parse_acmtime(struct parser_state *state, int field, int unit) {
 	struct expr *expr = parse_test_icmp(state, eval_acmtime);
 	if (expr) {
 		expr->reftime = state->now;
@@ -684,7 +698,7 @@ static struct expr *parse_acmtime(struct parser_state *state, enum time_field fi
 /**
  * Parse -[ac]?newer.
  */
-static struct expr *parse_acnewer(struct parser_state *state, enum time_field field) {
+static struct expr *parse_acnewer(struct parser_state *state, int field, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_acnewer);
 	if (!expr) {
 		return NULL;
@@ -702,9 +716,32 @@ static struct expr *parse_acnewer(struct parser_state *state, enum time_field fi
 }
 
 /**
- * "Parse" -daystart.
+ * Parse -(no)?color.
  */
-static struct expr *parse_daystart(struct parser_state *state) {
+static struct expr *parse_color(struct parser_state *state, int color, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
+	if (color) {
+		cmdline->stdout_colors = cmdline->colors;
+		cmdline->stderr_colors = cmdline->colors;
+	} else {
+		cmdline->stdout_colors = NULL;
+		cmdline->stderr_colors = NULL;
+	}
+	return parse_nullary_option(state);
+}
+
+/**
+ * Parse -{false,true}.
+ */
+static struct expr *parse_const(struct parser_state *state, int value, int arg2) {
+	parser_advance(state, T_TEST, 1);
+	return value ? &expr_true : &expr_false;
+}
+
+/**
+ * Parse -daystart.
+ */
+static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg2) {
 	// Should be called before localtime_r() according to POSIX.1-2004
 	tzset();
 
@@ -734,17 +771,35 @@ static struct expr *parse_daystart(struct parser_state *state) {
 }
 
 /**
+ * Parse -delete.
+ */
+static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->flags |= BFTW_DEPTH;
+	return parse_nullary_action(state, eval_delete);
+}
+
+/**
+ * Parse -d, -depth.
+ */
+static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->flags |= BFTW_DEPTH;
+	return parse_nullary_option(state);
+}
+
+/**
  * Parse -{min,max}depth N.
  */
-static struct expr *parse_depth(struct parser_state *state, int *depth) {
+static struct expr *parse_depth_limit(struct parser_state *state, int is_min, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		pretty_error(state->cmdline->stderr_colors,
+		pretty_error(cmdline->stderr_colors,
 		             "error: %s needs a value.\n", arg);
 		return NULL;
 	}
 
+	int *depth = is_min ? &cmdline->mindepth : &cmdline->maxdepth;
 	if (!parse_int(state, value, depth, IF_INT)) {
 		return NULL;
 	}
@@ -753,9 +808,16 @@ static struct expr *parse_depth(struct parser_state *state, int *depth) {
 }
 
 /**
+ * Parse -empty.
+ */
+static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_test(state, eval_empty);
+}
+
+/**
  * Parse -exec[dir]/-ok[dir].
  */
-static struct expr *parse_exec(struct parser_state *state, enum exec_flags flags) {
+static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
 	size_t i = 1;
 	const char *arg;
 	while ((arg = state->argv[i++])) {
@@ -789,7 +851,7 @@ static struct expr *parse_exec(struct parser_state *state, enum exec_flags flags
 /**
  * Parse -f PATH.
  */
-static struct expr *parse_f(struct parser_state *state) {
+static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 	parser_advance(state, T_FLAG, 1);
 
 	const char *path = state->argv[0];
@@ -826,7 +888,7 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 /**
  * Parse -fprint FILE.
  */
-static struct expr *parse_fprint(struct parser_state *state) {
+static struct expr *parse_fprint(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_unary_action(state, eval_fprint);
 	if (expr) {
 		if (expr_open(state, expr, expr->sdata) != 0) {
@@ -839,7 +901,7 @@ static struct expr *parse_fprint(struct parser_state *state) {
 /**
  * Parse -fprint0 FILE.
  */
-static struct expr *parse_fprint0(struct parser_state *state) {
+static struct expr *parse_fprint0(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_unary_action(state, eval_print0);
 	if (expr) {
 		if (expr_open(state, expr, expr->sdata) != 0) {
@@ -850,20 +912,16 @@ static struct expr *parse_fprint0(struct parser_state *state) {
 }
 
 /**
- * Parse -print0.
+ * Parse -gid N.
  */
-static struct expr *parse_print0(struct parser_state *state) {
-	struct expr *expr = parse_nullary_action(state, eval_print0);
-	if (expr) {
-		expr->file = stdout;
-	}
-	return expr;
+static struct expr *parse_gid(struct parser_state *state, int arg1, int arg2) {
+	return parse_test_icmp(state, eval_gid);
 }
 
 /**
  * Parse -group.
  */
-static struct expr *parse_group(struct parser_state *state) {
+static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 
 	struct expr *expr = parse_unary_test(state, eval_gid);
@@ -902,9 +960,23 @@ fail:
 }
 
 /**
+ * Parse -uid N.
+ */
+static struct expr *parse_uid(struct parser_state *state, int arg1, int arg2) {
+	return parse_test_icmp(state, eval_uid);
+}
+
+/**
+ * Parse -used N.
+ */
+static struct expr *parse_used(struct parser_state *state, int arg1, int arg2) {
+	return parse_test_icmp(state, eval_used);
+}
+
+/**
  * Parse -user.
  */
-static struct expr *parse_user(struct parser_state *state) {
+static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 
 	struct expr *expr = parse_unary_test(state, eval_uid);
@@ -943,6 +1015,35 @@ fail:
 }
 
 /**
+ * Parse -hidden.
+ */
+static struct expr *parse_hidden(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_test(state, eval_hidden);
+}
+
+/**
+ * Parse -inum N.
+ */
+static struct expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
+	return parse_test_icmp(state, eval_inum);
+}
+
+/**
+ * Parse -links N.
+ */
+static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) {
+	return parse_test_icmp(state, eval_links);
+}
+
+/**
+ * Parse -mount, -xdev.
+ */
+static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->flags |= BFTW_MOUNT;
+	return parse_nullary_option(state);
+}
+
+/**
  * Set the FNM_CASEFOLD flag, if supported.
  */
 static struct expr *set_fnm_casefold(const struct parser_state *state, struct expr *expr, bool casefold) {
@@ -966,7 +1067,7 @@ static struct expr *set_fnm_casefold(const struct parser_state *state, struct ex
 /**
  * Parse -i?name.
  */
-static struct expr *parse_name(struct parser_state *state, bool casefold) {
+static struct expr *parse_name(struct parser_state *state, int casefold, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_name);
 	return set_fnm_casefold(state, expr, casefold);
 }
@@ -974,7 +1075,7 @@ static struct expr *parse_name(struct parser_state *state, bool casefold) {
 /**
  * Parse -i?path, -i?wholename.
  */
-static struct expr *parse_path(struct parser_state *state, bool casefold) {
+static struct expr *parse_path(struct parser_state *state, int casefold, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_path);
 	return set_fnm_casefold(state, expr, casefold);
 }
@@ -982,7 +1083,7 @@ static struct expr *parse_path(struct parser_state *state, bool casefold) {
 /**
  * Parse -i?lname.
  */
-static struct expr *parse_lname(struct parser_state *state, bool casefold) {
+static struct expr *parse_lname(struct parser_state *state, int casefold, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_lname);
 	return set_fnm_casefold(state, expr, casefold);
 }
@@ -990,7 +1091,7 @@ static struct expr *parse_lname(struct parser_state *state, bool casefold) {
 /**
  * Parse -newerXY.
  */
-static struct expr *parse_newerxy(struct parser_state *state) {
+static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
 		pretty_error(state->cmdline->stderr_colors,
@@ -1067,9 +1168,16 @@ static struct expr *parse_newerxy(struct parser_state *state) {
 }
 
 /**
+ * Parse -nohidden.
+ */
+static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_action(state, eval_nohidden);
+}
+
+/**
  * Parse -noleaf.
  */
-static struct expr *parse_noleaf(struct parser_state *state) {
+static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
 	if (state->warn) {
 		pretty_warning(state->cmdline->stderr_colors,
 		               "warning: bfs does not apply the optimization that %s inhibits.\n\n",
@@ -1080,9 +1188,41 @@ static struct expr *parse_noleaf(struct parser_state *state) {
 }
 
 /**
+ * Parse -print.
+ */
+static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_action(state, eval_print);
+}
+
+/**
+ * Parse -print0.
+ */
+static struct expr *parse_print0(struct parser_state *state, int arg1, int arg2) {
+	struct expr *expr = parse_nullary_action(state, eval_print0);
+	if (expr) {
+		expr->file = stdout;
+	}
+	return expr;
+}
+
+/**
+ * Parse -prune.
+ */
+static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_action(state, eval_prune);
+}
+
+/**
+ * Parse -quit.
+ */
+static struct expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_action(state, eval_quit);
+}
+
+/**
  * Parse -samefile FILE.
  */
-static struct expr *parse_samefile(struct parser_state *state) {
+static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_samefile);
 	if (!expr) {
 		return NULL;
@@ -1102,7 +1242,7 @@ static struct expr *parse_samefile(struct parser_state *state) {
 /**
  * Parse -size N[bcwkMG]?.
  */
-static struct expr *parse_size(struct parser_state *state) {
+static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_size);
 	if (!expr) {
 		return NULL;
@@ -1156,7 +1296,8 @@ fail:
 /**
  * Parse -x?type [bcdpfls].
  */
-static struct expr *parse_type(struct parser_state *state, eval_fn *eval) {
+static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
+	eval_fn *eval = x ? eval_xtype : eval_type;
 	struct expr *expr = parse_unary_test(state, eval);
 	if (!expr) {
 		return NULL;
@@ -1200,9 +1341,17 @@ static struct expr *parse_type(struct parser_state *state, eval_fn *eval) {
 }
 
 /**
+ * Parse -(no)?warn.
+ */
+static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
+	state->warn = warn;
+	return parse_nullary_positional_option(state);
+}
+
+/**
  * "Parse" -help.
  */
-static struct expr *parse_help(struct parser_state *state) {
+static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	printf("Usage: %s [arguments...]\n\n", state->command);
 
 	printf("bfs is compatible with find; see find -help or man find for help with find-\n"
@@ -1221,7 +1370,7 @@ static struct expr *parse_help(struct parser_state *state) {
 /**
  * "Parse" -version.
  */
-static struct expr *parse_version(struct parser_state *state) {
+static struct expr *parse_version(struct parser_state *state, int arg1, int arg2) {
 	printf("bfs %s\n\n", BFS_VERSION);
 
 	printf("%s\n", BFS_HOMEPAGE);
@@ -1229,6 +1378,97 @@ static struct expr *parse_version(struct parser_state *state) {
 	state->just_info = true;
 	return NULL;
 }
+
+typedef struct expr *parse_fn(struct parser_state *state, int arg1, int arg2);
+
+/**
+ * An entry in the parse table for literals.
+ */
+struct table_entry {
+	const char *arg;
+	bool prefix;
+	parse_fn *parse;
+	int arg1;
+	int arg2;
+};
+
+/**
+ * The parse table for literals.
+ */
+static const struct table_entry parse_table[] = {
+	{"D", false, parse_debug},
+	{"O", true, parse_optlevel},
+	{"P", false, parse_follow, 0, false},
+	{"H", false, parse_follow, BFTW_FOLLOW_ROOT, false},
+	{"L", false, parse_follow, BFTW_FOLLOW | BFTW_DETECT_CYCLES, false},
+	{"amin", false, parse_acmtime, ATIME, MINUTES},
+	{"atime", false, parse_acmtime, ATIME, DAYS},
+	{"anewer", false, parse_acnewer, ATIME},
+	{"cmin", false, parse_acmtime, CTIME, MINUTES},
+	{"ctime", false, parse_acmtime, CTIME, DAYS},
+	{"cnewer", false, parse_acnewer, CTIME},
+	{"color", false, parse_color, true},
+	{"d", false, parse_depth},
+	{"daystart", false, parse_daystart},
+	{"delete", false, parse_delete},
+	{"depth", false, parse_depth},
+	{"empty", false, parse_empty},
+	{"exec", false, parse_exec, 0},
+	{"execdir", false, parse_exec, EXEC_CHDIR},
+	{"executable", false, parse_access, X_OK},
+	{"f", false, parse_f},
+	{"false", false, parse_const, false},
+	{"follow", false, parse_follow, BFTW_FOLLOW | BFTW_DETECT_CYCLES, true},
+	{"fprint", false, parse_fprint},
+	{"fprint0", false, parse_fprint0},
+	{"gid", false, parse_gid},
+	{"group", false, parse_group},
+	{"help", false, parse_help},
+	{"hidden", false, parse_hidden},
+	{"ilname", false, parse_lname, true},
+	{"iname", false, parse_name, true},
+	{"inum", false, parse_inum},
+	{"ipath", false, parse_path, true},
+	{"iwholename", false, parse_path, true},
+	{"links", false, parse_links},
+	{"lname", false, parse_lname, false},
+	{"maxdepth", false, parse_depth_limit, false},
+	{"mindepth", false, parse_depth_limit, true},
+	{"mmin", false, parse_acmtime, MTIME, MINUTES},
+	{"mount", false, parse_mount},
+	{"mtime", false, parse_acmtime, MTIME, DAYS},
+	{"name", false, parse_name, false},
+	{"newer", false, parse_acnewer, MTIME},
+	{"newer", true, parse_newerxy},
+	{"nocolor", false, parse_color, false},
+	{"nohidden", false, parse_nohidden},
+	{"noleaf", false, parse_noleaf},
+	{"nowarn", false, parse_warn, false},
+	{"ok", false, parse_exec, EXEC_CONFIRM},
+	{"okdir", false, parse_exec, EXEC_CONFIRM | EXEC_CHDIR},
+	{"path", false, parse_path, false},
+	{"print", false, parse_print},
+	{"print0", false, parse_print0},
+	{"prune", false, parse_prune},
+	{"quit", false, parse_quit},
+	{"readable", false, parse_access, R_OK},
+	{"samefile", false, parse_samefile},
+	{"size", false, parse_size},
+	{"true", false, parse_const, true},
+	{"type", false, parse_type, false},
+	{"uid", false, parse_uid},
+	{"used", false, parse_used},
+	{"user", false, parse_user},
+	{"version", false, parse_version},
+	{"warn", false, parse_warn, true},
+	{"wholename", false, parse_path, false},
+	{"writable", false, parse_access, W_OK},
+	{"xdev", false, parse_mount},
+	{"xtype", false, parse_type, true},
+	{"-help", false, parse_help},
+	{"-version", false, parse_version},
+	{0},
+};
 
 /**
  * LITERAL : OPTION
@@ -1241,272 +1481,22 @@ static struct expr *parse_literal(struct parser_state *state) {
 	// Paths are already skipped at this point
 	const char *arg = state->argv[0];
 
-	if (arg[0] != '-') {
+	if (*arg++ != '-') {
 		pretty_error(cmdline->stderr_colors,
 		             "error: Expected a predicate; found '%s'.\n", arg);
 		return NULL;
 	}
 
-	switch (arg[1]) {
-	case 'D':
-		if (strcmp(arg, "-D") == 0) {
-			return parse_debug(state);
+	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
+		bool match;
+		if (entry->prefix) {
+			match = strncmp(arg, entry->arg, strlen(entry->arg)) == 0;
+		} else {
+			match = strcmp(arg, entry->arg) == 0;
 		}
-		break;
-
-	case 'O':
-		return parse_optlevel(state);
-
-	case 'P':
-		if (strcmp(arg, "-P") == 0) {
-			cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
-			return parse_nullary_flag(state);
+		if (match) {
+			return entry->parse(state, entry->arg1, entry->arg2);
 		}
-		break;
-
-	case 'H':
-		if (strcmp(arg, "-H") == 0) {
-			cmdline->flags &= ~(BFTW_FOLLOW_NONROOT | BFTW_DETECT_CYCLES);
-			cmdline->flags |= BFTW_FOLLOW_ROOT;
-			return parse_nullary_flag(state);
-		}
-		break;
-
-	case 'L':
-		if (strcmp(arg, "-L") == 0) {
-			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return parse_nullary_flag(state);
-		}
-		break;
-
-	case 'a':
-		if (strcmp(arg, "-amin") == 0) {
-			return parse_acmtime(state, ATIME, MINUTES);
-		} else if (strcmp(arg, "-atime") == 0) {
-			return parse_acmtime(state, ATIME, DAYS);
-		} else if (strcmp(arg, "-anewer") == 0) {
-			return parse_acnewer(state, ATIME);
-		}
-		break;
-
-	case 'c':
-		if (strcmp(arg, "-cmin") == 0) {
-			return parse_acmtime(state, CTIME, MINUTES);
-		} else if (strcmp(arg, "-ctime") == 0) {
-			return parse_acmtime(state, CTIME, DAYS);
-		} else if (strcmp(arg, "-cnewer") == 0) {
-			return parse_acnewer(state, CTIME);
-		} else if (strcmp(arg, "-color") == 0) {
-			cmdline->stdout_colors = cmdline->colors;
-			cmdline->stderr_colors = cmdline->colors;
-			return parse_nullary_option(state);
-		}
-		break;
-
-	case 'd':
-		if (strcmp(arg, "-daystart") == 0) {
-			return parse_daystart(state);
-		} else if (strcmp(arg, "-delete") == 0) {
-			cmdline->flags |= BFTW_DEPTH;
-			return parse_nullary_action(state, eval_delete);
-		} else if (strcmp(arg, "-d") == 0 || strcmp(arg, "-depth") == 0) {
-			cmdline->flags |= BFTW_DEPTH;
-			return parse_nullary_option(state);
-		}
-		break;
-
-	case 'e':
-		if (strcmp(arg, "-empty") == 0) {
-			return parse_nullary_test(state, eval_empty);
-		} else if (strcmp(arg, "-exec") == 0) {
-			return parse_exec(state, 0);
-		} else if (strcmp(arg, "-execdir") == 0) {
-			return parse_exec(state, EXEC_CHDIR);
-		} else if (strcmp(arg, "-executable") == 0) {
-			return parse_access(state, X_OK);
-		}
-		break;
-
-	case 'f':
-		if (strcmp(arg, "-f") == 0) {
-			return parse_f(state);
-		} else if (strcmp(arg, "-false") == 0) {
-			parser_advance(state, T_TEST, 1);
-			return &expr_false;
-		} else if (strcmp(arg, "-follow") == 0) {
-			cmdline->flags |= BFTW_FOLLOW | BFTW_DETECT_CYCLES;
-			return parse_nullary_positional_option(state);
-		} else if (strcmp(arg, "-fprint") == 0) {
-			return parse_fprint(state);
-		} else if (strcmp(arg, "-fprint0") == 0) {
-			return parse_fprint0(state);
-		}
-		break;
-
-	case 'g':
-		if (strcmp(arg, "-gid") == 0) {
-			return parse_test_icmp(state, eval_gid);
-		} else if (strcmp(arg, "-group") == 0) {
-			return parse_group(state);
-		}
-		break;
-
-	case 'h':
-		if (strcmp(arg, "-help") == 0) {
-			return parse_help(state);
-		} else if (strcmp(arg, "-hidden") == 0) {
-			return parse_nullary_test(state, eval_hidden);
-		}
-		break;
-
-	case 'i':
-		if (strcmp(arg, "-ilname") == 0) {
-			return parse_lname(state, true);
-		} if (strcmp(arg, "-iname") == 0) {
-			return parse_name(state, true);
-		} else if (strcmp(arg, "-inum") == 0) {
-			return parse_test_icmp(state, eval_inum);
-		} else if (strcmp(arg, "-ipath") == 0 || strcmp(arg, "-iwholename") == 0) {
-			return parse_path(state, true);
-		}
-		break;
-
-	case 'l':
-		if (strcmp(arg, "-links") == 0) {
-			return parse_test_icmp(state, eval_links);
-		} else if (strcmp(arg, "-lname") == 0) {
-			return parse_lname(state, false);
-		}
-		break;
-
-	case 'm':
-		if (strcmp(arg, "-mindepth") == 0) {
-			return parse_depth(state, &cmdline->mindepth);
-		} else if (strcmp(arg, "-maxdepth") == 0) {
-			return parse_depth(state, &cmdline->maxdepth);
-		} else if (strcmp(arg, "-mmin") == 0) {
-			return parse_acmtime(state, MTIME, MINUTES);
-		} else if (strcmp(arg, "-mount") == 0) {
-			cmdline->flags |= BFTW_MOUNT;
-			return parse_nullary_option(state);
-		} else if (strcmp(arg, "-mtime") == 0) {
-			return parse_acmtime(state, MTIME, DAYS);
-		}
-		break;
-
-	case 'n':
-		if (strcmp(arg, "-name") == 0) {
-			return parse_name(state, false);
-		} else if (strcmp(arg, "-newer") == 0) {
-			return parse_acnewer(state, MTIME);
-		} else if (strncmp(arg, "-newer", 6) == 0) {
-			return parse_newerxy(state);
-		} else if (strcmp(arg, "-nocolor") == 0) {
-			cmdline->stdout_colors = NULL;
-			cmdline->stderr_colors = NULL;
-			return parse_nullary_option(state);
-		} else if (strcmp(arg, "-nohidden") == 0) {
-			return parse_nullary_action(state, eval_nohidden);
-		} else if (strcmp(arg, "-noleaf") == 0) {
-			return parse_noleaf(state);
-		} else if (strcmp(arg, "-nowarn") == 0) {
-			state->warn = false;
-			return parse_nullary_positional_option(state);
-		}
-		break;
-
-	case 'o':
-		if (strcmp(arg, "-ok") == 0) {
-			return parse_exec(state, EXEC_CONFIRM);
-		} else if (strcmp(arg, "-okdir") == 0) {
-			return parse_exec(state, EXEC_CONFIRM | EXEC_CHDIR);
-		}
-		break;
-
-	case 'p':
-		if (strcmp(arg, "-path") == 0) {
-			return parse_path(state, false);
-		} else if (strcmp(arg, "-print") == 0) {
-			return parse_nullary_action(state, eval_print);
-		} else if (strcmp(arg, "-print0") == 0) {
-			return parse_print0(state);
-		} else if (strcmp(arg, "-prune") == 0) {
-			return parse_nullary_action(state, eval_prune);
-		}
-		break;
-
-	case 'q':
-		if (strcmp(arg, "-quit") == 0) {
-			return parse_nullary_action(state, eval_quit);
-		}
-		break;
-
-	case 'r':
-		if (strcmp(arg, "-readable") == 0) {
-			return parse_access(state, R_OK);
-		}
-		break;
-
-	case 's':
-		if (strcmp(arg, "-samefile") == 0) {
-			return parse_samefile(state);
-		} else if (strcmp(arg, "-size") == 0) {
-			return parse_size(state);
-		}
-		break;
-
-	case 't':
-		if (strcmp(arg, "-true") == 0) {
-			parser_advance(state, T_TEST, 1);
-			return &expr_true;
-		} else if (strcmp(arg, "-type") == 0) {
-			return parse_type(state, eval_type);
-		}
-		break;
-
-	case  'u':
-		if (strcmp(arg, "-uid") == 0) {
-			return parse_test_icmp(state, eval_uid);
-		} else if (strcmp(arg, "-used") == 0) {
-			return parse_test_icmp(state, eval_used);
-		} else if (strcmp(arg, "-user") == 0) {
-			return parse_user(state);
-		}
-		break;
-
-	case 'v':
-		if (strcmp(arg, "-version") == 0) {
-			return parse_version(state);
-		}
-		break;
-
-	case 'w':
-		if (strcmp(arg, "-warn") == 0) {
-			state->warn = true;
-			return parse_nullary_positional_option(state);
-		} else if (strcmp(arg, "-wholename") == 0) {
-			return parse_path(state, false);
-		} else if (strcmp(arg, "-writable") == 0) {
-			return parse_access(state, W_OK);
-		}
-		break;
-
-	case 'x':
-		if (strcmp(arg, "-xdev") == 0) {
-			cmdline->flags |= BFTW_MOUNT;
-			return parse_nullary_option(state);
-		} else if (strcmp(arg, "-xtype") == 0) {
-			return parse_type(state, eval_xtype);
-		}
-		break;
-
-	case '-':
-		if (strcmp(arg, "--help") == 0) {
-			return parse_help(state);
-		} else if (strcmp(arg, "--version") == 0) {
-			return parse_version(state);
-		}
-		break;
 	}
 
 	pretty_error(cmdline->stderr_colors,
