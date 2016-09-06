@@ -192,7 +192,7 @@ struct parser_state {
 	/** The name of this program. */
 	const char *command;
 	/** The current tail of the root path list. */
-	struct root *roots_tail;
+	struct root **roots_tail;
 
 	/** The optimization level. */
 	int optlevel;
@@ -316,12 +316,8 @@ static bool parse_root(struct parser_state *state, const char *path) {
 
 	root->path = path;
 	root->next = NULL;
-	if (state->roots_tail) {
-		state->roots_tail->next = root;
-	} else {
-		state->cmdline->roots = root;
-	}
-	state->roots_tail = root;
+	*state->roots_tail = root;
+	state->roots_tail = &root->next;
 	return true;
 }
 
@@ -1937,7 +1933,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.cmdline = cmdline,
 		.argv = argv + 1,
 		.command = argv[0],
-		.roots_tail = NULL,
+		.roots_tail = &cmdline->roots,
 		.implicit_print = true,
 		.warn = true,
 		.non_option_seen = false,
