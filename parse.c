@@ -1398,7 +1398,9 @@ static const struct table_entry parse_table[] = {
 	{"P", false, parse_follow, 0, false},
 	{"H", false, parse_follow, BFTW_FOLLOW_ROOT, false},
 	{"L", false, parse_follow, BFTW_FOLLOW | BFTW_DETECT_CYCLES, false},
+	{"a"},
 	{"amin", false, parse_acmtime, ATIME, MINUTES},
+	{"and"},
 	{"atime", false, parse_acmtime, ATIME, DAYS},
 	{"anewer", false, parse_acnewer, ATIME},
 	{"cmin", false, parse_acmtime, CTIME, MINUTES},
@@ -1440,9 +1442,12 @@ static const struct table_entry parse_table[] = {
 	{"nocolor", false, parse_color, false},
 	{"nohidden", false, parse_nohidden},
 	{"noleaf", false, parse_noleaf},
+	{"not"},
 	{"nowarn", false, parse_warn, false},
+	{"o"},
 	{"ok", false, parse_exec, EXEC_CONFIRM},
 	{"okdir", false, parse_exec, EXEC_CONFIRM | EXEC_CHDIR},
+	{"or"},
 	{"path", false, parse_path, false},
 	{"print", false, parse_print},
 	{"print0", false, parse_print0},
@@ -1467,6 +1472,39 @@ static const struct table_entry parse_table[] = {
 	{0},
 };
 
+/** Look up an argument in the parse table. */
+static const struct table_entry *table_lookup(const char *arg) {
+	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
+		bool match;
+		if (entry->prefix) {
+			match = strncmp(arg, entry->arg, strlen(entry->arg)) == 0;
+		} else {
+			match = strcmp(arg, entry->arg) == 0;
+		}
+		if (match) {
+			return entry;
+		}
+	}
+
+	return NULL;
+}
+
+/** Search for a fuzzy match in the parse table. */
+static const struct table_entry *table_lookup_fuzzy(const char *arg) {
+	const struct table_entry *best = NULL;
+	int best_dist;
+
+	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
+		int dist = typo_distance(arg, entry->arg);
+		if (!best || dist < best_dist) {
+			best = entry;
+			best_dist = dist;
+		}
+	}
+
+	return best;
+}
+
 /**
  * LITERAL : OPTION
  *         | TEST
@@ -1478,36 +1516,26 @@ static struct expr *parse_literal(struct parser_state *state) {
 	// Paths are already skipped at this point
 	const char *arg = state->argv[0];
 
-	if (*arg++ != '-') {
-		pretty_error(cmdline->stderr_colors,
-		             "error: Expected a predicate; found '%s'.\n", arg);
-		return NULL;
+	if (arg[0] != '-') {
+		goto unexpected;
 	}
 
-	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
-		bool match;
-		if (entry->prefix) {
-			match = strncmp(arg, entry->arg, strlen(entry->arg)) == 0;
-		} else {
-			match = strcmp(arg, entry->arg) == 0;
+	const struct table_entry *match = table_lookup(arg + 1);
+	if (match) {
+		if (!match->parse) {
+			goto unexpected;
 		}
-		if (match) {
-			return entry->parse(state, entry->arg1, entry->arg2);
-		}
+		return match->parse(state, match->arg1, match->arg2);
 	}
 
-	const struct table_entry *best = NULL;
-	int best_dist;
-	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
-		int dist = typo_distance(arg, entry->arg);
-		if (!best || dist < best_dist) {
-			best = entry;
-			best_dist = dist;
-		}
-	}
-
+	match = table_lookup_fuzzy(arg + 1);
 	pretty_error(cmdline->stderr_colors,
-	             "error: Unknown argument '-%s'; did you mean '-%s'?\n", arg, best->arg);
+	             "error: Unknown argument '%s'; did you mean '-%s'?\n", arg, match->arg);
+	return NULL;
+
+unexpected:
+	pretty_error(cmdline->stderr_colors,
+	             "error: Expected a predicate; found '%s'.\n", arg);
 	return NULL;
 }
 
