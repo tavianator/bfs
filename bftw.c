@@ -236,7 +236,7 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 }
 
 /**
- * Get the full path do a dircache_entry.
+ * Get the full path to a dircache_entry.
  *
  * @param entry
  *         The entry to look up.
