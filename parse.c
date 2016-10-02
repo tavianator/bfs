@@ -327,18 +327,33 @@ static bool parse_root(struct parser_state *state, const char *path) {
 static const char *skip_paths(struct parser_state *state) {
 	while (true) {
 		const char *arg = state->argv[0];
+		if (!arg) {
+			return NULL;
+		}
+
+		if (arg[0] == '-') {
+			if (strcmp(arg, "--") == 0) {
+				// find uses -- to separate flags from the rest
+				// of the command line.  We allow mixing flags
+				// and paths/predicates, so we just ignore --.
+				parser_advance(state, T_FLAG, 1);
+				continue;
+			}
+			if (strcmp(arg, "-") != 0) {
+				// - by itself is a file name.  Anything else
+				// starting with - is a flag/predicate.
+				return arg;
+			}
+		}
 
 		// By POSIX, these are always options
-		if (!arg
-		    || (arg[0] == '-' && arg[1])
-		    || strcmp(arg, "(") == 0
-		    || strcmp(arg, "!") == 0) {
+		if (strcmp(arg, "(") == 0 || strcmp(arg, "!") == 0) {
 			return arg;
 		}
 
 		if (state->expr_started) {
 			// By POSIX, these can be paths.  We only treat them as
-			// such at the beginning of the command line
+			// such at the beginning of the command line.
 			if (strcmp(arg, ")") == 0 || strcmp(arg, ",") == 0) {
 				return arg;
 			}
@@ -1467,6 +1482,7 @@ static const struct table_entry parse_table[] = {
 	{"writable", false, parse_access, W_OK},
 	{"xdev", false, parse_mount},
 	{"xtype", false, parse_type, true},
+	{"-"},
 	{"-help", false, parse_help},
 	{"-version", false, parse_version},
 	{0},

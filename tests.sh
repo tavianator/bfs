@@ -367,7 +367,17 @@ function test_0065() {
     diff -u "$out/out.find" "$out/out.bfs"
 }
 
-for i in {1..65}; do
+function test_0066() {
+    cd "$basic"
+    find_diff -- -type f
+}
+
+function test_0067() {
+    cd "$basic"
+    find_diff -L -- -type f
+}
+
+for i in {1..67}; do
     test="test_$(printf '%04d' $i)"
     ("$test" "$dir")
     status=$?
