@@ -634,6 +634,24 @@ static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 }
 
 /**
+ * Trim the path to just the current directory.
+ */
+static void bftw_path_trim(struct bftw_state *state) {
+	struct dircache_entry *current = state->current;
+
+	size_t length = current->nameoff + current->namelen;
+	if (current->namelen > 1) {
+		// Trim the trailing slash
+		--length;
+	}
+	dstresize(&state->path, length);
+
+	if (state->status == BFTW_CHILD) {
+		state->status = BFTW_CURRENT;
+	}
+}
+
+/**
  * Record an error.
  */
 static void bftw_set_error(struct bftw_state *state, int error) {
@@ -779,6 +797,19 @@ static struct dircache_entry *bftw_add(struct bftw_state *state, const char *nam
 }
 
 /**
+ * readdir() wrapper that makes error handling cleaner.
+ */
+static int bftw_readdir(DIR *dir, struct dirent **de) {
+	errno = 0;
+	*de = readdir(dir);
+	if (!*de && errno != 0) {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+/**
  * Push a new entry onto the queue.
  */
 static int bftw_push(struct bftw_state *state, const char *name) {
@@ -820,14 +851,8 @@ static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 		}
 
 		if (invoke_callback) {
-			size_t length = current->nameoff + current->namelen;
-			if (current->namelen > 1) {
-				// Trim the trailing slash
-				--length;
-			}
-			dstresize(&state->path, length);
-
 			state->current = current;
+			bftw_path_trim(state);
 			bftw_init_buffers(state, NULL);
 
 			int action = bftw_handle_path(state);
@@ -915,27 +940,18 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 		DIR *dir = dircache_entry_open(&state.cache, state.current, state.path);
 		if (!dir) {
-			int error = errno;
-
-			bftw_init_buffers(&state, NULL);
-			bftw_set_error(&state, error);
-
-			switch (bftw_handle_path(&state)) {
-			case BFTW_CONTINUE:
-			case BFTW_SKIP_SIBLINGS:
-			case BFTW_SKIP_SUBTREE:
-				goto next;
-
-			case BFTW_STOP:
-				goto done;
-
-			case BFTW_FAIL:
-				goto fail;
-			}
+			goto dir_error;
 		}
 
-		struct dirent *de;
-		while ((de = readdir(dir)) != NULL) {
+		while (true) {
+			struct dirent *de;
+			if (bftw_readdir(dir, &de) != 0) {
+				goto dir_error;
+			}
+			if (!de) {
+				break;
+			}
+
 			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
 				continue;
 			}
@@ -989,6 +1005,31 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 		case BFTW_SKIP_SIBLINGS:
 		case BFTW_SKIP_SUBTREE:
 			break;
+
+		case BFTW_STOP:
+			goto done;
+
+		case BFTW_FAIL:
+			goto fail;
+		}
+		continue;
+
+	dir_error:
+		state.error = errno;
+
+		if (dir) {
+			closedir(dir);
+		}
+
+		bftw_path_trim(&state);
+		bftw_init_buffers(&state, NULL);
+		bftw_set_error(&state, state.error);
+
+		switch (bftw_handle_path(&state)) {
+		case BFTW_CONTINUE:
+		case BFTW_SKIP_SIBLINGS:
+		case BFTW_SKIP_SUBTREE:
+			goto next;
 
 		case BFTW_STOP:
 			goto done;
