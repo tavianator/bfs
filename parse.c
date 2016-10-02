@@ -1327,6 +1327,9 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 	case 'd':
 		typeflag = BFTW_DIR;
 		break;
+	case 'D':
+		typeflag = BFTW_DOOR;
+		break;
 	case 'p':
 		typeflag = BFTW_FIFO;
 		break;

@@ -464,29 +464,58 @@ static void dirqueue_free(struct dirqueue *queue) {
 
 /** Fill in ftwbuf fields with information from a struct dirent. */
 static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_DIR)
+#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
 	switch (de->d_type) {
+#ifdef DT_BLK
 	case DT_BLK:
 		ftwbuf->typeflag = BFTW_BLK;
 		break;
+#endif
+#ifdef DT_CHR
 	case DT_CHR:
 		ftwbuf->typeflag = BFTW_CHR;
 		break;
+#endif
+#ifdef DT_DIR
 	case DT_DIR:
 		ftwbuf->typeflag = BFTW_DIR;
 		break;
+#endif
+#ifdef DT_DOOR
+	case DT_DOOR:
+		ftwbuf->typeflag = BFTW_DOOR;
+		break;
+#endif
+#ifdef DT_FIFO
 	case DT_FIFO:
 		ftwbuf->typeflag = BFTW_FIFO;
 		break;
+#endif
+#ifdef DT_LNK
 	case DT_LNK:
 		ftwbuf->typeflag = BFTW_LNK;
 		break;
+#endif
+#ifdef DT_PORT
+	case DT_PORT:
+		ftwbuf->typeflag = BFTW_PORT;
+		break;
+#endif
+#ifdef DT_REG
 	case DT_REG:
 		ftwbuf->typeflag = BFTW_REG;
 		break;
+#endif
+#ifdef DT_SOCK
 	case DT_SOCK:
 		ftwbuf->typeflag = BFTW_SOCK;
 		break;
+#endif
+#ifdef DT_WHT
+	case DT_WHT:
+		ftwbuf->typeflag = BFTW_WHT;
+		break;
+#endif
 	}
 #endif
 }
@@ -501,27 +530,56 @@ static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb, int flags) {
 	ftwbuf->statbuf = sb;
 
 	switch (sb->st_mode & S_IFMT) {
+#ifdef S_IFBLK
 	case S_IFBLK:
 		ftwbuf->typeflag = BFTW_BLK;
 		break;
+#endif
+#ifdef S_IFCHR
 	case S_IFCHR:
 		ftwbuf->typeflag = BFTW_CHR;
 		break;
+#endif
+#ifdef S_IFDIR
 	case S_IFDIR:
 		ftwbuf->typeflag = BFTW_DIR;
 		break;
+#endif
+#ifdef S_IFDOOR
+	case S_IFDOOR:
+		ftwbuf->typeflag = BFTW_DOOR;
+		break;
+#endif
+#ifdef S_IFIFO
 	case S_IFIFO:
 		ftwbuf->typeflag = BFTW_FIFO;
 		break;
+#endif
+#ifdef S_IFLNK
 	case S_IFLNK:
 		ftwbuf->typeflag = BFTW_LNK;
 		break;
+#endif
+#ifdef S_IFPORT
+	case S_IFPORT:
+		ftwbuf->typeflag = BFTW_PORT;
+		break;
+#endif
+#ifdef S_IFREG
 	case S_IFREG:
 		ftwbuf->typeflag = BFTW_REG;
 		break;
+#endif
+#ifdef S_IFSOCK
 	case S_IFSOCK:
 		ftwbuf->typeflag = BFTW_SOCK;
 		break;
+#endif
+#ifdef S_IFWHT
+	case S_IFWHT:
+		ftwbuf->typeflag = BFTW_WHT;
+		break;
+#endif
 	}
 
 	return 0;

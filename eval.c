@@ -26,6 +26,18 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifndef S_ISDOOR
+#	define S_ISDOOR(mode) false
+#endif
+
+#ifndef S_ISPORT
+#	define S_ISPORT(mode) false
+#endif
+
+#ifndef S_ISWHT
+#	define S_ISWHT(mode) false
+#endif
+
 struct eval_state {
 	/** Data about the current file. */
 	struct BFTW *ftwbuf;
@@ -722,21 +734,30 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	switch (expr->idata) {
+	switch ((enum bftw_typeflag)expr->idata) {
+	case BFTW_UNKNOWN:
+	case BFTW_ERROR:
+		break;
 	case BFTW_BLK:
 		return S_ISBLK(sb.st_mode);
 	case BFTW_CHR:
 		return S_ISCHR(sb.st_mode);
 	case BFTW_DIR:
 		return S_ISDIR(sb.st_mode);
+	case BFTW_DOOR:
+		return S_ISDOOR(sb.st_mode);
 	case BFTW_FIFO:
 		return S_ISFIFO(sb.st_mode);
 	case BFTW_LNK:
 		return S_ISLNK(sb.st_mode);
+	case BFTW_PORT:
+		return S_ISPORT(sb.st_mode);
 	case BFTW_REG:
 		return S_ISREG(sb.st_mode);
 	case BFTW_SOCK:
 		return S_ISSOCK(sb.st_mode);
+	case BFTW_WHT:
+		return S_ISWHT(sb.st_mode);
 	}
 
 	return false;

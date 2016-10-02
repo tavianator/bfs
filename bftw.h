@@ -27,14 +27,20 @@ enum bftw_typeflag {
 	BFTW_CHR,
 	/** Directory. */
 	BFTW_DIR,
+	/** Solaris door. */
+	BFTW_DOOR,
 	/** Pipe. */
 	BFTW_FIFO,
 	/** Symbolic link. */
 	BFTW_LNK,
+	/** Solaris event port. */
+	BFTW_PORT,
 	/** Regular file. */
 	BFTW_REG,
 	/** Socket. */
 	BFTW_SOCK,
+	/** BSD whiteout. */
+	BFTW_WHT,
 	/** An error occurred for this file. */
 	BFTW_ERROR,
 };

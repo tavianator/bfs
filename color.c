@@ -302,6 +302,12 @@ static const char *file_color(const struct colors *colors, const char *filename,
 	case S_IFSOCK:
 		color = colors->socket;
 		break;
+
+#ifdef S_IFDOOR
+	case S_IFDOOR:
+		color = colors->door;
+		break;
+#endif
 	}
 
 	if (!color) {
