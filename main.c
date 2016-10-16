@@ -10,10 +10,67 @@
  *********************************************************************/
 
 #include "bfs.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
+/**
+ * Check if a file descriptor is open.
+ */
+static bool is_fd_open(int fd) {
+	return fcntl(fd, F_GETFD) >= 0 || errno != EBADF;
+}
+
+/**
+ * Ensure that a file descriptor is open.
+ */
+static int ensure_fd_open(int fd, int flags) {
+	if (is_fd_open(fd)) {
+		return 0;
+	}
+
+	int devnull = open("/dev/null", flags);
+	if (devnull < 0) {
+		perror("open()");
+		return -1;
+	}
+
+	int ret = 0;
+
+	if (devnull != fd) {
+		// Probably not reachable
+
+		if (dup2(devnull, fd) < 0) {
+			perror("dup2()");
+			ret = -1;
+		}
+
+		if (close(devnull) != 0) {
+			perror("close()");
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * bfs entry point.
+ */
 int main(int argc, char *argv[]) {
 	int ret = EXIT_FAILURE;
+
+	if (ensure_fd_open(STDIN_FILENO, O_WRONLY) != 0) {
+		goto done;
+	}
+	if (ensure_fd_open(STDOUT_FILENO, O_RDONLY) != 0) {
+		goto done;
+	}
+	if (ensure_fd_open(STDERR_FILENO, O_RDONLY) != 0) {
+		goto done;
+	}
 
 	struct cmdline *cmdline = parse_cmdline(argc, argv);
 	if (cmdline) {
@@ -23,5 +80,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	free_cmdline(cmdline);
+
+done:
 	return ret;
 }
