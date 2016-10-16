@@ -317,69 +317,104 @@ static const char *file_color(const struct colors *colors, const char *filename,
 	return color;
 }
 
-static void print_esc(const char *esc, FILE *file) {
-	fputs("\033[", file);
-	fputs(esc, file);
-	fputs("m", file);
+static int print_esc(const char *esc, FILE *file) {
+	if (fputs("\033[", file) == EOF) {
+		return -1;
+	}
+	if (fputs(esc, file) == EOF) {
+		return -1;
+	}
+	if (fputs("m", file) == EOF) {
+		return -1;
+	}
+
+	return 0;
 }
 
-void pretty_print(const struct colors *colors, const struct BFTW *ftwbuf) {
+int pretty_print(const struct colors *colors, const struct BFTW *ftwbuf) {
 	const char *path = ftwbuf->path;
 
 	if (!colors) {
-		puts(path);
-		return;
+		return puts(path) == EOF ? -1 : 0;
 	}
 
 	const char *filename = path + ftwbuf->nameoff;
 
 	if (colors->dir) {
-		print_esc(colors->dir, stdout);
+		if (print_esc(colors->dir, stdout) != 0) {
+			return -1;
+		}
 	}
-	fwrite(path, 1, ftwbuf->nameoff, stdout);
+	if (fwrite(path, 1, ftwbuf->nameoff, stdout) != ftwbuf->nameoff) {
+		return -1;
+	}
 	if (colors->dir) {
-		print_esc(colors->reset, stdout);
+		if (print_esc(colors->reset, stdout) != 0) {
+			return -1;
+		}
 	}
 
 	const char *color = file_color(colors, filename, ftwbuf);
 	if (color) {
-		print_esc(color, stdout);
+		if (print_esc(color, stdout) != 0) {
+			return -1;
+		}
 	}
-	fputs(filename, stdout);
+	if (fputs(filename, stdout) == EOF) {
+		return -1;
+	}
 	if (color) {
-		print_esc(colors->reset, stdout);
+		if (print_esc(colors->reset, stdout) != 0) {
+			return -1;
+		}
 	}
-	fputs("\n", stdout);
+	if (fputs("\n", stdout) == EOF) {
+		return -1;
+	}
+
+	return 0;
 }
 
-static void pretty_format(const struct colors *colors, const char *color, const char *format, va_list args) {
+static int pretty_format(const struct colors *colors, const char *color, const char *format, va_list args) {
 	if (color) {
-		print_esc(color, stderr);
+		if (print_esc(color, stderr) != 0) {
+			return -1;
+		}
 	}
 
-	vfprintf(stderr, format, args);
+	if (vfprintf(stderr, format, args) < 0) {
+		return -1;
+	}
 
 	if (color) {
-		print_esc(colors->reset, stderr);
+		if (print_esc(colors->reset, stderr) != 0) {
+			return -1;
+		}
 	}
+
+	return 0;
 }
 
-void pretty_warning(const struct colors *colors, const char *format, ...) {
+int pretty_warning(const struct colors *colors, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 
-	pretty_format(colors, colors ? colors->warning : NULL, format, args);
+	int ret = pretty_format(colors, colors ? colors->warning : NULL, format, args);
 
 	va_end(args);
+
+	return ret;
 }
 
-void pretty_error(const struct colors *colors, const char *format, ...) {
+int pretty_error(const struct colors *colors, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 
-	pretty_format(colors, colors ? colors->error : NULL, format, args);
+	int ret = pretty_format(colors, colors ? colors->error : NULL, format, args);
 
 	va_end(args);
+
+	return ret;
 }
 
 void free_colors(struct colors *colors) {

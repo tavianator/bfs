@@ -633,7 +633,10 @@ bool eval_print(const struct expr *expr, struct eval_state *state) {
 		fill_statbuf(state);
 	}
 
-	pretty_print(colors, state->ftwbuf);
+	if (pretty_print(colors, state->ftwbuf) != 0) {
+		eval_error(state);
+	}
+
 	return true;
 }
 
@@ -642,8 +645,16 @@ bool eval_print(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_fprint(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
-	fputs(path, expr->file);
-	fputc('\n', expr->file);
+	if (fputs(path, expr->file) == EOF) {
+		goto error;
+	}
+	if (fputc('\n', expr->file) == EOF) {
+		goto error;
+	}
+	return true;
+
+error:
+	eval_error(state);
 	return true;
 }
 
@@ -652,7 +663,10 @@ bool eval_fprint(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_print0(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
-	fwrite(path, 1, strlen(path) + 1, expr->file);
+	size_t length = strlen(path) + 1;
+	if (fwrite(path, 1, length, expr->file) != length) {
+		eval_error(state);
+	}
 	return true;
 }
 
