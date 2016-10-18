@@ -62,13 +62,13 @@ static int ensure_fd_open(int fd, int flags) {
 int main(int argc, char *argv[]) {
 	int ret = EXIT_FAILURE;
 
-	if (ensure_fd_open(STDIN_FILENO, O_WRONLY) != 0) {
+	if (ensure_fd_open(STDIN_FILENO, O_RDONLY) != 0) {
 		goto done;
 	}
-	if (ensure_fd_open(STDOUT_FILENO, O_RDONLY) != 0) {
+	if (ensure_fd_open(STDOUT_FILENO, O_WRONLY) != 0) {
 		goto done;
 	}
-	if (ensure_fd_open(STDERR_FILENO, O_RDONLY) != 0) {
+	if (ensure_fd_open(STDERR_FILENO, O_WRONLY) != 0) {
 		goto done;
 	}
 
