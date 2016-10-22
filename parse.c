@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -1955,6 +1956,29 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 }
 
 /**
+ * Get the current time.
+ */
+static int parse_gettime(struct timespec *ts) {
+#if _POSIX_TIMERS > 0
+	int ret = clock_gettime(CLOCK_REALTIME, ts);
+	if (ret != 0) {
+		perror("clock_gettime()");
+	}
+	return ret;
+#else
+	struct timeval tv;
+	int ret = gettimeofday(&tv, NULL);
+	if (ret == 0) {
+		ts->tv_sec = tv.tv_sec;
+		ts->tv_nsec = tv.tv_usec * 1000L;
+	} else {
+		perror("gettimeofday()");
+	}
+	return ret;
+#endif
+}
+
+/**
  * Parse the command line.
  */
 struct cmdline *parse_cmdline(int argc, char *argv[]) {
@@ -1987,8 +2011,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.just_info = false,
 	};
 
-	if (clock_gettime(CLOCK_REALTIME, &state.now) != 0) {
-		perror("clock_gettime()");
+	if (parse_gettime(&state.now) != 0) {
 		goto fail;
 	}
 

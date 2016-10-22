@@ -777,6 +777,27 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	return false;
 }
 
+#if _POSIX_MONOTONIC_CLOCK > 0
+#	define BFS_CLOCK CLOCK_MONOTONIC
+#elif _POSIX_TIMERS > 0
+#	define BFS_CLOCK CLOCK_REALTIME
+#endif
+
+/**
+ * Call clock_gettime(), if available.
+ */
+static int eval_gettime(struct timespec *ts) {
+#ifdef BFS_CLOCK
+	int ret = clock_gettime(BFS_CLOCK, ts);
+	if (ret != 0) {
+		perror("clock_gettime()");
+	}
+	return ret;
+#else
+	return -1;
+#endif
+}
+
 /**
  * Record the time that elapsed evaluating an expression.
  */
@@ -799,8 +820,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 	struct timespec start, end;
 	bool time = state->cmdline->debug & DEBUG_RATES;
 	if (time) {
-		if (clock_gettime(CLOCK_MONOTONIC, &start) != 0) {
-			perror("clock_gettime()");
+		if (eval_gettime(&start) != 0) {
 			time = false;
 		}
 	}
@@ -808,10 +828,8 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 	bool ret = expr->eval(expr, state);
 
 	if (time) {
-		if (clock_gettime(CLOCK_MONOTONIC, &end) == 0) {
+		if (eval_gettime(&end) == 0) {
 			add_elapsed(expr, &start, &end);
-		} else {
-			perror("clock_gettime()");
 		}
 	}
 
