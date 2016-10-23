@@ -1035,6 +1035,14 @@ static struct expr *parse_hidden(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
+ * Parse -(no)?ignore_readdir_race.
+ */
+static struct expr *parse_ignore_races(struct parser_state *state, int ignore, int arg2) {
+	state->cmdline->ignore_races = ignore;
+	return parse_nullary_option(state);
+}
+
+/**
  * Parse -inum N.
  */
 static struct expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
@@ -1443,6 +1451,7 @@ static const struct table_entry parse_table[] = {
 	{"group", false, parse_group},
 	{"help", false, parse_help},
 	{"hidden", false, parse_hidden},
+	{"ignore_readdir_race", false, parse_ignore_races, true},
 	{"ilname", false, parse_lname, true},
 	{"iname", false, parse_name, true},
 	{"inum", false, parse_inum},
@@ -1460,6 +1469,7 @@ static const struct table_entry parse_table[] = {
 	{"newer", true, parse_newerxy},
 	{"nocolor", false, parse_color, false},
 	{"nohidden", false, parse_nohidden},
+	{"noignore_readdir_race", false, parse_ignore_races, false},
 	{"noleaf", false, parse_noleaf},
 	{"not"},
 	{"nowarn", false, parse_warn, false},
@@ -1932,8 +1942,16 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		fprintf(stderr, "%s ", root->path);
 	}
 
+	if (cmdline->stdout_colors) {
+		fputs("-color ", stderr);
+	} else {
+		fputs("-nocolor ", stderr);
+	}
 	if (cmdline->flags & BFTW_DEPTH) {
 		fputs("-depth ", stderr);
+	}
+	if (cmdline->ignore_races) {
+		fputs("-ignore_readdir_race ", stderr);
 	}
 	if (cmdline->flags & BFTW_MOUNT) {
 		fputs("-mount ", stderr);
@@ -1943,11 +1961,6 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	}
 	if (cmdline->maxdepth != INT_MAX) {
 		fprintf(stderr, "-maxdepth %d ", cmdline->maxdepth);
-	}
-	if (cmdline->stdout_colors) {
-		fputs("-color ", stderr);
-	} else {
-		fputs("-nocolor ", stderr);
 	}
 
 	dump_expr(cmdline->expr, verbose);
@@ -1993,6 +2006,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->flags = BFTW_RECOVER;
 	cmdline->optlevel = 3;
 	cmdline->debug = 0;
+	cmdline->ignore_races = false;
 	cmdline->expr = &expr_true;
 	cmdline->nopen_files = 0;
 

@@ -106,6 +106,8 @@ struct cmdline {
 	int optlevel;
 	/** Debugging flags. */
 	enum debug_flags debug;
+	/** Whether to ignore deletions that race with bfs. */
+	bool ignore_races;
 
 	/** The command line expression. */
 	struct expr *expr;

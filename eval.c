@@ -52,12 +52,23 @@ struct eval_state {
 };
 
 /**
+ * Check if an error should be ignored.
+ */
+static bool eval_should_ignore(const struct eval_state *state, int error) {
+	return state->cmdline->ignore_races
+		&& error == ENOENT
+		&& state->ftwbuf->depth > 0;
+}
+
+/**
  * Report an error that occurs during evaluation.
  */
 static void eval_error(struct eval_state *state) {
-	pretty_error(state->cmdline->stderr_colors,
-	             "'%s': %s\n", state->ftwbuf->path, strerror(errno));
-	state->ret = -1;
+	if (!eval_should_ignore(state, errno)) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "'%s': %s\n", state->ftwbuf->path, strerror(errno));
+		state->ret = -1;
+	}
 }
 
 /**
@@ -905,8 +916,6 @@ struct callback_args {
 	const struct cmdline *cmdline;
 	/** Eventual return value from eval_cmdline(). */
 	int ret;
-	/** The last error code seen. */
-	int last_error;
 };
 
 /**
@@ -917,18 +926,21 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 
 	const struct cmdline *cmdline = args->cmdline;
 
-	if (ftwbuf->typeflag == BFTW_ERROR) {
-		args->last_error = ftwbuf->error;
-		pretty_error(cmdline->stderr_colors, "'%s': %s\n", ftwbuf->path, strerror(ftwbuf->error));
-		return BFTW_SKIP_SUBTREE;
-	}
-
 	struct eval_state state = {
 		.ftwbuf = ftwbuf,
 		.cmdline = cmdline,
 		.action = BFTW_CONTINUE,
 		.ret = args->ret,
 	};
+
+	if (ftwbuf->typeflag == BFTW_ERROR) {
+		if (!eval_should_ignore(&state, ftwbuf->error)) {
+			state.ret = -1;
+			pretty_error(cmdline->stderr_colors, "'%s': %s\n", ftwbuf->path, strerror(ftwbuf->error));
+		}
+		state.action = BFTW_SKIP_SUBTREE;
+		goto done;
+	}
 
 	if (ftwbuf->depth >= cmdline->maxdepth) {
 		state.action = BFTW_SKIP_SUBTREE;
@@ -948,6 +960,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		eval_expr(cmdline->expr, &state);
 	}
 
+done:
 	if ((cmdline->debug & DEBUG_STAT) && ftwbuf->statbuf) {
 		debug_stat(&state);
 	}
@@ -1024,14 +1037,9 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	};
 
 	for (struct root *root = cmdline->roots; root; root = root->next) {
-		args.last_error = 0;
-
 		if (bftw(root->path, cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
 			args.ret = -1;
-
-			if (errno != args.last_error) {
-				perror("bftw()");
-			}
+			perror("bftw()");
 		}
 	}
 

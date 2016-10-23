@@ -713,9 +713,12 @@ static void bftw_path_trim(struct bftw_state *state) {
  * Record an error.
  */
 static void bftw_set_error(struct bftw_state *state, int error) {
-	state->error = error;
 	state->ftwbuf.error = error;
 	state->ftwbuf.typeflag = BFTW_ERROR;
+
+	if (!(state->flags & BFTW_RECOVER)) {
+		state->error = error;
+	}
 }
 
 /**

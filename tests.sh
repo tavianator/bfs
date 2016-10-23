@@ -62,11 +62,12 @@ function make_weirdnames() {
 weirdnames="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.weirdnames.XXXXXXXXXX)"
 make_weirdnames "$weirdnames"
 
-out="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.out.XXXXXXXXXX)"
+# Create a scratch directory that tests can modify
+scratch="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.weirdnames.XXXXXXXXXX)"
 
 # Clean up temporary directories on exit
 function cleanup() {
-    rm -rf "$out"
+    rm -rf "$scratch"
     rm -rf "$weirdnames"
     rm -rf "$links"
     rm -rf "$perms"
@@ -359,12 +360,12 @@ function test_0064() {
 }
 
 function test_0065() {
-    find "$basic" -fprint "$out/out.find"
-    "$BFS" "$basic" -fprint "$out/out.bfs"
+    find "$basic" -fprint "$scratch/out.find"
+    "$BFS" "$basic" -fprint "$scratch/out.bfs"
 
-    sort -o "$out/out.find" "$out/out.find"
-    sort -o "$out/out.bfs" "$out/out.bfs"
-    diff -u "$out/out.find" "$out/out.bfs"
+    sort -o "$scratch/out.find" "$scratch/out.find"
+    sort -o "$scratch/out.bfs" "$scratch/out.bfs"
+    diff -u "$scratch/out.find" "$scratch/out.bfs"
 }
 
 function test_0066() {
@@ -377,7 +378,20 @@ function test_0067() {
     find_diff -L -- -type f
 }
 
-for i in {1..67}; do
+function test_0068() {
+    # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
+    ! "$BFS" "$basic/nonexistent" -ignore_readdir_race 2>/dev/null
+}
+
+function test_0069() {
+    rm -rf "$scratch"/*
+    touch "$scratch"/{foo,bar}
+
+    # -links 1 forces a stat() call, which will fail for the second file
+    "$BFS" "$scratch" -ignore_readdir_race -links 1 -exec ./tests/remove-sibling.sh '{}' ';'
+}
+
+for i in {1..69}; do
     test="test_$(printf '%04d' $i)"
     ("$test" "$dir")
     status=$?
