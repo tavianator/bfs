@@ -388,7 +388,7 @@ function test_0069() {
     touch "$scratch"/{foo,bar}
 
     # -links 1 forces a stat() call, which will fail for the second file
-    "$BFS" "$scratch" -ignore_readdir_race -links 1 -exec ./tests/remove-sibling.sh '{}' ';'
+    "$BFS" "$scratch" -mindepth 1 -ignore_readdir_race -links 1 -exec ./tests/remove-sibling.sh '{}' ';'
 }
 
 for i in {1..69}; do
