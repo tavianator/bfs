@@ -393,10 +393,24 @@ function test_0069() {
 
 for i in {1..69}; do
     test="test_$(printf '%04d' $i)"
+
+    if [ -t 1 ]; then
+        printf '\r%s' "$test"
+    fi
+
     ("$test" "$dir")
     status=$?
+
     if [ $status -ne 0 ]; then
-        echo "$test failed!" >&2
+        if [ -t 1 ]; then
+            echo " failed!"
+        else
+            echo "$test failed!"
+        fi
         exit $status
     fi
 done
+
+if [ -t 1 ]; then
+    echo
+fi
