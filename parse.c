@@ -1075,7 +1075,7 @@ static struct expr *set_fnm_casefold(const struct parser_state *state, struct ex
 #else
 			pretty_error(state->cmdline->stderr_colors,
 			             "error: %s is missing platform support.\n", expr->argv[0]);
-			free(expr);
+			free_expr(expr);
 			return NULL;
 #endif
 		} else {
@@ -1139,20 +1139,20 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 	case 'B':
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: %s: File birth times ('B') are not supported.\n", arg);
-		free(expr);
+		free_expr(expr);
 		return NULL;
 
 	default:
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.\n", arg);
-		free(expr);
+		free_expr(expr);
 		return NULL;
 	}
 
 	if (arg[7] == 't') {
 		pretty_error(state->cmdline->stderr_colors,
 		             "error: %s: Explicit reference times ('t') are not supported.\n", arg);
-		free(expr);
+		free_expr(expr);
 		return NULL;
 	} else {
 		struct stat sb;
@@ -1174,13 +1174,13 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 		case 'B':
 			pretty_error(state->cmdline->stderr_colors,
 			             "error: %s: File birth times ('B') are not supported.\n", arg);
-			free(expr);
+			free_expr(expr);
 			return NULL;
 
 		default:
 			pretty_error(state->cmdline->stderr_colors,
 			             "error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.\n", arg);
-			free(expr);
+			free_expr(expr);
 			return NULL;
 		}
 	}
@@ -1310,7 +1310,7 @@ bad_unit:
 	             "error: %s %s: Expected a size unit of 'b', 'c', 'w', 'k', 'M', or 'G'; found %s.\n",
 	             expr->argv[0], expr->argv[1], unit);
 fail:
-	free(expr);
+	free_expr(expr);
 	return NULL;
 }
 
