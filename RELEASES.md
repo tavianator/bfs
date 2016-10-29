@@ -2,6 +2,22 @@
 ===
 
 
+0.84
+----
+
+**October 29, 2016**
+
+64/76 GNU find features supported.
+
+- Spelling suggestion improvements
+- Handle `--`
+- (Untested) support for exotic file types like doors, ports, and whiteouts
+- Improved robustness in the face of closed std{in,out,err}
+- Fixed the build on macOS
+- Implement `-ignore_readdir_race`, `-noignore_readdir_race`
+- Implement `-perm`
+
+
 0.82
 ----
 
