@@ -370,12 +370,14 @@ static const char *skip_paths(struct parser_state *state) {
 
 /** Integer parsing flags. */
 enum int_flags {
-	IF_INT         = 0,
-	IF_LONG        = 1,
-	IF_LONG_LONG   = 2,
-	IF_SIZE_MASK   = 0x3,
-	IF_UNSIGNED    = 1 << 2,
-	IF_PARTIAL_OK  = 1 << 3,
+	IF_BASE_MASK   = 0x03F,
+	IF_INT         = 0x040,
+	IF_LONG        = 0x080,
+	IF_LONG_LONG   = 0x0C0,
+	IF_SIZE_MASK   = 0x0C0,
+	IF_UNSIGNED    = 0x100,
+	IF_PARTIAL_OK  = 0x200,
+	IF_QUIET       = 0x400,
 };
 
 /**
@@ -384,8 +386,13 @@ enum int_flags {
 static const char *parse_int(const struct parser_state *state, const char *str, void *result, enum int_flags flags) {
 	char *endptr;
 
+	int base = flags & IF_BASE_MASK;
+	if (base == 0) {
+		base = 10;
+	}
+
 	errno = 0;
-	long long value = strtoll(str, &endptr, 10);
+	long long value = strtoll(str, &endptr, base);
 	if (errno != 0) {
 		goto bad;
 	}
@@ -425,8 +432,10 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 	return endptr;
 
 bad:
-	pretty_error(state->cmdline->stderr_colors,
-	             "error: '%s' is not a valid integer.\n", str);
+	if (!(flags & IF_QUIET)) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: '%s' is not a valid integer.\n", str);
+	}
 	return NULL;
 }
 
@@ -1209,6 +1218,255 @@ static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
+ * Parse a permission mode like chmod(1).
+ */
+static int parse_mode(const struct parser_state *state, const char *mode, struct expr *expr) {
+	if (mode[0] >= '0' && mode[0] <= '9') {
+		unsigned int parsed;
+		if (!parse_int(state, mode, &parsed, 8 | IF_INT | IF_UNSIGNED | IF_QUIET)) {
+			goto fail;
+		}
+		if (parsed > 07777) {
+			goto fail;
+		}
+
+		expr->file_mode = parsed;
+		expr->dir_mode = parsed;
+		return 0;
+	}
+
+	expr->file_mode = 0;
+	expr->dir_mode = 0;
+
+	// Parse the same grammar as chmod(1), which looks like this:
+	//
+	// MODE : CLAUSE ["," CLAUSE]*
+	//
+	// CLAUSE : WHO* ACTION+
+	//
+	// WHO : "u" | "g" | "o" | "a"
+	//
+	// ACTION : OP PERM*
+	//        | OP PERMCOPY
+	//
+	// OP : "+" | "-" | "="
+	//
+	// PERM : "r" | "w" | "x" | "X" | "s" | "t"
+	//
+	// PERMCOPY : "u" | "g" | "o"
+
+	// State machine state
+	enum {
+		MODE_CLAUSE,
+		MODE_WHO,
+		MODE_ACTION,
+		MODE_ACTION_APPLY,
+		MODE_OP,
+		MODE_PERM,
+	} mstate = MODE_CLAUSE;
+
+	enum {
+		MODE_PLUS,
+		MODE_MINUS,
+		MODE_EQUALS,
+	} op;
+
+	mode_t who;
+	mode_t file_change;
+	mode_t dir_change;
+
+	const char *i = mode;
+	while (true) {
+		switch (mstate) {
+		case MODE_CLAUSE:
+			who = 0;
+			mstate = MODE_WHO;
+			// Fallthrough
+
+		case MODE_WHO:
+			switch (*i) {
+			case 'u':
+				who |= 0700;
+				break;
+			case 'g':
+				who |= 0070;
+				break;
+			case 'o':
+				who |= 0007;
+				break;
+			case 'a':
+				who |= 0777;
+				break;
+			default:
+				mstate = MODE_ACTION;
+				continue;
+			}
+			break;
+
+		case MODE_ACTION_APPLY:
+			switch (op) {
+			case MODE_EQUALS:
+				expr->file_mode &= ~who;
+				expr->dir_mode &= ~who;
+				// Fallthrough
+			case MODE_PLUS:
+				expr->file_mode |= file_change;
+				expr->dir_mode |= dir_change;
+				break;
+			case MODE_MINUS:
+				expr->file_mode &= ~file_change;
+				expr->dir_mode &= ~dir_change;
+				break;
+			}
+			// Fallthrough
+
+		case MODE_ACTION:
+			if (who == 0) {
+				who = 0777;
+			}
+
+			switch (*i) {
+			case '+':
+				op = MODE_PLUS;
+				mstate = MODE_OP;
+				break;
+			case '-':
+				op = MODE_MINUS;
+				mstate = MODE_OP;
+				break;
+			case '=':
+				op = MODE_EQUALS;
+				mstate = MODE_OP;
+				break;
+
+			case ',':
+				if (mstate == MODE_ACTION_APPLY) {
+					mstate = MODE_CLAUSE;
+				} else {
+					goto fail;
+				}
+				break;
+
+			case '\0':
+				if (mstate == MODE_ACTION_APPLY) {
+					goto done;
+				} else {
+					goto fail;
+				}
+
+			default:
+				goto fail;
+			}
+			break;
+
+		case MODE_OP:
+			file_change = 0;
+			dir_change = 0;
+
+			switch (*i) {
+			case 'u':
+			case 'g':
+			case 'o':
+				// PERMCOPY (e.g. u=g) has no effect for -perm
+				mstate = MODE_ACTION_APPLY;
+				break;
+
+			default:
+				mstate = MODE_PERM;
+				continue;
+			}
+			break;
+
+		case MODE_PERM:
+			switch (*i) {
+			case 'r':
+				file_change |= who & 0444;
+				dir_change |= who & 0444;
+				break;
+			case 'w':
+				file_change |= who & 0222;
+				dir_change |= who & 0222;
+				break;
+			case 'x':
+				file_change |= who & 0111;
+				// Fallthrough
+			case 'X':
+				dir_change |= who & 0111;
+				break;
+			case 's':
+				if (who & 0700) {
+					file_change |= S_ISUID;
+					dir_change |= S_ISUID;
+				}
+				if (who & 0070) {
+					file_change |= S_ISGID;
+					dir_change |= S_ISGID;
+				}
+				break;
+			case 't':
+				file_change |= S_ISVTX;
+				dir_change |= S_ISVTX;
+				break;
+			default:
+				mstate = MODE_ACTION_APPLY;
+				continue;
+			}
+			break;
+		}
+
+		++i;
+	}
+
+done:
+	return 0;
+
+fail:
+	pretty_error(state->cmdline->stderr_colors,
+	             "error: '%s' is an invalid mode.\n\n",
+	             mode);
+	return -1;
+}
+
+/**
+ * Parse -perm MODE.
+ */
+static struct expr *parse_perm(struct parser_state *state, int field, int arg2) {
+	struct expr *expr = parse_unary_test(state, eval_perm);
+	if (!expr) {
+		return NULL;
+	}
+
+	const char *mode = expr->sdata;
+	switch (mode[0]) {
+	case '-':
+		expr->mode_cmp = MODE_ALL;
+		++mode;
+		break;
+	case '/':
+		expr->mode_cmp = MODE_ANY;
+		++mode;
+		break;
+	case '+':
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: -perm +mode is not supported.\n\n");
+		goto fail;
+	default:
+		expr->mode_cmp = MODE_EXACT;
+		break;
+	}
+
+	if (parse_mode(state, mode, expr) != 0) {
+		goto fail;
+	}
+
+	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
  * Parse -print.
  */
 static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) {
@@ -1478,6 +1736,7 @@ static const struct table_entry parse_table[] = {
 	{"okdir", false, parse_exec, EXEC_CONFIRM | EXEC_CHDIR},
 	{"or"},
 	{"path", false, parse_path, false},
+	{"perm", false, parse_perm},
 	{"print", false, parse_print},
 	{"print0", false, parse_print0},
 	{"prune", false, parse_prune},

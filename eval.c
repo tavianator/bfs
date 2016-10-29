@@ -636,6 +636,37 @@ bool eval_path(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -perm test.
+ */
+bool eval_perm(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	mode_t mode = statbuf->st_mode;
+	mode_t target;
+	if (state->ftwbuf->typeflag == BFTW_DIR) {
+		target = expr->dir_mode;
+	} else {
+		target = expr->file_mode;
+	}
+
+	switch (expr->mode_cmp) {
+	case MODE_EXACT:
+		return (mode & 07777) == target;
+
+	case MODE_ALL:
+		return (mode & target) == target;
+
+	case MODE_ANY:
+		return !(mode & target) == !target;
+	}
+
+	return false;
+}
+
+/**
  * -print action.
  */
 bool eval_print(const struct expr *expr, struct eval_state *state) {

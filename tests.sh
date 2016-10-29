@@ -391,7 +391,50 @@ function test_0069() {
     "$BFS" "$scratch" -mindepth 1 -ignore_readdir_race -links 1 -exec ./tests/remove-sibling.sh '{}' ';'
 }
 
-for i in {1..69}; do
+function test_0070() {
+    find_diff "$perms" -perm 222 && \
+        find_diff "$perms" -perm -222 && \
+        find_diff "$perms" -perm /222
+}
+
+function test_0071() {
+    find_diff "$perms" -perm 644 && \
+        find_diff "$perms" -perm -644 && \
+        find_diff "$perms" -perm /644
+}
+
+function test_0072() {
+    find_diff "$perms" -perm a+r,u=wX,g+wX-w && \
+        find_diff "$perms" -perm -a+r,u=wX,g+wX-w && \
+        find_diff "$perms" -perm /a+r,u=wX,g+wX-w
+}
+
+function test_0073() {
+    ! "$BFS" "$perms" -perm a+r, 2>/dev/null
+}
+
+function test_0074() {
+    ! "$BFS" "$perms" -perm a+r,,u+w 2>/dev/null
+}
+
+function test_0075() {
+    ! "$BFS" "$perms" -perm a 2>/dev/null
+}
+
+function test_0076() {
+    find_diff "$perms" -perm -+rwx && \
+        find_diff "$perms" -perm /+rwx
+}
+
+function test_0077() {
+    ! "$BFS" "$perms" -perm +rwx 2>/dev/null
+}
+
+function test_0078() {
+    ! "$BFS" "$perms" -perm +777 2>/dev/null
+}
+
+for i in {1..78}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
@@ -403,14 +446,14 @@ for i in {1..69}; do
 
     if [ $status -ne 0 ]; then
         if [ -t 1 ]; then
-            echo " failed!"
+            printf '\r%s failed!\n' "$test"
         else
-            echo "$test failed!"
+            printf '%s failed!\n' "$test"
         fi
         exit $status
     fi
 done
 
 if [ -t 1 ]; then
-    echo
+    printf '\n'
 fi

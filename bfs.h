@@ -129,6 +129,18 @@ enum cmp_flag {
 };
 
 /**
+ * Possible types of mode comparison.
+ */
+enum mode_cmp {
+	/** Mode is an exact match (MODE). */
+	MODE_EXACT,
+	/** Mode has all these bits (-MODE). */
+	MODE_ALL,
+	/** Mode has any of these bits (/MODE). */
+	MODE_ANY,
+};
+
+/**
  * Available struct stat time fields.
  */
 enum time_field {
@@ -207,6 +219,13 @@ struct expr {
 	/** The optional comparison flag. */
 	enum cmp_flag cmp_flag;
 
+	/** The mode comparison flag. */
+	enum mode_cmp mode_cmp;
+	/** Mode to use for files. */
+	mode_t file_mode;
+	/** Mode to use for directories (different due to X). */
+	mode_t dir_mode;
+
 	/** The optional reference time. */
 	struct timespec reftime;
 	/** The optional time field. */
@@ -260,6 +279,7 @@ bool eval_true(const struct expr *expr, struct eval_state *state);
 bool eval_false(const struct expr *expr, struct eval_state *state);
 
 bool eval_access(const struct expr *expr, struct eval_state *state);
+bool eval_perm(const struct expr *expr, struct eval_state *state);
 
 bool eval_acmtime(const struct expr *expr, struct eval_state *state);
 bool eval_acnewer(const struct expr *expr, struct eval_state *state);
