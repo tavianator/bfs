@@ -955,7 +955,7 @@ static void bftw_state_free(struct bftw_state *state) {
 }
 
 int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void *ptr) {
-	int ret = -1;
+	int ret = -1, error;
 
 	struct bftw_state state;
 	if (bftw_state_init(&state, fn, nopenfd, flags, ptr) != 0) {
@@ -1076,7 +1076,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 		continue;
 
 	dir_error:
-		state.error = errno;
+		error = errno;
 
 		if (dir) {
 			closedir(dir);
@@ -1084,7 +1084,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 		bftw_path_trim(&state);
 		bftw_init_buffers(&state, NULL);
-		bftw_set_error(&state, state.error);
+		bftw_set_error(&state, error);
 
 		switch (bftw_handle_path(&state)) {
 		case BFTW_CONTINUE:
