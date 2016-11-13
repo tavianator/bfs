@@ -2279,7 +2279,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.command = argv[0],
 		.roots_tail = &cmdline->roots,
 		.implicit_print = true,
-		.warn = true,
+		.warn = isatty(STDIN_FILENO),
 		.non_option_seen = false,
 		.just_info = false,
 	};
