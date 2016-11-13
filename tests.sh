@@ -434,7 +434,17 @@ function test_0078() {
     ! "$BFS" "$perms" -perm +777 2>/dev/null
 }
 
-for i in {1..78}; do
+function test_0079() {
+    # -ok should close stdin for the executed command
+    yes | "$BFS" "$basic" -ok cat ';' 2>/dev/null
+}
+
+function test_0080() {
+    # -okdir should close stdin for the executed command
+    yes | "$BFS" "$basic" -okdir cat ';' 2>/dev/null
+}
+
+for i in {1..80}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
