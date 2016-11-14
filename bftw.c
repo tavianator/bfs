@@ -621,6 +621,8 @@ struct bftw_state {
 	/** The current traversal status. */
 	enum bftw_status status;
 
+	/** The root path of the walk. */
+	const char *root;
 	/** The current path being explored. */
 	char *path;
 
@@ -633,7 +635,8 @@ struct bftw_state {
 /**
  * Initialize the bftw() state.
  */
-static int bftw_state_init(struct bftw_state *state, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+	state->root = root;
 	state->fn = fn;
 	state->flags = flags;
 	state->ptr = ptr;
@@ -697,10 +700,17 @@ static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 static void bftw_path_trim(struct bftw_state *state) {
 	struct dircache_entry *current = state->current;
 
-	size_t length = current->nameoff + current->namelen;
-	if (current->namelen > 1) {
-		// Trim the trailing slash
-		--length;
+	size_t length;
+	if (current->depth == 0) {
+		// Use exactly the string passed to bftw(), including any
+		// trailing slashes
+		length = strlen(state->root);
+	} else {
+		length = current->nameoff + current->namelen;
+		if (current->namelen > 1) {
+			// Trim the trailing slash
+			--length;
+		}
 	}
 	dstresize(&state->path, length);
 
@@ -958,7 +968,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 	int ret = -1, error;
 
 	struct bftw_state state;
-	if (bftw_state_init(&state, fn, nopenfd, flags, ptr) != 0) {
+	if (bftw_state_init(&state, path, fn, nopenfd, flags, ptr) != 0) {
 		return -1;
 	}
 

@@ -444,7 +444,11 @@ function test_0080() {
     yes | "$BFS" "$basic" -okdir cat ';' 2>/dev/null
 }
 
-for i in {1..80}; do
+function test_0081() {
+    find_diff "$basic/" -depth
+}
+
+for i in {1..81}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
