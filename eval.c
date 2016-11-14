@@ -243,6 +243,11 @@ bool eval_uid(const struct expr *expr, struct eval_state *state) {
 bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
+	// Don't try to delete the current directory
+	if (strcmp(ftwbuf->path, ".") == 0) {
+		return true;
+	}
+
 	int flag = 0;
 	if (ftwbuf->typeflag == BFTW_DIR) {
 		flag |= AT_REMOVEDIR;

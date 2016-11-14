@@ -448,7 +448,12 @@ function test_0081() {
     find_diff "$basic/" -depth
 }
 
-for i in {1..81}; do
+function test_0082() {
+    # Don't try to delete .
+    (cd "$scratch" && "$BFS" -delete)
+}
+
+for i in {1..82}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
