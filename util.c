@@ -17,6 +17,16 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+int xreaddir(DIR *dir, struct dirent **de) {
+	errno = 0;
+	*de = readdir(dir);
+	if (!*de && errno != 0) {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
 bool isopen(int fd) {
 	return fcntl(fd, F_GETFD) >= 0 || errno != EBADF;
 }

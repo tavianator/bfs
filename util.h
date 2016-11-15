@@ -12,7 +12,13 @@
 #ifndef BFS_UTIL_H
 #define BFS_UTIL_H
 
+#include <dirent.h>
 #include <stdbool.h>
+
+/**
+ * readdir() wrapper that makes error handling cleaner.
+ */
+int xreaddir(DIR *dir, struct dirent **de);
 
 /**
  * Check if a file descriptor is open.

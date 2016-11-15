@@ -22,6 +22,7 @@
 
 #include "bftw.h"
 #include "dstring.h"
+#include "util.h"
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -868,19 +869,6 @@ static struct dircache_entry *bftw_add(struct bftw_state *state, const char *nam
 }
 
 /**
- * readdir() wrapper that makes error handling cleaner.
- */
-static int bftw_readdir(DIR *dir, struct dirent **de) {
-	errno = 0;
-	*de = readdir(dir);
-	if (!*de && errno != 0) {
-		return -1;
-	} else {
-		return 0;
-	}
-}
-
-/**
  * Push a new entry onto the queue.
  */
 static int bftw_push(struct bftw_state *state, const char *name) {
@@ -1016,7 +1004,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 		while (true) {
 			struct dirent *de;
-			if (bftw_readdir(dir, &de) != 0) {
+			if (xreaddir(dir, &de) != 0) {
 				goto dir_error;
 			}
 			if (!de) {
