@@ -496,7 +496,7 @@ function test_0091() {
 }
 
 function test_0092() {
-    ! "$BFS" perms -perm +rwx 2>/dev/null
+    bfs_diff perms -perm +rwx
 }
 
 function test_0093() {

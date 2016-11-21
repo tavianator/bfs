@@ -1446,10 +1446,6 @@ static struct expr *parse_perm(struct parser_state *state, int field, int arg2) 
 		expr->mode_cmp = MODE_ANY;
 		++mode;
 		break;
-	case '+':
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: -perm +mode is not supported.\n\n");
-		goto fail;
 	default:
 		expr->mode_cmp = MODE_EXACT;
 		break;
