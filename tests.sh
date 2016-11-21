@@ -522,7 +522,21 @@ function test_0097() {
     (cd scratch && "$BFS" -delete)
 }
 
-for i in {1..97}; do
+function test_0098() {
+    bfs_diff / -maxdepth 0 -execdir pwd ';'
+}
+
+function test_0099() {
+    # Don't prepend ./ for absolute paths in -execdir
+    bfs_diff / -maxdepth 0 -execdir echo '{}' ';'
+}
+
+function test_0100() {
+    # // is canonicalized to /
+    bfs_diff // -maxdepth 0 -execdir echo '{}' ';'
+}
+
+for i in {1..100}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
