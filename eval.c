@@ -803,8 +803,11 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
-	bool is_root = ftwbuf->depth == 0;
-	bool follow = state->cmdline->flags & (is_root ? BFTW_FOLLOW_ROOT : BFTW_FOLLOW_NONROOT);
+	int follow_flags = BFTW_LOGICAL;
+	if (ftwbuf->depth == 0) {
+		follow_flags |= BFTW_COMFOLLOW;
+	}
+	bool follow = state->cmdline->flags & follow_flags;
 
 	bool is_link = ftwbuf->typeflag == BFTW_LNK;
 	if (follow == is_link) {

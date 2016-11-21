@@ -785,18 +785,22 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		ftwbuf->typeflag = BFTW_DIR;
 	}
 
-	bool follow = state->flags & (current ? BFTW_FOLLOW_NONROOT : BFTW_FOLLOW_ROOT);
+	int follow_flags = BFTW_LOGICAL;
+	if (ftwbuf->depth == 0) {
+		follow_flags |= BFTW_COMFOLLOW;
+	}
+	bool follow = state->flags & follow_flags;
 	ftwbuf->at_flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 	bool detect_cycles = (state->flags & BFTW_DETECT_CYCLES)
 		&& state->status == BFTW_CHILD;
 
-	bool mount = state->flags & BFTW_MOUNT;
+	bool xdev = state->flags & BFTW_XDEV;
 
 	if ((state->flags & BFTW_STAT)
 	    || ftwbuf->typeflag == BFTW_UNKNOWN
 	    || (ftwbuf->typeflag == BFTW_LNK && follow)
-	    || (ftwbuf->typeflag == BFTW_DIR && (detect_cycles || mount))) {
+	    || (ftwbuf->typeflag == BFTW_DIR && (detect_cycles || xdev))) {
 		int ret = ftwbuf_stat(ftwbuf, &state->statbuf, ftwbuf->at_flags);
 		if (ret != 0 && follow && errno == ENOENT) {
 			// Could be a broken symlink, retry without following
@@ -857,7 +861,7 @@ static struct dircache_entry *bftw_add(struct bftw_state *state, const char *nam
 		return NULL;
 	}
 
-	if (state->flags & (BFTW_DETECT_CYCLES | BFTW_MOUNT)) {
+	if (state->flags & (BFTW_DETECT_CYCLES | BFTW_XDEV)) {
 		const struct stat *statbuf = state->ftwbuf.statbuf;
 		if (statbuf) {
 			entry->dev = statbuf->st_dev;
@@ -1043,7 +1047,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 			if (state.ftwbuf.typeflag == BFTW_DIR) {
 				const struct stat *statbuf = state.ftwbuf.statbuf;
-				if ((flags & BFTW_MOUNT)
+				if ((flags & BFTW_XDEV)
 				    && statbuf
 				    && statbuf->st_dev != state.current->dev) {
 					continue;

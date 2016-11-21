@@ -271,7 +271,7 @@ static void debug_opt(const struct parser_state *state, const char *format, ...)
 static int stat_arg(const struct parser_state *state, struct expr *expr, struct stat *sb) {
 	const struct cmdline *cmdline = state->cmdline;
 
-	bool follow = cmdline->flags & BFTW_FOLLOW;
+	bool follow = cmdline->flags & (BFTW_COMFOLLOW | BFTW_LOGICAL);
 	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
 	int ret = fstatat(AT_FDCWD, expr->sdata, sb, flags);
@@ -684,7 +684,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
  */
 static struct expr *parse_follow(struct parser_state *state, int flags, int option) {
 	struct cmdline *cmdline = state->cmdline;
-	cmdline->flags &= ~(BFTW_FOLLOW | BFTW_DETECT_CYCLES);
+	cmdline->flags &= ~(BFTW_COMFOLLOW | BFTW_LOGICAL | BFTW_DETECT_CYCLES);
 	cmdline->flags |= flags;
 	if (option) {
 		return parse_nullary_positional_option(state);
@@ -1069,7 +1069,7 @@ static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) 
  * Parse -mount, -xdev.
  */
 static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_MOUNT;
+	state->cmdline->flags |= BFTW_XDEV;
 	return parse_nullary_option(state);
 }
 
@@ -1677,8 +1677,8 @@ static const struct table_entry parse_table[] = {
 	{"D", false, parse_debug},
 	{"O", true, parse_optlevel},
 	{"P", false, parse_follow, 0, false},
-	{"H", false, parse_follow, BFTW_FOLLOW_ROOT, false},
-	{"L", false, parse_follow, BFTW_FOLLOW | BFTW_DETECT_CYCLES, false},
+	{"H", false, parse_follow, BFTW_COMFOLLOW, false},
+	{"L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
 	{"a"},
 	{"amin", false, parse_acmtime, ATIME, MINUTES},
 	{"and"},
@@ -1698,7 +1698,7 @@ static const struct table_entry parse_table[] = {
 	{"executable", false, parse_access, X_OK},
 	{"f", false, parse_f},
 	{"false", false, parse_const, false},
-	{"follow", false, parse_follow, BFTW_FOLLOW | BFTW_DETECT_CYCLES, true},
+	{"follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
 	{"fprint", false, parse_fprint},
 	{"fprint0", false, parse_fprint0},
 	{"gid", false, parse_gid},
@@ -2164,9 +2164,9 @@ static struct expr *optimize_whole_expr(const struct parser_state *state, struct
  * Dump the parsed form of the command line, for debugging.
  */
 void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
-	if (cmdline->flags & BFTW_FOLLOW_NONROOT) {
+	if (cmdline->flags & BFTW_LOGICAL) {
 		fputs("-L ", stderr);
-	} else if (cmdline->flags & BFTW_FOLLOW_ROOT) {
+	} else if (cmdline->flags & BFTW_COMFOLLOW) {
 		fputs("-H ", stderr);
 	} else {
 		fputs("-P ", stderr);
@@ -2208,7 +2208,7 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	if (cmdline->ignore_races) {
 		fputs("-ignore_readdir_race ", stderr);
 	}
-	if (cmdline->flags & BFTW_MOUNT) {
+	if (cmdline->flags & BFTW_XDEV) {
 		fputs("-mount ", stderr);
 	}
 	if (cmdline->mindepth != 0) {
