@@ -388,7 +388,11 @@ static void exec_chdir(const struct BFTW *ftwbuf) {
 	while (end > path && end[-1] != '/') {
 		--end;
 	}
-	if (end > path) {
+	if (end == path) {
+		// The path is something like "foo", so we're already in the
+		// right directory
+		return;
+	} else {
 		*end = '\0';
 	}
 
