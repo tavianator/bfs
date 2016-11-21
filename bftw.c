@@ -222,6 +222,9 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 	entry->refcount = 1;
 	entry->fd = -1;
 
+	entry->dev = -1;
+	entry->ino = -1;
+
 	memcpy(entry->name, name, namelen);
 	if (needs_slash) {
 		entry->name[namelen++] = '/';
@@ -861,12 +864,10 @@ static struct dircache_entry *bftw_add(struct bftw_state *state, const char *nam
 		return NULL;
 	}
 
-	if (state->flags & (BFTW_DETECT_CYCLES | BFTW_XDEV)) {
-		const struct stat *statbuf = state->ftwbuf.statbuf;
-		if (statbuf) {
-			entry->dev = statbuf->st_dev;
-			entry->ino = statbuf->st_ino;
-		}
+	const struct stat *statbuf = state->ftwbuf.statbuf;
+	if (statbuf) {
+		entry->dev = statbuf->st_dev;
+		entry->ino = statbuf->st_ino;
 	}
 
 	return entry;
