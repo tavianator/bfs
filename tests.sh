@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# The temporary directory that will hold our test data
+TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
+
+# Clean up temporary directories on exit
+function cleanup() {
+    rm -rf "$TMP"
+}
+trap cleanup EXIT
+
 # Like a mythical touch -p
 function touchp() {
     install -Dm644 /dev/null "$1"
@@ -17,9 +26,7 @@ function make_basic() {
     touchp "$1/k/foo/bar"
     touchp "$1/l/foo/bar/baz"
 }
-
-basic="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.basic.XXXXXXXXXX)"
-make_basic "$basic"
+make_basic "$TMP/basic"
 
 # Creates a file+directory structure with various permissions for tests
 function make_perms() {
@@ -30,9 +37,7 @@ function make_perms() {
     install -Dm311 /dev/null "$1/wx"
     install -Dm755 /dev/null "$1/rwx"
 }
-
-perms="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.perms.XXXXXXXXXX)"
-make_perms "$perms"
+make_perms "$TMP/perms"
 
 # Creates a file+directory structure with various symbolic and hard links
 function make_links() {
@@ -44,9 +49,19 @@ function make_links() {
     ln -s d/e "$1/h"
     ln -s q "$1/d/e/i"
 }
+make_links "$TMP/links"
 
-links="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.links.XXXXXXXXXX)"
-make_links "$links"
+# Creates a file+directory structure with varying timestamps
+function make_times() {
+    mkdir -p "$1"
+    touch -t 199112140000 "$1/a"
+    touch -t 199112140001 "$1/b"
+    touch -t 199112140002 "$1/c"
+    ln -s a "$1/l"
+    touch -h -t 199112140003 "$1/l"
+    touch -t 199112140004 "$1"
+}
+make_times "$TMP/times"
 
 # Creates a file+directory structure with various weird file/directory names
 function make_weirdnames() {
@@ -58,22 +73,13 @@ function make_weirdnames() {
     touchp "$1/,/f"
     touchp "$1/)/g"
 }
+make_weirdnames "$TMP/weirdnames"
 
-weirdnames="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.weirdnames.XXXXXXXXXX)"
-make_weirdnames "$weirdnames"
-
-# Create a scratch directory that tests can modify
-scratch="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.weirdnames.XXXXXXXXXX)"
-
-# Clean up temporary directories on exit
-function cleanup() {
-    rm -rf "$scratch"
-    rm -rf "$weirdnames"
-    rm -rf "$links"
-    rm -rf "$perms"
-    rm -rf "$basic"
+# Creates a scratch directory that tests can modify
+function make_scratch() {
+    mkdir -p "$1"
 }
-trap cleanup EXIT
+make_scratch "$TMP/scratch"
 
 function _realpath() {
     (
@@ -83,377 +89,440 @@ function _realpath() {
 }
 
 BFS="$(_realpath ./bfs)"
+TESTS="$(_realpath ./tests)"
 
-# Checks for any (order-independent) differences between bfs and find
-function find_diff() {
-    diff -u <("$BFS" "$@" | sort) <(find "$@" | sort)
+if [ "$1" == "update" ]; then
+    UPDATE="update"
+fi
+
+function bfs_sort() {
+    LC_ALL=C awk -F/ '{ print NF - 1 " " $0 }' | sort -n | awk '{ print $2 }'
 }
+
+function bfs_diff() {
+    local OUT="$TESTS/${FUNCNAME[1]}.out"
+    if [ "$UPDATE" ]; then
+        "$BFS" "$@" | bfs_sort >"$OUT"
+    else
+        diff -u "$OUT" <("$BFS" "$@" | bfs_sort)
+    fi
+}
+
+cd "$TMP"
 
 # Test cases
 
 function test_0001() {
-    find_diff "$basic"
+    bfs_diff basic
 }
 
 function test_0002() {
-    find_diff "$basic" -type d
+    bfs_diff basic -type d
 }
 
 function test_0003() {
-    find_diff "$basic" -type f
+    bfs_diff basic -type f
 }
 
 function test_0004() {
-    find_diff "$basic" -mindepth 1
+    bfs_diff basic -mindepth 1
 }
 
 function test_0005() {
-    find_diff "$basic" -maxdepth 1
+    bfs_diff basic -maxdepth 1
 }
 
 function test_0006() {
-    find_diff "$basic" -mindepth 1 -depth
+    bfs_diff basic -mindepth 1 -depth
 }
 
 function test_0007() {
-    find_diff "$basic" -mindepth 2 -depth
+    bfs_diff basic -mindepth 2 -depth
 }
 
 function test_0008() {
-    find_diff "$basic" -maxdepth 1 -depth
+    bfs_diff basic -maxdepth 1 -depth
 }
 
 function test_0009() {
-    find_diff "$basic" -maxdepth 2 -depth
+    bfs_diff basic -maxdepth 2 -depth
 }
 
 function test_0010() {
-    find_diff "$basic" -name '*f*'
+    bfs_diff basic -name '*f*'
 }
 
 function test_0011() {
-    find_diff "$basic" -path "$basic/*f*"
+    bfs_diff basic -path 'basic/*f*'
 }
 
 function test_0012() {
-    find_diff "$perms" -executable
+    bfs_diff perms -executable
 }
 
 function test_0013() {
-    find_diff "$perms" -readable
+    bfs_diff perms -readable
 }
 
 function test_0014() {
-    find_diff "$perms" -writable
+    bfs_diff perms -writable
 }
 
 function test_0015() {
-    find_diff "$basic" -empty
+    bfs_diff basic -empty
 }
 
 function test_0016() {
-    find_diff "$basic" -gid "$(id -g)" && \
-        find_diff "$basic" -gid +0 && \
-        find_diff "$basic" -gid -10000
+    bfs_diff basic -gid "$(id -g)"
 }
 
 function test_0017() {
-    find_diff "$basic" -uid "$(id -u)" && \
-        find_diff "$basic" -uid +0 && \
-        find_diff "$basic" -uid -10000
+    bfs_diff basic -gid +0
 }
 
 function test_0018() {
-    find_diff "$basic" -newer "$basic/e/f"
+    bfs_diff basic -gid "-$(($(id -g) + 1))"
 }
 
 function test_0019() {
-    find_diff "$basic" -cnewer "$basic/e/f"
+    bfs_diff basic -uid "$(id -u)"
 }
 
 function test_0020() {
-    find_diff "$links" -links 2 && \
-        find_diff "$links" -links -2 && \
-        find_diff "$links" -links +1
+    bfs_diff basic -uid +0
 }
 
 function test_0021() {
-    find_diff -P "$links/d/e/f" && \
-        find_diff -P "$links/d/e/f/"
+    bfs_diff basic -uid "-$(($(id -u) + 1))"
 }
 
 function test_0022() {
-    find_diff -H "$links/d/e/f" && \
-        find_diff -H "$links/d/e/f/"
+    bfs_diff times -newer times/a
 }
 
 function test_0023() {
-    find_diff -H "$links" -newer "$links/d/e/f"
+    bfs_diff times -anewer times/a
 }
 
 function test_0024() {
-    find_diff -H "$links/d/e/i"
+    bfs_diff links -links 2
 }
 
 function test_0025() {
-    find_diff -L "$links" 2>/dev/null
+    bfs_diff links -links -2
 }
 
 function test_0026() {
-    find_diff "$links" -follow 2>/dev/null
+    bfs_diff links -links +1
 }
 
 function test_0027() {
-    find_diff -L "$links" -depth 2>/dev/null
+    bfs_diff -P links/d/e/f
 }
 
 function test_0028() {
-    find_diff "$links" -samefile "$links/a"
+    bfs_diff -P links/d/e/f/
 }
 
 function test_0029() {
-    find_diff "$links" -xtype l
+    bfs_diff -H links/d/e/f
 }
 
 function test_0030() {
-    find_diff "$links" -xtype f
+    bfs_diff -H links/d/e/f/
 }
 
 function test_0031() {
-    find_diff -L "$links" -xtype l 2>/dev/null
+    bfs_diff -H times -newer times/l
 }
 
 function test_0032() {
-    find_diff -L "$links" -xtype f 2>/dev/null
+    bfs_diff -H links/d/e/i
 }
 
 function test_0033() {
-    find_diff "$basic/a" -name 'a'
+    bfs_diff -L links 2>/dev/null
 }
 
 function test_0034() {
-    find_diff "$basic/g/" -name 'g'
+    bfs_diff links -follow 2>/dev/null
 }
 
 function test_0035() {
-    find_diff "/" -maxdepth 0 -name '/' 2>/dev/null
+    bfs_diff -L links -depth 2>/dev/null
 }
 
 function test_0036() {
-    find_diff "//" -maxdepth 0 -name '/' 2>/dev/null
+    bfs_diff links -samefile links/a
 }
 
 function test_0037() {
-    find_diff "$basic" -iname '*F*'
+    bfs_diff links -xtype l
 }
 
 function test_0038() {
-    find_diff "$basic" -ipath "$basic/*F*"
+    bfs_diff links -xtype f
 }
 
 function test_0039() {
-    find_diff "$links" -lname '[aq]'
+    bfs_diff -L links -xtype l 2>/dev/null
 }
 
 function test_0040() {
-    find_diff "$links" -ilname '[AQ]'
+    bfs_diff -L links -xtype f 2>/dev/null
 }
 
 function test_0041() {
-    find_diff -L "$links" -lname '[aq]' 2>/dev/null
+    bfs_diff basic/a -name a
 }
 
 function test_0042() {
-    find_diff -L "$links" -lname '[AQ]' 2>/dev/null
+    bfs_diff basic/g/ -name g
 }
 
 function test_0043() {
-    find_diff -L "$basic" -user "$(id -un)"
+    bfs_diff / -maxdepth 0 -name / 2>/dev/null
 }
 
 function test_0044() {
-    find_diff -L "$basic" -user "$(id -u)"
+    bfs_diff // -maxdepth 0 -name / 2>/dev/null
 }
 
 function test_0045() {
-    find_diff -L "$basic" -group "$(id -gn)"
+    bfs_diff basic -iname '*F*'
 }
 
 function test_0046() {
-    find_diff -L "$basic" -group "$(id -g)"
+    bfs_diff basic -ipath 'basic/*F*'
 }
 
 function test_0047() {
-    find_diff "$basic" -daystart -mtime 0
+    bfs_diff links -lname '[aq]'
 }
 
 function test_0048() {
-    find_diff "$basic" -daystart -daystart -mtime 0
+    bfs_diff links -ilname '[AQ]'
 }
 
 function test_0049() {
-    find_diff "$basic" -newermc "$basic/e/f"
+    bfs_diff -L links -lname '[aq]' 2>/dev/null
 }
 
 function test_0050() {
-    find_diff "$basic" -size 0
+    bfs_diff -L links -ilname '[AQ]' 2>/dev/null
 }
 
 function test_0051() {
-    find_diff "$basic" -size +0
+    bfs_diff -L basic -user "$(id -un)"
 }
 
 function test_0052() {
-    find_diff "$basic" -size +0c
+    bfs_diff -L basic -user "$(id -u)"
 }
 
 function test_0053() {
-    find_diff "$basic" -size 9223372036854775807
+    bfs_diff -L basic -group "$(id -gn)"
 }
 
 function test_0054() {
-    find_diff "$basic" -exec echo '{}' ';'
+    bfs_diff -L basic -group "$(id -g)"
 }
 
 function test_0055() {
-    find_diff "$basic" -exec echo '-{}-' ';'
+    bfs_diff basic -daystart -mtime 0
 }
 
 function test_0056() {
-    find_diff "$basic" -execdir pwd ';'
+    bfs_diff basic -daystart -daystart -mtime 0
 }
 
 function test_0057() {
-    find_diff "$basic" -execdir echo '{}' ';'
+    bfs_diff times -newerma times/a
 }
 
 function test_0058() {
-    find_diff "$basic" -execdir echo '-{}-' ';'
+    bfs_diff basic -size 0
 }
 
 function test_0059() {
-    find_diff "$basic" \( -name '*f*' \)
+    bfs_diff basic -size +0
 }
 
 function test_0060() {
-    find_diff "$basic" -name '*f*' -print , -print
+    bfs_diff basic -size +0c
 }
 
 function test_0061() {
-    cd "$weirdnames"
-    find_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
+    bfs_diff basic -size 9223372036854775807
 }
 
 function test_0062() {
-    cd "$weirdnames"
-    find_diff -L '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
+    bfs_diff basic -exec echo '{}' ';'
 }
 
 function test_0063() {
-    cd "$weirdnames"
-    find_diff -L ',' -true
+    bfs_diff basic -exec echo '-{}-' ';'
 }
 
 function test_0064() {
-    cd "$weirdnames"
-    find_diff -follow ',' -true
+    local OFFSET="$((${#TMP} + 2))"
+    bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" ';'
 }
 
 function test_0065() {
-    find "$basic" -fprint "$scratch/out.find"
-    "$BFS" "$basic" -fprint "$scratch/out.bfs"
-
-    sort -o "$scratch/out.find" "$scratch/out.find"
-    sort -o "$scratch/out.bfs" "$scratch/out.bfs"
-    diff -u "$scratch/out.find" "$scratch/out.bfs"
+    bfs_diff basic -execdir echo '{}' ';'
 }
 
 function test_0066() {
-    cd "$basic"
-    find_diff -- -type f
+    bfs_diff basic -execdir echo '-{}-' ';'
 }
 
 function test_0067() {
-    cd "$basic"
-    find_diff -L -- -type f
+    bfs_diff basic \( -name '*f*' \)
 }
 
 function test_0068() {
-    # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
-    ! "$BFS" "$basic/nonexistent" -ignore_readdir_race 2>/dev/null
+    bfs_diff basic -name '*f*' -print , -print
 }
 
 function test_0069() {
-    rm -rf "$scratch"/*
-    touch "$scratch"/{foo,bar}
-
-    # -links 1 forces a stat() call, which will fail for the second file
-    "$BFS" "$scratch" -mindepth 1 -ignore_readdir_race -links 1 -exec ./tests/remove-sibling.sh '{}' ';'
+    cd weirdnames
+    bfs_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
 }
 
 function test_0070() {
-    find_diff "$perms" -perm 222 && \
-        find_diff "$perms" -perm -222 && \
-        find_diff "$perms" -perm /222
+    cd weirdnames
+    bfs_diff -L '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
 }
 
 function test_0071() {
-    find_diff "$perms" -perm 644 && \
-        find_diff "$perms" -perm -644 && \
-        find_diff "$perms" -perm /644
+    cd weirdnames
+    bfs_diff -L ',' -true
 }
 
 function test_0072() {
-    find_diff "$perms" -perm a+r,u=wX,g+wX-w && \
-        find_diff "$perms" -perm -a+r,u=wX,g+wX-w && \
-        find_diff "$perms" -perm /a+r,u=wX,g+wX-w
+    cd weirdnames
+    bfs_diff -follow ',' -true
 }
 
 function test_0073() {
-    ! "$BFS" "$perms" -perm a+r, 2>/dev/null
+    if [ "$UPDATE" ]; then
+        "$BFS" basic -fprint "$TESTS/test_0073.out"
+        sort -o "$TESTS/test_0073.out" "$TESTS/test_0073.out"
+    else
+        "$BFS" basic -fprint scratch/test_0073.out
+        sort -o scratch/test_0073.out scratch/test_0073.out
+        diff -u scratch/test_0073.out "$TESTS/test_0073.out"
+    fi
 }
 
 function test_0074() {
-    ! "$BFS" "$perms" -perm a+r,,u+w 2>/dev/null
+    cd basic
+    bfs_diff -- -type f
 }
 
 function test_0075() {
-    ! "$BFS" "$perms" -perm a 2>/dev/null
+    cd basic
+    bfs_diff -L -- -type f
 }
 
 function test_0076() {
-    find_diff "$perms" -perm -+rwx && \
-        find_diff "$perms" -perm /+rwx
+    # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
+    ! "$BFS" basic/nonexistent -ignore_readdir_race 2>/dev/null
 }
 
 function test_0077() {
-    ! "$BFS" "$perms" -perm +rwx 2>/dev/null
+    rm -rf scratch/*
+    touch scratch/{foo,bar}
+
+    # -links 1 forces a stat() call, which will fail for the second file
+    "$BFS" scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
 }
 
 function test_0078() {
-    ! "$BFS" "$perms" -perm +777 2>/dev/null
+    bfs_diff perms -perm 222
 }
 
 function test_0079() {
-    # -ok should close stdin for the executed command
-    yes | "$BFS" "$basic" -ok cat ';' 2>/dev/null
+    bfs_diff perms -perm -222
 }
 
 function test_0080() {
-    # -okdir should close stdin for the executed command
-    yes | "$BFS" "$basic" -okdir cat ';' 2>/dev/null
+    bfs_diff perms -perm /222
 }
 
 function test_0081() {
-    find_diff "$basic/" -depth
+    bfs_diff perms -perm 644
 }
 
 function test_0082() {
-    # Don't try to delete .
-    (cd "$scratch" && "$BFS" -delete)
+    bfs_diff perms -perm -644
 }
 
-for i in {1..82}; do
+function test_0083() {
+    bfs_diff perms -perm /644
+}
+
+function test_0084() {
+    bfs_diff perms -perm a+r,u=wX,g+wX-w
+}
+
+function test_0085() {
+    bfs_diff perms -perm -a+r,u=wX,g+wX-w
+}
+
+function test_0086() {
+    bfs_diff perms -perm /a+r,u=wX,g+wX-w
+}
+
+function test_0087() {
+    ! "$BFS" perms -perm a+r, 2>/dev/null
+}
+
+function test_0088() {
+    ! "$BFS" perms -perm a+r,,u+w 2>/dev/null
+}
+
+function test_0089() {
+    ! "$BFS" perms -perm a 2>/dev/null
+}
+
+function test_0090() {
+    bfs_diff perms -perm -+rwx
+}
+
+function test_0091() {
+    bfs_diff perms -perm /+rwx
+}
+
+function test_0092() {
+    ! "$BFS" perms -perm +rwx 2>/dev/null
+}
+
+function test_0093() {
+    ! "$BFS" perms -perm +777 2>/dev/null
+}
+
+function test_0094() {
+    # -ok should close stdin for the executed command
+    yes | "$BFS" basic -ok cat ';' 2>/dev/null
+}
+
+function test_0095() {
+    # -okdir should close stdin for the executed command
+    yes | "$BFS" basic -okdir cat ';' 2>/dev/null
+}
+
+function test_0096() {
+    bfs_diff basic/ -depth
+}
+
+function test_0097() {
+    # Don't try to delete '.'
+    (cd scratch && "$BFS" -delete)
+}
+
+for i in {1..97}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
