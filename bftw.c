@@ -841,7 +841,10 @@ static int bftw_handle_path(struct bftw_state *state) {
 		return BFTW_FAIL;
 	}
 
-	enum bftw_action action = state->fn(&state->ftwbuf, state->ptr);
+	// Defensive copy
+	struct BFTW ftwbuf = state->ftwbuf;
+
+	enum bftw_action action = state->fn(&ftwbuf, state->ptr);
 	switch (action) {
 	case BFTW_CONTINUE:
 	case BFTW_SKIP_SIBLINGS:
