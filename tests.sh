@@ -96,7 +96,10 @@ if [ "$1" == "update" ]; then
 fi
 
 function bfs_sort() {
-    LC_ALL=C awk -F/ '{ print NF - 1 " " $0 }' | sort -n | awk '{ print $2 }'
+    (
+        export LC_ALL=C
+        awk -F/ '{ print NF - 1 " " $0 }' | sort -n | awk '{ print $2 }'
+    )
 }
 
 function bfs_diff() {
