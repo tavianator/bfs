@@ -2,6 +2,7 @@
 
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
+chown "$(id -u)":"$(id -g)" "$TMP"
 
 # Clean up temporary directories on exit
 function cleanup() {
