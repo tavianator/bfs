@@ -2,6 +2,23 @@
 ===
 
 
+0.84.1
+------
+
+**November 24, 2016**
+
+Bugfix release.
+
+- Fixed https://github.com/tavianator/bfs/issues/7 again
+- Like GNU find, don't print warnings by default if standard input is not a terminal
+- Redirect standard input from /dev/null for -ok and -okdir
+- Skip . when -delete'ing
+- Fixed -execdir when the root path has no slashes
+- Fixed -execdir in /
+- Support -perm +MODE for symbolic modes
+- Fixed the build on FreeBSD
+
+
 0.84
 ----
 
