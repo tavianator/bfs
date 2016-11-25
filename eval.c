@@ -261,8 +261,6 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	return true;
 }
 
-static const char *exec_slash = "/";
-
 static const char *exec_format_path(const struct expr *expr, const struct BFTW *ftwbuf) {
 	if (!(expr->exec_flags & EXEC_CHDIR)) {
 		return ftwbuf->path;
@@ -271,8 +269,9 @@ static const char *exec_format_path(const struct expr *expr, const struct BFTW *
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
 
 	if (name[0] == '/') {
-		// Must be the root path ("/", "//", etc.), which we canonicalize
-		return exec_slash;
+		// Must be a root path ("/", "//", etc.)
+		assert(ftwbuf->nameoff == 0);
+		return name;
 	}
 
 	// For compatibility with GNU find, use './name' instead of just 'name'
@@ -299,7 +298,7 @@ err:
 }
 
 static void exec_free_path(const char *path, const struct BFTW *ftwbuf) {
-	if (path != ftwbuf->path && path != exec_slash) {
+	if (path != ftwbuf->path) {
 		dstrfree((char *)path);
 	}
 }

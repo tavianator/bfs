@@ -289,7 +289,7 @@ function test_0043() {
 }
 
 function test_0044() {
-    bfs_diff // -maxdepth 0 -name / 2>/dev/null
+    bfs_diff /// -maxdepth 0 -name / 2>/dev/null
 }
 
 function test_0045() {
@@ -536,8 +536,7 @@ function test_0099() {
 }
 
 function test_0100() {
-    # // is canonicalized to /
-    bfs_diff // -maxdepth 0 -execdir echo '{}' ';'
+    bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
 }
 
 for i in {1..100}; do
