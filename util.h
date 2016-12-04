@@ -14,6 +14,27 @@
 
 #include <dirent.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+
+// Some portability concerns
+
+#if __APPLE__
+#	define st_atim st_atimespec
+#	define st_ctim st_ctimespec
+#	define st_mtim st_mtimespec
+#endif
+
+#ifndef S_ISDOOR
+#	define S_ISDOOR(mode) false
+#endif
+
+#ifndef S_ISPORT
+#	define S_ISPORT(mode) false
+#endif
+
+#ifndef S_ISWHT
+#	define S_ISWHT(mode) false
+#endif
 
 /**
  * readdir() wrapper that makes error handling cleaner.
@@ -39,5 +60,14 @@ bool isopen(int fd);
  * @return fd on success, -1 on failure.
  */
 int redirect(int fd, const char *path, int flags, ...);
+
+/**
+ * Like dup(), but set the FD_CLOEXEC flag.
+ *
+ * @param fd
+ *         The file descriptor to duplicate.
+ * @return A duplicated file descriptor, or -1 on failure.
+ */
+int dup_cloexec(int fd);
 
 #endif // BFS_UTIL_H

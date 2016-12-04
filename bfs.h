@@ -27,13 +27,6 @@
 #	define BFS_HOMEPAGE "https://github.com/tavianator/bfs"
 #endif
 
-// Some portability concerns
-#if __APPLE__
-#	define st_atim st_atimespec
-#	define st_ctim st_ctimespec
-#	define st_mtim st_mtimespec
-#endif
-
 /**
  * A command line expression.
  */

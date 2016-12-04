@@ -11,6 +11,7 @@
 
 #include "bfs.h"
 #include "typo.h"
+#include "util.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>

@@ -58,3 +58,21 @@ int redirect(int fd, const char *path, int flags, ...) {
 
 	return ret;
 }
+
+int dup_cloexec(int fd) {
+#ifdef F_DUPFD_CLOEXEC
+	return fcntl(fd, F_DUPFD_CLOEXEC, 0);
+#else
+	int ret = dup(fd);
+	if (ret < 0) {
+		return -1;
+	}
+
+	if (fcntl(ret, F_SETFD, FD_CLOEXEC) == -1) {
+		close(ret);
+		return -1;
+	}
+
+	return ret;
+#endif
+}

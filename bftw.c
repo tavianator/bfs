@@ -359,10 +359,10 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 	// footprint significantly, while keeping the fd around for future
 	// openat() calls.
 
-	fd = fcntl(entry->fd, F_DUPFD_CLOEXEC, 0);
+	fd = dup_cloexec(entry->fd);
 
 	if (fd < 0 && dircache_should_retry(cache, entry)) {
-		fd = fcntl(entry->fd, F_DUPFD_CLOEXEC, 0);
+		fd = dup_cloexec(entry->fd);
 	}
 	if (fd < 0) {
 		return NULL;
