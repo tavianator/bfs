@@ -26,6 +26,7 @@ function make_basic() {
     touchp "$1/j/foo"
     touchp "$1/k/foo/bar"
     touchp "$1/l/foo/bar/baz"
+    echo baz >"$1/l/foo/bar/baz"
 }
 make_basic "$TMP/basic"
 
@@ -345,15 +346,15 @@ function test_0057() {
 }
 
 function test_0058() {
-    bfs_diff basic -size 0
+    bfs_diff basic -type f -size 0
 }
 
 function test_0059() {
-    bfs_diff basic -size +0
+    bfs_diff basic -type f -size +0
 }
 
 function test_0060() {
-    bfs_diff basic -size +0c
+    bfs_diff basic -type f -size +0c
 }
 
 function test_0061() {
