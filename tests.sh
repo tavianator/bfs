@@ -209,15 +209,15 @@ function test_0023() {
 }
 
 function test_0024() {
-    bfs_diff links -links 2
+    bfs_diff links -type f -links 2
 }
 
 function test_0025() {
-    bfs_diff links -links -2
+    bfs_diff links -type f -links -2
 }
 
 function test_0026() {
-    bfs_diff links -links +1
+    bfs_diff links -type f -links +1
 }
 
 function test_0027() {
