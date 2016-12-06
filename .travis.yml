@@ -1,0 +1,18 @@
+language: c
+
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+      sudo: false
+      compiler: gcc
+
+    - os: linux
+      dist: trusty
+      sudo: false
+      compiler: clang
+
+    - os: osx
+      compiler: clang
+
+script: make check
