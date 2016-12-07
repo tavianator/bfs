@@ -10,9 +10,16 @@ function cleanup() {
 }
 trap cleanup EXIT
 
+# Install a file, creating any parent directories
+function installp() {
+    local target="${@: -1}"
+    mkdir -p "${target%/*}"
+    install "$@"
+}
+
 # Like a mythical touch -p
 function touchp() {
-    install -Dm644 /dev/null "$1"
+    installp -m644 /dev/null "$1"
 }
 
 # Creates a simple file+directory structure for tests
@@ -32,12 +39,12 @@ make_basic "$TMP/basic"
 
 # Creates a file+directory structure with various permissions for tests
 function make_perms() {
-    install -Dm444 /dev/null "$1/r"
-    install -Dm222 /dev/null "$1/w"
-    install -Dm644 /dev/null "$1/rw"
-    install -Dm555 /dev/null "$1/rx"
-    install -Dm311 /dev/null "$1/wx"
-    install -Dm755 /dev/null "$1/rwx"
+    installp -m444 /dev/null "$1/r"
+    installp -m222 /dev/null "$1/w"
+    installp -m644 /dev/null "$1/rw"
+    installp -m555 /dev/null "$1/rx"
+    installp -m311 /dev/null "$1/wx"
+    installp -m755 /dev/null "$1/rwx"
 }
 make_perms "$TMP/perms"
 
