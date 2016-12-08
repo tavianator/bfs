@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o physical
+
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
 chown "$(id -u)":"$(id -g)" "$TMP"
@@ -377,7 +379,8 @@ function test_0063() {
 }
 
 function test_0064() {
-    local OFFSET="$((${#TMP} + 2))"
+    local TMP_REAL="$(cd "$TMP" && pwd)"
+    local OFFSET="$((${#TMP_REAL} + 2))"
     bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" ';'
 }
 
