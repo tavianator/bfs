@@ -13,6 +13,8 @@
 #define BFS_UTIL_H
 
 #include <dirent.h>
+#include <fcntl.h>
+#include <fnmatch.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 
@@ -22,6 +24,14 @@
 #	define st_atim st_atimespec
 #	define st_ctim st_ctimespec
 #	define st_mtim st_mtimespec
+#endif
+
+#if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
+#	define FNM_CASEFOLD FNM_IGNORECASE
+#endif
+
+#ifndef O_DIRECTORY
+#	define O_DIRECTORY 0
 #endif
 
 #ifndef S_ISDOOR
