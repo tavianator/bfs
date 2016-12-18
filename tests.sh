@@ -99,26 +99,36 @@ function _realpath() {
     )
 }
 
+export LC_ALL=C
+
 BFS="$(_realpath ./bfs)"
 TESTS="$(_realpath ./tests)"
 
-if [ "$1" == "update" ]; then
-    UPDATE="update"
-fi
+for arg; do
+    case "$arg" in
+        --bfs=*)
+            BFS="${arg#*=}"
+            ;;
+        --update)
+            UPDATE=update
+            ;;
+        *)
+            echo "Unrecognized option '$arg'." >&2
+            exit 1
+            ;;
+    esac
+done
 
 function bfs_sort() {
-    (
-        export LC_ALL=C
-        awk -F/ '{ print NF - 1 " " $0 }' | sort -n | awk '{ print $2 }'
-    )
+    awk -F/ '{ print NF - 1 " " $0 }' | sort -n | awk '{ print $2 }'
 }
 
 function bfs_diff() {
     local OUT="$TESTS/${FUNCNAME[1]}.out"
     if [ "$UPDATE" ]; then
-        "$BFS" "$@" | bfs_sort >"$OUT"
+        $BFS "$@" | bfs_sort >"$OUT"
     else
-        diff -u "$OUT" <("$BFS" "$@" | bfs_sort)
+        diff -u "$OUT" <($BFS "$@" | bfs_sort)
     fi
 }
 
@@ -422,10 +432,10 @@ function test_0072() {
 
 function test_0073() {
     if [ "$UPDATE" ]; then
-        "$BFS" basic -fprint "$TESTS/test_0073.out"
+        $BFS basic -fprint "$TESTS/test_0073.out"
         sort -o "$TESTS/test_0073.out" "$TESTS/test_0073.out"
     else
-        "$BFS" basic -fprint scratch/test_0073.out
+        $BFS basic -fprint scratch/test_0073.out
         sort -o scratch/test_0073.out scratch/test_0073.out
         diff -u scratch/test_0073.out "$TESTS/test_0073.out"
     fi
@@ -443,7 +453,7 @@ function test_0075() {
 
 function test_0076() {
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
-    ! "$BFS" basic/nonexistent -ignore_readdir_race 2>/dev/null
+    ! $BFS basic/nonexistent -ignore_readdir_race 2>/dev/null
 }
 
 function test_0077() {
@@ -451,7 +461,7 @@ function test_0077() {
     touch scratch/{foo,bar}
 
     # -links 1 forces a stat() call, which will fail for the second file
-    "$BFS" scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
+    $BFS scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
 }
 
 function test_0078() {
@@ -491,15 +501,15 @@ function test_0086() {
 }
 
 function test_0087() {
-    ! "$BFS" perms -perm a+r, 2>/dev/null
+    ! $BFS perms -perm a+r, 2>/dev/null
 }
 
 function test_0088() {
-    ! "$BFS" perms -perm a+r,,u+w 2>/dev/null
+    ! $BFS perms -perm a+r,,u+w 2>/dev/null
 }
 
 function test_0089() {
-    ! "$BFS" perms -perm a 2>/dev/null
+    ! $BFS perms -perm a 2>/dev/null
 }
 
 function test_0090() {
@@ -515,17 +525,17 @@ function test_0092() {
 }
 
 function test_0093() {
-    ! "$BFS" perms -perm +777 2>/dev/null
+    ! $BFS perms -perm +777 2>/dev/null
 }
 
 function test_0094() {
     # -ok should close stdin for the executed command
-    yes | "$BFS" basic -ok cat ';' 2>/dev/null
+    yes | $BFS basic -ok cat ';' 2>/dev/null
 }
 
 function test_0095() {
     # -okdir should close stdin for the executed command
-    yes | "$BFS" basic -okdir cat ';' 2>/dev/null
+    yes | $BFS basic -okdir cat ';' 2>/dev/null
 }
 
 function test_0096() {
@@ -534,7 +544,7 @@ function test_0096() {
 
 function test_0097() {
     # Don't try to delete '.'
-    (cd scratch && "$BFS" -delete)
+    (cd scratch && $BFS -delete)
 }
 
 function test_0098() {
@@ -578,6 +588,8 @@ function test_0106() {
     bfs_diff -regextype posix-extended -regex '\./(\()'
 }
 
+result=0
+
 for i in {1..106}; do
     test="test_$(printf '%04d' $i)"
 
@@ -594,10 +606,12 @@ for i in {1..106}; do
         else
             printf '%s failed!\n' "$test"
         fi
-        exit $status
+        result=$status
     fi
 done
 
 if [ -t 1 ]; then
     printf '\n'
 fi
+
+exit $result
