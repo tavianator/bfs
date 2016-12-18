@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <regex.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 
@@ -28,10 +29,6 @@
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
-#endif
-
-#ifndef O_DIRECTORY
-#	define O_DIRECTORY 0
 #endif
 
 #ifndef S_ISDOOR
@@ -79,5 +76,16 @@ int redirect(int fd, const char *path, int flags, ...);
  * @return A duplicated file descriptor, or -1 on failure.
  */
 int dup_cloexec(int fd);
+
+/**
+ * Dynamically allocate a regex error message.
+ *
+ * @param err
+ *         The error code to stringify.
+ * @param regex
+ *         The (partially) compiled regex.
+ * @return A human-readable description of the error, allocated with malloc().
+ */
+char *xregerror(int err, const regex_t *regex);
 
 #endif // BFS_UTIL_H

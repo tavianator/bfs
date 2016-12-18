@@ -550,7 +550,35 @@ function test_0100() {
     bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
 }
 
-for i in {1..100}; do
+function test_0101() {
+    bfs_diff basic -regex 'basic/./.'
+}
+
+function test_0102() {
+    bfs_diff basic -iregex 'basic/[A-Z]/[a-z]'
+}
+
+function test_0103() {
+    cd weirdnames
+    bfs_diff -regex '\./\((\)'
+}
+
+function test_0104() {
+    cd weirdnames
+    bfs_diff -E -regex '\./(\()'
+}
+
+function test_0105() {
+    cd weirdnames
+    bfs_diff -regextype posix-basic -regex '\./\((\)'
+}
+
+function test_0106() {
+    cd weirdnames
+    bfs_diff -regextype posix-extended -regex '\./(\()'
+}
+
+for i in {1..106}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

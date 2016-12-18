@@ -13,6 +13,7 @@
 #define BFS_H
 
 #include "color.h"
+#include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -240,6 +241,9 @@ struct expr {
 	/** Optional -exec flags. */
 	enum exec_flags exec_flags;
 
+	/** Optional compiled regex. */
+	regex_t *regex;
+
 	/** Optional integer data for this expression. */
 	long long idata;
 
@@ -293,6 +297,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state);
 bool eval_lname(const struct expr *expr, struct eval_state *state);
 bool eval_name(const struct expr *expr, struct eval_state *state);
 bool eval_path(const struct expr *expr, struct eval_state *state);
+bool eval_regex(const struct expr *expr, struct eval_state *state);
 
 bool eval_delete(const struct expr *expr, struct eval_state *state);
 bool eval_exec(const struct expr *expr, struct eval_state *state);

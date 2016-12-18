@@ -341,7 +341,10 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 	const char *at_path = path;
 	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
 
-	int flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC;
+	int flags = O_RDONLY | O_CLOEXEC;
+#ifdef O_DIRECTORY
+	flags |= O_DIRECTORY;
+#endif
 	int fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && dircache_should_retry(cache, base)) {

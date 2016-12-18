@@ -743,6 +743,39 @@ bool eval_quit(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -i?regex test.
+ */
+bool eval_regex(const struct expr *expr, struct eval_state *state) {
+	const char *path = state->ftwbuf->path;
+	size_t len = strlen(path);
+	regmatch_t match = {
+		.rm_so = 0,
+		.rm_eo = len,
+	};
+
+	int flags = 0;
+#ifdef REG_STARTEND
+	flags |= REG_STARTEND;
+#endif
+	int err = regexec(expr->regex, path, 1, &match, flags);
+	if (err == 0) {
+		return match.rm_so == 0 && match.rm_eo == len;
+	} else {
+		if (err != REG_NOMATCH) {
+			char *str = xregerror(err, expr->regex);
+			if (str) {
+				pretty_error(state->cmdline->stderr_colors,
+				             "'%s': %s\n", path, str);
+				free(str);
+			} else {
+				perror("xregerror()");
+			}
+		}
+		return false;
+	}
+}
+
+/**
  * -samefile test.
  */
 bool eval_samefile(const struct expr *expr, struct eval_state *state) {

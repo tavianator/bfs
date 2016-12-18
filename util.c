@@ -12,7 +12,9 @@
 #include "util.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <regex.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -75,4 +77,13 @@ int dup_cloexec(int fd) {
 
 	return ret;
 #endif
+}
+
+char *xregerror(int err, const regex_t *regex) {
+	size_t len = regerror(err, regex, NULL, 0);
+	char *str = malloc(len);
+	if (str) {
+		regerror(err, regex, str, len);
+	}
+	return str;
 }

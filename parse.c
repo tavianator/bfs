@@ -19,6 +19,7 @@
 #include <grp.h>
 #include <limits.h>
 #include <pwd.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +72,11 @@ static void free_expr(struct expr *expr) {
 			}
 		}
 
+		if (expr->regex) {
+			regfree(expr->regex);
+			free(expr->regex);
+		}
+
 		free_expr(expr->lhs);
 		free_expr(expr->rhs);
 		free(expr);
@@ -94,6 +100,7 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 		expr->argc = argc;
 		expr->argv = argv;
 		expr->file = NULL;
+		expr->regex = NULL;
 	}
 	return expr;
 }
@@ -196,8 +203,8 @@ struct parser_state {
 	/** The current tail of the root path list. */
 	struct root **roots_tail;
 
-	/** The optimization level. */
-	int optlevel;
+	/** The current regex flags to use. */
+	int regex_flags;
 
 	/** Whether a -print action is implied. */
 	bool implicit_print;
@@ -527,6 +534,21 @@ static struct expr *parse_positional_option(struct parser_state *state, size_t a
  */
 static struct expr *parse_nullary_positional_option(struct parser_state *state) {
 	return parse_positional_option(state, 1);
+}
+
+/**
+ * Parse a positional option that takes a single value.
+ */
+static struct expr *parse_unary_positional_option(struct parser_state *state, const char **value) {
+	const char *arg = state->argv[0];
+	*value = state->argv[1];
+	if (!*value) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a value.\n", arg);
+		return NULL;
+	}
+
+	return parse_positional_option(state, 2);
 }
 
 /**
@@ -1496,6 +1518,91 @@ static struct expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
 }
 
 /**
+ * Parse -i?regex.
+ */
+static struct expr *parse_regex(struct parser_state *state, int flags, int arg2) {
+	struct expr *expr = parse_unary_test(state, eval_regex);
+	if (!expr) {
+		goto fail;
+	}
+
+	expr->regex = malloc(sizeof(regex_t));
+	if (!expr->regex) {
+		perror("malloc()");
+		goto fail;
+	}
+
+	int err = regcomp(expr->regex, expr->sdata, state->regex_flags | flags);
+	if (err != 0) {
+		char *str = xregerror(err, expr->regex);
+		if (str) {
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s %s: %s.\n",
+			             expr->argv[0], expr->argv[1], str);
+			free(str);
+		} else {
+			perror("xregerror()");
+		}
+		goto fail_regex;
+	}
+
+	return expr;
+
+fail_regex:
+	free(expr->regex);
+	expr->regex = NULL;
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
+ * Parse -E.
+ */
+static struct expr *parse_regex_extended(struct parser_state *state, int arg1, int arg2) {
+	state->regex_flags = REG_EXTENDED;
+	return parse_nullary_flag(state);
+}
+
+/**
+ * Parse -regextype TYPE.
+ */
+static struct expr *parse_regextype(struct parser_state *state, int arg1, int arg2) {
+	const char *type;
+	struct expr *expr = parse_unary_positional_option(state, &type);
+	if (!expr) {
+		goto fail;
+	}
+
+	FILE *file = stderr;
+
+	if (strcmp(type, "posix-basic") == 0) {
+		state->regex_flags = 0;
+	} else if (strcmp(type, "posix-extended") == 0) {
+		state->regex_flags = REG_EXTENDED;
+	} else if (strcmp(type, "help") == 0) {
+		state->just_info = true;
+		file = stdout;
+		goto fail_list_types;
+	} else {
+		goto fail_bad_type;
+	}
+
+	return expr;
+
+fail_bad_type:
+	pretty_error(state->cmdline->stderr_colors,
+	             "error: Unsupported -regextype '%s'.\n\n", type);
+fail_list_types:
+	fputs("Supported types are:\n\n", file);
+	fputs("  posix-basic:    POSIX basic regular expressions (BRE)\n", file);
+	fputs("  posix-extended: POSIX extended regular expressions (ERE)\n", file);
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
  * Parse -samefile FILE.
  */
 static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg2) {
@@ -1676,6 +1783,7 @@ struct table_entry {
  */
 static const struct table_entry parse_table[] = {
 	{"D", false, parse_debug},
+	{"E", false, parse_regex_extended},
 	{"O", true, parse_optlevel},
 	{"P", false, parse_follow, 0, false},
 	{"H", false, parse_follow, BFTW_COMFOLLOW, false},
@@ -1711,6 +1819,7 @@ static const struct table_entry parse_table[] = {
 	{"iname", false, parse_name, true},
 	{"inum", false, parse_inum},
 	{"ipath", false, parse_path, true},
+	{"iregex", false, parse_regex, REG_ICASE},
 	{"iwholename", false, parse_path, true},
 	{"links", false, parse_links},
 	{"lname", false, parse_lname, false},
@@ -1739,6 +1848,8 @@ static const struct table_entry parse_table[] = {
 	{"prune", false, parse_prune},
 	{"quit", false, parse_quit},
 	{"readable", false, parse_access, R_OK},
+	{"regex", false, parse_regex, 0},
+	{"regextype", false, parse_regextype},
 	{"samefile", false, parse_samefile},
 	{"size", false, parse_size},
 	{"true", false, parse_const, true},
@@ -2275,6 +2386,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.argv = argv + 1,
 		.command = argv[0],
 		.roots_tail = &cmdline->roots,
+		.regex_flags = 0,
 		.implicit_print = true,
 		.warn = isatty(STDIN_FILENO),
 		.non_option_seen = false,
