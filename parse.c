@@ -832,6 +832,23 @@ static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) 
 }
 
 /**
+ * Parse -depth [N].
+ */
+static struct expr *parse_depth_n(struct parser_state *state, int arg1, int arg2) {
+	const char *arg = state->argv[1];
+	if (arg) {
+		while (*arg == '-' || *arg == '+') {
+			++arg;
+		}
+		if (*arg >= '0' && *arg <= '9') {
+			return parse_test_icmp(state, eval_depth);
+		}
+	}
+
+	return parse_depth(state, arg1, arg2);
+}
+
+/**
  * Parse -{min,max}depth N.
  */
 static struct expr *parse_depth_limit(struct parser_state *state, int is_min, int arg2) {
@@ -1800,7 +1817,7 @@ static const struct table_entry parse_table[] = {
 	{"d", false, parse_depth},
 	{"daystart", false, parse_daystart},
 	{"delete", false, parse_delete},
-	{"depth", false, parse_depth},
+	{"depth", false, parse_depth_n},
 	{"empty", false, parse_empty},
 	{"exec", false, parse_exec, 0},
 	{"execdir", false, parse_exec, EXEC_CHDIR},

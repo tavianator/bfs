@@ -285,6 +285,7 @@ bool eval_used(const struct expr *expr, struct eval_state *state);
 bool eval_gid(const struct expr *expr, struct eval_state *state);
 bool eval_uid(const struct expr *expr, struct eval_state *state);
 
+bool eval_depth(const struct expr *expr, struct eval_state *state);
 bool eval_empty(const struct expr *expr, struct eval_state *state);
 bool eval_hidden(const struct expr *expr, struct eval_state *state);
 bool eval_inum(const struct expr *expr, struct eval_state *state);

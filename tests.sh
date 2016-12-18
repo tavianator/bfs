@@ -705,9 +705,39 @@ function test_0111() {
     bfs_diff weirdnames -nohidden
 }
 
+function test_0112() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -depth 2
+}
+
+function test_0113() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -depth +2
+}
+
+function test_0114() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -depth -2
+}
+
+function test_0115() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -depth -depth 2
+}
+
+function test_0116() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -depth -depth +2
+}
+
+function test_0117() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -depth -depth -2
+}
+
 result=0
 
-for i in {1..111}; do
+for i in {1..117}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

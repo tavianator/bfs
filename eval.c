@@ -474,6 +474,13 @@ out:
 }
 
 /**
+ * -depth N test.
+ */
+bool eval_depth(const struct expr *expr, struct eval_state *state) {
+	return do_cmp(expr, state->ftwbuf->depth);
+}
+
+/**
  * -empty test.
  */
 bool eval_empty(const struct expr *expr, struct eval_state *state) {
