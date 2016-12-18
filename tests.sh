@@ -2,6 +2,8 @@
 
 set -o physical
 
+export LC_ALL=C
+
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
 chown "$(id -u)":"$(id -g)" "$TMP"
@@ -83,6 +85,7 @@ function make_weirdnames() {
     touchp "$1/!-/e"
     touchp "$1/,/f"
     touchp "$1/)/g"
+    touchp "$1/.../h"
 }
 make_weirdnames "$TMP/weirdnames"
 
@@ -99,18 +102,40 @@ function _realpath() {
     )
 }
 
-export LC_ALL=C
-
 BFS="$(_realpath ./bfs)"
 TESTS="$(_realpath ./tests)"
+
+BSD=yes
+GNU=yes
+ALL=yes
 
 for arg; do
     case "$arg" in
         --bfs=*)
             BFS="${arg#*=}"
             ;;
+        --posix)
+            BSD=
+            GNU=
+            ALL=
+            ;;
+        --bsd)
+            BSD=yes
+            GNU=
+            ALL=
+            ;;
+        --gnu)
+            BSD=
+            GNU=yes
+            ALL=
+            ;;
+        --all)
+            BSD=yes
+            GNU=yes
+            ALL=yes
+            ;;
         --update)
-            UPDATE=update
+            UPDATE=yes
             ;;
         *)
             echo "Unrecognized option '$arg'." >&2
@@ -181,42 +206,52 @@ function test_0011() {
 }
 
 function test_0012() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -executable
 }
 
 function test_0013() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -readable
 }
 
 function test_0014() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -writable
 }
 
 function test_0015() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -empty
 }
 
 function test_0016() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -gid "$(id -g)"
 }
 
 function test_0017() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -gid +0
 }
 
 function test_0018() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -gid "-$(($(id -g) + 1))"
 }
 
 function test_0019() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -uid "$(id -u)"
 }
 
 function test_0020() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -uid +0
 }
 
 function test_0021() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -uid "-$(($(id -u) + 1))"
 }
 
@@ -225,6 +260,7 @@ function test_0022() {
 }
 
 function test_0023() {
+    [ "$GNU" ] || return 0
     bfs_diff times -anewer times/a
 }
 
@@ -269,6 +305,7 @@ function test_0033() {
 }
 
 function test_0034() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff links -follow 2>/dev/null
 }
 
@@ -277,22 +314,27 @@ function test_0035() {
 }
 
 function test_0036() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff links -samefile links/a
 }
 
 function test_0037() {
+    [ "$GNU" ] || return 0
     bfs_diff links -xtype l
 }
 
 function test_0038() {
+    [ "$GNU" ] || return 0
     bfs_diff links -xtype f
 }
 
 function test_0039() {
+    [ "$GNU" ] || return 0
     bfs_diff -L links -xtype l 2>/dev/null
 }
 
 function test_0040() {
+    [ "$GNU" ] || return 0
     bfs_diff -L links -xtype f 2>/dev/null
 }
 
@@ -305,34 +347,42 @@ function test_0042() {
 }
 
 function test_0043() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff / -maxdepth 0 -name / 2>/dev/null
 }
 
 function test_0044() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff /// -maxdepth 0 -name / 2>/dev/null
 }
 
 function test_0045() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -iname '*F*'
 }
 
 function test_0046() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -ipath 'basic/*F*'
 }
 
 function test_0047() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff links -lname '[aq]'
 }
 
 function test_0048() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff links -ilname '[AQ]'
 }
 
 function test_0049() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff -L links -lname '[aq]' 2>/dev/null
 }
 
 function test_0050() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff -L links -ilname '[AQ]' 2>/dev/null
 }
 
@@ -353,14 +403,17 @@ function test_0054() {
 }
 
 function test_0055() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -daystart -mtime 0
 }
 
 function test_0056() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -daystart -daystart -mtime 0
 }
 
 function test_0057() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff times -newerma times/a
 }
 
@@ -377,6 +430,7 @@ function test_0060() {
 }
 
 function test_0061() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -size 9223372036854775807
 }
 
@@ -385,20 +439,25 @@ function test_0062() {
 }
 
 function test_0063() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -exec echo '-{}-' ';'
 }
 
 function test_0064() {
+    [ "$BSD" -o "$GNU" ] || return 0
+
     local TMP_REAL="$(cd "$TMP" && pwd)"
     local OFFSET="$((${#TMP_REAL} + 2))"
     bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" ';'
 }
 
 function test_0065() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -execdir echo '{}' ';'
 }
 
 function test_0066() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -execdir echo '-{}-' ';'
 }
 
@@ -407,30 +466,35 @@ function test_0067() {
 }
 
 function test_0068() {
+    [ "$GNU" ] || return 0
     bfs_diff basic -name '*f*' -print , -print
 }
 
 function test_0069() {
+    [ "$GNU" ] || return 0
     cd weirdnames
     bfs_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
 }
 
 function test_0070() {
+    [ "$GNU" ] || return 0
     cd weirdnames
     bfs_diff -L '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
 }
 
 function test_0071() {
     cd weirdnames
-    bfs_diff -L ',' -true
+    bfs_diff -L ',' -print
 }
 
 function test_0072() {
+    [ "$GNU" ] || return 0
     cd weirdnames
-    bfs_diff -follow ',' -true
+    bfs_diff -follow ',' -print
 }
 
 function test_0073() {
+    [ "$GNU" ] || return 0
     if [ "$UPDATE" ]; then
         $BFS basic -fprint "$TESTS/test_0073.out"
         sort -o "$TESTS/test_0073.out" "$TESTS/test_0073.out"
@@ -442,21 +506,27 @@ function test_0073() {
 }
 
 function test_0074() {
+    [ "$BSD" -o "$GNU" ] || return 0
     cd basic
-    bfs_diff -- -type f
+    bfs_diff -- . -type f
 }
 
 function test_0075() {
+    [ "$BSD" -o "$GNU" ] || return 0
     cd basic
-    bfs_diff -L -- -type f
+    bfs_diff -L -- . -type f
 }
 
 function test_0076() {
+    [ "$GNU" ] || return 0
+
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
     ! $BFS basic/nonexistent -ignore_readdir_race 2>/dev/null
 }
 
 function test_0077() {
+    [ "$GNU" ] || return 0
+
     rm -rf scratch/*
     touch scratch/{foo,bar}
 
@@ -473,6 +543,7 @@ function test_0079() {
 }
 
 function test_0080() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -perm /222
 }
 
@@ -485,6 +556,7 @@ function test_0082() {
 }
 
 function test_0083() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -perm /644
 }
 
@@ -497,18 +569,22 @@ function test_0085() {
 }
 
 function test_0086() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -perm /a+r,u=wX,g+wX-w
 }
 
 function test_0087() {
+    [ "$ALL" ] || return 0
     ! $BFS perms -perm a+r, 2>/dev/null
 }
 
 function test_0088() {
+    [ "$ALL" ] || return 0
     ! $BFS perms -perm a+r,,u+w 2>/dev/null
 }
 
 function test_0089() {
+    [ "$ALL" ] || return 0
     ! $BFS perms -perm a 2>/dev/null
 }
 
@@ -517,23 +593,28 @@ function test_0090() {
 }
 
 function test_0091() {
+    [ "$GNU" ] || return 0
     bfs_diff perms -perm /+rwx
 }
 
 function test_0092() {
+    [ "$ALL" ] || return 0
     bfs_diff perms -perm +rwx
 }
 
 function test_0093() {
+    [ "$ALL" ] || return 0
     ! $BFS perms -perm +777 2>/dev/null
 }
 
 function test_0094() {
+    [ "$GNU" ] || return 0
     # -ok should close stdin for the executed command
     yes | $BFS basic -ok cat ';' 2>/dev/null
 }
 
 function test_0095() {
+    [ "$GNU" ] || return 0
     # -okdir should close stdin for the executed command
     yes | $BFS basic -okdir cat ';' 2>/dev/null
 }
@@ -543,54 +624,90 @@ function test_0096() {
 }
 
 function test_0097() {
+    [ "$BSD" -o "$GNU" ] || return 0
     # Don't try to delete '.'
-    (cd scratch && $BFS -delete)
+    (cd scratch && $BFS . -delete)
 }
 
 function test_0098() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff / -maxdepth 0 -execdir pwd ';'
 }
 
 function test_0099() {
+    [ "$BSD" -o "$GNU" ] || return 0
     # Don't prepend ./ for absolute paths in -execdir
     bfs_diff / -maxdepth 0 -execdir echo '{}' ';'
 }
 
 function test_0100() {
+    [ "$ALL" ] || return 0
     bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
 }
 
 function test_0101() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -regex 'basic/./.'
 }
 
 function test_0102() {
+    [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -iregex 'basic/[A-Z]/[a-z]'
 }
 
 function test_0103() {
+    [ "$BSD" -o "$GNU" ] || return 0
     cd weirdnames
-    bfs_diff -regex '\./\((\)'
+    bfs_diff . -regex '\./\((\)'
 }
 
 function test_0104() {
+    [ "$BSD" ] || return 0
     cd weirdnames
-    bfs_diff -E -regex '\./(\()'
+    bfs_diff -E . -regex '\./(\()'
 }
 
 function test_0105() {
+    [ "$GNU" ] || return 0
     cd weirdnames
     bfs_diff -regextype posix-basic -regex '\./\((\)'
 }
 
 function test_0106() {
+    [ "$GNU" ] || return 0
     cd weirdnames
     bfs_diff -regextype posix-extended -regex '\./(\()'
 }
 
+function test_0107() {
+    [ "$BSD" ] || return 0
+    bfs_diff -d basic
+}
+
+function test_0108() {
+    [ "$GNU" ] || return 0
+    bfs_diff basic -d 2>/dev/null
+}
+
+function test_0109() {
+    [ "$BSD" ] || return 0
+    cd weirdnames
+    bfs_diff -f '-' -f '('
+}
+
+function test_0110() {
+    [ "$ALL" ] || return 0
+    bfs_diff weirdnames -hidden
+}
+
+function test_0111() {
+    [ "$ALL" ] || return 0
+    bfs_diff weirdnames -nohidden
+}
+
 result=0
 
-for i in {1..106}; do
+for i in {1..111}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
