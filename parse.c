@@ -1861,6 +1861,7 @@ static const struct table_entry parse_table[] = {
 	{"warn", false, parse_warn, true},
 	{"wholename", false, parse_path, false},
 	{"writable", false, parse_access, W_OK},
+	{"x", false, parse_mount},
 	{"xdev", false, parse_mount},
 	{"xtype", false, parse_type, true},
 	{"-"},
