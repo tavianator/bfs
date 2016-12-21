@@ -745,9 +745,19 @@ function test_0119() {
     bfs_diff basic -uid "$(id -un)"
 }
 
+function test_0120() {
+    [ "$BSD" ] || return 0
+    bfs_diff times -mnewer times/a
+}
+
+function test_0121() {
+    [ "$BSD" ] || return 0
+    bfs_diff -H times -mnewer times/l
+}
+
 result=0
 
-for i in {1..119}; do
+for i in {1..121}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

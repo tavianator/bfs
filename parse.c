@@ -1824,6 +1824,7 @@ static const struct table_entry parse_table[] = {
 	{"maxdepth", false, parse_depth_limit, false},
 	{"mindepth", false, parse_depth_limit, true},
 	{"mmin", false, parse_acmtime, MTIME, MINUTES},
+	{"mnewer", false, parse_acnewer, MTIME},
 	{"mount", false, parse_mount},
 	{"mtime", false, parse_acmtime, MTIME, DAYS},
 	{"name", false, parse_name, false},
