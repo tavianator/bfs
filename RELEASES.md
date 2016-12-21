@@ -2,6 +2,23 @@
 ===
 
 
+0.88
+----
+
+**December 20, 2016**
+
+67/76 GNU find features supported.
+
+- Fixed the build on macOS, and some other UNIXes
+- Implemented `-regex`, `-iregex`, `-regextype`, and BSD's `-E`
+- Implemented `-x` (same as `-mount`/`-xdev`) from BSD
+- Implemented `-mnewer` (same as `-newer`) from BSD
+- Implemented `-depth N` from BSD
+- Implemented `-sparse` from FreeBSD
+- Implemented the `T` and `P` suffices for `-size`, for BSD compatibility
+- Added support for `-gid NAME` and `-uid NAME` as in BSD
+
+
 0.84.1
 ------
 

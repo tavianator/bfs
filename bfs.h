@@ -21,7 +21,7 @@
 #include <time.h>
 
 #ifndef BFS_VERSION
-#	define BFS_VERSION "0.84.1"
+#	define BFS_VERSION "0.88"
 #endif
 
 #ifndef BFS_HOMEPAGE
