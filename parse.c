@@ -1736,10 +1736,36 @@ static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
  * "Parse" -help.
  */
 static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
-	printf("Usage: %s [arguments...]\n\n", state->command);
+	printf("Usage: %s [flags...] [paths...] [expression...]\n\n", state->command);
 
 	printf("bfs is compatible with find; see find -help or man find for help with find-\n"
 	       "compatible options :)\n\n");
+
+	printf("flags (-H/-L/-P etc.), paths, and expressions may be freely mixed in any order.\n\n");
+
+	printf("POSIX find features:\n");
+	printf("  ( EXPRESSION )\n");
+	printf("  ! EXPRESSION\n");
+	printf("  EXPRESSION [-a] EXPRESSION\n");
+	printf("  EXPRESSION -o EXPRESSION\n\n");
+	printf("  -H, -L, -name, -path, -xdev, -prune, -perm, -type, -links, -user, -group,\n");
+	printf("  -size, -atime, -ctime, -mtime, -exec ... ;, -ok ... ;, -print, -newer, -depth\n\n");
+
+	printf("GNU find features:\n");
+	printf("  -not EXPRESSION\n");
+	printf("  EXPRESSION -and EXPRESSION\n");
+	printf("  EXPRESSION -or EXPRESSION\n");
+	printf("  EXPRESSION , EXPRESSION\n\n");
+	printf("  -P, -D, -O, -daystart, -follow, -regextype, -warn, -nowarn, -d, -maxdepth,\n");
+	printf("  -mindepth, -mount, -noleaf, -ignore_readdir_race, -noignore_readdir_race,\n");
+	printf("  -amin, -anewer, -cmin, -cnewer, -mmin, -empty, -false, -gid, -ilname, -iname,\n");
+	printf("  -inum, -ipath, -iwholename, -iregex, -lname, -newerXY, -wholename, -regex,\n");
+	printf("  -readable, -writable, -executable, -samefile, -true, -uid, -used, -xtype,\n");
+	printf("  -delete, -execdir ... ;, -okdir ... ;, -print0, -fprint, -fprint0, -quit,\n");
+	printf("  -help, -version\n\n");
+
+	printf("BSD find features:\n");
+	printf("  -E, -d, -x, -depth N, -gid NAME, -uid NAME, -size N[ckMGTP], -sparse\n\n");
 
 	printf("Extra features:\n"
 	       "  -color, -nocolor: Turn on or off file type colorization.\n\n"
