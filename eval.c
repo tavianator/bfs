@@ -818,6 +818,19 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -sparse test.
+ */
+bool eval_sparse(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	blkcnt_t expected = (statbuf->st_size + 511)/512;
+	return statbuf->st_blocks < expected;
+}
+
+/**
  * -type test.
  */
 bool eval_type(const struct expr *expr, struct eval_state *state) {

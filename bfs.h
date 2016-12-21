@@ -292,6 +292,7 @@ bool eval_inum(const struct expr *expr, struct eval_state *state);
 bool eval_links(const struct expr *expr, struct eval_state *state);
 bool eval_samefile(const struct expr *expr, struct eval_state *state);
 bool eval_size(const struct expr *expr, struct eval_state *state);
+bool eval_sparse(const struct expr *expr, struct eval_state *state);
 bool eval_type(const struct expr *expr, struct eval_state *state);
 bool eval_xtype(const struct expr *expr, struct eval_state *state);
 

@@ -1662,6 +1662,13 @@ fail:
 }
 
 /**
+ * Parse -sparse.
+ */
+static struct expr *parse_sparse(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_test(state, eval_sparse);
+}
+
+/**
  * Parse -x?type [bcdpfls].
  */
 static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
@@ -1837,6 +1844,7 @@ static const struct table_entry parse_table[] = {
 	{"regextype", false, parse_regextype},
 	{"samefile", false, parse_samefile},
 	{"size", false, parse_size},
+	{"sparse", false, parse_sparse},
 	{"true", false, parse_const, true},
 	{"type", false, parse_type, false},
 	{"uid", false, parse_user},
