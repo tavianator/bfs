@@ -1645,6 +1645,12 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	case 'G':
 		expr->size_unit = SIZE_GB;
 		break;
+	case 'T':
+		expr->size_unit = SIZE_TB;
+		break;
+	case 'P':
+		expr->size_unit = SIZE_PB;
+		break;
 
 	default:
 		goto bad_unit;
@@ -1654,7 +1660,7 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 
 bad_unit:
 	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: Expected a size unit of 'b', 'c', 'w', 'k', 'M', or 'G'; found %s.\n",
+	             "error: %s %s: Expected a size unit (one of bcwkMGTP); found %s.\n",
 	             expr->argv[0], expr->argv[1], unit);
 fail:
 	free_expr(expr);

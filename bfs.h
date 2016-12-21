@@ -172,6 +172,10 @@ enum size_unit {
 	SIZE_MB,
 	/** Gibibytes. */
 	SIZE_GB,
+	/** Tebibytes. */
+	SIZE_TB,
+	/** Pebibytes. */
+	SIZE_PB,
 };
 
 /**
