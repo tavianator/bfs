@@ -991,30 +991,21 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 		return NULL;
 	}
 
-	const char *error;
-
-	errno = 0;
 	struct group *grp = getgrnam(expr->sdata);
 	if (grp) {
 		expr->idata = grp->gr_gid;
-	} else if (errno != 0) {
-		error = strerror(errno);
-		goto error;
 	} else if (isdigit(expr->sdata[0])) {
 		if (!parse_int(state, expr->sdata, &expr->idata, IF_LONG_LONG)) {
 			goto fail;
 		}
 	} else {
-		error = "No such group";
-		goto error;
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s %s: No such group.\n", arg, expr->sdata);
+		goto fail;
 	}
 
 	expr->cmp_flag = CMP_EXACT;
 	return expr;
-
-error:
-	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: %s.\n", arg, expr->sdata, error);
 
 fail:
 	free_expr(expr);
@@ -1046,30 +1037,21 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 		return NULL;
 	}
 
-	const char *error;
-
-	errno = 0;
 	struct passwd *pwd = getpwnam(expr->sdata);
 	if (pwd) {
 		expr->idata = pwd->pw_uid;
-	} else if (errno != 0) {
-		error = strerror(errno);
-		goto error;
 	} else if (isdigit(expr->sdata[0])) {
 		if (!parse_int(state, expr->sdata, &expr->idata, IF_LONG_LONG)) {
 			goto fail;
 		}
 	} else {
-		error = "No such user";
-		goto error;
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s %s: No such user.\n", arg, expr->sdata);
+		goto fail;
 	}
 
 	expr->cmp_flag = CMP_EXACT;
 	return expr;
-
-error:
-	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: %s.\n", arg, expr->sdata, error);
 
 fail:
 	free_expr(expr);
