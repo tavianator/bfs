@@ -735,9 +735,19 @@ function test_0117() {
     bfs_diff basic -depth -depth -2
 }
 
+function test_0118() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -gid "$(id -gn)"
+}
+
+function test_0119() {
+    [ "$BSD" ] || return 0
+    bfs_diff basic -uid "$(id -un)"
+}
+
 result=0
 
-for i in {1..117}; do
+for i in {1..119}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

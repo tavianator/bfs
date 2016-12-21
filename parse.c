@@ -974,14 +974,7 @@ static struct expr *parse_fprint0(struct parser_state *state, int arg1, int arg2
 }
 
 /**
- * Parse -gid N.
- */
-static struct expr *parse_gid(struct parser_state *state, int arg1, int arg2) {
-	return parse_test_icmp(state, eval_gid);
-}
-
-/**
- * Parse -group.
+ * Parse -gid/-group.
  */
 static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
@@ -994,8 +987,9 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 	struct group *grp = getgrnam(expr->sdata);
 	if (grp) {
 		expr->idata = grp->gr_gid;
-	} else if (isdigit(expr->sdata[0])) {
-		if (!parse_int(state, expr->sdata, &expr->idata, IF_LONG_LONG)) {
+		expr->cmp_flag = CMP_EXACT;
+	} else if (isdigit(expr->sdata[0]) || expr->sdata[0] == '+' || expr->sdata[0] == '-') {
+		if (!parse_icmp(state, expr->sdata, expr, 0)) {
 			goto fail;
 		}
 	} else {
@@ -1004,19 +998,11 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 		goto fail;
 	}
 
-	expr->cmp_flag = CMP_EXACT;
 	return expr;
 
 fail:
 	free_expr(expr);
 	return NULL;
-}
-
-/**
- * Parse -uid N.
- */
-static struct expr *parse_uid(struct parser_state *state, int arg1, int arg2) {
-	return parse_test_icmp(state, eval_uid);
 }
 
 /**
@@ -1027,7 +1013,7 @@ static struct expr *parse_used(struct parser_state *state, int arg1, int arg2) {
 }
 
 /**
- * Parse -user.
+ * Parse -uid/-user.
  */
 static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
@@ -1040,8 +1026,9 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 	struct passwd *pwd = getpwnam(expr->sdata);
 	if (pwd) {
 		expr->idata = pwd->pw_uid;
-	} else if (isdigit(expr->sdata[0])) {
-		if (!parse_int(state, expr->sdata, &expr->idata, IF_LONG_LONG)) {
+		expr->cmp_flag = CMP_EXACT;
+	} else if (isdigit(expr->sdata[0]) || expr->sdata[0] == '+' || expr->sdata[0] == '-') {
+		if (!parse_icmp(state, expr->sdata, expr, 0)) {
 			goto fail;
 		}
 	} else {
@@ -1050,7 +1037,6 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 		goto fail;
 	}
 
-	expr->cmp_flag = CMP_EXACT;
 	return expr;
 
 fail:
@@ -1809,7 +1795,7 @@ static const struct table_entry parse_table[] = {
 	{"follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
 	{"fprint", false, parse_fprint},
 	{"fprint0", false, parse_fprint0},
-	{"gid", false, parse_gid},
+	{"gid", false, parse_group},
 	{"group", false, parse_group},
 	{"help", false, parse_help},
 	{"hidden", false, parse_hidden},
@@ -1853,7 +1839,7 @@ static const struct table_entry parse_table[] = {
 	{"size", false, parse_size},
 	{"true", false, parse_const, true},
 	{"type", false, parse_type, false},
-	{"uid", false, parse_uid},
+	{"uid", false, parse_user},
 	{"used", false, parse_used},
 	{"user", false, parse_user},
 	{"version", false, parse_version},
