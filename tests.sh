@@ -780,9 +780,16 @@ function test_0126() {
     bfs_diff basic/g -depth -print -name h -quit
 }
 
+function test_0127() {
+    [ "$BSD" -o "$GNU" ] || return 0
+
+    local inode="$(ls -id basic/k/foo/bar | cut -f1 -d' ')"
+    bfs_diff basic -inum "$inode"
+}
+
 result=0
 
-for i in {1..126}; do
+for i in {1..127}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
