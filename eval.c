@@ -488,7 +488,11 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
 	if (ftwbuf->typeflag == BFTW_DIR) {
-		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_DIRECTORY);
+		int flags = 0;
+#ifdef O_DIRECTORY
+		flags |= O_DIRECTORY;
+#endif
+		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, flags);
 		if (dfd < 0) {
 			eval_error(state);
 			goto done;
