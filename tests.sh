@@ -760,9 +760,29 @@ function test_0122() {
     bfs_diff basic -type f -size 1T
 }
 
+function test_0123() {
+    [ "$BSD" -o "$GNU" ] || return 0
+    bfs_diff basic/g -print -name g -quit
+}
+
+function test_0124() {
+    [ "$BSD" -o "$GNU" ] || return 0
+    bfs_diff basic/g -print -name h -quit
+}
+
+function test_0125() {
+    [ "$BSD" -o "$GNU" ] || return 0
+    bfs_diff basic/g -depth -print -name g -quit
+}
+
+function test_0126() {
+    [ "$BSD" -o "$GNU" ] || return 0
+    bfs_diff basic/g -depth -print -name h -quit
+}
+
 result=0
 
-for i in {1..122}; do
+for i in {1..126}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
