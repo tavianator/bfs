@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -741,6 +742,125 @@ bool eval_print0(const struct expr *expr, struct eval_state *state) {
 	size_t length = strlen(path) + 1;
 	if (fwrite(path, 1, length, expr->file) != length) {
 		eval_error(state);
+	}
+	return true;
+}
+
+/**
+ * -f?printf action.
+ */
+bool eval_printf(const struct expr *expr, struct eval_state *state) {
+	const struct cmdline *cmdline = state->cmdline;
+	const char *path = state->ftwbuf->path;
+	const struct stat *statbuf;
+	size_t length = strlen(path) + 1;
+	char *format = expr->argv[1];
+	for (; *format; format++) {
+		if (*format == '\\') {
+			switch (*++format) {
+			case '\0':
+				pretty_error(cmdline->stderr_colors,
+					"error: Escape '\\' followed by nothing at all.\n");
+				state->action = BFTW_STOP;
+				state->ret = -1;
+				return false;
+			case 'a':
+				fputc('\a', expr->file);
+				break;
+			case 'b':
+				fputc('\b', expr->file);
+				break;
+			case 'f':
+				fputc('\f', expr->file);
+				break;
+			case 'n':
+				fputc('\n', expr->file);
+				break;
+			case 'r':
+				fputc('\r', expr->file);
+				break;
+			case 't':
+				fputc('\t', expr->file);
+				break;
+			case 'v':
+				fputc('\v', expr->file);
+				break;
+			case '\\':
+				fputc('\\', expr->file);
+				break;
+			}
+		} else if (*format == '%') {
+			switch (*++format) {
+			case '\0':
+				pretty_error(cmdline->stderr_colors,
+					"error: %% at end of format string.\n");
+				state->action = BFTW_STOP;
+				state->ret = -1;
+				return false;
+			case '%':
+				fputc('%', expr->file);
+				break;
+			case 'd':
+				fprintf(expr->file, "%zu", state->ftwbuf->depth);
+				break;
+			case 'D':
+				statbuf = fill_statbuf(state);
+				fprintf(expr->file, "%ju", (uintmax_t)statbuf->st_dev);
+				break;
+			case 'f':
+				fputs(state->ftwbuf->at_path, expr->file);
+				break;
+			case 'G':
+				statbuf = fill_statbuf(state);
+				fprintf(expr->file, "%ju", (uintmax_t)statbuf->st_gid);
+				break;
+			case 'h': {
+					char *path2 = strdup(path);
+					if (!path2) {
+						perror("strdup()");
+						_Exit(EXIT_FAILURE);
+					}
+					// Skip trailing slashes
+					char *end = path2 + strlen(path2);
+					while (end > path2 && end[-1] == '/') {
+						--end;
+					}
+					// Remove the last component
+					while (end > path2 && end[-1] != '/') {
+						--end;
+					}
+					while (end > path2 && end[-1] == '/') {
+						--end;
+					}
+					if (end > path2)
+						*end = '\0';
+					fputs(path2, expr->file);
+					free(path2);
+				}
+				break;
+			case 'i':
+				statbuf = fill_statbuf(state);
+				fprintf(expr->file, "%ju", (uintmax_t)statbuf->st_ino);
+				break;
+			case 'n':
+				statbuf = fill_statbuf(state);
+				fprintf(expr->file, "%ju", (uintmax_t)statbuf->st_nlink);
+				break;
+			case 'p':
+				fputs(state->ftwbuf->path, expr->file);
+				break;
+			case 's':
+				statbuf = fill_statbuf(state);
+				fprintf(expr->file, "%ju", (uintmax_t)statbuf->st_size);
+				break;
+			case 'U':
+				statbuf = fill_statbuf(state);
+				fprintf(expr->file, "%ju", (uintmax_t)statbuf->st_uid);
+				break;
+			}
+		} else {
+			fputc(*format, expr->file);
+		}
 	}
 	return true;
 }
