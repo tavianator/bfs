@@ -64,6 +64,8 @@ struct BFTW {
 	/** The string offset of the filename. */
 	size_t nameoff;
 
+	/** The root path passed to bftw(). */
+	const char *root;
 	/** The depth of this file in the traversal. */
 	size_t depth;
 	/** Which visit this is. */

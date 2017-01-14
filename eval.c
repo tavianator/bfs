@@ -37,7 +37,7 @@ struct eval_state {
 	/** The bftw() callback return value. */
 	enum bftw_action action;
 	/** The eval_cmdline() return value. */
-	int ret;
+	int *ret;
 	/** A stat() buffer, if necessary. */
 	struct stat statbuf;
 };
@@ -58,7 +58,7 @@ static void eval_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
 		pretty_error(state->cmdline->stderr_colors,
 		             "'%s': %s\n", state->ftwbuf->path, strerror(errno));
-		state->ret = -1;
+		*state->ret = -1;
 	}
 }
 
@@ -557,14 +557,6 @@ done:
 }
 
 /**
- * -prune action.
- */
-bool eval_prune(const struct expr *expr, struct eval_state *state) {
-	state->action = BFTW_SKIP_SUBTREE;
-	return true;
-}
-
-/**
  * -hidden test.
  */
 bool eval_hidden(const struct expr *expr, struct eval_state *state) {
@@ -709,22 +701,6 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -print action.
- */
-bool eval_print(const struct expr *expr, struct eval_state *state) {
-	const struct colors *colors = state->cmdline->stdout_colors;
-	if (colors) {
-		fill_statbuf(state);
-	}
-
-	if (pretty_print(colors, state->ftwbuf) != 0) {
-		eval_error(state);
-	}
-
-	return true;
-}
-
-/**
  * -fprint action.
  */
 bool eval_fprint(const struct expr *expr, struct eval_state *state) {
@@ -745,12 +721,54 @@ error:
 /**
  * -f?print0 action.
  */
-bool eval_print0(const struct expr *expr, struct eval_state *state) {
+bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
 	size_t length = strlen(path) + 1;
 	if (fwrite(path, 1, length, expr->file) != length) {
 		eval_error(state);
 	}
+	return true;
+}
+
+/**
+ * -f?printf action.
+ */
+bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
+	if (expr->printf->needs_stat) {
+		if (!fill_statbuf(state)) {
+			goto done;
+		}
+	}
+
+	if (bfs_printf(expr->file, expr->printf, state->ftwbuf) != 0) {
+		eval_error(state);
+	}
+
+done:
+	return true;
+}
+
+/**
+ * -print action.
+ */
+bool eval_print(const struct expr *expr, struct eval_state *state) {
+	const struct colors *colors = state->cmdline->stdout_colors;
+	if (colors) {
+		fill_statbuf(state);
+	}
+
+	if (pretty_print(colors, state->ftwbuf) != 0) {
+		eval_error(state);
+	}
+
+	return true;
+}
+
+/**
+ * -prune action.
+ */
+bool eval_prune(const struct expr *expr, struct eval_state *state) {
+	state->action = BFTW_SKIP_SUBTREE;
 	return true;
 }
 
@@ -1054,12 +1072,12 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		.ftwbuf = ftwbuf,
 		.cmdline = cmdline,
 		.action = BFTW_CONTINUE,
-		.ret = args->ret,
+		.ret = &args->ret,
 	};
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
-			state.ret = -1;
+			args->ret = -1;
 			pretty_error(cmdline->stderr_colors, "'%s': %s\n", ftwbuf->path, strerror(ftwbuf->error));
 		}
 		state.action = BFTW_SKIP_SUBTREE;
@@ -1089,7 +1107,6 @@ done:
 		debug_stat(&state);
 	}
 
-	args->ret = state.ret;
 	return state.action;
 }
 

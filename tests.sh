@@ -145,7 +145,7 @@ for arg; do
 done
 
 function bfs_sort() {
-    awk -F/ '{ print NF - 1 " " $0 }' | sort -n | awk '{ print $2 }'
+    awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
 }
 
 function bfs_diff() {
@@ -787,13 +787,6 @@ function test_0127() {
     bfs_diff basic -inum "$inode"
 }
 
-function test_0127() {
-    [ "$BSD" -o "$GNU" ] || return 0
-
-    local inode="$(ls -id basic/k/foo/bar | cut -f1 -d' ')"
-    bfs_diff basic -inum "$inode"
-}
-
 function test_0128() {
     [ "$BSD" -o "$GNU" ] || return 0
     bfs_diff basic -nogroup
@@ -804,9 +797,49 @@ function test_0129() {
     bfs_diff basic -nouser
 }
 
+function test_0130() {
+    [ "$GNU" ] || return 0
+    bfs_diff basic -printf '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
+}
+
+function test_0131() {
+    [ "$GNU" ] || return 0
+    bfs_diff / -maxdepth 0 -printf '(%h)/(%f)\n'
+}
+
+function test_0132() {
+    [ "$GNU" ] || return 0
+    bfs_diff /// -maxdepth 0 -printf '(%h)/(%f)\n'
+}
+
+function test_0133() {
+    [ "$GNU" ] || return 0
+    bfs_diff basic/ -printf '(%h)/(%f)\n'
+}
+
+function test_0134() {
+    [ "$GNU" ] || return 0
+    bfs_diff basic/// -printf '(%h)/(%f)\n'
+}
+
+function test_0135() {
+    [ "$GNU" ] || return 0
+    bfs_diff basic -printf '|%- 10.10p| %+03d %#4m\n'
+}
+
+function test_0136() {
+    [ "$GNU" ] || return 0
+    bfs_diff links -printf '(%p) (%l) %y %Y\n'
+}
+
+function test_0137() {
+    [ "$GNU" ] || return 0
+    bfs_diff basic -maxdepth 0 -printf '\18\118\1118\11118\n\cfoo'
+}
+
 result=0
 
-for i in {1..129}; do
+for i in {1..137}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

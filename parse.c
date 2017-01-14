@@ -10,6 +10,7 @@
  *********************************************************************/
 
 #include "bfs.h"
+#include "printf.h"
 #include "typo.h"
 #include "util.h"
 #include <ctype.h>
@@ -77,6 +78,8 @@ static void free_expr(struct expr *expr) {
 			free(expr->regex);
 		}
 
+		free_bfs_printf(expr->printf);
+
 		free_expr(expr->lhs);
 		free_expr(expr->rhs);
 		free(expr);
@@ -101,6 +104,7 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 		expr->argv = argv;
 		expr->file = NULL;
 		expr->regex = NULL;
+		expr->printf = NULL;
 	}
 	return expr;
 }
@@ -964,12 +968,50 @@ static struct expr *parse_fprint(struct parser_state *state, int arg1, int arg2)
  * Parse -fprint0 FILE.
  */
 static struct expr *parse_fprint0(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_action(state, eval_print0);
+	struct expr *expr = parse_unary_action(state, eval_fprint0);
 	if (expr) {
 		if (expr_open(state, expr, expr->sdata) != 0) {
 			return NULL;
 		}
 	}
+	return expr;
+}
+
+/**
+ * Parse -fprintf FILE FORMAT.
+ */
+static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2) {
+	const char *arg = state->argv[0];
+
+	const char *file = state->argv[1];
+	if (!file) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a file.\n", arg);
+		return NULL;
+	}
+
+	const char *format = state->argv[2];
+	if (!format) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: %s needs a format string.\n", arg);
+		return NULL;
+	}
+
+	struct expr *expr = parse_action(state, eval_fprintf, 3);
+	if (!expr) {
+		return NULL;
+	}
+
+	if (expr_open(state, expr, file) != 0) {
+		return NULL;
+	}
+
+	expr->printf = parse_bfs_printf(format, state->cmdline->stderr_colors);
+	if (!expr->printf) {
+		free_expr(expr);
+		return NULL;
+	}
+
 	return expr;
 }
 
@@ -1495,10 +1537,30 @@ static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) 
  * Parse -print0.
  */
 static struct expr *parse_print0(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_action(state, eval_print0);
+	struct expr *expr = parse_nullary_action(state, eval_fprint0);
 	if (expr) {
 		expr->file = stdout;
 	}
+	return expr;
+}
+
+/**
+ * Parse -printf FORMAT.
+ */
+static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2) {
+	struct expr *expr = parse_unary_action(state, eval_fprintf);
+	if (!expr) {
+		return NULL;
+	}
+
+	expr->file = stdout;
+
+	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline->stderr_colors);
+	if (!expr->printf) {
+		free_expr(expr);
+		return NULL;
+	}
+
 	return expr;
 }
 
@@ -1775,8 +1837,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	printf("  -amin, -anewer, -cmin, -cnewer, -mmin, -empty, -false, -gid, -ilname, -iname,\n");
 	printf("  -inum, -ipath, -iwholename, -iregex, -lname, -newerXY, -wholename, -regex,\n");
 	printf("  -readable, -writable, -executable, -samefile, -true, -uid, -used, -xtype,\n");
-	printf("  -delete, -execdir ... ;, -okdir ... ;, -print0, -fprint, -fprint0, -quit,\n");
-	printf("  -help, -version\n\n");
+	printf("  -delete, -execdir ... ;, -okdir ... ;, -print0, -printf, -fprint, -fprint0,\n");
+	printf("  -fprintf, -quit, -help, -version\n\n");
 
 	printf("BSD find features:\n");
 	printf("  -E, -d, -x, -depth N, -gid NAME, -uid NAME, -size N[ckMGTP], -sparse\n\n");
@@ -1848,6 +1910,7 @@ static const struct table_entry parse_table[] = {
 	{"follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
 	{"fprint", false, parse_fprint},
 	{"fprint0", false, parse_fprint0},
+	{"fprintf", false, parse_fprintf},
 	{"gid", false, parse_group},
 	{"group", false, parse_group},
 	{"help", false, parse_help},
@@ -1886,6 +1949,7 @@ static const struct table_entry parse_table[] = {
 	{"perm", false, parse_perm},
 	{"print", false, parse_print},
 	{"print0", false, parse_print0},
+	{"printf", false, parse_printf},
 	{"prune", false, parse_prune},
 	{"quit", false, parse_quit},
 	{"readable", false, parse_access, R_OK},

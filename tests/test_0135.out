@@ -1,0 +1,19 @@
+|basic     | +00 0755
+|basic/a   | +01 0644
+|basic/b   | +01 0644
+|basic/c   | +01 0755
+|basic/e   | +01 0755
+|basic/g   | +01 0755
+|basic/i   | +01 0755
+|basic/j   | +01 0755
+|basic/k   | +01 0755
+|basic/l   | +01 0755
+|basic/c/d | +02 0644
+|basic/e/f | +02 0644
+|basic/g/h | +02 0755
+|basic/j/fo| +02 0644
+|basic/k/fo| +02 0755
+|basic/k/fo| +03 0644
+|basic/l/fo| +02 0755
+|basic/l/fo| +03 0755
+|basic/l/fo| +04 0644

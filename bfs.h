@@ -13,6 +13,7 @@
 #define BFS_H
 
 #include "color.h"
+#include "printf.h"
 #include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -248,6 +249,9 @@ struct expr {
 	/** Optional compiled regex. */
 	regex_t *regex;
 
+	/** Optional printf command. */
+	struct bfs_printf *printf;
+
 	/** Optional integer data for this expression. */
 	long long idata;
 
@@ -310,9 +314,10 @@ bool eval_regex(const struct expr *expr, struct eval_state *state);
 bool eval_delete(const struct expr *expr, struct eval_state *state);
 bool eval_exec(const struct expr *expr, struct eval_state *state);
 bool eval_nohidden(const struct expr *expr, struct eval_state *state);
-bool eval_print(const struct expr *expr, struct eval_state *state);
 bool eval_fprint(const struct expr *expr, struct eval_state *state);
-bool eval_print0(const struct expr *expr, struct eval_state *state);
+bool eval_fprint0(const struct expr *expr, struct eval_state *state);
+bool eval_fprintf(const struct expr *expr, struct eval_state *state);
+bool eval_print(const struct expr *expr, struct eval_state *state);
 bool eval_prune(const struct expr *expr, struct eval_state *state);
 bool eval_quit(const struct expr *expr, struct eval_state *state);
 

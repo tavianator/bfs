@@ -755,6 +755,7 @@ static size_t basename_offset(const char *path) {
 static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de) {
 	struct BFTW *ftwbuf = &state->ftwbuf;
 	ftwbuf->path = state->path;
+	ftwbuf->root = state->root;
 	ftwbuf->error = 0;
 	ftwbuf->visit = (state->status == BFTW_GC ? BFTW_POST : BFTW_PRE);
 	ftwbuf->statbuf = NULL;
