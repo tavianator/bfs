@@ -366,28 +366,22 @@ static void exec_chdir(const struct BFTW *ftwbuf) {
 		return;
 	}
 
+	size_t nameoff = ftwbuf->nameoff;
+
+	if (nameoff == 0 && ftwbuf->path[nameoff] != '/') {
+		// The path is something like "foo", so we're already in the
+		// right directory
+		return;
+	}
+
 	char *path = strdup(ftwbuf->path);
 	if (!path) {
 		perror("strdup()");
 		_Exit(EXIT_FAILURE);
 	}
 
-	// Skip trailing slashes
-	char *end = path + strlen(path);
-	while (end > path && end[-1] == '/') {
-		--end;
-	}
-
-	// Remove the last component
-	while (end > path && end[-1] != '/') {
-		--end;
-	}
-	if (end > path) {
-		*end = '\0';
-	} if (path[0] != '/') {
-		// The path is something like "foo", so we're already in the
-		// right directory
-		return;
+	if (nameoff > 0) {
+		path[nameoff] = '\0';
 	}
 
 	if (chdir(path) != 0) {
