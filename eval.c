@@ -599,22 +599,11 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 		goto done;
 	}
 
-	size_t size = statbuf->st_size + 1;
-	name = malloc(size);
+	name = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->st_size);
 	if (!name) {
 		eval_error(state);
 		goto done;
 	}
-
-	ssize_t len = readlinkat(ftwbuf->at_fd, ftwbuf->at_path, name, size);
-	if (len < 0) {
-		eval_error(state);
-		goto done;
-	} else if (len >= size) {
-		goto done;
-	}
-
-	name[len] = '\0';
 
 	ret = fnmatch(expr->sdata, name, expr->idata) == 0;
 

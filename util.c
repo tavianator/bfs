@@ -29,6 +29,36 @@ int xreaddir(DIR *dir, struct dirent **de) {
 	}
 }
 
+char *xreadlinkat(int fd, const char *path, size_t size) {
+	++size; // NUL-terminator
+	ssize_t len;
+	char *name = NULL;
+
+	while (true) {
+		char *new_name = realloc(name, size);
+		if (!new_name) {
+			goto error;
+		}
+		name = new_name;
+
+		len = readlinkat(fd, path, name, size);
+		if (len < 0) {
+			goto error;
+		} else if (len >= size) {
+			size *= 2;
+		} else {
+			break;
+		}
+	}
+
+	name[len] = '\0';
+	return name;
+
+error:
+	free(name);
+	return NULL;
+}
+
 bool isopen(int fd) {
 	return fcntl(fd, F_GETFD) >= 0 || errno != EBADF;
 }

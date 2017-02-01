@@ -49,6 +49,19 @@
 int xreaddir(DIR *dir, struct dirent **de);
 
 /**
+ * readlinkat() wrapper that dynamically allocates the result.
+ *
+ * @param fd
+ *         The base directory descriptor.
+ * @param path
+ *         The path to the link, relative to fd.
+ * @param size
+ *         An estimate for the size of the link name (pass 0 if unknown).
+ * @return The target of the link, allocated with malloc(), or NULL on failure.
+ */
+char *xreadlinkat(int fd, const char *path, size_t size);
+
+/**
  * Check if a file descriptor is open.
  */
 bool isopen(int fd);
