@@ -311,6 +311,7 @@ bool eval_nohidden(const struct expr *expr, struct eval_state *state);
 bool eval_print(const struct expr *expr, struct eval_state *state);
 bool eval_fprint(const struct expr *expr, struct eval_state *state);
 bool eval_print0(const struct expr *expr, struct eval_state *state);
+bool eval_printf(const struct expr *expr, struct eval_state *state);
 bool eval_prune(const struct expr *expr, struct eval_state *state);
 bool eval_quit(const struct expr *expr, struct eval_state *state);
 

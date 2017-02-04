@@ -1489,6 +1489,17 @@ static struct expr *parse_print0(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
+ * Parse -printf.
+ */
+static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2) {
+	struct expr *expr = parse_unary_action(state, eval_printf);
+	if (expr) {
+		expr->file = stdout;
+	}
+	return expr;
+}
+
+/**
  * Parse -prune.
  */
 static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
@@ -1870,6 +1881,7 @@ static const struct table_entry parse_table[] = {
 	{"perm", false, parse_perm},
 	{"print", false, parse_print},
 	{"print0", false, parse_print0},
+	{"printf", false, parse_printf},
 	{"prune", false, parse_prune},
 	{"quit", false, parse_quit},
 	{"readable", false, parse_access, R_OK},
