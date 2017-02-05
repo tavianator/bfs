@@ -841,9 +841,19 @@ function test_0138() {
     bfs_diff basic/g -depth -name g
 }
 
+function test_0139() {
+    [ "$BSD" -o "$GNU" ] || return 0
+    bfs_diff basic basic -print -quit
+}
+
+function test_0140() {
+    [ "$BSD" -o "$GNU" ] || return 0
+    bfs_diff basic basic -quit -print
+}
+
 result=0
 
-for i in {1..138}; do
+for i in {1..140}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

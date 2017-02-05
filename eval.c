@@ -38,6 +38,8 @@ struct eval_state {
 	enum bftw_action action;
 	/** The eval_cmdline() return value. */
 	int *ret;
+	/** Whether to quit immediately. */
+	bool *quit;
 	/** A stat() buffer, if necessary. */
 	struct stat statbuf;
 };
@@ -777,6 +779,7 @@ bool eval_prune(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_quit(const struct expr *expr, struct eval_state *state) {
 	state->action = BFTW_STOP;
+	*state->quit = true;
 	return true;
 }
 
@@ -1005,14 +1008,30 @@ bool eval_not(const struct expr *expr, struct eval_state *state) {
  * Evaluate a conjunction.
  */
 bool eval_and(const struct expr *expr, struct eval_state *state) {
-	return eval_expr(expr->lhs, state) && eval_expr(expr->rhs, state);
+	if (!eval_expr(expr->lhs, state)) {
+		return false;
+	}
+
+	if (*state->quit) {
+		return false;
+	}
+
+	return eval_expr(expr->rhs, state);
 }
 
 /**
  * Evaluate a disjunction.
  */
 bool eval_or(const struct expr *expr, struct eval_state *state) {
-	return eval_expr(expr->lhs, state) || eval_expr(expr->rhs, state);
+	if (eval_expr(expr->lhs, state)) {
+		return true;
+	}
+
+	if (*state->quit) {
+		return false;
+	}
+
+	return eval_expr(expr->rhs, state);
 }
 
 /**
@@ -1020,6 +1039,11 @@ bool eval_or(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_comma(const struct expr *expr, struct eval_state *state) {
 	eval_expr(expr->lhs, state);
+
+	if (*state->quit) {
+		return false;
+	}
+
 	return eval_expr(expr->rhs, state);
 }
 
@@ -1058,6 +1082,8 @@ struct callback_args {
 	const struct cmdline *cmdline;
 	/** Eventual return value from eval_cmdline(). */
 	int ret;
+	/** Whether to quit immediately. */
+	bool quit;
 };
 
 /**
@@ -1073,6 +1099,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		.cmdline = cmdline,
 		.action = BFTW_CONTINUE,
 		.ret = &args->ret,
+		.quit = &args->quit,
 	};
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
@@ -1178,9 +1205,10 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	struct callback_args args = {
 		.cmdline = cmdline,
 		.ret = 0,
+		.quit = false,
 	};
 
-	for (struct root *root = cmdline->roots; root; root = root->next) {
+	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
 		if (bftw(root->path, cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
 			args.ret = -1;
 			perror("bftw()");
