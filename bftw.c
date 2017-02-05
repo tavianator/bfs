@@ -777,8 +777,12 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 			dircache_entry_base(&state->cache, current, &ftwbuf->at_fd, &ftwbuf->at_path);
 		}
 	} else {
-		ftwbuf->nameoff = basename_offset(ftwbuf->path);
 		ftwbuf->depth = 0;
+	}
+
+	if (ftwbuf->depth == 0) {
+		// Compute the name offset for root paths like "foo/bar"
+		ftwbuf->nameoff = basename_offset(ftwbuf->path);
 	}
 
 	ftwbuf->typeflag = BFTW_UNKNOWN;

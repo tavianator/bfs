@@ -837,9 +837,13 @@ function test_0137() {
     bfs_diff basic -maxdepth 0 -printf '\18\118\1118\11118\n\cfoo'
 }
 
+function test_0138() {
+    bfs_diff basic/g -depth -name g
+}
+
 result=0
 
-for i in {1..137}; do
+for i in {1..138}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
