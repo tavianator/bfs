@@ -1206,6 +1206,13 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 }
 
 /**
+ * Parse -nogroup.
+ */
+static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_test(state, eval_nogroup);
+}
+
+/**
  * Parse -nohidden.
  */
 static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg2) {
@@ -1223,6 +1230,13 @@ static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2)
 	}
 
 	return parse_nullary_option(state);
+}
+
+/**
+ * Parse -nouser.
+ */
+static struct expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
+	return parse_nullary_test(state, eval_nouser);
 }
 
 /**
@@ -1857,10 +1871,12 @@ static const struct table_entry parse_table[] = {
 	{"newer", false, parse_acnewer, MTIME},
 	{"newer", true, parse_newerxy},
 	{"nocolor", false, parse_color, false},
+	{"nogroup", false, parse_nogroup},
 	{"nohidden", false, parse_nohidden},
 	{"noignore_readdir_race", false, parse_ignore_races, false},
 	{"noleaf", false, parse_noleaf},
 	{"not"},
+	{"nouser", false, parse_nouser},
 	{"nowarn", false, parse_warn, false},
 	{"o"},
 	{"ok", false, parse_exec, EXEC_CONFIRM},

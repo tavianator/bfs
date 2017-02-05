@@ -18,6 +18,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -223,6 +225,30 @@ bool eval_uid(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return do_cmp(expr, statbuf->st_uid);
+}
+
+/**
+ * -nogroup test.
+ */
+bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return getgrgid(statbuf->st_gid) == NULL;
+}
+
+/**
+ * -nouser test.
+ */
+bool eval_nouser(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	return getpwuid(statbuf->st_uid) == NULL;
 }
 
 /**
