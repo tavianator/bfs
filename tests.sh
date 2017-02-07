@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o physical
+umask 022
 
 export LC_ALL=C
 
