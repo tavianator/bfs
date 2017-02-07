@@ -852,9 +852,15 @@ function test_0140() {
     bfs_diff basic basic -quit -print
 }
 
+function test_0141() {
+    # Memory leak regression test
+    [ "$GNU" ] || return 0
+    bfs_diff basic -maxdepth 0 -printf '%p'
+}
+
 result=0
 
-for i in {1..140}; do
+for i in {1..141}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then

@@ -731,6 +731,7 @@ done:
 		goto error;
 	}
 
+	dstrfree(literal);
 	return command;
 
 error:
