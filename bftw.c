@@ -881,23 +881,10 @@ static struct dircache_entry *bftw_add(struct bftw_state *state, const char *nam
 }
 
 /**
- * Push a new entry onto the queue.
+ * Garbage-collect a dircache entry.
  */
-static int bftw_push(struct bftw_state *state, const char *name) {
-	struct dircache_entry *entry = bftw_add(state, name);
-	if (!entry) {
-		return -1;
-	}
-
-	return dirqueue_push(&state->queue, entry);
-}
-
-/**
- * Pop an entry off the queue.
- */
-static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
+static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool invoke_callback) {
 	int ret = BFTW_CONTINUE;
-	struct dircache_entry *entry = state->current;
 
 	if (!(state->flags & BFTW_DEPTH)) {
 		invoke_callback = false;
@@ -944,9 +931,34 @@ static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 		dircache_entry_free(&state->cache, current);
 	}
 
+	return ret;
+}
+
+/**
+ * Push a new entry onto the queue.
+ */
+static int bftw_push(struct bftw_state *state, const char *name) {
+	struct dircache_entry *entry = bftw_add(state, name);
+	if (!entry) {
+		return -1;
+	}
+
+	if (dirqueue_push(&state->queue, entry) != 0) {
+		state->error = errno;
+		bftw_gc(state, entry, false);
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * Pop an entry off the queue.
+ */
+static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
+	int ret = bftw_gc(state, state->current, invoke_callback);
 	state->current = dirqueue_pop(&state->queue);
 	state->status = BFTW_CURRENT;
-
 	return ret;
 }
 
