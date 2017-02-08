@@ -1040,6 +1040,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 			}
 
 			if (bftw_path_concat(&state, de->d_name) != 0) {
+				closedir(dir);
 				goto fail;
 			}
 
