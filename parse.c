@@ -323,28 +323,28 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
 /**
  * Parse a root path.
  */
-static bool parse_root(struct parser_state *state, const char *path) {
+static int parse_root(struct parser_state *state, const char *path) {
 	struct root *root = malloc(sizeof(struct root));
 	if (!root) {
 		perror("malloc()");
-		return false;
+		return -1;
 	}
 
 	root->path = path;
 	root->next = NULL;
 	*state->roots_tail = root;
 	state->roots_tail = &root->next;
-	return true;
+	return 0;
 }
 
 /**
  * While parsing an expression, skip any paths and add them to the cmdline.
  */
-static const char *skip_paths(struct parser_state *state) {
+static int skip_paths(struct parser_state *state) {
 	while (true) {
 		const char *arg = state->argv[0];
 		if (!arg) {
-			return NULL;
+			return 0;
 		}
 
 		if (arg[0] == '-') {
@@ -358,25 +358,25 @@ static const char *skip_paths(struct parser_state *state) {
 			if (strcmp(arg, "-") != 0) {
 				// - by itself is a file name.  Anything else
 				// starting with - is a flag/predicate.
-				return arg;
+				return 0;
 			}
 		}
 
 		// By POSIX, these are always options
 		if (strcmp(arg, "(") == 0 || strcmp(arg, "!") == 0) {
-			return arg;
+			return 0;
 		}
 
 		if (state->expr_started) {
 			// By POSIX, these can be paths.  We only treat them as
 			// such at the beginning of the command line.
 			if (strcmp(arg, ")") == 0 || strcmp(arg, ",") == 0) {
-				return arg;
+				return 0;
 			}
 		}
 
-		if (!parse_root(state, arg)) {
-			return NULL;
+		if (parse_root(state, arg) != 0) {
+			return -1;
 		}
 
 		parser_advance(state, T_PATH, 1);
@@ -930,7 +930,7 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 		return NULL;
 	}
 
-	if (!parse_root(state, path)) {
+	if (parse_root(state, path) != 0) {
 		return NULL;
 	}
 
@@ -2103,7 +2103,11 @@ static struct expr *new_not_expr(const struct parser_state *state, struct expr *
  *        | LITERAL
  */
 static struct expr *parse_factor(struct parser_state *state) {
-	const char *arg = skip_paths(state);
+	if (skip_paths(state) != 0) {
+		return NULL;
+	}
+
+	const char *arg = state->argv[0];
 	if (!arg) {
 		fputs("Expression terminated prematurely.\n", stderr);
 		return NULL;
@@ -2117,7 +2121,12 @@ static struct expr *parse_factor(struct parser_state *state) {
 			return NULL;
 		}
 
-		arg = skip_paths(state);
+		if (skip_paths(state) != 0) {
+			free_expr(expr);
+			return NULL;
+		}
+
+		arg = state->argv[0];
 		if (!arg || strcmp(arg, ")") != 0) {
 			fputs("Expected a ')'.\n", stderr);
 			free_expr(expr);
@@ -2192,7 +2201,12 @@ static struct expr *parse_term(struct parser_state *state) {
 	struct expr *term = parse_factor(state);
 
 	while (term) {
-		const char *arg = skip_paths(state);
+		if (skip_paths(state) != 0) {
+			free_expr(term);
+			return NULL;
+		}
+
+		const char *arg = state->argv[0];
 		if (!arg) {
 			break;
 		}
@@ -2272,7 +2286,12 @@ static struct expr *parse_clause(struct parser_state *state) {
 	struct expr *clause = parse_term(state);
 
 	while (clause) {
-		const char *arg = skip_paths(state);
+		if (skip_paths(state) != 0) {
+			free_expr(clause);
+			return NULL;
+		}
+
+		const char *arg = state->argv[0];
 		if (!arg) {
 			break;
 		}
@@ -2331,7 +2350,12 @@ static struct expr *parse_expr(struct parser_state *state) {
 	struct expr *expr = parse_clause(state);
 
 	while (expr) {
-		const char *arg = skip_paths(state);
+		if (skip_paths(state) != 0) {
+			free_expr(expr);
+			return NULL;
+		}
+
+		const char *arg = state->argv[0];
 		if (!arg) {
 			break;
 		}
@@ -2380,6 +2404,48 @@ static struct expr *optimize_whole_expr(const struct parser_state *state, struct
 	}
 
 	return expr;
+}
+
+/**
+ * Parse the top-level expression.
+ */
+static struct expr *parse_whole_expr(struct parser_state *state) {
+	if (skip_paths(state) != 0) {
+		return NULL;
+	}
+
+	struct expr *expr = &expr_true;
+	if (state->argv[0]) {
+		expr = parse_expr(state);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
+	if (state->argv[0]) {
+		pretty_error(state->cmdline->stderr_colors,
+		             "error: Unexpected argument '%s'.\n", state->argv[0]);
+		goto fail;
+	}
+
+	if (state->implicit_print) {
+		struct expr *print = new_expr(eval_print, false, 1, &fake_print_arg);
+		if (!print) {
+			goto fail;
+		}
+
+		expr = new_and_expr(state, expr, print, &fake_and_arg);
+		if (!expr) {
+			goto fail;
+		}
+	}
+
+	expr = optimize_whole_expr(state, expr);
+	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -2508,39 +2574,17 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	if (skip_paths(&state)) {
-		cmdline->expr = parse_expr(&state);
-		if (!cmdline->expr) {
-			if (state.just_info) {
-				goto done;
-			} else {
-				goto fail;
-			}
-		}
-	}
-
-	if (state.argv[0]) {
-		pretty_error(cmdline->stderr_colors,
-		             "error: Unexpected argument '%s'.\n", state.argv[0]);
-		goto fail;
-	}
-
-	if (state.implicit_print) {
-		struct expr *print = new_expr(eval_print, false, 1, &fake_print_arg);
-		if (!print) {
-			goto fail;
-		}
-
-		cmdline->expr = new_and_expr(&state, cmdline->expr, print, &fake_and_arg);
-		if (!cmdline->expr) {
+	cmdline->expr = parse_whole_expr(&state);
+	if (!cmdline->expr) {
+		if (state.just_info) {
+			goto done;
+		} else {
 			goto fail;
 		}
 	}
-
-	cmdline->expr = optimize_whole_expr(&state, cmdline->expr);
 
 	if (!cmdline->roots) {
-		if (!parse_root(&state, ".")) {
+		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}
 	}
