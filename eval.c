@@ -293,16 +293,13 @@ static const char *exec_format_path(const struct expr *expr, const struct BFTW *
 	// For compatibility with GNU find, use './name' instead of just 'name'
 	char *path = dstralloc(2 + strlen(name));
 	if (!path) {
-		perror("dstralloc()");
 		return NULL;
 	}
 
 	if (dstrcat(&path, "./") != 0) {
-		perror("dstrcat()");
 		goto err;
 	}
 	if (dstrcat(&path, name) != 0) {
-		perror("dstrcat()");
 		goto err;
 	}
 
@@ -327,18 +324,15 @@ static char *exec_format_arg(char *arg, const char *path) {
 
 	char *ret = dstralloc(0);
 	if (!ret) {
-		perror("dstralloc()");
 		return NULL;
 	}
 
 	char *last = arg;
 	do {
 		if (dstrncat(&ret, last, match - last) != 0) {
-			perror("dstrncat()");
 			goto err;
 		}
 		if (dstrcat(&ret, path) != 0) {
-			perror("dstrcat()");
 			goto err;
 		}
 
@@ -347,7 +341,6 @@ static char *exec_format_arg(char *arg, const char *path) {
 	} while (match);
 
 	if (dstrcat(&ret, last) != 0) {
-		perror("dstrcat()");
 		goto err;
 	}
 
@@ -428,6 +421,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 
 	const char *path = exec_format_path(expr, ftwbuf);
 	if (!path) {
+		eval_error(state);
 		goto out;
 	}
 
@@ -435,6 +429,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	char **template = expr->argv + 1;
 	char **argv = exec_format_argv(argc, template, path);
 	if (!argv) {
+		eval_error(state);
 		goto out_path;
 	}
 
@@ -458,12 +453,12 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	pid_t pid = fork();
 
 	if (pid < 0) {
-		perror("fork()");
+		eval_error(state);
 		goto out_argv;
 	} else if (pid > 0) {
 		int status;
 		if (waitpid(pid, &status, 0) < 0) {
-			perror("waitpid()");
+			eval_error(state);
 			goto out_argv;
 		}
 
@@ -801,19 +796,20 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	int err = regexec(expr->regex, path, 1, &match, flags);
 	if (err == 0) {
 		return match.rm_so == 0 && match.rm_eo == len;
-	} else {
-		if (err != REG_NOMATCH) {
-			char *str = xregerror(err, expr->regex);
-			if (str) {
-				pretty_error(state->cmdline->stderr_colors,
-				             "'%s': %s\n", path, str);
-				free(str);
-			} else {
-				perror("xregerror()");
-			}
+	} else if (err != REG_NOMATCH) {
+		char *str = xregerror(err, expr->regex);
+		if (str) {
+			pretty_error(state->cmdline->stderr_colors,
+			             "'%s': %s\n", path, str);
+			free(str);
+		} else {
+			perror("xregerror()");
 		}
-		return false;
+
+		*state->ret = -1;
 	}
+
+	return false;
 }
 
 /**

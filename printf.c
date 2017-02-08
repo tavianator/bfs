@@ -466,6 +466,7 @@ static int append_literal(struct bfs_printf_directive ***tail, char **literal, b
 struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *stderr_colors) {
 	struct bfs_printf *command = malloc(sizeof(*command));
 	if (!command) {
+		perror("malloc()");
 		return NULL;
 	}
 
@@ -474,6 +475,10 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 	struct bfs_printf_directive **tail = &command->directives;
 
 	char *literal = dstralloc(0);
+	if (!literal) {
+		perror("dstralloc()");
+		goto error;
+	}
 
 	for (const char *i = format; *i; ++i) {
 		char c = *i;

@@ -91,21 +91,24 @@ static void free_expr(struct expr *expr) {
  */
 static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv) {
 	struct expr *expr = malloc(sizeof(struct expr));
-	if (expr) {
-		expr->eval = eval;
-		expr->lhs = NULL;
-		expr->rhs = NULL;
-		expr->pure = pure;
-		expr->evaluations = 0;
-		expr->successes = 0;
-		expr->elapsed.tv_sec = 0;
-		expr->elapsed.tv_nsec = 0;
-		expr->argc = argc;
-		expr->argv = argv;
-		expr->file = NULL;
-		expr->regex = NULL;
-		expr->printf = NULL;
+	if (!expr) {
+		perror("malloc()");
+		return NULL;
 	}
+
+	expr->eval = eval;
+	expr->lhs = NULL;
+	expr->rhs = NULL;
+	expr->pure = pure;
+	expr->evaluations = 0;
+	expr->successes = 0;
+	expr->elapsed.tv_sec = 0;
+	expr->elapsed.tv_nsec = 0;
+	expr->argc = argc;
+	expr->argv = argv;
+	expr->file = NULL;
+	expr->regex = NULL;
+	expr->printf = NULL;
 	return expr;
 }
 
@@ -2471,6 +2474,7 @@ static int parse_gettime(struct timespec *ts) {
 struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	struct cmdline *cmdline = malloc(sizeof(struct cmdline));
 	if (!cmdline) {
+		perror("malloc()");
 		goto fail;
 	}
 
