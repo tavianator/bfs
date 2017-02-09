@@ -617,6 +617,8 @@ struct bftw_state {
 	struct dirqueue queue;
 	/** The current dircache entry. */
 	struct dircache_entry *current;
+	/** The currently open directory. */
+	DIR *dir;
 	/** The current traversal status. */
 	enum bftw_status status;
 
@@ -657,6 +659,7 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 	}
 
 	state->current = NULL;
+	state->dir = NULL;
 	state->status = BFTW_CURRENT;
 
 	state->path = dstralloc(0);
@@ -715,6 +718,33 @@ static void bftw_path_trim(struct bftw_state *state) {
 
 	if (state->status == BFTW_CHILD) {
 		state->status = BFTW_CURRENT;
+	}
+}
+
+/**
+ * Open the current directory.
+ */
+static int bftw_opendir(struct bftw_state *state) {
+	assert(!state->dir);
+
+	state->dir = dircache_entry_open(&state->cache, state->current, state->path);
+	if (state->dir) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+/**
+ * Close the current directory.
+ */
+static int bftw_closedir(struct bftw_state *state) {
+	DIR *dir = state->dir;
+	state->dir = NULL;
+	if (dir) {
+		return closedir(dir);
+	} else {
+		return 0;
 	}
 }
 
@@ -962,6 +992,8 @@ static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
  * Dispose of the bftw() state.
  */
 static void bftw_state_free(struct bftw_state *state) {
+	bftw_closedir(state);
+
 	while (state->current) {
 		bftw_pop(state, false);
 	}
@@ -1017,14 +1049,13 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 			goto fail;
 		}
 
-		DIR *dir = dircache_entry_open(&state.cache, state.current, state.path);
-		if (!dir) {
+		if (bftw_opendir(&state) != 0) {
 			goto dir_error;
 		}
 
 		while (true) {
 			struct dirent *de;
-			if (xreaddir(dir, &de) != 0) {
+			if (xreaddir(state.dir, &de) != 0) {
 				goto dir_error;
 			}
 			if (!de) {
@@ -1036,7 +1067,6 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 			}
 
 			if (bftw_path_concat(&state, de->d_name) != 0) {
-				closedir(dir);
 				goto fail;
 			}
 
@@ -1047,18 +1077,15 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 				break;
 
 			case BFTW_SKIP_SIBLINGS:
-				closedir(dir);
 				goto next;
 
 			case BFTW_SKIP_SUBTREE:
 				continue;
 
 			case BFTW_STOP:
-				closedir(dir);
 				goto done;
 
 			case BFTW_FAIL:
-				closedir(dir);
 				goto fail;
 			}
 
@@ -1071,15 +1098,16 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 				}
 
 				if (bftw_push(&state, de->d_name) != 0) {
-					closedir(dir);
 					goto fail;
 				}
 			}
 		}
 
-		closedir(dir);
-
 	next:
+		if (bftw_closedir(&state) != 0) {
+			goto dir_error;
+		}
+
 		switch (bftw_pop(&state, true)) {
 		case BFTW_CONTINUE:
 		case BFTW_SKIP_SIBLINGS:
@@ -1096,11 +1124,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 	dir_error:
 		error = errno;
-
-		if (dir) {
-			closedir(dir);
-		}
-
+		bftw_closedir(&state);
 		bftw_path_trim(&state);
 		bftw_init_buffers(&state, NULL);
 		bftw_set_error(&state, error);
