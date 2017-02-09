@@ -468,17 +468,8 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 			exec_chdir(ftwbuf);
 		}
 
-		if (expr->exec_flags & EXEC_CONFIRM) {
-			if (redirect(STDIN_FILENO, "/dev/null", O_RDONLY) < 0) {
-				perror("redirect()");
-				goto exit;
-			}
-		}
-
 		execvp(argv[0], argv);
 		perror("execvp()");
-
-	exit:
 		_Exit(EXIT_FAILURE);
 	}
 

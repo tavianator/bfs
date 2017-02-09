@@ -609,15 +609,16 @@ function test_0093() {
 }
 
 function test_0094() {
-    [ "$GNU" ] || return 0
-    # -ok should close stdin for the executed command
-    yes | $BFS basic -ok cat ';' 2>/dev/null
+    [ "$BSD" ] || return 0
+    # -ok should *not* close stdin
+    # See https://savannah.gnu.org/bugs/?24561
+    yes | bfs_diff basic -ok bash -c "printf '%s? ' {} && head -n1" \; 2>/dev/null
 }
 
 function test_0095() {
-    [ "$GNU" ] || return 0
-    # -okdir should close stdin for the executed command
-    yes | $BFS basic -okdir cat ';' 2>/dev/null
+    [ "$BSD" ] || return 0
+    # -okdir should *not* close stdin
+    yes | bfs_diff basic -okdir bash -c "printf '%s? ' {} && head -n1" \; 2>/dev/null
 }
 
 function test_0096() {
