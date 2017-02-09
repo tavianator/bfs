@@ -476,6 +476,16 @@ static const char *parse_icmp(const struct parser_state *state, const char *str,
 }
 
 /**
+ * Check if a string could be an integer comparison.
+ */
+static bool looks_like_icmp(const char *str) {
+	if (str[0] == '-' || str[0] == '+') {
+		++str;
+	}
+	return str[0] >= '0' && str[0] <= '9';
+}
+
+/**
  * Parse a single flag.
  */
 static struct expr *parse_flag(struct parser_state *state, size_t argc) {
@@ -843,16 +853,11 @@ static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) 
  */
 static struct expr *parse_depth_n(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[1];
-	if (arg) {
-		while (*arg == '-' || *arg == '+') {
-			++arg;
-		}
-		if (*arg >= '0' && *arg <= '9') {
-			return parse_test_icmp(state, eval_depth);
-		}
+	if (arg && looks_like_icmp(arg)) {
+		return parse_test_icmp(state, eval_depth);
+	} else {
+		return parse_depth(state, arg1, arg2);
 	}
-
-	return parse_depth(state, arg1, arg2);
 }
 
 /**
@@ -1033,7 +1038,7 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 	if (grp) {
 		expr->idata = grp->gr_gid;
 		expr->cmp_flag = CMP_EXACT;
-	} else if (isdigit(expr->sdata[0]) || expr->sdata[0] == '+' || expr->sdata[0] == '-') {
+	} else if (looks_like_icmp(expr->sdata)) {
 		if (!parse_icmp(state, expr->sdata, expr, 0)) {
 			goto fail;
 		}
@@ -1072,7 +1077,7 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 	if (pwd) {
 		expr->idata = pwd->pw_uid;
 		expr->cmp_flag = CMP_EXACT;
-	} else if (isdigit(expr->sdata[0]) || expr->sdata[0] == '+' || expr->sdata[0] == '-') {
+	} else if (looks_like_icmp(expr->sdata)) {
 		if (!parse_icmp(state, expr->sdata, expr, 0)) {
 			goto fail;
 		}
