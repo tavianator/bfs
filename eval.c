@@ -866,7 +866,7 @@ bool eval_sparse(const struct expr *expr, struct eval_state *state) {
  * -type test.
  */
 bool eval_type(const struct expr *expr, struct eval_state *state) {
-	return state->ftwbuf->typeflag == expr->idata;
+	return state->ftwbuf->typeflag & expr->idata;
 }
 
 /**
@@ -900,33 +900,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	switch ((enum bftw_typeflag)expr->idata) {
-	case BFTW_UNKNOWN:
-	case BFTW_ERROR:
-		break;
-	case BFTW_BLK:
-		return S_ISBLK(sb.st_mode);
-	case BFTW_CHR:
-		return S_ISCHR(sb.st_mode);
-	case BFTW_DIR:
-		return S_ISDIR(sb.st_mode);
-	case BFTW_DOOR:
-		return S_ISDOOR(sb.st_mode);
-	case BFTW_FIFO:
-		return S_ISFIFO(sb.st_mode);
-	case BFTW_LNK:
-		return S_ISLNK(sb.st_mode);
-	case BFTW_PORT:
-		return S_ISPORT(sb.st_mode);
-	case BFTW_REG:
-		return S_ISREG(sb.st_mode);
-	case BFTW_SOCK:
-		return S_ISSOCK(sb.st_mode);
-	case BFTW_WHT:
-		return S_ISWHT(sb.st_mode);
-	}
-
-	return false;
+	return bftw_mode_to_typeflag(sb.st_mode) & expr->idata;
 }
 
 #if _POSIX_MONOTONIC_CLOCK > 0

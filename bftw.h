@@ -20,30 +20,35 @@
  */
 enum bftw_typeflag {
 	/** Unknown type. */
-	BFTW_UNKNOWN,
+	BFTW_UNKNOWN = 0,
 	/** Block device. */
-	BFTW_BLK,
+	BFTW_BLK     = 1 << 0,
 	/** Character device. */
-	BFTW_CHR,
+	BFTW_CHR     = 1 << 1,
 	/** Directory. */
-	BFTW_DIR,
+	BFTW_DIR     = 1 << 2,
 	/** Solaris door. */
-	BFTW_DOOR,
+	BFTW_DOOR    = 1 << 3,
 	/** Pipe. */
-	BFTW_FIFO,
+	BFTW_FIFO    = 1 << 4,
 	/** Symbolic link. */
-	BFTW_LNK,
+	BFTW_LNK     = 1 << 5,
 	/** Solaris event port. */
-	BFTW_PORT,
+	BFTW_PORT    = 1 << 6,
 	/** Regular file. */
-	BFTW_REG,
+	BFTW_REG     = 1 << 7,
 	/** Socket. */
-	BFTW_SOCK,
+	BFTW_SOCK    = 1 << 8,
 	/** BSD whiteout. */
-	BFTW_WHT,
+	BFTW_WHT     = 1 << 9,
 	/** An error occurred for this file. */
-	BFTW_ERROR,
+	BFTW_ERROR   = 1 << 10,
 };
+
+/**
+ * Convert a stat() st_mode to a bftw() typeflag.
+ */
+enum bftw_typeflag bftw_mode_to_typeflag(mode_t mode);
 
 /**
  * Possible visit occurrences.

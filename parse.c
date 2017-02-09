@@ -1754,7 +1754,7 @@ static struct expr *parse_sparse(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
- * Parse -x?type [bcdpfls].
+ * Parse -x?type [bcdpflsD].
  */
 static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 	eval_fn *eval = x ? eval_xtype : eval_type;
@@ -1763,44 +1763,69 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 		return NULL;
 	}
 
-	int typeflag = BFTW_UNKNOWN;
+	enum bftw_typeflag types = 0;
 
-	switch (expr->sdata[0]) {
-	case 'b':
-		typeflag = BFTW_BLK;
-		break;
-	case 'c':
-		typeflag = BFTW_CHR;
-		break;
-	case 'd':
-		typeflag = BFTW_DIR;
-		break;
-	case 'D':
-		typeflag = BFTW_DOOR;
-		break;
-	case 'p':
-		typeflag = BFTW_FIFO;
-		break;
-	case 'f':
-		typeflag = BFTW_REG;
-		break;
-	case 'l':
-		typeflag = BFTW_LNK;
-		break;
-	case 's':
-		typeflag = BFTW_SOCK;
-		break;
+	const char *c = expr->sdata;
+	while (true) {
+		switch (*c) {
+		case 'b':
+			types |= BFTW_BLK;
+			break;
+		case 'c':
+			types |= BFTW_CHR;
+			break;
+		case 'd':
+			types |= BFTW_DIR;
+			break;
+		case 'D':
+			types |= BFTW_DOOR;
+			break;
+		case 'p':
+			types |= BFTW_FIFO;
+			break;
+		case 'f':
+			types |= BFTW_REG;
+			break;
+		case 'l':
+			types |= BFTW_LNK;
+			break;
+		case 's':
+			types |= BFTW_SOCK;
+			break;
+
+		case '\0':
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s %s: Expected a type flag.\n",
+			             expr->argv[0], expr->argv[1]);
+			goto fail;
+
+		default:
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s %s: Unknown type flag '%c' (expected one of [bcdpflsD]).\n",
+			             expr->argv[0], expr->argv[1], *c);
+			goto fail;
+		}
+
+		++c;
+		if (*c == '\0') {
+			break;
+		} else if (*c == ',') {
+			++c;
+			continue;
+		} else {
+			pretty_error(state->cmdline->stderr_colors,
+			             "error: %s %s: Types must be comma-separated.\n",
+			             expr->argv[0], expr->argv[1]);
+			goto fail;
+		}
 	}
 
-	if (typeflag == BFTW_UNKNOWN || expr->sdata[1] != '\0') {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: Unknown type flag '%s'.\n", expr->sdata);
-		free_expr(expr);
-		return NULL;
-	}
-
-	expr->idata = typeflag;
+	expr->idata = types;
 	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**

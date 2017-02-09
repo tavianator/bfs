@@ -523,6 +523,54 @@ static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
 #endif
 }
 
+enum bftw_typeflag bftw_mode_to_typeflag(mode_t mode) {
+	switch (mode & S_IFMT) {
+#ifdef S_IFBLK
+	case S_IFBLK:
+		return BFTW_BLK;
+#endif
+#ifdef S_IFCHR
+	case S_IFCHR:
+		return BFTW_CHR;
+#endif
+#ifdef S_IFDIR
+	case S_IFDIR:
+		return BFTW_DIR;
+#endif
+#ifdef S_IFDOOR
+	case S_IFDOOR:
+		return BFTW_DOOR;
+#endif
+#ifdef S_IFIFO
+	case S_IFIFO:
+		return BFTW_FIFO;
+#endif
+#ifdef S_IFLNK
+	case S_IFLNK:
+		return BFTW_LNK;
+#endif
+#ifdef S_IFPORT
+	case S_IFPORT:
+		return BFTW_PORT;
+#endif
+#ifdef S_IFREG
+	case S_IFREG:
+		return BFTW_REG;
+#endif
+#ifdef S_IFSOCK
+	case S_IFSOCK:
+		return BFTW_SOCK;
+#endif
+#ifdef S_IFWHT
+	case S_IFWHT:
+		return BFTW_WHT;
+#endif
+
+	default:
+		return BFTW_UNKNOWN;
+	}
+}
+
 /** Call stat() and use the results. */
 static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
 	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, ftwbuf->at_flags);
@@ -531,59 +579,7 @@ static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
 	}
 
 	ftwbuf->statbuf = sb;
-
-	switch (sb->st_mode & S_IFMT) {
-#ifdef S_IFBLK
-	case S_IFBLK:
-		ftwbuf->typeflag = BFTW_BLK;
-		break;
-#endif
-#ifdef S_IFCHR
-	case S_IFCHR:
-		ftwbuf->typeflag = BFTW_CHR;
-		break;
-#endif
-#ifdef S_IFDIR
-	case S_IFDIR:
-		ftwbuf->typeflag = BFTW_DIR;
-		break;
-#endif
-#ifdef S_IFDOOR
-	case S_IFDOOR:
-		ftwbuf->typeflag = BFTW_DOOR;
-		break;
-#endif
-#ifdef S_IFIFO
-	case S_IFIFO:
-		ftwbuf->typeflag = BFTW_FIFO;
-		break;
-#endif
-#ifdef S_IFLNK
-	case S_IFLNK:
-		ftwbuf->typeflag = BFTW_LNK;
-		break;
-#endif
-#ifdef S_IFPORT
-	case S_IFPORT:
-		ftwbuf->typeflag = BFTW_PORT;
-		break;
-#endif
-#ifdef S_IFREG
-	case S_IFREG:
-		ftwbuf->typeflag = BFTW_REG;
-		break;
-#endif
-#ifdef S_IFSOCK
-	case S_IFSOCK:
-		ftwbuf->typeflag = BFTW_SOCK;
-		break;
-#endif
-#ifdef S_IFWHT
-	case S_IFWHT:
-		ftwbuf->typeflag = BFTW_WHT;
-		break;
-#endif
-	}
+	ftwbuf->typeflag = bftw_mode_to_typeflag(sb->st_mode);
 
 	return 0;
 }

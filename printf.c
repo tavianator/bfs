@@ -318,39 +318,32 @@ static int bfs_printf_u(FILE *file, const struct bfs_printf_directive *directive
 	return fprintf(file, directive->str, pwd->pw_name);
 }
 
+static const char *bfs_printf_type(enum bftw_typeflag typeflag) {
+	switch (typeflag) {
+	case BFTW_BLK:
+		return "b";
+	case BFTW_CHR:
+		return "c";
+	case BFTW_DIR:
+		return "d";
+	case BFTW_DOOR:
+		return "D";
+	case BFTW_FIFO:
+		return "p";
+	case BFTW_LNK:
+		return "l";
+	case BFTW_REG:
+		return "f";
+	case BFTW_SOCK:
+		return "s";
+	default:
+		return "U";
+	}
+}
+
 /** %y: type */
 static int bfs_printf_y(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	const char *type;
-	switch (ftwbuf->typeflag) {
-	case BFTW_BLK:
-		type = "b";
-		break;
-	case BFTW_CHR:
-		type = "c";
-		break;
-	case BFTW_DIR:
-		type = "d";
-		break;
-	case BFTW_DOOR:
-		type = "D";
-		break;
-	case BFTW_FIFO:
-		type = "p";
-		break;
-	case BFTW_LNK:
-		type = "l";
-		break;
-	case BFTW_REG:
-		type = "f";
-		break;
-	case BFTW_SOCK:
-		type = "s";
-		break;
-	default:
-		type = "U";
-		break;
-	}
-
+	const char *type = bfs_printf_type(ftwbuf->typeflag);
 	return fprintf(file, directive->str, type);
 }
 
@@ -364,48 +357,7 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive
 
 	struct stat sb;
 	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, 0) == 0) {
-		switch (sb.st_mode & S_IFMT) {
-#ifdef S_IFBLK
-		case S_IFBLK:
-			type = "b";
-			break;
-#endif
-#ifdef S_IFCHR
-		case S_IFCHR:
-			type = "c";
-			break;
-#endif
-#ifdef S_IFDIR
-		case S_IFDIR:
-			type = "d";
-			break;
-#endif
-#ifdef S_IFDOOR
-		case S_IFDOOR:
-			type = "D";
-			break;
-#endif
-#ifdef S_IFIFO
-		case S_IFIFO:
-			type = "p";
-			break;
-#endif
-#ifdef S_IFLNK
-		case S_IFLNK:
-			type = "l";
-			break;
-#endif
-#ifdef S_IFREG
-		case S_IFREG:
-			type = "f";
-			break;
-#endif
-#ifdef S_IFSOCK
-		case S_IFSOCK:
-			type = "s";
-			break;
-#endif
-		}
+		type = bfs_printf_type(bftw_mode_to_typeflag(sb.st_mode));
 	} else {
 		switch (errno) {
 		case ELOOP:

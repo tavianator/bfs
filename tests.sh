@@ -858,9 +858,19 @@ function test_0141() {
     bfs_diff basic -maxdepth 0 -printf '%p'
 }
 
+function test_0142() {
+    [ "$ALL" ] || return 0
+    bfs_diff links -type f,d,c
+}
+
+function test_0143() {
+    [ "$ALL" ] || return 0
+    bfs_diff links -xtype f,d,c
+}
+
 result=0
 
-for i in {1..141}; do
+for i in {1..143}; do
     test="test_$(printf '%04d' $i)"
 
     if [ -t 1 ]; then
