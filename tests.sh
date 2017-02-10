@@ -336,29 +336,16 @@ for arg; do
     esac
 done
 
-declare -A run_tests
-
-for test in "${posix_tests[@]}"; do
-    run_tests["$test"]=yes
-done
-
-if [ "$BSD" ]; then
-    for test in "${bsd_tests[@]}"; do
-        run_tests["$test"]=yes
+function enable_tests() {
+    for test; do
+        declare -g run_$test=yes
     done
-fi
+}
 
-if [ "$GNU" ]; then
-    for test in "${gnu_tests[@]}"; do
-        run_tests["$test"]=yes
-    done
-fi
-
-if [ "$ALL" ]; then
-    for test in "${bfs_tests[@]}"; do
-        run_tests["$test"]=yes
-    done
-fi
+enable_tests "${posix_tests[@]}"
+[ "$BSD" ] && enable_tests "${bsd_tests[@]}"
+[ "$GNU" ] && enable_tests "${gnu_tests[@]}"
+[ "$ALL" ] && enable_tests "${bfs_tests[@]}"
 
 function bfs_sort() {
     awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
@@ -989,7 +976,9 @@ function test_printf_leak() {
 
 result=0
 
-for test in "${!run_tests[@]}"; do
+for test in ${!run_*}; do
+    test=${test#run_}
+
     if [ -t 1 ]; then
         printf '\r\033[J%s' "$test"
     else
