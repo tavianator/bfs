@@ -286,7 +286,6 @@ static const char *exec_format_path(const struct expr *expr, const struct BFTW *
 
 	if (name[0] == '/') {
 		// Must be a root path ("/", "//", etc.)
-		assert(ftwbuf->nameoff == 0);
 		return name;
 	}
 
@@ -311,7 +310,7 @@ err:
 }
 
 static void exec_free_path(const char *path, const struct BFTW *ftwbuf) {
-	if (path != ftwbuf->path) {
+	if (path != ftwbuf->path && path != ftwbuf->path + ftwbuf->nameoff) {
 		dstrfree((char *)path);
 	}
 }
@@ -630,16 +629,12 @@ bool eval_name(const struct expr *expr, struct eval_state *state) {
 		// Any trailing slashes are not part of the name.  This can only
 		// happen for the root path.
 		const char *slash = strchr(name, '/');
-		if (slash == name) {
-			// The name of "/" (or "//", etc.) is "/"
-			name = "/";
-		} else if (slash) {
-			copy = strdup(name);
+		if (slash && slash > name) {
+			copy = strndup(name, slash - name);
 			if (!copy) {
 				eval_error(state);
 				return false;
 			}
-			copy[slash - name] = '\0';
 			name = copy;
 		}
 	}

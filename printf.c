@@ -145,6 +145,10 @@ static int bfs_printf_h(FILE *file, const struct bfs_printf_directive *directive
 		buf = ".";
 	}
 
+	if (!buf) {
+		return -1;
+	}
+
 	int ret = fprintf(file, directive->str, buf);
 	free(copy);
 	return ret;

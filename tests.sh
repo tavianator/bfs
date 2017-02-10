@@ -177,6 +177,7 @@ bsd_tests=(
     test_delete_root
     test_execdir_slash
     test_execdir_slash_pwd
+    test_execdir_slashes
     test_regex
     test_iregex
     test_regex_parens
@@ -257,6 +258,7 @@ gnu_tests=(
     test_delete_root
     test_execdir_slash
     test_execdir_slash_pwd
+    test_execdir_slashes
     test_regex
     test_iregex
     test_regex_parens
@@ -291,7 +293,6 @@ bfs_tests=(
     test_perm_symbolic_missing_action
     test_perm_leading_plus_symbolic
     test_perm_octal_plus
-    test_execdir_slashes
     test_hidden
     test_nohidden
 )

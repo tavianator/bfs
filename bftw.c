@@ -772,6 +772,9 @@ static size_t basename_offset(const char *path) {
 	// Find the beginning of the name
 	for (; i > 0 && path[i - 1] != '/'; --i);
 
+	// Strip leading slashes
+	for (; path[i] == '/' && path[i + 1]; ++i);
+
 	return i;
 }
 
