@@ -1039,7 +1039,8 @@ function test_precedence() {
     bfs_diff basic \( -name foo -type d -o -name bar -a -type f \) -print , \! -empty -type f -print
 }
 
-result=0
+passed=0
+failed=0
 
 for test in ${!run_*}; do
     test=${test#run_}
@@ -1053,22 +1054,22 @@ for test in ${!run_*}; do
     ("$test" "$dir")
     status=$?
 
-    if [ $status -ne 0 ]; then
+    if [ $status -eq 0 ]; then
+        ((++passed))
+    else
+        ((++failed))
         echo "$test failed!"
-        result=$status
     fi
 done
 
-if [ $result -eq 0 ]; then
-    status=passed
-else
-    status=failed
-fi
-
 if [ -t 1 ]; then
-    printf '\r\033[Jtests %s\n' "$status"
-else
-    echo "tests $status"
+    printf '\r\033[J'
 fi
 
-exit $result
+if [ $passed -gt 0 ]; then
+    echo "tests passed: $passed"
+fi
+if [ $failed -gt 0 ]; then
+    echo "tests failed: $failed"
+    exit 1
+fi
