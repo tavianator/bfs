@@ -295,6 +295,11 @@ bfs_tests=(
     test_perm_octal_plus
     test_hidden
     test_nohidden
+    test_path_flag_expr
+    test_path_expr_flag
+    test_flag_expr_path
+    test_expr_flag_path
+    test_expr_path_flag
 )
 
 BSD=yes
@@ -972,6 +977,26 @@ function test_printf_escapes() {
 function test_printf_leak() {
     # Memory leak regression test
     bfs_diff basic -maxdepth 0 -printf '%p'
+}
+
+function test_path_flag_expr() {
+    bfs_diff links/h -H -type l
+}
+
+function test_path_expr_flag() {
+    bfs_diff links/h -type l -H
+}
+
+function test_flag_expr_path() {
+    bfs_diff -H -type l links/h
+}
+
+function test_expr_flag_path() {
+    bfs_diff -type l -H links/h
+}
+
+function test_expr_path_flag() {
+    bfs_diff -type l links/h -H
 }
 
 result=0
