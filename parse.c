@@ -46,6 +46,7 @@ static struct expr expr_true = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.pure = true,
+	.always_true = true,
 	.argc = 1,
 	.argv = &fake_true_arg,
 };
@@ -58,6 +59,7 @@ static struct expr expr_false = {
 	.lhs = NULL,
 	.rhs = NULL,
 	.pure = true,
+	.always_false = true,
 	.argc = 1,
 	.argv = &fake_false_arg,
 };
@@ -100,6 +102,8 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 	expr->lhs = NULL;
 	expr->rhs = NULL;
 	expr->pure = pure;
+	expr->always_true = false;
+	expr->always_false = false;
 	expr->evaluations = 0;
 	expr->successes = 0;
 	expr->elapsed.tv_sec = 0;
@@ -2124,7 +2128,12 @@ static struct expr *new_not_expr(const struct parser_state *state, struct expr *
 		}
 	}
 
-	return new_unary_expr(eval_not, rhs, argv);
+	struct expr *expr = new_unary_expr(eval_not, rhs, argv);
+	if (expr) {
+		expr->always_true = rhs->always_false;
+		expr->always_false = rhs->always_true;
+	}
+	return expr;
 }
 
 /**
@@ -2188,14 +2197,14 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 		if (lhs == &expr_true) {
 			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			return rhs;
-		} else if (lhs == &expr_false) {
-			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
-			free_expr(rhs);
-			return lhs;
 		} else if (rhs == &expr_true) {
 			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
-		} else if (optlevel >= 2 && rhs == &expr_false && lhs->pure) {
+		} else if (lhs->always_false) {
+			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
+			free_expr(rhs);
+			return lhs;
+		} else if (optlevel >= 2 && rhs->always_false && lhs->pure) {
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
@@ -2218,7 +2227,12 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 		}
 	}
 
-	return new_binary_expr(eval_and, lhs, rhs, argv);
+	struct expr *expr = new_binary_expr(eval_and, lhs, rhs, argv);
+	if (expr) {
+		expr->always_true = lhs->always_true && rhs->always_true;
+		expr->always_false = lhs->always_false || rhs->always_false;
+	}
+	return expr;
 }
 
 /**
@@ -2271,20 +2285,20 @@ static struct expr *parse_term(struct parser_state *state) {
 static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
 	int optlevel = state->cmdline->optlevel;
 	if (optlevel >= 1) {
-		if (lhs == &expr_true) {
+		if (lhs->always_true) {
 			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			free_expr(rhs);
 			return lhs;
 		} else if (lhs == &expr_false) {
 			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			return rhs;
-		} else if (optlevel >= 2 && rhs == &expr_true && lhs->pure) {
-			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			free_expr(lhs);
-			return rhs;
 		} else if (rhs == &expr_false) {
 			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
+		} else if (optlevel >= 2 && rhs->always_true && lhs->pure) {
+			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
+			free_expr(lhs);
+			return rhs;
 		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
 			char **not_arg = lhs->argv;
 			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
@@ -2304,7 +2318,12 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 		}
 	}
 
-	return new_binary_expr(eval_or, lhs, rhs, argv);
+	struct expr *expr = new_binary_expr(eval_or, lhs, rhs, argv);
+	if (expr) {
+		expr->always_true = lhs->always_true || rhs->always_true;
+		expr->always_false = lhs->always_false && rhs->always_false;
+	}
+	return expr;
 }
 
 /**
@@ -2369,7 +2388,12 @@ static struct expr *new_comma_expr(const struct parser_state *state, struct expr
 		}
 	}
 
-	return new_binary_expr(eval_comma, lhs, rhs, argv);
+	struct expr *expr = new_binary_expr(eval_comma, lhs, rhs, argv);
+	if (expr) {
+		expr->always_true = rhs->always_true;
+		expr->always_false = rhs->always_false;
+	}
+	return expr;
 }
 
 /**

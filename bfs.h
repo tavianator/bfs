@@ -202,6 +202,10 @@ struct expr {
 
 	/** Whether this expression has no side effects. */
 	bool pure;
+	/** Whether this expression always evaluates to true. */
+	bool always_true;
+	/** Whether this expression always evaluates to false. */
+	bool always_false;
 
 	/** Number of times this predicate was executed. */
 	size_t evaluations;
