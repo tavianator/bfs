@@ -141,7 +141,6 @@ posix_tests=(
     test_size_plus
     test_size_bytes
     test_exec
-    test_parens
     test_flag_comma
     test_perm_222
     test_perm_222_minus
@@ -151,6 +150,11 @@ posix_tests=(
     test_perm_symbolic_minus
     test_perm_leading_plus_symbolic_minus
     test_ok_stdin
+    test_parens
+    test_bang
+    test_implicit_and
+    test_a
+    test_o
 )
 
 bsd_tests=(
@@ -242,7 +246,6 @@ gnu_tests=(
     test_execdir
     test_execdir_substring
     test_execdir_pwd
-    test_comma
     test_weird_names
     test_flag_weird_names
     test_follow_comma
@@ -283,6 +286,11 @@ gnu_tests=(
     test_quit_after_print
     test_quit_before_print
     test_printf_leak
+    test_not
+    test_and
+    test_or
+    test_comma
+    test_precedence
 )
 
 bfs_tests=(
@@ -655,14 +663,6 @@ function test_execdir_pwd() {
     bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" ';'
 }
 
-function test_parens() {
-    bfs_diff basic \( -name '*f*' \)
-}
-
-function test_comma() {
-    bfs_diff basic -name '*f*' -print , -print
-}
-
 function test_weird_names() {
     cd weirdnames
     bfs_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
@@ -997,6 +997,46 @@ function test_expr_flag_path() {
 
 function test_expr_path_flag() {
     bfs_diff -type l links/h -H
+}
+
+function test_parens() {
+    bfs_diff basic \( -name '*f*' \)
+}
+
+function test_bang() {
+    bfs_diff basic \! -name foo
+}
+
+function test_not() {
+    bfs_diff basic -not -name foo
+}
+
+function test_implicit_and() {
+    bfs_diff basic -name foo -type d
+}
+
+function test_a() {
+    bfs_diff basic -name foo -a -type d
+}
+
+function test_and() {
+    bfs_diff basic -name foo -and -type d
+}
+
+function test_o() {
+    bfs_diff basic -name foo -o -type d
+}
+
+function test_or() {
+    bfs_diff basic -name foo -or -type d
+}
+
+function test_comma() {
+    bfs_diff basic -name '*f*' -print , -print
+}
+
+function test_precedence() {
+    bfs_diff basic \( -name foo -type d -o -name bar -a -type f \) -print , \! -empty -type f -print
 }
 
 result=0
