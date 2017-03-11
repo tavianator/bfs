@@ -309,6 +309,7 @@ bfs_tests=(
     test_flag_expr_path
     test_expr_flag_path
     test_expr_path_flag
+    test_colors
 )
 
 BSD=yes
@@ -1042,6 +1043,10 @@ function test_comma() {
 
 function test_precedence() {
     bfs_diff basic \( -name foo -type d -o -name bar -a -type f \) -print , \! -empty -type f -print
+}
+
+function test_colors() {
+    LS_COLORS= bfs_diff links -color
 }
 
 passed=0
