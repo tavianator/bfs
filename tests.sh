@@ -4,6 +4,7 @@ set -o physical
 umask 022
 
 export LC_ALL=C
+export TZ=UTC
 
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
@@ -977,7 +978,7 @@ function test_printf_escapes() {
 }
 
 function test_printf_times() {
-    TZ=UTC bfs_diff times -type f -printf '%p | %a %AY-%Am-%Ad %AH:%AI:%AS %T@ | %t %TY-%Tm-%Td %TH:%TI:%TS %T@\n'
+    bfs_diff times -type f -printf '%p | %a %AY-%Am-%Ad %AH:%AI:%AS %T@ | %t %TY-%Tm-%Td %TH:%TI:%TS %T@\n'
 }
 
 function test_printf_leak() {
