@@ -18,6 +18,7 @@
 #include <regex.h>
 #include <stdbool.h>
 #include <sys/stat.h>
+#include <time.h>
 
 // Some portability concerns
 
@@ -100,5 +101,26 @@ int dup_cloexec(int fd);
  * @return A human-readable description of the error, allocated with malloc().
  */
 char *xregerror(int err, const regex_t *regex);
+
+/**
+ * localtime_r() wrapper that calls tzset() first.
+ *
+ * @param timep
+ *         The time_t to convert.
+ * @param result
+ *         Buffer to hold the result.
+ * @return 0 on success, -1 on failure.
+ */
+int xlocaltime(const time_t *timep, struct tm *result);
+
+/**
+ * Format a mode like ls -l (e.g. -rw-r--r--).
+ *
+ * @param mode
+ *         The mode to format.
+ * @param str
+ *         The string to hold the formatted mode.
+ */
+void format_mode(mode_t mode, char str[11]);
 
 #endif // BFS_UTIL_H

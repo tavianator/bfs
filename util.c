@@ -10,11 +10,13 @@
  *********************************************************************/
 
 #include "util.h"
+#include "bftw.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <regex.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -116,4 +118,87 @@ char *xregerror(int err, const regex_t *regex) {
 		regerror(err, regex, str, len);
 	}
 	return str;
+}
+
+int xlocaltime(const time_t *timep, struct tm *result) {
+	// Should be called before localtime_r() according to POSIX.1-2004
+	tzset();
+
+	if (localtime_r(timep, result)) {
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+void format_mode(mode_t mode, char str[11]) {
+	strcpy(str, "----------");
+
+	switch (bftw_mode_to_typeflag(mode)) {
+	case BFTW_BLK:
+		str[0] = 'b';
+		break;
+	case BFTW_CHR:
+		str[0] = 'c';
+		break;
+	case BFTW_DIR:
+		str[0] = 'd';
+		break;
+	case BFTW_DOOR:
+		str[0] = 'D';
+		break;
+	case BFTW_FIFO:
+		str[0] = 'p';
+		break;
+	case BFTW_LNK:
+		str[0] = 'l';
+		break;
+	case BFTW_SOCK:
+		str[0] = 's';
+		break;
+	default:
+		break;
+	}
+
+	if (mode & 00400) {
+		str[1] = 'r';
+	}
+	if (mode & 00200) {
+		str[2] = 'w';
+	}
+	if ((mode & 04100) == 04000) {
+		str[3] = 'S';
+	} else if (mode & 04000) {
+		str[3] = 's';
+	} else if (mode & 00100) {
+		str[3] = 'x';
+	}
+
+	if (mode & 00040) {
+		str[4] = 'r';
+	}
+	if (mode & 00020) {
+		str[5] = 'w';
+	}
+	if ((mode & 02010) == 02000) {
+		str[6] = 'S';
+	} else if (mode & 02000) {
+		str[6] = 's';
+	} else if (mode & 00010) {
+		str[6] = 'x';
+	}
+
+	if (mode & 00004) {
+		str[7] = 'r';
+	}
+	if (mode & 00002) {
+		str[8] = 'w';
+	}
+	if ((mode & 01001) == 01000) {
+		str[9] = 'T';
+	} else if (mode & 01000) {
+		str[9] = 't';
+	} else if (mode & 00001) {
+		str[9] = 'x';
+	}
 }

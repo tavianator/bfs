@@ -86,16 +86,20 @@ static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *direc
 	static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
 	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->time_field);
-	const struct tm *tm = localtime(&ts->tv_sec);
+	struct tm tm;
+	if (xlocaltime(&ts->tv_sec, &tm) != 0) {
+		return -1;
+	}
+
 	BFS_PRINTF_BUF(buf, "%s %s %2d %.2d:%.2d:%.2d.%09ld0 %4d",
-	               days[tm->tm_wday],
-	               months[tm->tm_mon],
-	               tm->tm_mday,
-	               tm->tm_hour,
-	               tm->tm_min,
-	               tm->tm_sec,
+	               days[tm.tm_wday],
+	               months[tm.tm_mon],
+	               tm.tm_mday,
+	               tm.tm_hour,
+	               tm.tm_min,
+	               tm.tm_sec,
 	               (long)ts->tv_nsec,
-	               1900 + tm->tm_year);
+	               1900 + tm.tm_year);
 
 	return fprintf(file, directive->str, buf);
 }
@@ -103,7 +107,10 @@ static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *direc
 /** %A, %C, %T: strftime() */
 static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->time_field);
-	const struct tm *tm = localtime(&ts->tv_sec);
+	struct tm tm;
+	if (xlocaltime(&ts->tv_sec, &tm) != 0) {
+		return -1;
+	}
 
 	int ret;
 	char buf[256];
@@ -114,29 +121,29 @@ static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *di
 		ret = snprintf(buf, sizeof(buf), "%lld.%09ld0", (long long)ts->tv_sec, (long)ts->tv_nsec);
 		break;
 	case 'k':
-		ret = snprintf(buf, sizeof(buf), "%2d", tm->tm_hour);
+		ret = snprintf(buf, sizeof(buf), "%2d", tm.tm_hour);
 		break;
 	case 'l':
-		ret = snprintf(buf, sizeof(buf), "%2d", (tm->tm_hour + 11)%12 + 1);
+		ret = snprintf(buf, sizeof(buf), "%2d", (tm.tm_hour + 11)%12 + 1);
 		break;
 	case 'S':
-		ret = snprintf(buf, sizeof(buf), "%.2d.%09ld0", tm->tm_sec, (long)ts->tv_nsec);
+		ret = snprintf(buf, sizeof(buf), "%.2d.%09ld0", tm.tm_sec, (long)ts->tv_nsec);
 		break;
 	case '+':
 		ret = snprintf(buf, sizeof(buf), "%4d-%.2d-%.2d+%.2d:%.2d:%.2d.%09ld0",
-		               1900 + tm->tm_year,
-		               tm->tm_mon + 1,
-		               tm->tm_mday,
-		               tm->tm_hour,
-		               tm->tm_min,
-		               tm->tm_sec,
+		               1900 + tm.tm_year,
+		               tm.tm_mon + 1,
+		               tm.tm_mday,
+		               tm.tm_hour,
+		               tm.tm_min,
+		               tm.tm_sec,
 		               (long)ts->tv_nsec);
 		break;
 
 	// POSIX strftime() features
 	default:
 		format[1] = directive->c;
-		ret = strftime(buf, sizeof(buf), format, tm);
+		ret = strftime(buf, sizeof(buf), format, &tm);
 		break;
 	}
 
@@ -251,78 +258,8 @@ static int bfs_printf_m(FILE *file, const struct bfs_printf_directive *directive
 
 /** %M: symbolic mode */
 static int bfs_printf_M(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	char buf[] = "----------";
-
-	switch (ftwbuf->typeflag) {
-	case BFTW_BLK:
-		buf[0] = 'b';
-		break;
-	case BFTW_CHR:
-		buf[0] = 'c';
-		break;
-	case BFTW_DIR:
-		buf[0] = 'd';
-		break;
-	case BFTW_DOOR:
-		buf[0] = 'D';
-		break;
-	case BFTW_FIFO:
-		buf[0] = 'p';
-		break;
-	case BFTW_LNK:
-		buf[0] = 'l';
-		break;
-	case BFTW_SOCK:
-		buf[0] = 's';
-		break;
-	default:
-		break;
-	}
-
-	mode_t mode = ftwbuf->statbuf->st_mode;
-
-	if (mode & 00400) {
-		buf[1] = 'r';
-	}
-	if (mode & 00200) {
-		buf[2] = 'w';
-	}
-	if ((mode & 04100) == 04000) {
-		buf[3] = 'S';
-	} else if (mode & 04000) {
-		buf[3] = 's';
-	} else if (mode & 00100) {
-		buf[3] = 'x';
-	}
-
-	if (mode & 00040) {
-		buf[4] = 'r';
-	}
-	if (mode & 00020) {
-		buf[5] = 'w';
-	}
-	if ((mode & 02010) == 02000) {
-		buf[6] = 'S';
-	} else if (mode & 02000) {
-		buf[6] = 's';
-	} else if (mode & 00010) {
-		buf[6] = 'x';
-	}
-
-	if (mode & 00004) {
-		buf[7] = 'r';
-	}
-	if (mode & 00002) {
-		buf[8] = 'w';
-	}
-	if ((mode & 01001) == 01000) {
-		buf[9] = 'T';
-	} else if (mode & 01000) {
-		buf[9] = 't';
-	} else if (mode & 00001) {
-		buf[9] = 'x';
-	}
-
+	char buf[11];
+	format_mode(ftwbuf->statbuf->st_mode, buf);
 	return fprintf(file, directive->str, buf);
 }
 

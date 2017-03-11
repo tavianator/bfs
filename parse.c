@@ -802,12 +802,9 @@ static struct expr *parse_const(struct parser_state *state, int value, int arg2)
  * Parse -daystart.
  */
 static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg2) {
-	// Should be called before localtime_r() according to POSIX.1-2004
-	tzset();
-
 	struct tm tm;
-	if (!localtime_r(&state->now.tv_sec, &tm)) {
-		perror("localtime_r()");
+	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
+		perror("xlocaltime()");
 		return NULL;
 	}
 
@@ -944,12 +941,29 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 	expr->file = fopen(path, "wb");
 	if (!expr->file) {
 		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
-		free_expr(expr);
 		return -1;
 	}
 
 	++state->cmdline->nopen_files;
 	return 0;
+}
+
+/**
+ * Parse -fls FILE.
+ */
+static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
+	struct expr *expr = parse_unary_action(state, eval_fls);
+	if (expr) {
+		if (expr_open(state, expr, expr->sdata) != 0) {
+			goto fail;
+		}
+		expr->reftime = state->now;
+	}
+	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -959,10 +973,14 @@ static struct expr *parse_fprint(struct parser_state *state, int arg1, int arg2)
 	struct expr *expr = parse_unary_action(state, eval_fprint);
 	if (expr) {
 		if (expr_open(state, expr, expr->sdata) != 0) {
-			return NULL;
+			goto fail;
 		}
 	}
 	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -972,10 +990,14 @@ static struct expr *parse_fprint0(struct parser_state *state, int arg1, int arg2
 	struct expr *expr = parse_unary_action(state, eval_fprint0);
 	if (expr) {
 		if (expr_open(state, expr, expr->sdata) != 0) {
-			return NULL;
+			goto fail;
 		}
 	}
 	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -1002,16 +1024,19 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 	}
 
 	if (expr_open(state, expr, file) != 0) {
-		return NULL;
+		goto fail;
 	}
 
 	expr->printf = parse_bfs_printf(format, state->cmdline->cerr);
 	if (!expr->printf) {
-		free_expr(expr);
-		return NULL;
+		goto fail;
 	}
 
 	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -1110,6 +1135,18 @@ static struct expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
  */
 static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) {
 	return parse_test_icmp(state, eval_links);
+}
+
+/**
+ * Parse -ls.
+ */
+static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
+	struct expr *expr = parse_nullary_action(state, eval_fls);
+	if (expr) {
+		expr->file = stdout;
+		expr->reftime = state->now;
+	}
+	return expr;
 }
 
 /**
@@ -1918,6 +1955,7 @@ static const struct table_entry parse_table[] = {
 	{"executable", false, parse_access, X_OK},
 	{"f", false, parse_f},
 	{"false", false, parse_const, false},
+	{"fls", false, parse_fls},
 	{"follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
 	{"fprint", false, parse_fprint},
 	{"fprint0", false, parse_fprint0},
@@ -1935,6 +1973,7 @@ static const struct table_entry parse_table[] = {
 	{"iwholename", false, parse_path, true},
 	{"links", false, parse_links},
 	{"lname", false, parse_lname, false},
+	{"ls", false, parse_ls},
 	{"maxdepth", false, parse_depth_limit, false},
 	{"mindepth", false, parse_depth_limit, true},
 	{"mmin", false, parse_acmtime, MTIME, MINUTES},

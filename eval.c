@@ -20,6 +20,7 @@
 #include <fnmatch.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -680,6 +681,110 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return false;
+}
+
+/**
+ * -f?ls action.
+ */
+bool eval_fls(const struct expr *expr, struct eval_state *state) {
+	FILE *file = expr->file;
+	const struct BFTW *ftwbuf = state->ftwbuf;
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		goto done;
+	}
+
+	uintmax_t ino = statbuf->st_ino;
+	uintmax_t blocks = (statbuf->st_blocks + 1)/2;
+	char mode[11];
+	format_mode(statbuf->st_mode, mode);
+	uintmax_t nlink = statbuf->st_nlink;
+	if (fprintf(file, "%9ju %6ju %s %3ju ", ino, blocks, mode, nlink) < 0) {
+		goto error;
+	}
+
+	uintmax_t uid = statbuf->st_uid;
+	struct passwd *pwd = getpwuid(uid);
+	if (pwd) {
+		if (fprintf(file, " %-8s", pwd->pw_name) < 0) {
+			goto error;
+		}
+	} else {
+		if (fprintf(file, " %-8ju", uid) < 0) {
+			goto error;
+		}
+	}
+
+	uintmax_t gid = statbuf->st_gid;
+	struct group *grp = getgrgid(gid);
+	if (grp) {
+		if (fprintf(file, " %-8s", grp->gr_name) < 0) {
+			goto error;
+		}
+	} else {
+		if (fprintf(file, " %-8ju", gid) < 0) {
+			goto error;
+		}
+	}
+
+	uintmax_t size = statbuf->st_size;
+	if (fprintf(file, " %8ju", size) < 0) {
+		goto error;
+	}
+
+	time_t time = statbuf->st_mtim.tv_sec;
+	time_t now = expr->reftime.tv_sec;
+	time_t six_months_ago = now - 6*30*24*60*60;
+	time_t tomorrow = now + 24*60*60;
+	struct tm tm;
+	if (xlocaltime(&time, &tm) != 0) {
+		goto error;
+	}
+	char time_str[256];
+	const char *time_format = "%b %e %H:%M";
+	if (time <= six_months_ago || time >= tomorrow) {
+		time_format = "%b %e  %Y";
+	}
+	if (!strftime(time_str, sizeof(time_str), time_format, &tm)) {
+		errno = EOVERFLOW;
+		goto error;
+	}
+	if (fprintf(file, " %s", time_str) < 0) {
+		goto error;
+	}
+
+	if (file == stdout) {
+		if (cfprintf(state->cmdline->cout, " %P", ftwbuf) < 0) {
+			goto error;
+		}
+	} else {
+		if (fprintf(file, " %s", ftwbuf->path) < 0) {
+			goto error;
+		}
+	}
+
+	if (ftwbuf->typeflag == BFTW_LNK) {
+		char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->st_size);
+		if (!target) {
+			goto error;
+		}
+		int ret = fprintf(file, " -> %s", target);
+		free(target);
+		if (ret < 0) {
+			goto error;
+		}
+	}
+
+	if (fputc('\n', file) == EOF) {
+		goto error;
+	}
+
+done:
+	return true;
+
+error:
+	eval_error(state);
+	return true;
 }
 
 /**
