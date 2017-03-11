@@ -283,9 +283,10 @@ gnu_tests=(
     test_printf_flags
     test_printf_types
     test_printf_escapes
+    test_printf_times
+    test_printf_leak
     test_quit_after_print
     test_quit_before_print
-    test_printf_leak
     test_not
     test_and
     test_or
@@ -972,6 +973,10 @@ function test_printf_types() {
 
 function test_printf_escapes() {
     bfs_diff basic -maxdepth 0 -printf '\18\118\1118\11118\n\cfoo'
+}
+
+function test_printf_times() {
+    TZ=UTC bfs_diff times -type f -printf '%p | %a %AY-%Am-%Ad %AH:%AI:%AS %T@ | %t %TY-%Tm-%Td %TH:%TI:%TS %T@\n'
 }
 
 function test_printf_leak() {

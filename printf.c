@@ -10,6 +10,7 @@
  *********************************************************************/
 
 #include "printf.h"
+#include "bfs.h"
 #include "color.h"
 #include "dstring.h"
 #include "util.h"
@@ -34,6 +35,10 @@ struct bfs_printf_directive {
 	bfs_printf_fn *fn;
 	/** String data associated with this directive. */
 	char *str;
+	/** The time field to print. */
+	enum time_field time_field;
+	/** Character data associated with this directive. */
+	char c;
 	/** The next printf directive in the chain. */
 	struct bfs_printf_directive *next;
 };
@@ -58,41 +63,93 @@ static int bfs_printf_flush(FILE *file, const struct bfs_printf_directive *direc
 	(void)ret
 
 /**
- * Print a ctime()-style string, for %a, %c, and %t.
+ * Get a particular time field from a struct stat.
  */
-static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *directive, const struct timespec *ts) {
+static const struct timespec *get_time_field(const struct stat *statbuf, enum time_field time_field) {
+	switch (time_field) {
+	case ATIME:
+		return &statbuf->st_atim;
+	case CTIME:
+		return &statbuf->st_ctim;
+	case MTIME:
+		return &statbuf->st_mtim;
+	}
+
+	assert(false);
+	return NULL;
+}
+
+/** %c, %c, and %t: ctime() */
+static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	// Not using ctime() itself because GNU find adds nanoseconds
 	static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 	static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
+	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->time_field);
 	const struct tm *tm = localtime(&ts->tv_sec);
 	BFS_PRINTF_BUF(buf, "%s %s %2d %.2d:%.2d:%.2d.%09ld0 %4d",
-		       days[tm->tm_wday],
-		       months[tm->tm_mon],
-		       tm->tm_mday,
-		       tm->tm_hour,
-		       tm->tm_min,
-		       tm->tm_sec,
-		       (long)ts->tv_nsec,
-		       1900 + tm->tm_year);
+	               days[tm->tm_wday],
+	               months[tm->tm_mon],
+	               tm->tm_mday,
+	               tm->tm_hour,
+	               tm->tm_min,
+	               tm->tm_sec,
+	               (long)ts->tv_nsec,
+	               1900 + tm->tm_year);
 
 	return fprintf(file, directive->str, buf);
 }
 
-/** %a: access time */
-static int bfs_printf_a(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	return bfs_printf_ctime(file, directive, &ftwbuf->statbuf->st_atim);
+/** %A, %C, %T: strftime() */
+static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
+	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->time_field);
+	const struct tm *tm = localtime(&ts->tv_sec);
+
+	int ret;
+	char buf[256];
+	char format[] = "% ";
+	switch (directive->c) {
+	// Non-POSIX strftime() features
+	case '@':
+		ret = snprintf(buf, sizeof(buf), "%lld.%09ld0", (long long)ts->tv_sec, (long)ts->tv_nsec);
+		break;
+	case 'k':
+		ret = snprintf(buf, sizeof(buf), "%2d", tm->tm_hour);
+		break;
+	case 'l':
+		ret = snprintf(buf, sizeof(buf), "%2d", (tm->tm_hour + 11)%12 + 1);
+		break;
+	case 'S':
+		ret = snprintf(buf, sizeof(buf), "%.2d.%09ld0", tm->tm_sec, (long)ts->tv_nsec);
+		break;
+	case '+':
+		ret = snprintf(buf, sizeof(buf), "%4d-%.2d-%.2d+%.2d:%.2d:%.2d.%09ld0",
+		               1900 + tm->tm_year,
+		               tm->tm_mon + 1,
+		               tm->tm_mday,
+		               tm->tm_hour,
+		               tm->tm_min,
+		               tm->tm_sec,
+		               (long)ts->tv_nsec);
+		break;
+
+	// POSIX strftime() features
+	default:
+		format[1] = directive->c;
+		ret = strftime(buf, sizeof(buf), format, tm);
+		break;
+	}
+
+	assert(ret >= 0 && ret < sizeof(buf));
+	(void)ret;
+
+	return fprintf(file, directive->str, buf);
 }
 
 /** %b: blocks */
 static int bfs_printf_b(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)ftwbuf->statbuf->st_blocks);
 	return fprintf(file, directive->str, buf);
-}
-
-/** %c: change time */
-static int bfs_printf_c(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	return bfs_printf_ctime(file, directive, &ftwbuf->statbuf->st_ctim);
 }
 
 /** %d: depth */
@@ -301,11 +358,6 @@ static int bfs_printf_S(FILE *file, const struct bfs_printf_directive *directive
 	return fprintf(file, directive->str, sparsity);
 }
 
-/** %t: modification time */
-static int bfs_printf_t(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	return bfs_printf_ctime(file, directive, &ftwbuf->statbuf->st_mtim);
-}
-
 /** %U: uid */
 static int bfs_printf_U(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)ftwbuf->statbuf->st_uid);
@@ -377,41 +429,66 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive
 }
 
 /**
- * Append a printf directive to the chain.
+ * Free a printf directive.
  */
-static int append_directive(struct bfs_printf_directive ***tail, bfs_printf_fn *fn, char *str) {
+static void free_directive(struct bfs_printf_directive *directive) {
+	if (directive) {
+		dstrfree(directive->str);
+		free(directive);
+	}
+}
+
+/**
+ * Create a new printf directive.
+ */
+static struct bfs_printf_directive *new_directive() {
 	struct bfs_printf_directive *directive = malloc(sizeof(*directive));
 	if (!directive) {
 		perror("malloc()");
-		return -1;
+		goto error;
 	}
 
-	directive->fn = fn;
-	directive->str = str;
+	directive->fn = NULL;
+	directive->str = dstralloc(2);
+	if (!directive->str) {
+		perror("dstralloc()");
+		goto error;
+	}
+	directive->time_field = 0;
+	directive->c = 0;
 	directive->next = NULL;
+	return directive;
+
+error:
+	free_directive(directive);
+	return NULL;
+}
+
+/**
+ * Append a printf directive to the chain.
+ */
+static void append_directive(struct bfs_printf_directive ***tail, struct bfs_printf_directive *directive) {
 	**tail = directive;
 	*tail = &directive->next;
-	return 0;
 }
 
 /**
  * Append a literal string to the chain.
  */
-static int append_literal(struct bfs_printf_directive ***tail, char **literal, bool last) {
-	if (!*literal || dstrlen(*literal) == 0) {
+static int append_literal(struct bfs_printf_directive ***tail, struct bfs_printf_directive **literal, bool last) {
+	struct bfs_printf_directive *directive = *literal;
+	if (!directive || dstrlen(directive->str) == 0) {
 		return 0;
 	}
 
-	if (append_directive(tail, bfs_printf_literal, *literal) != 0) {
-		return -1;
-	}
+	directive->fn = bfs_printf_literal;
+	append_directive(tail, directive);
 
 	if (last) {
 		*literal = NULL;
 	} else {
-		*literal = dstralloc(0);
+		*literal = new_directive();
 		if (!*literal) {
-			perror("dstralloc()");
 			return -1;
 		}
 	}
@@ -430,9 +507,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 	command->needs_stat = false;
 	struct bfs_printf_directive **tail = &command->directives;
 
-	char *literal = dstralloc(0);
+	struct bfs_printf_directive *literal = new_directive();
 	if (!literal) {
-		perror("dstralloc()");
 		goto error;
 	}
 
@@ -466,9 +542,12 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 				if (append_literal(&tail, &literal, true) != 0) {
 					goto error;
 				}
-				if (append_directive(&tail, bfs_printf_flush, NULL) != 0) {
+				struct bfs_printf_directive *directive = new_directive();
+				if (!directive) {
 					goto error;
 				}
+				directive->fn = bfs_printf_flush;
+				append_directive(&tail, directive);
 				goto done;
 
 			case '\0':
@@ -484,19 +563,24 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 				goto error;
 			}
 		} else if (c == '%') {
-			bfs_printf_fn *fn;
+			if (i[1] == '%') {
+				c = *++i;
+				goto one_char;
+			}
 
-			char *directive = dstralloc(2);
+			struct bfs_printf_directive *directive = new_directive();
 			if (!directive) {
+				goto directive_error;
+			}
+			if (dstrncat(&directive->str, &c, 1) != 0) {
 				perror("dstralloc()");
 				goto directive_error;
 			}
-			dstrncat(&directive, &c, 1);
 
 			const char *specifier = "s";
 
 			// Parse any flags
-			bool must_be_int = false;
+			bool must_be_numeric = false;
 			while (true) {
 				c = *++i;
 
@@ -504,16 +588,16 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 				case '#':
 				case '0':
 				case '+':
-					must_be_int = true;
+					must_be_numeric = true;
 				case ' ':
 				case '-':
-					if (strchr(directive, c)) {
+					if (strchr(directive->str, c)) {
 						pretty_error(stderr_colors,
 						             "error: '%s': Duplicate flag '%c'.\n",
 						             format, c);
 						goto directive_error;
 					}
-					if (dstrncat(&directive, &c, 1) != 0) {
+					if (dstrncat(&directive->str, &c, 1) != 0) {
 						perror("dstrncat()");
 						goto directive_error;
 					}
@@ -525,7 +609,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 
 			// Parse the field width
 			while (c >= '0' && c <= '9') {
-				if (dstrncat(&directive, &c, 1) != 0) {
+				if (dstrncat(&directive->str, &c, 1) != 0) {
 					perror("dstrncat()");
 					goto directive_error;
 				}
@@ -535,7 +619,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 			// Parse the precision
 			if (c == '.') {
 				do {
-					if (dstrncat(&directive, &c, 1) != 0) {
+					if (dstrncat(&directive->str, &c, 1) != 0) {
 						perror("dstrncat()");
 						goto directive_error;
 					}
@@ -544,108 +628,169 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 			}
 
 			switch (c) {
-			case '%':
-				dstrfree(directive);
-				goto one_char;
 			case 'a':
-				fn = bfs_printf_a;
+				directive->fn = bfs_printf_ctime;
+				directive->time_field = ATIME;
 				command->needs_stat = true;
 				break;
 			case 'b':
-				fn = bfs_printf_b;
+				directive->fn = bfs_printf_b;
 				command->needs_stat = true;
 				break;
 			case 'c':
-				fn = bfs_printf_c;
+				directive->fn = bfs_printf_ctime;
+				directive->time_field = CTIME;
 				command->needs_stat = true;
 				break;
 			case 'd':
-				fn = bfs_printf_d;
+				directive->fn = bfs_printf_d;
 				specifier = "jd";
 				break;
 			case 'D':
-				fn = bfs_printf_D;
+				directive->fn = bfs_printf_D;
 				command->needs_stat = true;
 				break;
 			case 'f':
-				fn = bfs_printf_f;
+				directive->fn = bfs_printf_f;
 				break;
 			case 'g':
-				fn = bfs_printf_g;
+				directive->fn = bfs_printf_g;
 				command->needs_stat = true;
 				break;
 			case 'G':
-				fn = bfs_printf_G;
+				directive->fn = bfs_printf_G;
 				command->needs_stat = true;
 				break;
 			case 'h':
-				fn = bfs_printf_h;
+				directive->fn = bfs_printf_h;
 				break;
 			case 'H':
-				fn = bfs_printf_H;
+				directive->fn = bfs_printf_H;
 				break;
 			case 'i':
-				fn = bfs_printf_i;
+				directive->fn = bfs_printf_i;
 				command->needs_stat = true;
 				break;
 			case 'k':
-				fn = bfs_printf_k;
+				directive->fn = bfs_printf_k;
 				command->needs_stat = true;
 				break;
 			case 'l':
-				fn = bfs_printf_l;
+				directive->fn = bfs_printf_l;
 				break;
 			case 'm':
-				fn = bfs_printf_m;
+				directive->fn = bfs_printf_m;
 				specifier = "o";
 				command->needs_stat = true;
 				break;
 			case 'M':
-				fn = bfs_printf_M;
+				directive->fn = bfs_printf_M;
 				command->needs_stat = true;
 				break;
 			case 'n':
-				fn = bfs_printf_n;
+				directive->fn = bfs_printf_n;
 				command->needs_stat = true;
 				break;
 			case 'p':
-				fn = bfs_printf_p;
+				directive->fn = bfs_printf_p;
 				break;
 			case 'P':
-				fn = bfs_printf_P;
+				directive->fn = bfs_printf_P;
 				break;
 			case 's':
-				fn = bfs_printf_s;
+				directive->fn = bfs_printf_s;
 				command->needs_stat = true;
 				break;
 			case 'S':
-				fn = bfs_printf_S;
+				directive->fn = bfs_printf_S;
 				specifier = "g";
 				command->needs_stat = true;
 				break;
 			case 't':
-				fn = bfs_printf_t;
+				directive->fn = bfs_printf_ctime;
+				directive->time_field = MTIME;
 				command->needs_stat = true;
 				break;
 			case 'u':
-				fn = bfs_printf_u;
+				directive->fn = bfs_printf_u;
 				command->needs_stat = true;
 				break;
 			case 'U':
-				fn = bfs_printf_U;
+				directive->fn = bfs_printf_U;
 				command->needs_stat = true;
 				break;
 			case 'y':
-				fn = bfs_printf_y;
+				directive->fn = bfs_printf_y;
 				break;
 			case 'Y':
-				fn = bfs_printf_Y;
+				directive->fn = bfs_printf_Y;
+				break;
+
+			case 'A':
+				directive->time_field = ATIME;
+				goto directive_strftime;
+			case 'C':
+				directive->time_field = CTIME;
+				goto directive_strftime;
+			case 'T':
+				directive->time_field = MTIME;
+				goto directive_strftime;
+
+			directive_strftime:
+				directive->fn = bfs_printf_strftime;
+				command->needs_stat = true;
+				c = *++i;
+				switch (c) {
+				case '@':
+				case 'H':
+				case 'I':
+				case 'k':
+				case 'l':
+				case 'M':
+				case 'p':
+				case 'r':
+				case 'S':
+				case 'T':
+				case '+':
+				case 'X':
+				case 'Z':
+				case 'a':
+				case 'A':
+				case 'b':
+				case 'B':
+				case 'c':
+				case 'd':
+				case 'D':
+				case 'h':
+				case 'j':
+				case 'm':
+				case 'U':
+				case 'w':
+				case 'W':
+				case 'x':
+				case 'y':
+				case 'Y':
+					directive->c = c;
+					break;
+
+				case '\0':
+					pretty_error(stderr_colors,
+					             "error: '%s': Incomplete time specifier '%s%c'.\n",
+					             format, directive->str, i[-1]);
+					goto directive_error;
+
+				default:
+					pretty_error(stderr_colors,
+					             "error: '%s': Unrecognized time specifier '%%%c%c'.\n",
+					             format, i[-1], c);
+					goto directive_error;
+				}
 				break;
 
 			case '\0':
 				pretty_error(stderr_colors,
 				             "error: '%s': Incomplete format specifier '%s'.\n",
-				             format, directive);
+				             format, directive->str);
 				goto directive_error;
 
 			default:
@@ -655,14 +800,14 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 				goto directive_error;
 			}
 
-			if (must_be_int && strcmp(specifier, "s") == 0) {
+			if (must_be_numeric && strcmp(specifier, "s") == 0) {
 				pretty_error(stderr_colors,
 				             "error: '%s': Invalid flags '%s' for string format '%%%c'.\n",
-				             format, directive + 1, c);
+				             format, directive->str + 1, c);
 				goto directive_error;
 			}
 
-			if (dstrcat(&directive, specifier) != 0) {
+			if (dstrcat(&directive->str, specifier) != 0) {
 				perror("dstrcat()");
 				goto directive_error;
 			}
@@ -670,18 +815,16 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 			if (append_literal(&tail, &literal, false) != 0) {
 				goto directive_error;
 			}
-			if (append_directive(&tail, fn, directive) != 0) {
-				goto directive_error;
-			}
+			append_directive(&tail, directive);
 			continue;
 
 		directive_error:
-			dstrfree(directive);
+			free_directive(directive);
 			goto error;
 		}
 
 	one_char:
-		if (dstrncat(&literal, &c, 1) != 0) {
+		if (dstrncat(&literal->str, &c, 1) != 0) {
 			perror("dstrncat()");
 			goto error;
 		}
@@ -692,11 +835,11 @@ done:
 		goto error;
 	}
 
-	dstrfree(literal);
+	free_directive(literal);
 	return command;
 
 error:
-	dstrfree(literal);
+	free_directive(literal);
 	free_bfs_printf(command);
 	return NULL;
 }
@@ -720,8 +863,7 @@ void free_bfs_printf(struct bfs_printf *command) {
 		struct bfs_printf_directive *directive = command->directives;
 		while (directive) {
 			struct bfs_printf_directive *next = directive->next;
-			dstrfree(directive->str);
-			free(directive);
+			free_directive(directive);
 			directive = next;
 		}
 
