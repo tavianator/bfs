@@ -2,6 +2,24 @@
 ===
 
 
+0.96
+----
+
+**March 11, 2017**
+
+73/76 GNU find features supported.
+
+- Implemented -nouser and -nogroup
+- Implemented -printf and -fprintf
+- Implemented -ls and -fls
+- Implemented -type with multiple types at once (e.g. -type f,d,l)
+- Fixed 32-bit builds
+- Fixed -lname on "symlinks" in Linux /proc
+- Fixed -quit to take effect as soon as it's reached
+- Stopped redirecting standard input from /dev/null for -ok and -okdir, as that violates POSIX
+- Many test suite improvements
+
+
 0.88
 ----
 
