@@ -496,7 +496,7 @@ static int append_literal(struct bfs_printf_directive ***tail, struct bfs_printf
 	return 0;
 }
 
-struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *stderr_colors) {
+struct bfs_printf *parse_bfs_printf(const char *format, CFILE *cerr) {
 	struct bfs_printf *command = malloc(sizeof(*command));
 	if (!command) {
 		perror("malloc()");
@@ -551,15 +551,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 				goto done;
 
 			case '\0':
-				pretty_error(stderr_colors,
-				             "error: '%s': Incomplete escape sequence '\\'.\n",
-				             format);
+				cfprintf(cerr, "%{er}error: '%s': Incomplete escape sequence '\\'.%{rs}\n", format);
 				goto error;
 
 			default:
-				pretty_error(stderr_colors,
-				             "error: '%s': Unrecognized escape sequence '\\%c'.\n",
-				             format, c);
+				cfprintf(cerr, "%{er}error: '%s': Unrecognized escape sequence '\\%c'.%{rs}\n", format, c);
 				goto error;
 			}
 		} else if (c == '%') {
@@ -592,9 +588,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 				case ' ':
 				case '-':
 					if (strchr(directive->str, c)) {
-						pretty_error(stderr_colors,
-						             "error: '%s': Duplicate flag '%c'.\n",
-						             format, c);
+						cfprintf(cerr, "%{er}error: '%s': Duplicate flag '%c'.%{rs}\n", format, c);
 						goto directive_error;
 					}
 					if (dstrncat(&directive->str, &c, 1) != 0) {
@@ -774,36 +768,31 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *std
 					break;
 
 				case '\0':
-					pretty_error(stderr_colors,
-					             "error: '%s': Incomplete time specifier '%s%c'.\n",
-					             format, directive->str, i[-1]);
+					cfprintf(cerr, "%{er}error: '%s': Incomplete time specifier '%s%c'.%{rs}\n",
+					         format, directive->str, i[-1]);
 					goto directive_error;
 
 				default:
-					pretty_error(stderr_colors,
-					             "error: '%s': Unrecognized time specifier '%%%c%c'.\n",
-					             format, i[-1], c);
+					cfprintf(cerr, "%{er}error: '%s': Unrecognized time specifier '%%%c%c'.%{rs}\n",
+					         format, i[-1], c);
 					goto directive_error;
 				}
 				break;
 
 			case '\0':
-				pretty_error(stderr_colors,
-				             "error: '%s': Incomplete format specifier '%s'.\n",
-				             format, directive->str);
+				cfprintf(cerr, "%{er}error: '%s': Incomplete format specifier '%s'.%{rs}\n",
+				         format, directive->str);
 				goto directive_error;
 
 			default:
-				pretty_error(stderr_colors,
-				             "error: '%s': Unrecognized format specifier '%%%c'.\n",
-				             format, c);
+				cfprintf(cerr, "%{er}error: '%s': Unrecognized format specifier '%%%c'.%{rs}\n",
+				         format, c);
 				goto directive_error;
 			}
 
 			if (must_be_numeric && strcmp(specifier, "s") == 0) {
-				pretty_error(stderr_colors,
-				             "error: '%s': Invalid flags '%s' for string format '%%%c'.\n",
-				             format, directive->str + 1, c);
+				cfprintf(cerr, "%{er}error: '%s': Invalid flags '%s' for string format '%%%c'.%{rs}\n",
+				         format, directive->str + 1, c);
 				goto directive_error;
 			}
 

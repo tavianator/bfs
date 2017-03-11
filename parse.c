@@ -188,6 +188,8 @@ void free_cmdline(struct cmdline *cmdline) {
 	if (cmdline) {
 		free_expr(cmdline->expr);
 
+		cfclose(cmdline->cerr);
+		cfclose(cmdline->cout);
 		free_colors(cmdline->colors);
 
 		struct root *root = cmdline->roots;
@@ -295,9 +297,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 
 	int ret = fstatat(AT_FDCWD, expr->sdata, sb, flags);
 	if (ret != 0) {
-		pretty_error(cmdline->stderr_colors,
-		             "error: '%s': %s\n", expr->sdata, strerror(errno));
-		free_expr(expr);
+		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", expr->sdata, strerror(errno));
 	}
 	return ret;
 }
@@ -452,8 +452,7 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 
 bad:
 	if (!(flags & IF_QUIET)) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: '%s' is not a valid integer.\n", str);
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s' is not a valid integer.%{rs}\n", str);
 	}
 	return NULL;
 }
@@ -518,10 +517,10 @@ static struct expr *parse_option(struct parser_state *state, size_t argc) {
 	const char *arg = *parser_advance(state, T_OPTION, argc);
 
 	if (state->warn && state->non_option_seen) {
-		pretty_warning(state->cmdline->stderr_colors,
-		               "warning: The '%s' option applies to the entire command line.  For clarity, place\n"
-		               "it before any non-option arguments.\n\n",
-		               arg);
+		cfprintf(state->cmdline->cerr,
+		         "%{wr}warning: The '%s' option applies to the entire command line.  For clarity, place\n"
+		         "it before any non-option arguments.%{rs}\n\n",
+		         arg);
 	}
 
 
@@ -564,8 +563,7 @@ static struct expr *parse_unary_positional_option(struct parser_state *state, co
 	const char *arg = state->argv[0];
 	*value = state->argv[1];
 	if (!*value) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", arg);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s needs a value.%{rs}\n", arg);
 		return NULL;
 	}
 
@@ -594,8 +592,7 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", arg);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s needs a value.%{rs}\n", arg);
 		return NULL;
 	}
 
@@ -632,8 +629,7 @@ static struct expr *parse_unary_action(struct parser_state *state, eval_fn *eval
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a value.\n", arg);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s needs a value.%{rs}\n", arg);
 		return NULL;
 	}
 
@@ -670,8 +666,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 	const char *arg = state->argv[0];
 	const char *flag = state->argv[1];
 	if (!flag) {
-		pretty_error(cmdline->stderr_colors,
-		             "error: %s needs a flag.\n", arg);
+		cfprintf(cmdline->cerr, "%{er}error: %s needs a flag.%{rs}\n", arg);
 		return NULL;
 	}
 
@@ -695,8 +690,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 	} else if (strcmp(flag, "tree") == 0) {
 		cmdline->debug |= DEBUG_TREE;
 	} else {
-		pretty_warning(cmdline->stderr_colors,
-		               "warning: Unrecognized debug flag '%s'.\n\n", flag);
+		cfprintf(cmdline->cerr, "%{wr}warning: Unrecognized debug flag '%s'.%{rs}\n\n", flag);
 	}
 
 	return parse_unary_flag(state);
@@ -715,9 +709,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
 	}
 
 	if (*optlevel > 4) {
-		pretty_warning(state->cmdline->stderr_colors,
-		               "warning: %s is the same as -O4.\n\n",
-		               state->argv[0]);
+		cfprintf(state->cmdline->cerr, "%{wr}warning: %s is the same as -O4.%{rs}\n\n", state->argv[0]);
 	}
 
 	return parse_nullary_flag(state);
@@ -772,6 +764,7 @@ static struct expr *parse_acnewer(struct parser_state *state, int field, int arg
 
 	struct stat sb;
 	if (stat_arg(state, expr, &sb) != 0) {
+		free_expr(expr);
 		return NULL;
 	}
 
@@ -786,12 +779,13 @@ static struct expr *parse_acnewer(struct parser_state *state, int field, int arg
  */
 static struct expr *parse_color(struct parser_state *state, int color, int arg2) {
 	struct cmdline *cmdline = state->cmdline;
+	struct colors *colors = cmdline->colors;
 	if (color) {
-		cmdline->stdout_colors = cmdline->colors;
-		cmdline->stderr_colors = cmdline->colors;
+		cmdline->cout->colors = colors;
+		cmdline->cerr->colors = colors;
 	} else {
-		cmdline->stdout_colors = NULL;
-		cmdline->stderr_colors = NULL;
+		cmdline->cout->colors = NULL;
+		cmdline->cerr->colors = NULL;
 	}
 	return parse_nullary_option(state);
 }
@@ -872,8 +866,7 @@ static struct expr *parse_depth_limit(struct parser_state *state, int is_min, in
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		pretty_error(cmdline->stderr_colors,
-		             "error: %s needs a value.\n", arg);
+		cfprintf(cmdline->cerr, "%{er}error: %s needs a value.%{rs}\n", arg);
 		return NULL;
 	}
 
@@ -908,14 +901,12 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 	}
 
 	if (!arg) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s: Expected ';' or '+'.\n", state->argv[0]);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: Expected ';' or '+'.%{rs}\n", state->argv[0]);
 		return NULL;
 	}
 
 	if (flags & EXEC_MULTI) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s ... {} + is not supported yet.\n", state->argv[0]);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s ... {} + is not supported yet.%{rs}\n", state->argv[0]);
 		return NULL;
 	}
 
@@ -934,8 +925,7 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 
 	const char *path = state->argv[0];
 	if (!path) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: -f requires a path.\n");
+		cfprintf(state->cmdline->cerr, "%{er}error: -f requires a path.%{rs}\n");
 		return NULL;
 	}
 
@@ -953,8 +943,7 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
 	expr->file = fopen(path, "wb");
 	if (!expr->file) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: '%s': %s\n", path, strerror(errno));
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
 		free_expr(expr);
 		return -1;
 	}
@@ -997,15 +986,13 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 
 	const char *file = state->argv[1];
 	if (!file) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a file.\n", arg);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s needs a file.%{rs}\n", arg);
 		return NULL;
 	}
 
 	const char *format = state->argv[2];
 	if (!format) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s needs a format string.\n", arg);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s needs a format string.%{rs}\n", arg);
 		return NULL;
 	}
 
@@ -1018,7 +1005,7 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 		return NULL;
 	}
 
-	expr->printf = parse_bfs_printf(format, state->cmdline->stderr_colors);
+	expr->printf = parse_bfs_printf(format, state->cmdline->cerr);
 	if (!expr->printf) {
 		free_expr(expr);
 		return NULL;
@@ -1047,8 +1034,7 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 			goto fail;
 		}
 	} else {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s %s: No such group.\n", arg, expr->sdata);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s %s: No such group.%{rs}\n", arg, expr->sdata);
 		goto fail;
 	}
 
@@ -1086,8 +1072,7 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 			goto fail;
 		}
 	} else {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s %s: No such user.\n", arg, expr->sdata);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s %s: No such user.%{rs}\n", arg, expr->sdata);
 		goto fail;
 	}
 
@@ -1144,8 +1129,7 @@ static struct expr *set_fnm_casefold(const struct parser_state *state, struct ex
 #ifdef FNM_CASEFOLD
 			expr->idata = FNM_CASEFOLD;
 #else
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s is missing platform support.\n", expr->argv[0]);
+			cfprintf(state->cmdline->cerr, "%{er}error: %s is missing platform support.%{rs}\n", expr->argv[0]);
 			free_expr(expr);
 			return NULL;
 #endif
@@ -1186,14 +1170,13 @@ static struct expr *parse_lname(struct parser_state *state, int casefold, int ar
 static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: Expected -newerXY; found %s.\n", arg);
+		cfprintf(state->cmdline->cerr, "%{er}error: Expected -newerXY; found %s.%{rs}\n", arg);
 		return NULL;
 	}
 
 	struct expr *expr = parse_unary_test(state, eval_acnewer);
 	if (!expr) {
-		return NULL;
+		goto fail;
 	}
 
 	switch (arg[6]) {
@@ -1208,27 +1191,21 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 		break;
 
 	case 'B':
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s: File birth times ('B') are not supported.\n", arg);
-		free_expr(expr);
-		return NULL;
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: File birth times ('B') are not supported.%{rs}\n", arg);
+		goto fail;
 
 	default:
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.\n", arg);
-		free_expr(expr);
-		return NULL;
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.%{rs}\n", arg);
+		goto fail;
 	}
 
 	if (arg[7] == 't') {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: %s: Explicit reference times ('t') are not supported.\n", arg);
-		free_expr(expr);
-		return NULL;
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: Explicit reference times ('t') are not supported.%{rs}\n", arg);
+		goto fail;
 	} else {
 		struct stat sb;
 		if (stat_arg(state, expr, &sb) != 0) {
-			return NULL;
+			goto fail;
 		}
 
 		switch (arg[7]) {
@@ -1243,20 +1220,21 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 			break;
 
 		case 'B':
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s: File birth times ('B') are not supported.\n", arg);
-			free_expr(expr);
-			return NULL;
+			cfprintf(state->cmdline->cerr, "%{er}error: %s: File birth times ('B') are not supported.%{rs}\n", arg);
+			goto fail;
 
 		default:
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.\n", arg);
-			free_expr(expr);
-			return NULL;
+			cfprintf(state->cmdline->cerr,
+			         "%{er}error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.%{rs}\n", arg);
+			goto fail;
 		}
 	}
 
 	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -1278,9 +1256,9 @@ static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg
  */
 static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
 	if (state->warn) {
-		pretty_warning(state->cmdline->stderr_colors,
-		               "warning: bfs does not apply the optimization that %s inhibits.\n\n",
-		               state->argv[0]);
+		cfprintf(state->cmdline->cerr,
+		         "%{wr}warning: bfs does not apply the optimization that %s inhibits.%{rs}\n\n",
+		         state->argv[0]);
 	}
 
 	return parse_nullary_option(state);
@@ -1497,9 +1475,7 @@ done:
 	return 0;
 
 fail:
-	pretty_error(state->cmdline->stderr_colors,
-	             "error: '%s' is an invalid mode.\n\n",
-	             mode);
+	cfprintf(state->cmdline->cerr, "%{er}error: '%s' is an invalid mode.%{rs}\n", mode);
 	return -1;
 }
 
@@ -1567,7 +1543,7 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 
 	expr->file = stdout;
 
-	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline->stderr_colors);
+	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline->cerr);
 	if (!expr->printf) {
 		free_expr(expr);
 		return NULL;
@@ -1609,9 +1585,7 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 	if (err != 0) {
 		char *str = xregerror(err, expr->regex);
 		if (str) {
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s %s: %s.\n",
-			             expr->argv[0], expr->argv[1], str);
+			cfprintf(state->cmdline->cerr, "%{er}error: %s %s: %s.%{rs}\n", expr->argv[0], expr->argv[1], str);
 			free(str);
 		} else {
 			perror("xregerror()");
@@ -1664,8 +1638,7 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 	return expr;
 
 fail_bad_type:
-	pretty_error(state->cmdline->stderr_colors,
-	             "error: Unsupported -regextype '%s'.\n\n", type);
+	cfprintf(state->cmdline->cerr, "%{er}error: Unsupported -regextype '%s'.%{rs}\n\n", type);
 fail_list_types:
 	fputs("Supported types are:\n\n", file);
 	fputs("  posix-basic:    POSIX basic regular expressions (BRE)\n", file);
@@ -1686,6 +1659,7 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
 
 	struct stat sb;
 	if (stat_arg(state, expr, &sb) != 0) {
+		free_expr(expr);
 		return NULL;
 	}
 
@@ -1747,9 +1721,9 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	return expr;
 
 bad_unit:
-	pretty_error(state->cmdline->stderr_colors,
-	             "error: %s %s: Expected a size unit (one of bcwkMGTP); found %s.\n",
-	             expr->argv[0], expr->argv[1], unit);
+	cfprintf(state->cmdline->cerr,
+	         "%{er}error: %s %s: Expected a size unit (one of bcwkMGTP); found %s.%{rs}\n",
+	         expr->argv[0], expr->argv[1], unit);
 fail:
 	free_expr(expr);
 	return NULL;
@@ -1803,15 +1777,15 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			break;
 
 		case '\0':
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s %s: Expected a type flag.\n",
-			             expr->argv[0], expr->argv[1]);
+			cfprintf(state->cmdline->cerr,
+			         "%{er}error: %s %s: Expected a type flag.%{rs}\n",
+			         expr->argv[0], expr->argv[1]);
 			goto fail;
 
 		default:
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s %s: Unknown type flag '%c' (expected one of [bcdpflsD]).\n",
-			             expr->argv[0], expr->argv[1], *c);
+			cfprintf(state->cmdline->cerr,
+			         "%{er}error: %s %s: Unknown type flag '%c' (expected one of [bcdpflsD]).%{rs}\n",
+			         expr->argv[0], expr->argv[1], *c);
 			goto fail;
 		}
 
@@ -1822,9 +1796,9 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			++c;
 			continue;
 		} else {
-			pretty_error(state->cmdline->stderr_colors,
-			             "error: %s %s: Types must be comma-separated.\n",
-			             expr->argv[0], expr->argv[1]);
+			cfprintf(state->cmdline->cerr,
+			         "%{er}error: %s %s: Types must be comma-separated.%{rs}\n",
+			         expr->argv[0], expr->argv[1]);
 			goto fail;
 		}
 	}
@@ -2070,13 +2044,13 @@ static struct expr *parse_literal(struct parser_state *state) {
 	}
 
 	match = table_lookup_fuzzy(arg + 1);
-	pretty_error(cmdline->stderr_colors,
-	             "error: Unknown argument '%s'; did you mean '-%s'?\n", arg, match->arg);
+	cfprintf(cmdline->cerr,
+	         "%{er}error: Unknown argument '%s'; did you mean '-%s'?%{rs}\n",
+		 arg, match->arg);
 	return NULL;
 
 unexpected:
-	pretty_error(cmdline->stderr_colors,
-	             "error: Expected a predicate; found '%s'.\n", arg);
+	cfprintf(cmdline->cerr, "%{er}error: Expected a predicate; found '%s'.%{rs}\n", arg);
 	return NULL;
 }
 
@@ -2477,8 +2451,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->argv[0]) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "error: Unexpected argument '%s'.\n", state->argv[0]);
+		cfprintf(state->cmdline->cerr, "%{er}error: Unexpected argument '%s'.%{rs}\n", state->argv[0]);
 		goto fail;
 	}
 
@@ -2539,7 +2512,7 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		fprintf(stderr, "%s ", root->path);
 	}
 
-	if (cmdline->stdout_colors) {
+	if (cmdline->cout->colors) {
 		fputs("-color ", stderr);
 	} else {
 		fputs("-nocolor ", stderr);
@@ -2609,8 +2582,12 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->nopen_files = 0;
 
 	cmdline->colors = parse_colors(getenv("LS_COLORS"));
-	cmdline->stdout_colors = isatty(STDOUT_FILENO) ? cmdline->colors : NULL;
-	cmdline->stderr_colors = isatty(STDERR_FILENO) ? cmdline->colors : NULL;
+	cmdline->cout = cfdup(stdout, cmdline->colors);
+	cmdline->cerr = cfdup(stderr, cmdline->colors);
+	if (!cmdline->cout || !cmdline->cerr) {
+		perror("cfdup()");
+		goto fail;
+	}
 
 	struct parser_state state = {
 		.cmdline = cmdline,

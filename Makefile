@@ -16,7 +16,8 @@ VERSION := $(shell git describe --always)
 endif
 
 CC ?= gcc
-CFLAGS ?= -g -Wall
+WFLAGS ?= -Wall -Wmissing-declarations
+CFLAGS ?= -g $(WFLAGS)
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 RM ?= rm -f
@@ -46,7 +47,7 @@ all: bfs
 bfs: bftw.o color.o dstring.o eval.o main.o parse.o printf.o typo.o util.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
-release: CFLAGS := -O3 -flto -Wall -DNDEBUG
+release: CFLAGS := -O3 -flto $(WFLAGS) -DNDEBUG
 release: bfs
 
 %.o: %.c

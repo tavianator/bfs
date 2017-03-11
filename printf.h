@@ -34,11 +34,11 @@ struct bfs_printf {
  *
  * @param format
  *         The format string to parse.
- * @param stderr_colors
- *         Color table for printing error messages.
+ * @param cerr
+ *         For error messages.
  * @return The parsed printf command, or NULL on failure.
  */
-struct bfs_printf *parse_bfs_printf(const char *format, const struct colors *stderr_colors);
+struct bfs_printf *parse_bfs_printf(const char *format, CFILE *cerr);
 
 /**
  * Evaluate a parsed format string.

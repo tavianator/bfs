@@ -13,6 +13,7 @@
 #define BFS_COLOR_H
 
 #include "bftw.h"
+#include <stdio.h>
 
 /**
  * A lookup table for colors.
@@ -29,54 +30,58 @@ struct colors;
 struct colors *parse_colors(const char *ls_colors);
 
 /**
- * Pretty-print a file path.
- *
- * @param colors
- *         The color table to use.
- * @param ftwbuf
- *         The bftw() data for the current path.
- * @return 0 on success, -1 on failure.
- */
-int pretty_print(const struct colors *colors, const struct BFTW *ftwbuf);
-
-#if __GNUC__
-#	define BFS_PRINTF_ATTRIBUTE(f, v) __attribute__((format(printf, f, v)))
-#else
-#	define BFS_PRINTF_ATTRIBUTE(f, v)
-#endif
-
-/**
- * Pretty-print a warning message.
- *
- * @param colors
- *         The color table to use.
- * @param format
- *         The format string.
- * @param ...
- *         The format string's arguments.
- * @return 0 on success, -1 on failure.
- */
-int pretty_warning(const struct colors *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
-
-/**
- * Pretty-print an error message.
- *
- * @param colors
- *         The color table to use.
- * @param format
- *         The format string.
- * @param ...
- *         The format string's arguments.
- * @return 0 on success, -1 on failure.
- */
-int pretty_error(const struct colors *colors, const char *format, ...) BFS_PRINTF_ATTRIBUTE(2, 3);
-
-/**
  * Free a color table.
  *
  * @param colors
  *         The color table to free.
  */
 void free_colors(struct colors *colors);
+
+/**
+ * A file/stream with associated colors.
+ */
+typedef struct CFILE {
+	/** The underlying file/stream. */
+	FILE *file;
+	/** The color table to use, if any. */
+	const struct colors *colors;
+} CFILE;
+
+/**
+ * Make a colored copy of an open file.
+ *
+ * @param file
+ *         The underlying file.
+ * @param colors
+ *         The color table to use if file is a TTY.
+ * @return A colored wrapper around file.
+ */
+CFILE *cfdup(FILE *file, const struct colors *colors);
+
+/**
+ * Close a colored file.
+ *
+ * @param cfile
+ *         The colored file to close.
+ * @return 0 on success, -1 on failure.
+ */
+int cfclose(CFILE *cfile);
+
+/**
+ * Colored, formatted output.
+ *
+ * @param cfile
+ *         The colored stream to print to.
+ * @param format
+ *         A printf()-style format string, supporting these format specifiers:
+ *
+ *         %%: A literal '%'
+ *         %c: A single character
+ *         %s: A string
+ *         %P: A colored file path, from a const struct BFTW * argument
+ *         %{cc}: Change the color to 'cc'
+ * @return 0 on success, -1 on failure.
+ */
+int cfprintf(CFILE *cfile, const char *format, ...);
 
 #endif // BFS_COLOR_H

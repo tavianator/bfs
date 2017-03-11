@@ -84,10 +84,10 @@ struct cmdline {
 
 	/** Color data. */
 	struct colors *colors;
-	/** Colors to use for stdout. */
-	const struct colors *stdout_colors;
-	/** Colors to use for stderr. */
-	const struct colors *stderr_colors;
+	/** Colored stdout. */
+	CFILE *cout;
+	/** Colored stderr. */
+	CFILE *cerr;
 
 	/** -mindepth option. */
 	int mindepth;

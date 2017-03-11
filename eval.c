@@ -58,8 +58,7 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
  */
 static void eval_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
-		pretty_error(state->cmdline->stderr_colors,
-		             "'%s': %s\n", state->ftwbuf->path, strerror(errno));
+		cfprintf(state->cmdline->cerr, "%{er}'%s': %s%{rs}\n", state->ftwbuf->path, strerror(errno));
 		*state->ret = -1;
 	}
 }
@@ -735,12 +734,12 @@ done:
  * -print action.
  */
 bool eval_print(const struct expr *expr, struct eval_state *state) {
-	const struct colors *colors = state->cmdline->stdout_colors;
-	if (colors) {
+	CFILE *cout = state->cmdline->cout;
+	if (cout->colors) {
 		fill_statbuf(state);
 	}
 
-	if (pretty_print(colors, state->ftwbuf) != 0) {
+	if (cfprintf(cout, "%P\n", state->ftwbuf) < 0) {
 		eval_error(state);
 	}
 
@@ -785,8 +784,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	} else if (err != REG_NOMATCH) {
 		char *str = xregerror(err, expr->regex);
 		if (str) {
-			pretty_error(state->cmdline->stderr_colors,
-			             "'%s': %s\n", path, str);
+			cfprintf(state->cmdline->cerr, "%{er}'%s': %s%{rs}\n", path, str);
 			free(str);
 		} else {
 			perror("xregerror()");
@@ -1006,7 +1004,7 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 /**
  * Debug stat() calls.
  */
-void debug_stat(const struct eval_state *state) {
+static void debug_stat(const struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
 	fprintf(stderr, "fstatat(");
@@ -1061,7 +1059,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = -1;
-			pretty_error(cmdline->stderr_colors, "'%s': %s\n", ftwbuf->path, strerror(ftwbuf->error));
+			cfprintf(cmdline->cerr, "%{er}'%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
 		}
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;

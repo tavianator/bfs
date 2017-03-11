@@ -11,6 +11,7 @@
 
 #include "color.h"
 #include "bftw.h"
+#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -57,6 +58,69 @@ struct colors {
 
 	char *data;
 };
+
+struct color_name {
+	const char *name;
+	size_t offset;
+};
+
+#define COLOR_NAME(name, field) {name, offsetof(struct colors, field)}
+
+static const struct color_name color_names[] = {
+	COLOR_NAME("bd", block),
+	COLOR_NAME("ca", capable),
+	COLOR_NAME("cd", chardev),
+	COLOR_NAME("di", dir),
+	COLOR_NAME("do", door),
+	COLOR_NAME("er", error),
+	COLOR_NAME("ex", exec),
+	COLOR_NAME("fi", file),
+	COLOR_NAME("ln", link),
+	COLOR_NAME("mh", multi_hard),
+	COLOR_NAME("mi", missing),
+	COLOR_NAME("no", normal),
+	COLOR_NAME("or", orphan),
+	COLOR_NAME("ow", ow),
+	COLOR_NAME("pi", pipe),
+	COLOR_NAME("rs", reset),
+	COLOR_NAME("sg", setgid),
+	COLOR_NAME("so", socket),
+	COLOR_NAME("st", sticky),
+	COLOR_NAME("su", setuid),
+	COLOR_NAME("tw", sticky_ow),
+	COLOR_NAME("wr", warning),
+	{0},
+};
+
+static const char **look_up_color(const struct colors *colors, const char *name) {
+	if (!colors) {
+		return NULL;
+	}
+
+	for (const struct color_name *entry = color_names; entry->name; ++entry) {
+		if (strcmp(name, entry->name) == 0) {
+			return (const char **)((char *)colors + entry->offset);
+		}
+	}
+
+	return NULL;
+}
+
+static const char *get_color(const struct colors *colors, const char *name) {
+	const char **color = look_up_color(colors, name);
+	if (color) {
+		return *color;
+	} else {
+		return NULL;
+	}
+}
+
+static void set_color(struct colors *colors, const char *name, const char *value) {
+	const char **color = look_up_color(colors, name);
+	if (color) {
+		*color = value;
+	}
+}
 
 struct colors *parse_colors(const char *ls_colors) {
 	struct colors *colors = malloc(sizeof(struct colors));
@@ -117,100 +181,7 @@ struct colors *parse_colors(const char *ls_colors) {
 			continue;
 		}
 
-		switch (key[0]) {
-		case 'b':
-			if (strcmp(key, "bd") == 0) {
-				colors->block = value;
-			}
-			break;
-
-		case 'c':
-			if (strcmp(key, "ca") == 0) {
-				colors->capable = value;
-			} else if (strcmp(key, "cd") == 0) {
-				colors->chardev = value;
-			}
-			break;
-
-		case 'd':
-			if (strcmp(key, "di") == 0) {
-				colors->dir = value;
-			} else if (strcmp(key, "do") == 0) {
-				colors->door = value;
-			}
-			break;
-
-		case 'e':
-			if (strcmp(key, "ex") == 0) {
-				colors->exec = value;
-			}
-			break;
-
-		case 'f':
-			if (strcmp(key, "fi") == 0) {
-				colors->file = value;
-			}
-			break;
-
-		case 'l':
-			if (strcmp(key, "ln") == 0) {
-				colors->link = value;
-			}
-			break;
-
-		case 'm':
-			if (strcmp(key, "mh") == 0) {
-				colors->multi_hard = value;
-			} else if (strcmp(key, "mi") == 0) {
-				colors->missing = value;
-			}
-			break;
-
-		case 'n':
-			if (strcmp(key, "no") == 0) {
-				colors->normal = value;
-			}
-			break;
-
-		case 'o':
-			if (strcmp(key, "or") == 0) {
-				colors->orphan = value;
-			} else if (strcmp(key, "ow") == 0) {
-				colors->ow = value;
-			}
-			break;
-
-		case 'p':
-			if (strcmp(key, "pi") == 0) {
-				colors->pipe = value;
-			}
-			break;
-
-		case 'r':
-			if (strcmp(key, "rs") == 0) {
-				colors->reset = value;
-			}
-			break;
-
-		case 's':
-			if (strcmp(key, "sg") == 0) {
-				colors->setgid = value;
-			} else if (strcmp(key, "so") == 0) {
-				colors->socket = value;
-			} else if (strcmp(key, "st") == 0) {
-				colors->sticky = value;
-			} else if (strcmp(key, "su") == 0) {
-				colors->setuid = value;
-			}
-			break;
-
-		case 't':
-			if (strcmp(key, "tw") == 0) {
-				colors->sticky_ow = value;
-			}
-			break;
-
-		case '*':
+		if (key[0] == '*') {
 			ext = malloc(sizeof(struct ext_color));
 			if (ext) {
 				ext->ext = key + 1;
@@ -219,11 +190,45 @@ struct colors *parse_colors(const char *ls_colors) {
 				ext->next = colors->ext_list;
 				colors->ext_list = ext;
 			}
+		} else {
+			set_color(colors, key, value);
 		}
 	}
 
 done:
 	return colors;
+}
+
+void free_colors(struct colors *colors) {
+	if (colors) {
+		struct ext_color *ext = colors->ext_list;
+		while (ext) {
+			struct ext_color *saved = ext;
+			ext = ext->next;
+			free(saved);
+		}
+
+		free(colors->data);
+		free(colors);
+	}
+}
+
+CFILE *cfdup(FILE *file, const struct colors *colors) {
+	CFILE *cfile = malloc(sizeof(*cfile));
+	if (cfile) {
+		cfile->file = file;
+		if (isatty(fileno(file))) {
+			cfile->colors = colors;
+		} else {
+			cfile->colors = NULL;
+		}
+	}
+	return cfile;
+}
+
+int cfclose(CFILE *cfile) {
+	free(cfile);
+	return 0;
 }
 
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
@@ -331,63 +336,42 @@ static int print_esc(const char *esc, FILE *file) {
 	return 0;
 }
 
-int pretty_print(const struct colors *colors, const struct BFTW *ftwbuf) {
+static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
+	const struct colors *colors = cfile->colors;
+	FILE *file = cfile->file;
 	const char *path = ftwbuf->path;
 
 	if (!colors) {
-		return puts(path) == EOF ? -1 : 0;
+		return fputs(path, file) == EOF ? -1 : 0;
 	}
 
 	const char *filename = path + ftwbuf->nameoff;
 
 	if (colors->dir) {
-		if (print_esc(colors->dir, stdout) != 0) {
+		if (print_esc(colors->dir, file) != 0) {
 			return -1;
 		}
 	}
-	if (fwrite(path, 1, ftwbuf->nameoff, stdout) != ftwbuf->nameoff) {
+	if (fwrite(path, 1, ftwbuf->nameoff, file) != ftwbuf->nameoff) {
 		return -1;
 	}
 	if (colors->dir) {
-		if (print_esc(colors->reset, stdout) != 0) {
+		if (print_esc(colors->reset, file) != 0) {
 			return -1;
 		}
 	}
 
 	const char *color = file_color(colors, filename, ftwbuf);
 	if (color) {
-		if (print_esc(color, stdout) != 0) {
+		if (print_esc(color, file) != 0) {
 			return -1;
 		}
 	}
-	if (fputs(filename, stdout) == EOF) {
+	if (fputs(filename, file) == EOF) {
 		return -1;
 	}
 	if (color) {
-		if (print_esc(colors->reset, stdout) != 0) {
-			return -1;
-		}
-	}
-	if (fputs("\n", stdout) == EOF) {
-		return -1;
-	}
-
-	return 0;
-}
-
-static int pretty_format(const struct colors *colors, const char *color, const char *format, va_list args) {
-	if (color) {
-		if (print_esc(color, stderr) != 0) {
-			return -1;
-		}
-	}
-
-	if (vfprintf(stderr, format, args) < 0) {
-		return -1;
-	}
-
-	if (color) {
-		if (print_esc(colors->reset, stderr) != 0) {
+		if (print_esc(colors->reset, file) != 0) {
 			return -1;
 		}
 	}
@@ -395,38 +379,68 @@ static int pretty_format(const struct colors *colors, const char *color, const c
 	return 0;
 }
 
-int pretty_warning(const struct colors *colors, const char *format, ...) {
+int cfprintf(CFILE *cfile, const char *format, ...) {
+	const struct colors *colors = cfile->colors;
+	FILE *file = cfile->file;
+
+	int ret = -1;
+
 	va_list args;
 	va_start(args, format);
 
-	int ret = pretty_format(colors, colors ? colors->warning : NULL, format, args);
+	char name[3] = {0};
+	const char *esc;
 
-	va_end(args);
+	for (const char *i = format; *i; ++i) {
+		if (*i == '%') {
+			switch (*++i) {
+			case '%':
+				goto one_char;
 
-	return ret;
-}
+			case 'c':
+				if (fputc(va_arg(args, int), file) == EOF) {
+					goto done;
+				}
+				break;
 
-int pretty_error(const struct colors *colors, const char *format, ...) {
-	va_list args;
-	va_start(args, format);
+			case 's':
+				if (fputs(va_arg(args, const char *), file) == EOF) {
+					goto done;
+				}
+				break;
 
-	int ret = pretty_format(colors, colors ? colors->error : NULL, format, args);
+			case 'P':
+				if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
+					goto done;
+				}
+				break;
 
-	va_end(args);
+			case '{':
+				memcpy(name, i + 1, 2);
+				esc = get_color(colors, name);
+				if (esc && print_esc(esc, file) != 0) {
+					goto done;
+				}
+				i += 3;
+				break;
 
-	return ret;
-}
+			default:
+				errno = EINVAL;
+				goto done;
+			}
 
-void free_colors(struct colors *colors) {
-	if (colors) {
-		struct ext_color *ext = colors->ext_list;
-		while (ext) {
-			struct ext_color *saved = ext;
-			ext = ext->next;
-			free(saved);
+			continue;
 		}
 
-		free(colors->data);
-		free(colors);
+	one_char:
+		if (fputc(*i, file) == EOF) {
+			goto done;
+		}
 	}
+
+	ret = 0;
+
+done:
+	va_end(args);
+	return ret;
 }
