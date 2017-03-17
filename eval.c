@@ -760,13 +760,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	}
 
 	if (ftwbuf->typeflag == BFTW_LNK) {
-		char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->st_size);
-		if (!target) {
-			goto error;
-		}
-		int ret = fprintf(file, " -> %s", target);
-		free(target);
-		if (ret < 0) {
+		if (cfprintf(cfile, " -> %L", ftwbuf) < 0) {
 			goto error;
 		}
 	}

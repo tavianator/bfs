@@ -761,24 +761,6 @@ static void bftw_set_error(struct bftw_state *state, int error) {
 }
 
 /**
- * Figure out the name offset in a path.
- */
-static size_t basename_offset(const char *path) {
-	size_t i;
-
-	// Strip trailing slashes
-	for (i = strlen(path); i > 0 && path[i - 1] == '/'; --i);
-
-	// Find the beginning of the name
-	for (; i > 0 && path[i - 1] != '/'; --i);
-
-	// Strip leading slashes
-	for (; path[i] == '/' && path[i + 1]; ++i);
-
-	return i;
-}
-
-/**
  * Initialize the buffers with data about the current path.
  */
 static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de) {
@@ -811,7 +793,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 
 	if (ftwbuf->depth == 0) {
 		// Compute the name offset for root paths like "foo/bar"
-		ftwbuf->nameoff = basename_offset(ftwbuf->path);
+		ftwbuf->nameoff = xbasename(ftwbuf->path) - ftwbuf->path;
 	}
 
 	ftwbuf->typeflag = BFTW_UNKNOWN;

@@ -123,4 +123,13 @@ int xlocaltime(const time_t *timep, struct tm *result);
  */
 void format_mode(mode_t mode, char str[11]);
 
+/**
+ * basename() variant that doesn't modify the input.
+ *
+ * @param path
+ *         The path in question.
+ * @return A pointer into path at the base name offset.
+ */
+const char *xbasename(const char *path);
+
 #endif // BFS_UTIL_H

@@ -202,3 +202,18 @@ void format_mode(mode_t mode, char str[11]) {
 		str[9] = 'x';
 	}
 }
+
+const char *xbasename(const char *path) {
+	const char *i;
+
+	// Skip trailing slashes
+	for (i = path + strlen(path); i > path && i[-1] == '/'; --i);
+
+	// Find the beginning of the name
+	for (; i > path && i[-1] != '/'; --i);
+
+	// Skip leading slashes
+	for (; i[0] == '/' && i[1]; ++i);
+
+	return i;
+}

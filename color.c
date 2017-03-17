@@ -11,6 +11,7 @@
 
 #include "color.h"
 #include "bftw.h"
+#include "util.h"
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -413,6 +414,32 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	return 0;
 }
 
+static int print_link(CFILE *cfile, const struct BFTW *ftwbuf) {
+	int ret = -1;
+
+	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, 0);
+	if (!target) {
+		goto done;
+	}
+
+	struct BFTW altbuf = *ftwbuf;
+	altbuf.path = target;
+	altbuf.nameoff = xbasename(target) - target;
+
+	struct stat statbuf;
+	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &statbuf, 0) == 0) {
+		altbuf.statbuf = &statbuf;
+	} else {
+		altbuf.statbuf = NULL;
+	}
+
+	ret = print_path(cfile, &altbuf);
+
+done:
+	free(target);
+	return ret;
+}
+
 int cfprintf(CFILE *cfile, const char *format, ...) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
@@ -445,6 +472,12 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 
 			case 'P':
 				if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
+					goto done;
+				}
+				break;
+
+			case 'L':
+				if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
 					goto done;
 				}
 				break;
