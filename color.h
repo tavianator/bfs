@@ -13,6 +13,7 @@
 #define BFS_COLOR_H
 
 #include "bftw.h"
+#include <stdbool.h>
 #include <stdio.h>
 
 /**
@@ -45,7 +46,20 @@ typedef struct CFILE {
 	FILE *file;
 	/** The color table to use, if any. */
 	const struct colors *colors;
+	/** Whether to close the underlying stream. */
+	bool close;
 } CFILE;
+
+/**
+ * Open a file for colored output.
+ *
+ * @param path
+ *         The path to the file to open.
+ * @param colors
+ *         The color table to use if file is a TTY.
+ * @return A colored file stream.
+ */
+CFILE *cfopen(const char *path, const struct colors *colors);
 
 /**
  * Make a colored copy of an open file.

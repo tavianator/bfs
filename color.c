@@ -213,22 +213,56 @@ void free_colors(struct colors *colors) {
 	}
 }
 
+CFILE *cfopen(const char *path, const struct colors *colors) {
+	CFILE *cfile = malloc(sizeof(*cfile));
+	if (!cfile) {
+		return NULL;
+	}
+
+	cfile->close = false;
+	cfile->file = fopen(path, "wb");
+	if (!cfile->file) {
+		cfclose(cfile);
+		return NULL;
+	}
+	cfile->close = true;
+
+	if (isatty(fileno(cfile->file))) {
+		cfile->colors = colors;
+	} else {
+		cfile->colors = NULL;
+	}
+
+	return cfile;
+}
+
 CFILE *cfdup(FILE *file, const struct colors *colors) {
 	CFILE *cfile = malloc(sizeof(*cfile));
-	if (cfile) {
-		cfile->file = file;
-		if (isatty(fileno(file))) {
-			cfile->colors = colors;
-		} else {
-			cfile->colors = NULL;
-		}
+	if (!cfile) {
+		return NULL;
 	}
+
+	cfile->close = false;
+	cfile->file = file;
+
+	if (isatty(fileno(file))) {
+		cfile->colors = colors;
+	} else {
+		cfile->colors = NULL;
+	}
+
 	return cfile;
 }
 
 int cfclose(CFILE *cfile) {
-	free(cfile);
-	return 0;
+	int ret = 0;
+	if (cfile) {
+		if (cfile->close) {
+			ret = fclose(cfile->file);
+		}
+		free(cfile);
+	}
+	return ret;
 }
 
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {

@@ -11,6 +11,7 @@
 
 #include "bfs.h"
 #include "bftw.h"
+#include "color.h"
 #include "dstring.h"
 #include "util.h"
 #include <assert.h>
@@ -687,7 +688,8 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
  * -f?ls action.
  */
 bool eval_fls(const struct expr *expr, struct eval_state *state) {
-	FILE *file = expr->file;
+	CFILE *cfile = expr->cfile;
+	FILE *file = cfile->file;
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
@@ -753,14 +755,8 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		goto error;
 	}
 
-	if (file == stdout) {
-		if (cfprintf(state->cmdline->cout, " %P", ftwbuf) < 0) {
-			goto error;
-		}
-	} else {
-		if (fprintf(file, " %s", ftwbuf->path) < 0) {
-			goto error;
-		}
+	if (cfprintf(cfile, " %P", ftwbuf) < 0) {
+		goto error;
 	}
 
 	if (ftwbuf->typeflag == BFTW_LNK) {
@@ -788,20 +784,18 @@ error:
 }
 
 /**
- * -fprint action.
+ * -f?print action.
  */
 bool eval_fprint(const struct expr *expr, struct eval_state *state) {
-	const char *path = state->ftwbuf->path;
-	if (fputs(path, expr->file) == EOF) {
-		goto error;
+	CFILE *cfile = expr->cfile;
+	if (cfile->colors) {
+		fill_statbuf(state);
 	}
-	if (fputc('\n', expr->file) == EOF) {
-		goto error;
-	}
-	return true;
 
-error:
-	eval_error(state);
+	if (cfprintf(cfile, "%P\n", state->ftwbuf) < 0) {
+		eval_error(state);
+	}
+
 	return true;
 }
 
@@ -811,7 +805,7 @@ error:
 bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
 	size_t length = strlen(path) + 1;
-	if (fwrite(path, 1, length, expr->file) != length) {
+	if (fwrite(path, 1, length, expr->cfile->file) != length) {
 		eval_error(state);
 	}
 	return true;
@@ -827,27 +821,11 @@ bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	if (bfs_printf(expr->file, expr->printf, state->ftwbuf) != 0) {
+	if (bfs_printf(expr->cfile->file, expr->printf, state->ftwbuf) != 0) {
 		eval_error(state);
 	}
 
 done:
-	return true;
-}
-
-/**
- * -print action.
- */
-bool eval_print(const struct expr *expr, struct eval_state *state) {
-	CFILE *cout = state->cmdline->cout;
-	if (cout->colors) {
-		fill_statbuf(state);
-	}
-
-	if (cfprintf(cout, "%P\n", state->ftwbuf) < 0) {
-		eval_error(state);
-	}
-
 	return true;
 }
 

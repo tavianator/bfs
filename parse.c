@@ -69,9 +69,9 @@ static struct expr expr_false = {
  */
 static void free_expr(struct expr *expr) {
 	if (expr && expr != &expr_true && expr != &expr_false) {
-		if (expr->file && expr->file != stdout && expr->file != stderr) {
-			if (fclose(expr->file) != 0) {
-				perror("fclose()");
+		if (expr->cfile && expr->cfile->close) {
+			if (cfclose(expr->cfile) != 0) {
+				perror("cfclose()");
 			}
 		}
 
@@ -110,7 +110,7 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 	expr->elapsed.tv_nsec = 0;
 	expr->argc = argc;
 	expr->argv = argv;
-	expr->file = NULL;
+	expr->cfile = NULL;
 	expr->regex = NULL;
 	expr->printf = NULL;
 	return expr;
@@ -938,8 +938,8 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
  * Open a file for an expression.
  */
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
-	expr->file = fopen(path, "wb");
-	if (!expr->file) {
+	expr->cfile = cfopen(path, state->cmdline->colors);
+	if (!expr->cfile) {
 		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
 		return -1;
 	}
@@ -1143,7 +1143,7 @@ static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) 
 static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_nullary_action(state, eval_fls);
 	if (expr) {
-		expr->file = stdout;
+		expr->cfile = state->cmdline->cout;
 		expr->reftime = state->now;
 	}
 	return expr;
@@ -1555,7 +1555,13 @@ fail:
  * Parse -print.
  */
 static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) {
-	return parse_nullary_action(state, eval_print);
+	struct expr *expr = parse_nullary_action(state, eval_fprint);
+	if (!expr) {
+		return NULL;
+	}
+
+	expr->cfile = state->cmdline->cout;
+	return expr;
 }
 
 /**
@@ -1564,7 +1570,7 @@ static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) 
 static struct expr *parse_print0(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_nullary_action(state, eval_fprint0);
 	if (expr) {
-		expr->file = stdout;
+		expr->cfile = state->cmdline->cout;
 	}
 	return expr;
 }
@@ -1578,7 +1584,7 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 		return NULL;
 	}
 
-	expr->file = stdout;
+	expr->cfile = state->cmdline->cout;
 
 	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline->cerr);
 	if (!expr->printf) {
@@ -2495,10 +2501,11 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->implicit_print) {
-		struct expr *print = new_expr(eval_print, false, 1, &fake_print_arg);
+		struct expr *print = new_expr(eval_fprint, false, 1, &fake_print_arg);
 		if (!print) {
 			goto fail;
 		}
+		print->cfile = state->cmdline->cout;
 
 		expr = new_and_expr(state, expr, print, &fake_and_arg);
 		if (!expr) {

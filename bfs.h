@@ -245,7 +245,7 @@ struct expr {
 	ino_t ino;
 
 	/** File to output to. */
-	FILE *file;
+	CFILE *cfile;
 
 	/** Optional -exec flags. */
 	enum exec_flags exec_flags;
@@ -322,7 +322,6 @@ bool eval_fls(const struct expr *expr, struct eval_state *state);
 bool eval_fprint(const struct expr *expr, struct eval_state *state);
 bool eval_fprint0(const struct expr *expr, struct eval_state *state);
 bool eval_fprintf(const struct expr *expr, struct eval_state *state);
-bool eval_print(const struct expr *expr, struct eval_state *state);
 bool eval_prune(const struct expr *expr, struct eval_state *state);
 bool eval_quit(const struct expr *expr, struct eval_state *state);
 
