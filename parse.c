@@ -204,6 +204,15 @@ void free_cmdline(struct cmdline *cmdline) {
 }
 
 /**
+ * Color use flags.
+ */
+enum use_color {
+	COLOR_NEVER,
+	COLOR_AUTO,
+	COLOR_ALWAYS,
+};
+
+/**
  * Ephemeral state for parsing the command line.
  */
 struct parser_state {
@@ -219,6 +228,8 @@ struct parser_state {
 	/** The current regex flags to use. */
 	int regex_flags;
 
+	/** Whether -color or -nocolor has been passed. */
+	enum use_color use_color;
 	/** Whether a -print action is implied. */
 	bool implicit_print;
 	/** Whether warnings are enabled (see -warn, -nowarn). */
@@ -781,9 +792,11 @@ static struct expr *parse_color(struct parser_state *state, int color, int arg2)
 	struct cmdline *cmdline = state->cmdline;
 	struct colors *colors = cmdline->colors;
 	if (color) {
+		state->use_color = COLOR_ALWAYS;
 		cmdline->cout->colors = colors;
 		cmdline->cerr->colors = colors;
 	} else {
+		state->use_color = COLOR_NEVER;
 		cmdline->cout->colors = NULL;
 		cmdline->cerr->colors = NULL;
 	}
@@ -938,7 +951,7 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
  * Open a file for an expression.
  */
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
-	expr->cfile = cfopen(path, state->cmdline->colors);
+	expr->cfile = cfopen(path, state->use_color ? state->cmdline->colors : NULL);
 	if (!expr->cfile) {
 		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
 		return -1;
@@ -2641,6 +2654,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.command = argv[0],
 		.roots_tail = &cmdline->roots,
 		.regex_flags = 0,
+		.use_color = COLOR_AUTO,
 		.implicit_print = true,
 		.warn = isatty(STDIN_FILENO),
 		.non_option_seen = false,
@@ -2667,7 +2681,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (cmdline->debug & DEBUG_TREE) {
-		dump_cmdline(cmdline, 0);
+		dump_cmdline(cmdline, false);
 	}
 
 done:
