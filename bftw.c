@@ -96,6 +96,17 @@ static void dircache_free(struct dircache *cache) {
 	free(cache->heap);
 }
 
+/** Check if two dircache entries are in heap order. */
+static bool dircache_heap_check(const struct dircache_entry *parent, const struct dircache_entry *child) {
+	if (parent->depth > child->depth) {
+		return true;
+	} else if (parent->depth < child->depth) {
+		return false;
+	} else {
+		return parent->refcount <= child->refcount;
+	}
+}
+
 /** Move an entry to a particular place in the heap. */
 static void dircache_heap_move(struct dircache *cache, struct dircache_entry *entry, size_t i) {
 	cache->heap[i] = entry;
@@ -109,7 +120,7 @@ static void dircache_bubble_up(struct dircache *cache, struct dircache_entry *en
 	while (i > 0) {
 		size_t pi = (i - 1)/2;
 		struct dircache_entry *parent = cache->heap[pi];
-		if (entry->refcount >= parent->refcount) {
+		if (dircache_heap_check(parent, entry)) {
 			break;
 		}
 
@@ -135,7 +146,7 @@ static void dircache_bubble_down(struct dircache *cache, struct dircache_entry *
 		size_t ri = ci + 1;
 		if (ri < cache->size) {
 			struct dircache_entry *right = cache->heap[ri];
-			if (child->refcount > right->refcount) {
+			if (!dircache_heap_check(child, right)) {
 				ci = ri;
 				child = right;
 			}
@@ -214,6 +225,7 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 	if (parent) {
 		entry->depth = parent->depth + 1;
 		entry->nameoff = parent->nameoff + parent->namelen;
+		dircache_entry_incref(cache, parent);
 	} else {
 		entry->depth = 0;
 		entry->nameoff = 0;
@@ -230,11 +242,6 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 		entry->name[namelen++] = '/';
 	}
 	entry->namelen = namelen;
-
-	while (parent) {
-		dircache_entry_incref(cache, parent);
-		parent = parent->parent;
-	}
 
 	return entry;
 }
@@ -916,7 +923,7 @@ static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool 
 
 		dircache_entry_decref(&state->cache, current);
 		if (current->refcount > 0) {
-			continue;
+			break;
 		}
 
 		if (invoke_callback) {
