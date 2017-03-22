@@ -247,33 +247,6 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 }
 
 /**
- * Get the full path to a dircache_entry.
- *
- * @param entry
- *         The entry to look up.
- * @param[out] path
- *         Will hold the full path to the entry, with a trailing '/'.
- */
-static int dircache_entry_path(const struct dircache_entry *entry, char **path) {
-	size_t namelen = entry->namelen;
-	size_t pathlen = entry->nameoff + namelen;
-
-	if (dstresize(path, pathlen) != 0) {
-		return -1;
-	}
-
-	// Build the path backwards
-	do {
-		char *segment = *path + entry->nameoff;
-		namelen = entry->namelen;
-		memcpy(segment, entry->name, namelen);
-		entry = entry->parent;
-	} while (entry);
-
-	return 0;
-}
-
-/**
  * Get the appropriate (fd, path) pair for the *at() family of functions.
  *
  * @param cache
@@ -333,7 +306,7 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
  * @param entry
  *         The entry to open.
  * @param path
- *         The full path to the entry (see dircache_entry_path()).
+ *         The full path to the entry.
  * @return
  *         The opened DIR *, or NULL on error.
  */
@@ -624,6 +597,8 @@ struct bftw_state {
 	struct dirqueue queue;
 	/** The current dircache entry. */
 	struct dircache_entry *current;
+	/** The previous dircache entry. */
+	struct dircache_entry *last;
 	/** The currently open directory. */
 	DIR *dir;
 	/** The current traversal status. */
@@ -666,6 +641,7 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 	}
 
 	state->current = NULL;
+	state->last = NULL;
 	state->dir = NULL;
 	state->status = BFTW_CURRENT;
 
@@ -682,6 +658,42 @@ err_cache:
 	dircache_free(&state->cache);
 err:
 	return -1;
+}
+
+/**
+ * Compute the path to the current dircache_entry.
+ */
+static int bftw_build_path(struct bftw_state *state) {
+	const struct dircache_entry *entry = state->current;
+	size_t namelen = entry->namelen;
+	size_t pathlen = entry->nameoff + namelen;
+
+	if (dstresize(&state->path, pathlen) != 0) {
+		return -1;
+	}
+
+	// Only rebuild the part of the path that changes
+	const struct dircache_entry *last = state->last;
+	while (last && last->depth > entry->depth) {
+		last = last->parent;
+	}
+
+	// Build the path backwards
+	char *path = state->path;
+	while (entry != last) {
+		char *segment = path + entry->nameoff;
+		namelen = entry->namelen;
+		memcpy(segment, entry->name, namelen);
+
+		if (last && last->depth == entry->depth) {
+			last = last->parent;
+		}
+		entry = entry->parent;
+	}
+
+	state->last = state->current;
+
+	return 0;
 }
 
 /**
@@ -719,6 +731,7 @@ static void bftw_path_trim(struct bftw_state *state) {
 		if (current->namelen > 1) {
 			// Trim the trailing slash
 			--length;
+			state->last = current->parent;
 		}
 	}
 	dstresize(&state->path, length);
@@ -909,7 +922,7 @@ static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool 
 	}
 
 	if (entry && invoke_callback) {
-		if (dircache_entry_path(entry, &state->path) != 0) {
+		if (bftw_build_path(state) != 0) {
 			ret = BFTW_FAIL;
 			invoke_callback = false;
 		}
@@ -918,16 +931,14 @@ static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool 
 	state->status = BFTW_GC;
 
 	while (entry) {
-		struct dircache_entry *current = entry;
-		entry = entry->parent;
-
-		dircache_entry_decref(&state->cache, current);
-		if (current->refcount > 0) {
+		dircache_entry_decref(&state->cache, entry);
+		if (entry->refcount > 0) {
+			state->last = entry;
 			break;
 		}
 
 		if (invoke_callback) {
-			state->current = current;
+			state->current = entry;
 			bftw_path_trim(state);
 			bftw_init_buffers(state, NULL);
 
@@ -946,7 +957,9 @@ static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool 
 			}
 		}
 
-		dircache_entry_free(&state->cache, current);
+		struct dircache_entry *parent = entry->parent;
+		dircache_entry_free(&state->cache, entry);
+		entry = parent;
 	}
 
 	return ret;
@@ -1037,7 +1050,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 	}
 
 	do {
-		if (dircache_entry_path(state.current, &state.path) != 0) {
+		if (bftw_build_path(&state) != 0) {
 			goto fail;
 		}
 
