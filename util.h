@@ -132,4 +132,14 @@ void format_mode(mode_t mode, char str[11]);
  */
 const char *xbasename(const char *path);
 
+/**
+ * Convert a stat() st_mode to a bftw() typeflag.
+ */
+enum bftw_typeflag mode_to_typeflag(mode_t mode);
+
+/**
+ * Convert a directory entry to a bftw() typeflag.
+ */
+enum bftw_typeflag dirent_to_typeflag(const struct dirent *de);
+
 #endif // BFS_UTIL_H

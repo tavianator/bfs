@@ -961,7 +961,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	return bftw_mode_to_typeflag(sb.st_mode) & expr->idata;
+	return mode_to_typeflag(sb.st_mode) & expr->idata;
 }
 
 #if _POSIX_MONOTONIC_CLOCK > 0

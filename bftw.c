@@ -445,112 +445,6 @@ static void dirqueue_free(struct dirqueue *queue) {
 	free(queue->entries);
 }
 
-/** Fill in ftwbuf fields with information from a struct dirent. */
-static void ftwbuf_use_dirent(struct BFTW *ftwbuf, const struct dirent *de) {
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
-	switch (de->d_type) {
-#ifdef DT_BLK
-	case DT_BLK:
-		ftwbuf->typeflag = BFTW_BLK;
-		break;
-#endif
-#ifdef DT_CHR
-	case DT_CHR:
-		ftwbuf->typeflag = BFTW_CHR;
-		break;
-#endif
-#ifdef DT_DIR
-	case DT_DIR:
-		ftwbuf->typeflag = BFTW_DIR;
-		break;
-#endif
-#ifdef DT_DOOR
-	case DT_DOOR:
-		ftwbuf->typeflag = BFTW_DOOR;
-		break;
-#endif
-#ifdef DT_FIFO
-	case DT_FIFO:
-		ftwbuf->typeflag = BFTW_FIFO;
-		break;
-#endif
-#ifdef DT_LNK
-	case DT_LNK:
-		ftwbuf->typeflag = BFTW_LNK;
-		break;
-#endif
-#ifdef DT_PORT
-	case DT_PORT:
-		ftwbuf->typeflag = BFTW_PORT;
-		break;
-#endif
-#ifdef DT_REG
-	case DT_REG:
-		ftwbuf->typeflag = BFTW_REG;
-		break;
-#endif
-#ifdef DT_SOCK
-	case DT_SOCK:
-		ftwbuf->typeflag = BFTW_SOCK;
-		break;
-#endif
-#ifdef DT_WHT
-	case DT_WHT:
-		ftwbuf->typeflag = BFTW_WHT;
-		break;
-#endif
-	}
-#endif
-}
-
-enum bftw_typeflag bftw_mode_to_typeflag(mode_t mode) {
-	switch (mode & S_IFMT) {
-#ifdef S_IFBLK
-	case S_IFBLK:
-		return BFTW_BLK;
-#endif
-#ifdef S_IFCHR
-	case S_IFCHR:
-		return BFTW_CHR;
-#endif
-#ifdef S_IFDIR
-	case S_IFDIR:
-		return BFTW_DIR;
-#endif
-#ifdef S_IFDOOR
-	case S_IFDOOR:
-		return BFTW_DOOR;
-#endif
-#ifdef S_IFIFO
-	case S_IFIFO:
-		return BFTW_FIFO;
-#endif
-#ifdef S_IFLNK
-	case S_IFLNK:
-		return BFTW_LNK;
-#endif
-#ifdef S_IFPORT
-	case S_IFPORT:
-		return BFTW_PORT;
-#endif
-#ifdef S_IFREG
-	case S_IFREG:
-		return BFTW_REG;
-#endif
-#ifdef S_IFSOCK
-	case S_IFSOCK:
-		return BFTW_SOCK;
-#endif
-#ifdef S_IFWHT
-	case S_IFWHT:
-		return BFTW_WHT;
-#endif
-
-	default:
-		return BFTW_UNKNOWN;
-	}
-}
-
 /** Call stat() and use the results. */
 static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
 	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, ftwbuf->at_flags);
@@ -559,7 +453,7 @@ static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
 	}
 
 	ftwbuf->statbuf = sb;
-	ftwbuf->typeflag = bftw_mode_to_typeflag(sb->st_mode);
+	ftwbuf->typeflag = mode_to_typeflag(sb->st_mode);
 
 	return 0;
 }
@@ -818,7 +712,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 
 	ftwbuf->typeflag = BFTW_UNKNOWN;
 	if (de) {
-		ftwbuf_use_dirent(ftwbuf, de);
+		ftwbuf->typeflag = dirent_to_typeflag(de);
 	} else if (state->status != BFTW_CHILD) {
 		ftwbuf->typeflag = BFTW_DIR;
 	}

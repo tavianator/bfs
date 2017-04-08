@@ -350,7 +350,7 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive
 
 	struct stat sb;
 	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, 0) == 0) {
-		type = bfs_printf_type(bftw_mode_to_typeflag(sb.st_mode));
+		type = bfs_printf_type(mode_to_typeflag(sb.st_mode));
 	} else {
 		switch (errno) {
 		case ELOOP:

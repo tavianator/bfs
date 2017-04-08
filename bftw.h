@@ -46,11 +46,6 @@ enum bftw_typeflag {
 };
 
 /**
- * Convert a stat() st_mode to a bftw() typeflag.
- */
-enum bftw_typeflag bftw_mode_to_typeflag(mode_t mode);
-
-/**
  * Possible visit occurrences.
  */
 enum bftw_visit {
