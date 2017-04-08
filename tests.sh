@@ -354,7 +354,7 @@ done
 
 function enable_tests() {
     for test; do
-        declare -g run_$test=yes
+        eval run_$test=yes
     done
 }
 
