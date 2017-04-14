@@ -12,6 +12,7 @@
 #ifndef BFS_UTIL_H
 #define BFS_UTIL_H
 
+#include "bftw.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
