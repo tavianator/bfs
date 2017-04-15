@@ -142,6 +142,7 @@ posix_tests=(
     test_size_plus
     test_size_bytes
     test_exec
+    test_exec_plus
     test_flag_comma
     test_perm_222
     test_perm_222_minus
@@ -303,6 +304,7 @@ bfs_tests=(
     test_perm_symbolic_missing_action
     test_perm_leading_plus_symbolic
     test_perm_octal_plus
+    test_execdir_plus
     test_hidden
     test_nohidden
     test_path_flag_expr
@@ -648,12 +650,20 @@ function test_exec() {
     bfs_diff basic -exec echo '{}' ';'
 }
 
+function test_exec_plus() {
+    bfs_diff basic -exec "$TESTS/sort-args.sh" '{}' +
+}
+
 function test_exec_substring() {
     bfs_diff basic -exec echo '-{}-' ';'
 }
 
 function test_execdir() {
     bfs_diff basic -execdir echo '{}' ';'
+}
+
+function test_execdir_plus() {
+    bfs_diff basic -execdir "$TESTS/sort-args.sh" '{}' +
 }
 
 function test_execdir_substring() {

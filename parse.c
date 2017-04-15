@@ -10,6 +10,7 @@
  *********************************************************************/
 
 #include "bfs.h"
+#include "exec.h"
 #include "printf.h"
 #include "typo.h"
 #include "util.h"
@@ -81,6 +82,7 @@ static void free_expr(struct expr *expr) {
 		}
 
 		free_bfs_printf(expr->printf);
+		free_bfs_exec(expr->execbuf);
 
 		free_expr(expr->lhs);
 		free_expr(expr->rhs);
@@ -112,6 +114,7 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 	expr->argv = argv;
 	expr->cfile = NULL;
 	expr->regex = NULL;
+	expr->execbuf = NULL;
 	expr->printf = NULL;
 	return expr;
 }
@@ -896,33 +899,21 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
 }
 
 /**
- * Parse -exec[dir]/-ok[dir].
+ * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
-	size_t i = 1;
-	const char *arg;
-	while ((arg = state->argv[i++])) {
-		if (strcmp(arg, ";") == 0) {
-			break;
-		} else if (strcmp(arg, "+") == 0) {
-			flags |= EXEC_MULTI;
-			break;
-		}
-	}
-
-	if (!arg) {
-		cfprintf(state->cmdline->cerr, "%{er}error: %s: Expected ';' or '+'.%{rs}\n", state->argv[0]);
+	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->cmdline->cerr);
+	if (!execbuf) {
 		return NULL;
 	}
 
-	if (flags & EXEC_MULTI) {
-		cfprintf(state->cmdline->cerr, "%{er}error: %s ... {} + is not supported yet.%{rs}\n", state->argv[0]);
-		return NULL;
+	if ((execbuf->flags & BFS_EXEC_CHDIR) && (execbuf->flags & BFS_EXEC_MULTI)) {
+		++state->cmdline->nopen_files;
 	}
 
-	struct expr *expr = parse_action(state, eval_exec, i);
+	struct expr *expr = parse_action(state, eval_exec, execbuf->tmpl_argc + 2);
 	if (expr) {
-		expr->exec_flags = flags;
+		expr->execbuf = execbuf;
 	}
 	return expr;
 }
@@ -1970,7 +1961,7 @@ static const struct table_entry parse_table[] = {
 	{"depth", false, parse_depth_n},
 	{"empty", false, parse_empty},
 	{"exec", false, parse_exec, 0},
-	{"execdir", false, parse_exec, EXEC_CHDIR},
+	{"execdir", false, parse_exec, BFS_EXEC_CHDIR},
 	{"executable", false, parse_access, X_OK},
 	{"f", false, parse_f},
 	{"false", false, parse_const, false},
@@ -2011,8 +2002,8 @@ static const struct table_entry parse_table[] = {
 	{"nouser", false, parse_nouser},
 	{"nowarn", false, parse_warn, false},
 	{"o"},
-	{"ok", false, parse_exec, EXEC_CONFIRM},
-	{"okdir", false, parse_exec, EXEC_CONFIRM | EXEC_CHDIR},
+	{"ok", false, parse_exec, BFS_EXEC_CONFIRM},
+	{"okdir", false, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
 	{"or"},
 	{"path", false, parse_path, false},
 	{"perm", false, parse_perm},

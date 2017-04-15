@@ -13,6 +13,7 @@
 #define BFS_H
 
 #include "color.h"
+#include "exec.h"
 #include "printf.h"
 #include <regex.h>
 #include <stdbool.h>
@@ -179,18 +180,6 @@ enum size_unit {
 	SIZE_PB,
 };
 
-/**
- * Flags for the -exec actions.
- */
-enum exec_flags {
-	/** Prompt the user before executing (-ok, -okdir). */
-	EXEC_CONFIRM = 1 << 0,
-	/** Run the command in the file's parent directory (-execdir, -okdir). */
-	EXEC_CHDIR   = 1 << 1,
-	/** Pass multiple files at once to the command (-exec ... {} +). */
-	EXEC_MULTI   = 1 << 2,
-};
-
 struct expr {
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
@@ -247,11 +236,11 @@ struct expr {
 	/** File to output to. */
 	CFILE *cfile;
 
-	/** Optional -exec flags. */
-	enum exec_flags exec_flags;
-
 	/** Optional compiled regex. */
 	regex_t *regex;
+
+	/** Optional exec command. */
+	struct bfs_exec *execbuf;
 
 	/** Optional printf command. */
 	struct bfs_printf *printf;

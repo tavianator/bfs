@@ -27,7 +27,6 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -278,206 +277,29 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	return true;
 }
 
-static const char *exec_format_path(const struct expr *expr, const struct BFTW *ftwbuf) {
-	if (!(expr->exec_flags & EXEC_CHDIR)) {
-		return ftwbuf->path;
+/** Finish any pending -exec ... + operations. */
+static int eval_exec_finish(const struct expr *expr) {
+	int ret = 0;
+	if (expr->execbuf && bfs_exec_finish(expr->execbuf) != 0) {
+		ret = -1;
 	}
-
-	const char *name = ftwbuf->path + ftwbuf->nameoff;
-
-	if (name[0] == '/') {
-		// Must be a root path ("/", "//", etc.)
-		return name;
+	if (expr->lhs && eval_exec_finish(expr->lhs) != 0) {
+		ret = -1;
 	}
-
-	// For compatibility with GNU find, use './name' instead of just 'name'
-	char *path = dstralloc(2 + strlen(name));
-	if (!path) {
-		return NULL;
+	if (expr->rhs && eval_exec_finish(expr->rhs) != 0) {
+		ret = -1;
 	}
-
-	if (dstrcat(&path, "./") != 0) {
-		goto err;
-	}
-	if (dstrcat(&path, name) != 0) {
-		goto err;
-	}
-
-	return path;
-
-err:
-	dstrfree(path);
-	return NULL;
-}
-
-static void exec_free_path(const char *path, const struct BFTW *ftwbuf) {
-	if (path != ftwbuf->path && path != ftwbuf->path + ftwbuf->nameoff) {
-		dstrfree((char *)path);
-	}
-}
-
-static char *exec_format_arg(char *arg, const char *path) {
-	char *match = strstr(arg, "{}");
-	if (!match) {
-		return arg;
-	}
-
-	char *ret = dstralloc(0);
-	if (!ret) {
-		return NULL;
-	}
-
-	char *last = arg;
-	do {
-		if (dstrncat(&ret, last, match - last) != 0) {
-			goto err;
-		}
-		if (dstrcat(&ret, path) != 0) {
-			goto err;
-		}
-
-		last = match + 2;
-		match = strstr(last, "{}");
-	} while (match);
-
-	if (dstrcat(&ret, last) != 0) {
-		goto err;
-	}
-
 	return ret;
-
-err:
-	dstrfree(ret);
-	return NULL;
-}
-
-static void exec_free_argv(size_t argc, char **argv, char **template) {
-	for (size_t i = 0; i < argc; ++i) {
-		if (argv[i] != template[i]) {
-			dstrfree(argv[i]);
-		}
-	}
-	free(argv);
-}
-
-static char **exec_format_argv(size_t argc, char **template, const char *path) {
-	char **argv = malloc((argc + 1)*sizeof(char *));
-	if (!argv) {
-		return NULL;
-	}
-
-	for (size_t i = 0; i < argc; ++i) {
-		argv[i] = exec_format_arg(template[i], path);
-		if (!argv[i]) {
-			exec_free_argv(i, argv, template);
-			return NULL;
-		}
-	}
-	argv[argc] = NULL;
-
-	return argv;
-}
-
-static void exec_chdir(const struct BFTW *ftwbuf) {
-	if (ftwbuf->at_fd != AT_FDCWD) {
-		if (fchdir(ftwbuf->at_fd) != 0) {
-			perror("fchdir()");
-			_Exit(EXIT_FAILURE);
-		}
-		return;
-	}
-
-	size_t nameoff = ftwbuf->nameoff;
-
-	if (nameoff == 0 && ftwbuf->path[nameoff] != '/') {
-		// The path is something like "foo", so we're already in the
-		// right directory
-		return;
-	}
-
-	char *path = strdup(ftwbuf->path);
-	if (!path) {
-		perror("strdup()");
-		_Exit(EXIT_FAILURE);
-	}
-
-	if (nameoff > 0) {
-		path[nameoff] = '\0';
-	}
-
-	if (chdir(path) != 0) {
-		perror("chdir()");
-		_Exit(EXIT_FAILURE);
-	}
 }
 
 /**
  * -exec[dir]/-ok[dir] actions.
  */
 bool eval_exec(const struct expr *expr, struct eval_state *state) {
-	bool ret = false;
-
-	const struct BFTW *ftwbuf = state->ftwbuf;
-
-	const char *path = exec_format_path(expr, ftwbuf);
-	if (!path) {
+	bool ret = bfs_exec(expr->execbuf, state->ftwbuf) == 0;
+	if (errno != 0) {
 		eval_error(state);
-		goto out;
 	}
-
-	size_t argc = expr->argc - 2;
-	char **template = expr->argv + 1;
-	char **argv = exec_format_argv(argc, template, path);
-	if (!argv) {
-		eval_error(state);
-		goto out_path;
-	}
-
-	if (expr->exec_flags & EXEC_CONFIRM) {
-		for (size_t i = 0; i < argc; ++i) {
-			fprintf(stderr, "%s ", argv[i]);
-		}
-		fprintf(stderr, "? ");
-		fflush(stderr);
-
-		int c = getchar();
-		bool exec = c == 'y' || c == 'Y';
-		while (c != '\n' && c != EOF) {
-			c = getchar();
-		}
-		if (!exec) {
-			goto out_argv;
-		}
-	}
-
-	pid_t pid = fork();
-
-	if (pid < 0) {
-		eval_error(state);
-		goto out_argv;
-	} else if (pid > 0) {
-		int status;
-		if (waitpid(pid, &status, 0) < 0) {
-			eval_error(state);
-			goto out_argv;
-		}
-
-		ret = WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS;
-	} else {
-		if (expr->exec_flags & EXEC_CHDIR) {
-			exec_chdir(ftwbuf);
-		}
-
-		execvp(argv[0], argv);
-		perror("execvp()");
-		_Exit(EXIT_FAILURE);
-	}
-
-out_argv:
-	exec_free_argv(argc, argv, template);
-out_path:
-	exec_free_path(path, ftwbuf);
-out:
 	return ret;
 }
 
@@ -1244,6 +1066,10 @@ int eval_cmdline(const struct cmdline *cmdline) {
 			args.ret = -1;
 			perror("bftw()");
 		}
+	}
+
+	if (eval_exec_finish(cmdline->expr) != 0) {
+		args.ret = -1;
 	}
 
 	if (cmdline->debug & DEBUG_RATES) {
