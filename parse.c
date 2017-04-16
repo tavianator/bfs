@@ -1878,42 +1878,212 @@ static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
  * "Parse" -help.
  */
 static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
-	printf("Usage: %s [flags...] [paths...] [expression...]\n\n", state->command);
+	CFILE *cout = state->cmdline->cout;
+	cfprintf(cout, "Usage: %{ex}%s%{rs} [%{cyn}flags%{rs}...] [%{mag}paths%{rs}...] [%{blu}expression%{rs}...]\n\n",
+		 state->command);
 
-	printf("bfs is compatible with find; see find -help or man find for help with find-\n"
-	       "compatible options :)\n\n");
+	cfprintf(cout, "%{ex}bfs%{rs} is compatible with %{ex}find%{rs}; see %{ex}find%{rs} %{blu}-help%{rs} or"
+	               " %{ex}man%{rs} %{bld}find%{rs} for help with %{ex}find%{rs}-\n"
+	               "compatible options :)\n\n");
 
-	printf("flags (-H/-L/-P etc.), paths, and expressions may be freely mixed in any order.\n\n");
+	cfprintf(cout, "%{cyn}flags%{rs} (%{cyn}-H%{rs}/%{cyn}-L%{rs}/%{cyn}-P%{rs} etc.), %{mag}paths%{rs}, and"
+	               " %{blu}expressions%{rs} may be freely mixed in any order.\n\n");
 
-	printf("POSIX find features:\n");
-	printf("  ( EXPRESSION )\n");
-	printf("  ! EXPRESSION\n");
-	printf("  EXPRESSION [-a] EXPRESSION\n");
-	printf("  EXPRESSION -o EXPRESSION\n\n");
-	printf("  -H, -L, -name, -path, -xdev, -prune, -perm, -type, -links, -user, -group,\n");
-	printf("  -size, -atime, -ctime, -mtime, -exec ... ;, -ok ... ;, -print, -newer, -depth\n\n");
+	cfprintf(cout, "%{bld}POSIX find features:%{rs}\n\n");
 
-	printf("GNU find features:\n");
-	printf("  -not EXPRESSION\n");
-	printf("  EXPRESSION -and EXPRESSION\n");
-	printf("  EXPRESSION -or EXPRESSION\n");
-	printf("  EXPRESSION , EXPRESSION\n\n");
-	printf("  -P, -D, -O, -daystart, -follow, -regextype, -warn, -nowarn, -d, -maxdepth,\n");
-	printf("  -mindepth, -mount, -noleaf, -ignore_readdir_race, -noignore_readdir_race,\n");
-	printf("  -amin, -anewer, -cmin, -cnewer, -mmin, -empty, -false, -gid, -ilname, -iname,\n");
-	printf("  -inum, -ipath, -iwholename, -iregex, -lname, -newerXY, -wholename, -regex,\n");
-	printf("  -readable, -writable, -executable, -samefile, -true, -uid, -used, -xtype,\n");
-	printf("  -delete, -execdir ... ;, -okdir ... ;, -print0, -printf, -fprint, -fprint0,\n");
-	printf("  -fprintf, -quit, -help, -version\n\n");
+	cfprintf(cout, "  %{red}(%{rs} %{blu}expression%{rs} %{red})%{rs}\n");
+	cfprintf(cout, "  %{red}!%{rs} %{blu}expression%{rs}\n");
+	cfprintf(cout, "  %{blu}expression%{rs} [%{red}-a%{rs}] %{blu}expression%{rs}\n");
+	cfprintf(cout, "  %{blu}expression%{rs} %{red}-o%{rs} %{blu}expression%{rs}\n\n");
 
-	printf("BSD find features:\n");
-	printf("  -E, -d, -x, -depth N, -gid NAME, -uid NAME, -size N[ckMGTP], -sparse\n\n");
+	cfprintf(cout, "  %{cyn}-H%{rs}\n");
+	cfprintf(cout, "      Follow symbolic links on the command line, but not while searching\n");
+	cfprintf(cout, "  %{cyn}-L%{rs}\n");
+	cfprintf(cout, "      Follow all symbolic links\n\n");
 
-	printf("Extra features:\n"
-	       "  -color, -nocolor: Turn on or off file type colorization.\n\n"
-	       "  -hidden, -nohidden: Match hidden files, or filter them out.\n\n");
+	cfprintf(cout, "  %{blu}-depth%{rs}\n");
+	cfprintf(cout, "      Search in post-order (descendents first)\n");
+	cfprintf(cout, "  %{blu}-xdev%{rs}\n");
+	cfprintf(cout, "      Don't descend into other mount points\n\n");
 
-	printf("%s\n", BFS_HOMEPAGE);
+	cfprintf(cout, "  %{blu}-atime%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "  %{blu}-ctime%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "  %{blu}-mtime%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files accessed/changed/modified %{bld}N%{rs} days ago\n");
+	cfprintf(cout, "  %{blu}-group%{rs} %{bld}NAME%{rs}\n");
+	cfprintf(cout, "  %{blu}-user%{rs}  %{bld}NAME%{rs}\n");
+	cfprintf(cout, "      Find files owned by the group/user %{bld}NAME%{rs}\n");
+	cfprintf(cout, "  %{blu}-links%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files with %{bld}N%{rs} hard links\n");
+	cfprintf(cout, "  %{blu}-name%{rs} %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "      Find files whose name matches the %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "  %{blu}-path%{rs} %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "      Find files whose entire path matches the %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "  %{blu}-newer%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "      Find files newer than %{bld}FILE%{rs}\n");
+	cfprintf(cout, "  %{blu}-perm%{rs} %{bld}[-]MODE%{rs}\n");
+	cfprintf(cout, "      Find files with a matching mode\n");
+	cfprintf(cout, "  %{blu}-type%{rs} %{bld}[bcdlpfs]%{rs}\n");
+	cfprintf(cout, "      Find files of the given type\n");
+	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[c]%{rs}\n");
+	cfprintf(cout, "      Find files with the given size\n\n");
+
+	cfprintf(cout, "  %{blu}-prune%{rs}\n");
+	cfprintf(cout, "      Don't descend into this directory\n");
+	cfprintf(cout, "  %{blu}-exec%{rs} %{bld}command ... {} ;%{rs}\n");
+	cfprintf(cout, "      Execute a command\n");
+	cfprintf(cout, "  %{blu}-exec%{rs} %{bld}command ... {} +%{rs}\n");
+	cfprintf(cout, "      Execute a command with multiple files at once\n");
+	cfprintf(cout, "  %{blu}-ok%{rs} %{bld}command ... {} ;%{rs}\n");
+	cfprintf(cout, "      Prompt the user whether to execute a command\n");
+	cfprintf(cout, "  %{blu}-print%{rs}\n");
+	cfprintf(cout, "      Print the path to the found file\n\n");
+
+	cfprintf(cout, "%{bld}GNU find features:%{rs}\n\n");
+
+	cfprintf(cout, "  %{red}-not%{rs} %{blu}expression%{rs}\n");
+	cfprintf(cout, "  %{blu}expression%{rs} %{red}-and%{rs} %{blu}expression%{rs}\n");
+	cfprintf(cout, "  %{blu}expression%{rs} %{red}-or%{rs} %{blu}expression%{rs}\n");
+	cfprintf(cout, "  %{blu}expression%{rs} %{red},%{rs} %{blu}expression%{rs}\n\n");
+
+	cfprintf(cout, "  %{cyn}-P%{rs}\n");
+	cfprintf(cout, "      Never follow symbolic links (the default)\n");
+	cfprintf(cout, "  %{cyn}-D%{rs} %{bld}FLAG%{rs}\n");
+	cfprintf(cout, "      Turn on a debugging flag (see -D help)\n");
+	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}N%{rs}\n");
+	cfprintf(cout, "      Enable optimization level %{bld}N%{rs} (default: 3)\n\n");
+
+	cfprintf(cout, "  %{blu}-d%{rs}\n");
+	cfprintf(cout, "      Search in post-order (same as %{blu}-depth%{rs})\n");
+	cfprintf(cout, "  %{blu}-daystart%{rs}\n");
+	cfprintf(cout, "      Measure times relative to the start of today\n");
+	cfprintf(cout, "  %{blu}-follow%{rs}\n");
+	cfprintf(cout, "      Follow all symbolic links (same as %{cyn}-L%{rs})\n");
+	cfprintf(cout, "  %{blu}-ignore_readdir_race%{rs}\n");
+	cfprintf(cout, "  %{blu}-noignore_readdir_race%{rs}\n");
+	cfprintf(cout, "      Whether to report an error if %{ex}bfs%{rs} detects that the file tree is modified\n");
+	cfprintf(cout, "      during the search (default: %{blu}-noignore_readdir_race%{rs})\n");
+	cfprintf(cout, "  %{blu}-maxdepth%{rs} %{bld}N%{rs}\n");
+	cfprintf(cout, "  %{blu}-mindepth%{rs} %{bld}N%{rs}\n");
+	cfprintf(cout, "      Ignore files deeper/shallower than %{bld}N%{rs}\n");
+	cfprintf(cout, "  %{blu}-mount%{rs}\n");
+	cfprintf(cout, "      Don't descend into other mount points (same as %{blu}-xdev%{rs})\n");
+	cfprintf(cout, "  %{blu}-noleaf%{rs}\n");
+	cfprintf(cout, "      Ignored, for compatibility with GNU find\n");
+	cfprintf(cout, "  %{blu}-regextype%{rs} %{bld}TYPE%{rs}\n");
+	cfprintf(cout, "      Use TYPE-flavored regexes (see -regextype help)\n");
+	cfprintf(cout, "  %{blu}-warn%{rs}\n");
+	cfprintf(cout, "  %{blu}-nowarn%{rs}\n");
+	cfprintf(cout, "      Turn on or off warnings about the command line\n\n");
+
+	cfprintf(cout, "  %{blu}-amin%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "  %{blu}-cmin%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "  %{blu}-mmin%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files accessed/changed/modified %{bld}N%{rs} minutes ago\n");
+	cfprintf(cout, "  %{blu}-anewer%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "  %{blu}-cnewer%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "  %{blu}-mnewer%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "      Find files accessed/changed/modified more recently than %{bld}FILE%{rs} was modified\n");
+	cfprintf(cout, "  %{blu}-empty%{rs}\n");
+	cfprintf(cout, "      Find empty files/directories\n");
+	cfprintf(cout, "  %{blu}-executable%{rs}\n");
+	cfprintf(cout, "  %{blu}-readable%{rs}\n");
+	cfprintf(cout, "  %{blu}-writable%{rs}\n");
+	cfprintf(cout, "      Find files the current user can execute/read/write\n");
+	cfprintf(cout, "  %{blu}-false%{rs}\n");
+	cfprintf(cout, "  %{blu}-true%{rs}\n");
+	cfprintf(cout, "      Always false/true\n");
+	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "  %{blu}-uid%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files owned by group/user ID %{bld}N%{rs}\n");
+	cfprintf(cout, "  %{blu}-inum%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files with inode number %{bld}N%{rs}\n");
+	cfprintf(cout, "  %{blu}-lname%{rs} %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "      Find symbolic links whose target matches the %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "  %{blu}-newer%{rs}%{bld}XY%{rs} %{bld}REFERENCE%{rs}\n");
+	cfprintf(cout, "      Find files whose %{bld}X%{rs} time is newer than the %{bld}Y%{rs} time of"
+	               " %{bld}REFERENCE%{bld}.  %{bld}X%{rs} and %{bld}Y%{rs}\n");
+	cfprintf(cout, "      can be any of [acm].\n");
+	cfprintf(cout, "  %{blu}-regex%{rs} %{bld}REGEX%{rs}\n");
+	cfprintf(cout, "      Find files whose entire path matches the regular expression %{bld}REGEX%{rs}\n");
+	cfprintf(cout, "  %{blu}-samefile%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "      Find hard links to %{bld}FILE%{rs}\n");
+	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[wbkMG]%{rs}\n");
+	cfprintf(cout, "      2-byte %{bld}w%{rs}ords, 512-byte %{bld}b%{rs}locks, and %{bld}k%{rs}iB/%{bld}M%{rs}iB"
+	               "/%{bld}G%{rs}iB\n");
+	cfprintf(cout, "  %{blu}-used%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files last accessed %{bld}N%{rs} days after they were changed\n");
+	cfprintf(cout, "  %{blu}-wholename%{rs} %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "      Find files whose entire path matches the %{bld}GLOB%{rs} (same as %{blu}-path%{rs})\n");
+	cfprintf(cout, "  %{blu}-ilname%{rs} %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "  %{blu}-iname%{rs}  %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "  %{blu}-ipath%{rs}  %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "  %{blu}-iregex%{rs} %{bld}REGEX%{rs}\n");
+	cfprintf(cout, "  %{blu}-iwholename%{rs} %{bld}GLOB%{rs}\n");
+	cfprintf(cout, "      Case-insensitive versions of %{blu}-lname%{rs}/%{blu}-name%{rs}/%{blu}-path%{rs}"
+	               "/%{blu}-regex%{rs}/%{blu}-wholename%{rs}\n");
+	cfprintf(cout, "  %{blu}-xtype%{rs} %{bld}[bcdlpfs]%{rs}\n");
+	cfprintf(cout, "      Find files of the given type, following links when %{blu}-type%{rs} would not, and\n");
+	cfprintf(cout, "      vice versa\n\n");
+
+	cfprintf(cout, "  %{blu}-delete%{rs}\n");
+	cfprintf(cout, "      Delete any found files (implies %{blu}-depth%{rs})\n");
+	cfprintf(cout, "  %{blu}-execdir%{rs} %{bld}command ... {} ;%{rs}\n");
+	cfprintf(cout, "  %{blu}-execdir%{rs} %{bld}command ... {} +%{rs}\n");
+	cfprintf(cout, "  %{blu}-okdir%{rs}   %{bld}command ... {} ;%{rs}\n");
+	cfprintf(cout, "      Like %{blu}-exec%{rs}/%{blu}-ok%{rs}, but run the command in the same directory as the found\n");
+	cfprintf(cout, "      file(s)\n");
+	cfprintf(cout, "  %{blu}-print0%{rs}\n");
+	cfprintf(cout, "      Like %{blu}-print%{rs}, but use the null character ('\\0') as a separator rather than\n");
+	cfprintf(cout, "      newlines\n");
+	cfprintf(cout, "  %{blu}-printf%{rs} %{bld}FORMAT%{rs}\n");
+	cfprintf(cout, "      Print according to a format string (see %{ex}man%{rs} %{bld}find%{rs})\n");
+	cfprintf(cout, "  %{blu}-fprint%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "  %{blu}-fprint0%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "  %{blu}-fprintf%{rs} %{bld}FORMAT%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "      Like %{blu}-print%{rs}/%{blu}-print0%{rs}/%{blu}-printf%{rs}, but write to %{bld}FILE%{rs} instead"
+	               " of standard output\n");
+	cfprintf(cout, "  %{blu}-quit%{rs}\n");
+	cfprintf(cout, "      Quit immediately\n\n");
+
+	cfprintf(cout, "  %{blu}-version%{rs}\n");
+	cfprintf(cout, "      Print version information\n");
+	cfprintf(cout, "  %{blu}-help%{rs}\n");
+	cfprintf(cout, "      Print this help message\n\n");
+
+	cfprintf(cout, "%{bld}BSD find features:%{rs}\n\n");
+
+	cfprintf(cout, "  %{cyn}-E%{rs}\n");
+	cfprintf(cout, "      Use extended regular expressions (same as %{blu}-regextype%{rs} %{bld}posix-extended%{rs})\n");
+	cfprintf(cout, "  %{cyn}-X%{rs}\n");
+	cfprintf(cout, "      Filter out files with non-%{ex}xargs%{rs}-safe names\n");
+	cfprintf(cout, "  %{cyn}-x%{rs}\n");
+	cfprintf(cout, "      Don't descend into other mount points (same as %{blu}-xdev%{rs})\n\n");
+
+	cfprintf(cout, "  %{cyn}-f%{rs} %{mag}PATH%{rs}\n");
+	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if it may begin with a dash)\n\n");
+
+	cfprintf(cout, "  %{blu}-depth%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files with depth %{bld}N%{rs}\n");
+	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}NAME%{rs}\n");
+	cfprintf(cout, "  %{blu}-uid%{rs} %{bld}NAME%{rs}\n");
+	cfprintf(cout, "      Group/user names are supported in addition to numeric IDs\n");
+	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[TP]%{rs}\n");
+	cfprintf(cout, "      %{bld}T%{rs}iB/%{bld}P%{rs}iB\n");
+	cfprintf(cout, "  %{blu}-sparse%{rs}\n");
+	cfprintf(cout, "      Find files that occupy fewer disk blocks than expected\n\n");
+
+	cfprintf(cout, "%{bld}Extra features:%{rs}\n\n");
+
+	cfprintf(cout, "  %{blu}-color%{rs}\n");
+	cfprintf(cout, "  %{blu}-nocolor%{rs}\n");
+	cfprintf(cout, "      Turn on or off file type colorization\n\n");
+
+	cfprintf(cout, "  %{blu}-hidden%{rs}\n");
+	cfprintf(cout, "  %{blu}-nohidden%{rs}\n");
+	cfprintf(cout, "      Match hidden files, or filter them out\n\n");
+
+	cfprintf(cout, "%s\n", BFS_HOMEPAGE);
 
 	state->just_info = true;
 	return NULL;
@@ -1923,7 +2093,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
  * "Parse" -version.
  */
 static struct expr *parse_version(struct parser_state *state, int arg1, int arg2) {
-	printf("bfs %s\n\n", BFS_VERSION);
+	cfprintf(state->cmdline->cout, "%{ex}bfs%{rs} %{bld}%s%{rs}\n\n", BFS_VERSION);
 
 	printf("%s\n", BFS_HOMEPAGE);
 
