@@ -247,7 +247,7 @@ static int bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf)
 	int ret = 0;
 
 	if (execbuf->wd_fd >= 0) {
-		if (ftwbuf && execbuf->wd_fd != ftwbuf->at_fd) {
+		if (!ftwbuf || execbuf->wd_fd != ftwbuf->at_fd) {
 			ret = close(execbuf->wd_fd);
 		}
 		execbuf->wd_fd = -1;
