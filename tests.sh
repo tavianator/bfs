@@ -324,6 +324,12 @@ BSD=yes
 GNU=yes
 ALL=yes
 
+function enable_tests() {
+    for test; do
+        eval run_$test=yes
+    done
+}
+
 for arg; do
     case "$arg" in
         --bfs=*)
@@ -352,6 +358,10 @@ for arg; do
         --update)
             UPDATE=yes
             ;;
+        test_*)
+            EXPLICIT=yes
+            enable_tests "$arg"
+            ;;
         *)
             echo "Unrecognized option '$arg'." >&2
             exit 1
@@ -359,16 +369,12 @@ for arg; do
     esac
 done
 
-function enable_tests() {
-    for test; do
-        eval run_$test=yes
-    done
-}
-
-enable_tests "${posix_tests[@]}"
-[ "$BSD" ] && enable_tests "${bsd_tests[@]}"
-[ "$GNU" ] && enable_tests "${gnu_tests[@]}"
-[ "$ALL" ] && enable_tests "${bfs_tests[@]}"
+if [ -z "$EXPLICIT" ]; then
+    enable_tests "${posix_tests[@]}"
+    [ "$BSD" ] && enable_tests "${bsd_tests[@]}"
+    [ "$GNU" ] && enable_tests "${gnu_tests[@]}"
+    [ "$ALL" ] && enable_tests "${bfs_tests[@]}"
+fi
 
 function bfs_sort() {
     awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
