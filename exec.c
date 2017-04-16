@@ -25,6 +25,48 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+extern char **environ;
+
+/** Determine the size of a single argument, for comparison to arg_max. */
+static size_t bfs_exec_arg_size(const char *arg) {
+	return sizeof(arg) + strlen(arg) + 1;
+}
+
+/** Even if we can pass a bigger argument list, cap it here. */
+#define BFS_EXEC_ARG_MAX (16*1024*1024)
+
+/** Determine the maximum argv size. */
+static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
+	long arg_max = sysconf(_SC_ARG_MAX);
+	if (arg_max < 0) {
+		arg_max = _POSIX_ARG_MAX;
+	}
+
+	// We have to share space with the environment variables
+	for (char **envp = environ; *envp; ++envp) {
+		arg_max -= bfs_exec_arg_size(*envp);
+	}
+
+	// Account for the non-placeholder arguments
+	for (size_t i = 0; i < execbuf->placeholder; ++i) {
+		arg_max -= bfs_exec_arg_size(execbuf->tmpl_argv[i]);
+	}
+	for (size_t i = execbuf->placeholder + 1; i < execbuf->tmpl_argc; ++i) {
+		arg_max -= bfs_exec_arg_size(execbuf->tmpl_argv[i]);
+	}
+
+	// POSIX recommends subtracting 2048, for some wiggle room
+	arg_max -= 2048;
+
+	if (arg_max < 0) {
+		arg_max = 0;
+	} else if (arg_max > BFS_EXEC_ARG_MAX) {
+		arg_max = BFS_EXEC_ARG_MAX;
+	}
+
+	return arg_max;
+}
+
 struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *cerr) {
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
@@ -36,6 +78,9 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *c
 	execbuf->placeholder = 0;
 	execbuf->argv = NULL;
 	execbuf->argc = 0;
+	execbuf->argv_cap = 0;
+	execbuf->arg_size = 0;
+	execbuf->arg_max = 0;
 	execbuf->wd_fd = -1;
 	execbuf->wd_path = NULL;
 	execbuf->wd_len = 0;
@@ -64,18 +109,8 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *c
 	execbuf->tmpl_argv = argv + 1;
 	execbuf->tmpl_argc = i - 1;
 
-	if (execbuf->flags & BFS_EXEC_MULTI) {
-		long arg_max = sysconf(_SC_ARG_MAX);
-		if (arg_max < 0) {
-			execbuf->arg_max = _POSIX_ARG_MAX;
-		} else {
-			execbuf->arg_max = arg_max;
-		}
-	} else {
-		execbuf->arg_max = execbuf->tmpl_argc;
-	}
-
-	execbuf->argv = malloc((execbuf->arg_max + 1)*sizeof(*execbuf->argv));
+	execbuf->argv_cap = execbuf->tmpl_argc + 1;
+	execbuf->argv = malloc(execbuf->argv_cap*sizeof(*execbuf->argv));
 	if (!execbuf->argv) {
 		perror("malloc()");
 		goto fail;
@@ -98,6 +133,8 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *c
 				goto fail;
 			}
 		}
+
+		execbuf->arg_max = bfs_exec_arg_max(execbuf);
 
 		for (i = 0; i < execbuf->placeholder; ++i) {
 			execbuf->argv[i] = execbuf->tmpl_argv[i];
@@ -358,8 +395,10 @@ out:
 	return ret;
 }
 
-/** Execute the pending command from a multi-execbuf. */
-static void bfs_exec_flush(struct bfs_exec *execbuf) {
+/** Execute the pending command from a BFS_EXEC_MULTI execbuf. */
+static int bfs_exec_flush(struct bfs_exec *execbuf) {
+	int ret = 0;
+
 	size_t last_path = execbuf->argc;
 	if (last_path > execbuf->placeholder) {
 		for (size_t i = execbuf->placeholder + 1; i < execbuf->tmpl_argc; ++i, ++execbuf->argc) {
@@ -368,7 +407,7 @@ static void bfs_exec_flush(struct bfs_exec *execbuf) {
 		execbuf->argv[execbuf->argc] = NULL;
 
 		if (bfs_exec_spawn(execbuf) != 0) {
-			execbuf->ret = -1;
+			ret = -1;
 		}
 	}
 
@@ -378,10 +417,13 @@ static void bfs_exec_flush(struct bfs_exec *execbuf) {
 		bfs_exec_free_arg(execbuf->argv[i], execbuf->tmpl_argv[execbuf->placeholder]);
 	}
 	execbuf->argc = execbuf->placeholder;
+	execbuf->arg_size = 0;
+
+	return ret;
 }
 
 /** Check if a flush is needed before a new file is processed. */
-static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
+static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ftwbuf, const char *arg) {
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		if (ftwbuf->nameoff > execbuf->wd_len) {
 			return true;
@@ -391,48 +433,82 @@ static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ft
 		}
 	}
 
-	size_t tail = execbuf->tmpl_argc - execbuf->placeholder - 1;
-	if (execbuf->argc + tail >= execbuf->arg_max) {
+	if (execbuf->arg_size + bfs_exec_arg_size(arg) > execbuf->arg_max) {
 		return true;
 	}
 
 	return false;
 }
 
-/** Push a new file to a multi-execbuf. */
-static void bfs_exec_multi(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
-	if (bfs_exec_needs_flush(execbuf, ftwbuf)) {
-		bfs_exec_flush(execbuf);
+/** Push a new argument to a BFS_EXEC_MULTI execbuf. */
+static int bfs_exec_push(struct bfs_exec *execbuf, char *arg) {
+	execbuf->argv[execbuf->argc] = arg;
+
+	if (execbuf->argc + 1 >= execbuf->argv_cap) {
+		size_t cap = 2*execbuf->argv_cap;
+		char **argv = realloc(execbuf->argv, cap*sizeof(*argv));
+		if (!argv) {
+			return -1;
+		}
+		execbuf->argv = argv;
+		execbuf->argv_cap = cap;
 	}
 
-	if ((execbuf->flags & BFS_EXEC_CHDIR) && execbuf->wd_fd < 0) {
-		if (bfs_exec_openwd(execbuf, ftwbuf) != 0) {
-			execbuf->ret = -1;
-			return;
-		}
-	}
+	++execbuf->argc;
+	execbuf->arg_size += bfs_exec_arg_size(arg);
+	return 0;
+}
+
+/** Handle a new path for a BFS_EXEC_MULTI execbuf. */
+static int bfs_exec_multi(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
+	int ret = 0;
 
 	const char *path = bfs_exec_format_path(execbuf, ftwbuf);
 	if (!path) {
-		execbuf->ret = -1;
-		return;
+		ret = -1;
+		goto out;
 	}
 
 	char *arg = bfs_exec_format_arg(execbuf->tmpl_argv[execbuf->placeholder], path);
 	if (!arg) {
-		execbuf->ret = -1;
+		ret = -1;
 		goto out_path;
 	}
 
-	execbuf->argv[execbuf->argc++] = arg;
+	if (bfs_exec_needs_flush(execbuf, ftwbuf, arg)) {
+		if (bfs_exec_flush(execbuf) != 0) {
+			ret = -1;
+		}
+	}
 
+	if ((execbuf->flags & BFS_EXEC_CHDIR) && execbuf->wd_fd < 0) {
+		if (bfs_exec_openwd(execbuf, ftwbuf) != 0) {
+			ret = -1;
+			goto out_arg;
+		}
+	}
+
+	if (bfs_exec_push(execbuf, arg) != 0) {
+		ret = -1;
+		goto out_arg;
+	}
+
+	// arg will get cleaned up later by bfs_exec_flush()
+	goto out_path;
+
+out_arg:
+	bfs_exec_free_arg(arg, execbuf->tmpl_argv[execbuf->placeholder]);
 out_path:
 	bfs_exec_free_path(path, ftwbuf);
+out:
+	return ret;
 }
 
 int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	if (execbuf->flags & BFS_EXEC_MULTI) {
-		bfs_exec_multi(execbuf, ftwbuf);
+		if (bfs_exec_multi(execbuf, ftwbuf) != 0) {
+			execbuf->ret = -1;
+		}
 		// -exec ... + never returns false
 		return 0;
 	} else {
@@ -442,7 +518,9 @@ int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 
 int bfs_exec_finish(struct bfs_exec *execbuf) {
 	if (execbuf->flags & BFS_EXEC_MULTI) {
-		bfs_exec_flush(execbuf);
+		if (bfs_exec_flush(execbuf) != 0) {
+			execbuf->ret = -1;
+		}
 	}
 	return execbuf->ret;
 }

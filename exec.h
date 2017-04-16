@@ -46,7 +46,12 @@ struct bfs_exec {
 	char **argv;
 	/** Number of command line arguments. */
 	size_t argc;
-	/** Maximum argc before E2BIG. */
+	/** Capacity of argv. */
+	size_t argv_cap;
+
+	/** Current size of all arguments. */
+	size_t arg_size;
+	/** Maximum arg_size before E2BIG. */
 	size_t arg_max;
 
 	/** A file descriptor for the working directory, for BFS_EXEC_CHDIR. */
