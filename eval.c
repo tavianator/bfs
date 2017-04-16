@@ -964,6 +964,13 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		goto done;
 	}
 
+	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
+		args->ret = -1;
+		cfprintf(cmdline->cerr, "%{er}'%s': Path is not safe for xargs.%{rs}\n", ftwbuf->path);
+		state.action = BFTW_SKIP_SUBTREE;
+		goto done;
+	}
+
 	if (ftwbuf->depth >= cmdline->maxdepth) {
 		state.action = BFTW_SKIP_SUBTREE;
 	}

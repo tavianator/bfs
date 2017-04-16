@@ -88,6 +88,8 @@ function make_weirdnames() {
     touchp "$1/,/f"
     touchp "$1/)/g"
     touchp "$1/.../h"
+    touchp "$1/\\/i"
+    touchp "$1/ /j"
 }
 make_weirdnames "$TMP/weirdnames"
 
@@ -162,6 +164,7 @@ posix_tests=(
 bsd_tests=(
     test_P
     test_P_slash
+    test_X
     test_follow
     test_samefile
     test_name_slash
@@ -546,6 +549,10 @@ function test_H_newer() {
 
 function test_L() {
     bfs_diff -L links 2>/dev/null
+}
+
+function test_X() {
+    bfs_diff -X weirdnames 2>/dev/null
 }
 
 function test_follow() {

@@ -102,6 +102,8 @@ struct cmdline {
 	int optlevel;
 	/** Debugging flags. */
 	enum debug_flags debug;
+	/** Whether to only handle paths with xargs-safe characters. */
+	bool xargs_safe;
 	/** Whether to ignore deletions that race with bfs. */
 	bool ignore_races;
 

@@ -744,6 +744,14 @@ static struct expr *parse_follow(struct parser_state *state, int flags, int opti
 }
 
 /**
+ * Parse -X.
+ */
+static struct expr *parse_xargs_safe(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->xargs_safe = true;
+	return parse_nullary_flag(state);
+}
+
+/**
  * Parse -executable, -readable, -writable
  */
 static struct expr *parse_access(struct parser_state *state, int flag, int arg2) {
@@ -1946,6 +1954,7 @@ static const struct table_entry parse_table[] = {
 	{"P", false, parse_follow, 0, false},
 	{"H", false, parse_follow, BFTW_COMFOLLOW, false},
 	{"L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
+	{"X", false, parse_xargs_safe},
 	{"a"},
 	{"amin", false, parse_acmtime, ATIME, MINUTES},
 	{"and"},
@@ -2627,6 +2636,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->flags = BFTW_RECOVER;
 	cmdline->optlevel = 3;
 	cmdline->debug = 0;
+	cmdline->xargs_safe = false;
 	cmdline->ignore_races = false;
 	cmdline->expr = &expr_true;
 	cmdline->nopen_files = 0;
