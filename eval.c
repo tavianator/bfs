@@ -13,6 +13,7 @@
 #include "bftw.h"
 #include "color.h"
 #include "dstring.h"
+#include "mtab.h"
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
@@ -364,6 +365,19 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 
 done:
 	return ret;
+}
+
+/**
+ * -fstype test.
+ */
+bool eval_fstype(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	const char *type = bfs_fstype(state->cmdline->mtab, statbuf);
+	return strcmp(type, expr->sdata) == 0;
 }
 
 /**

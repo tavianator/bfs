@@ -292,6 +292,7 @@ gnu_tests=(
     test_printf_leak
     test_quit_after_print
     test_quit_before_print
+    test_fstype
     test_not
     test_and
     test_or
@@ -1017,6 +1018,11 @@ function test_printf_times() {
 function test_printf_leak() {
     # Memory leak regression test
     bfs_diff basic -maxdepth 0 -printf '%p'
+}
+
+function test_fstype() {
+    fstype="$($BFS -printf '%F\n' | head -n1)"
+    bfs_diff basic -fstype "$fstype"
 }
 
 function test_path_flag_expr() {

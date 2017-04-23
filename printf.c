@@ -13,6 +13,7 @@
 #include "bfs.h"
 #include "color.h"
 #include "dstring.h"
+#include "mtab.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
@@ -39,6 +40,8 @@ struct bfs_printf_directive {
 	enum time_field time_field;
 	/** Character data associated with this directive. */
 	char c;
+	/** The current mount table. */
+	const struct bfs_mtab *mtab;
 	/** The next printf directive in the chain. */
 	struct bfs_printf_directive *next;
 };
@@ -173,6 +176,12 @@ static int bfs_printf_D(FILE *file, const struct bfs_printf_directive *directive
 /** %f: file name */
 static int bfs_printf_f(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	return fprintf(file, directive->str, ftwbuf->path + ftwbuf->nameoff);
+}
+
+/** %F: file system type */
+static int bfs_printf_F(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
+	const char *type = bfs_fstype(directive->mtab, ftwbuf->statbuf);
+	return fprintf(file, directive->str, type);
 }
 
 /** %G: gid */
@@ -393,6 +402,7 @@ static struct bfs_printf_directive *new_directive() {
 	}
 	directive->time_field = 0;
 	directive->c = 0;
+	directive->mtab = NULL;
 	directive->next = NULL;
 	return directive;
 
@@ -433,7 +443,9 @@ static int append_literal(struct bfs_printf_directive ***tail, struct bfs_printf
 	return 0;
 }
 
-struct bfs_printf *parse_bfs_printf(const char *format, CFILE *cerr) {
+struct bfs_printf *parse_bfs_printf(const char *format, const struct cmdline *cmdline) {
+	CFILE *cerr = cmdline->cerr;
+
 	struct bfs_printf *command = malloc(sizeof(*command));
 	if (!command) {
 		perror("malloc()");
@@ -583,6 +595,15 @@ struct bfs_printf *parse_bfs_printf(const char *format, CFILE *cerr) {
 				break;
 			case 'f':
 				directive->fn = bfs_printf_f;
+				break;
+			case 'F':
+				if (!cmdline->mtab) {
+					cfprintf(cerr, "%{er}error: '%s': Couldn't parse the mount table.%{rs}\n", format);
+					goto directive_error;
+				}
+				directive->fn = bfs_printf_F;
+				directive->mtab = cmdline->mtab;
+				command->needs_stat = true;
 				break;
 			case 'g':
 				directive->fn = bfs_printf_g;

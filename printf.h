@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+struct cmdline;
 struct bfs_printf_directive;
 
 /**
@@ -34,11 +35,11 @@ struct bfs_printf {
  *
  * @param format
  *         The format string to parse.
- * @param cerr
- *         For error messages.
+ * @param cmdline
+ *         The command line.
  * @return The parsed printf command, or NULL on failure.
  */
-struct bfs_printf *parse_bfs_printf(const char *format, CFILE *cerr);
+struct bfs_printf *parse_bfs_printf(const char *format, const struct cmdline *cmdline);
 
 /**
  * Evaluate a parsed format string.

@@ -191,6 +191,8 @@ void free_cmdline(struct cmdline *cmdline) {
 	if (cmdline) {
 		free_expr(cmdline->expr);
 
+		free_bfs_mtab(cmdline->mtab);
+
 		cfclose(cmdline->cerr);
 		cfclose(cmdline->cout);
 		free_colors(cmdline->colors);
@@ -1039,7 +1041,7 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 		goto fail;
 	}
 
-	expr->printf = parse_bfs_printf(format, state->cmdline->cerr);
+	expr->printf = parse_bfs_printf(format, state->cmdline);
 	if (!expr->printf) {
 		goto fail;
 	}
@@ -1049,6 +1051,18 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 fail:
 	free_expr(expr);
 	return NULL;
+}
+
+/**
+ * Parse -fstype TYPE.
+ */
+static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2) {
+	if (!state->cmdline->mtab) {
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: Couldn't parse the mount table.%{rs}\n", state->argv[0]);
+		return NULL;
+	}
+
+	return parse_unary_test(state, eval_fstype);
 }
 
 /**
@@ -1598,7 +1612,7 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 
 	expr->cfile = state->cmdline->cout;
 
-	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline->cerr);
+	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline);
 	if (!expr->printf) {
 		free_expr(expr);
 		return NULL;
@@ -1993,6 +2007,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-false%{rs}\n");
 	cfprintf(cout, "  %{blu}-true%{rs}\n");
 	cfprintf(cout, "      Always false/true\n");
+	cfprintf(cout, "  %{blu}-fstype%{rs} %{bld}TYPE%{rs}\n");
+	cfprintf(cout, "      Find files on file systems with the given %{bld}TYPE%{rs}\n");
 	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "  %{blu}-uid%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files owned by group/user ID %{bld}N%{rs}\n");
@@ -2149,6 +2165,7 @@ static const struct table_entry parse_table[] = {
 	{"fprint", false, parse_fprint},
 	{"fprint0", false, parse_fprint0},
 	{"fprintf", false, parse_fprintf},
+	{"fstype", false, parse_fstype},
 	{"gid", false, parse_group},
 	{"group", false, parse_group},
 	{"help", false, parse_help},
@@ -2801,6 +2818,10 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	cmdline->roots = NULL;
+	cmdline->colors = NULL;
+	cmdline->cout = NULL;
+	cmdline->cerr = NULL;
+	cmdline->mtab = NULL;
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
@@ -2817,6 +2838,11 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	if (!cmdline->cout || !cmdline->cerr) {
 		perror("cfdup()");
 		goto fail;
+	}
+
+	cmdline->mtab = parse_bfs_mtab();
+	if (!cmdline->mtab) {
+		cfprintf(cmdline->cerr, "%{wr}warning: Couldn't parse the mount table: %s.%{rs}\n\n", strerror(errno));
 	}
 
 	struct parser_state state = {

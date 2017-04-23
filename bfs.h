@@ -15,6 +15,7 @@
 #include "color.h"
 #include "exec.h"
 #include "printf.h"
+#include "mtab.h"
 #include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -89,6 +90,9 @@ struct cmdline {
 	CFILE *cout;
 	/** Colored stderr. */
 	CFILE *cerr;
+
+	/** Table of mounted file systems. */
+	struct bfs_mtab *mtab;
 
 	/** -mindepth option. */
 	int mindepth;
@@ -292,6 +296,7 @@ bool eval_nouser(const struct expr *expr, struct eval_state *state);
 
 bool eval_depth(const struct expr *expr, struct eval_state *state);
 bool eval_empty(const struct expr *expr, struct eval_state *state);
+bool eval_fstype(const struct expr *expr, struct eval_state *state);
 bool eval_hidden(const struct expr *expr, struct eval_state *state);
 bool eval_inum(const struct expr *expr, struct eval_state *state);
 bool eval_links(const struct expr *expr, struct eval_state *state);
