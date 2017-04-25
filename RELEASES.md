@@ -1,3 +1,23 @@
+1.*
+===
+
+
+1.0
+---
+
+**April 24, 2017**
+
+This is the first release of bfs with support for all of GNU find's primitives.
+
+Changes since 0.96:
+
+- Implemented `-fstype`
+- Implemented `-exec/-execdir ... +`
+- Implemented BSD's `-X`
+- Fixed the tests under Bash 3 (mostly for macOS)
+- Some minor optimizations and fixes
+
+
 0.*
 ===
 
