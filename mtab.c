@@ -73,7 +73,7 @@ static int bfs_mtab_push(struct bfs_mtab *mtab, dev_t dev, const char *type) {
 struct bfs_mtab *parse_bfs_mtab() {
 #if __linux__
 
-	FILE *file = setmntent("/etc/mtab", "r");
+	FILE *file = setmntent(_PATH_MOUNTED, "r");
 	if (!file) {
 		goto fail;
 	}
