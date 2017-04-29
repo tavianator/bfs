@@ -1057,9 +1057,13 @@ fail:
  * Parse -fstype TYPE.
  */
 static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2) {
-	if (!state->cmdline->mtab) {
-		cfprintf(state->cmdline->cerr, "%{er}error: %s: Couldn't parse the mount table.%{rs}\n", state->argv[0]);
-		return NULL;
+	struct cmdline *cmdline = state->cmdline;
+	if (!cmdline->mtab) {
+		cmdline->mtab = parse_bfs_mtab();
+		if (!cmdline->mtab) {
+			cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %s.%{rs}\n\n", strerror(errno));
+			return NULL;
+		}
 	}
 
 	return parse_unary_test(state, eval_fstype);
@@ -2838,11 +2842,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	if (!cmdline->cout || !cmdline->cerr) {
 		perror("cfdup()");
 		goto fail;
-	}
-
-	cmdline->mtab = parse_bfs_mtab();
-	if (!cmdline->mtab) {
-		cfprintf(cmdline->cerr, "%{wr}warning: Couldn't parse the mount table: %s.%{rs}\n\n", strerror(errno));
 	}
 
 	struct parser_state state = {

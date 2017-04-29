@@ -39,7 +39,7 @@ struct bfs_printf {
  *         The command line.
  * @return The parsed printf command, or NULL on failure.
  */
-struct bfs_printf *parse_bfs_printf(const char *format, const struct cmdline *cmdline);
+struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline);
 
 /**
  * Evaluate a parsed format string.

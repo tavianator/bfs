@@ -443,7 +443,7 @@ static int append_literal(struct bfs_printf_directive ***tail, struct bfs_printf
 	return 0;
 }
 
-struct bfs_printf *parse_bfs_printf(const char *format, const struct cmdline *cmdline) {
+struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline) {
 	CFILE *cerr = cmdline->cerr;
 
 	struct bfs_printf *command = malloc(sizeof(*command));
@@ -598,8 +598,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, const struct cmdline *cm
 				break;
 			case 'F':
 				if (!cmdline->mtab) {
-					cfprintf(cerr, "%{er}error: '%s': Couldn't parse the mount table.%{rs}\n", format);
-					goto directive_error;
+					cmdline->mtab = parse_bfs_mtab();
+					if (!cmdline->mtab) {
+						cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %s.%{rs}\n\n", strerror(errno));
+						goto directive_error;
+					}
 				}
 				directive->fn = bfs_printf_F;
 				directive->mtab = cmdline->mtab;
