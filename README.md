@@ -116,3 +116,5 @@ Finally, if you want to install it globally, run
     $ sudo make install
 
 If you're on Arch Linux, `bfs` is available in the [AUR](https://aur.archlinux.org/packages/bfs/).
+
+If you're on Debian GNU/Linux, `bfs` is available via `apt-get install bfs`.
