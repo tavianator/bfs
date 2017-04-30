@@ -319,7 +319,7 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
 	if (ftwbuf->typeflag == BFTW_DIR) {
-		int flags = 0;
+		int flags = O_RDONLY | O_CLOEXEC;
 #ifdef O_DIRECTORY
 		flags |= O_DIRECTORY;
 #endif
