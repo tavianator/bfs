@@ -126,7 +126,7 @@ bool eval_false(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_access(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, 0) == 0;
+	return faccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata, AT_EACCESS) == 0;
 }
 
 /**
