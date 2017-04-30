@@ -39,7 +39,7 @@ static size_t bfs_exec_arg_size(const char *arg) {
 static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	long arg_max = sysconf(_SC_ARG_MAX);
 	if (arg_max < 0) {
-		arg_max = _POSIX_ARG_MAX;
+		arg_max = BFS_EXEC_ARG_MAX;
 	}
 
 	// We have to share space with the environment variables
