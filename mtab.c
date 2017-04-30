@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if __linux__
+#if __GLIBC__
 #	include <mntent.h>
 #elif BSD
 #	include <sys/mount.h>
@@ -71,7 +71,7 @@ static int bfs_mtab_push(struct bfs_mtab *mtab, dev_t dev, const char *type) {
 }
 
 struct bfs_mtab *parse_bfs_mtab() {
-#if __linux__
+#if __GLIBC__
 
 	FILE *file = setmntent(_PATH_MOUNTED, "r");
 	if (!file) {
