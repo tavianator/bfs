@@ -23,8 +23,10 @@
 static int ensure_fd_open(int fd, int flags) {
 	if (isopen(fd)) {
 		return 0;
+	} else if (redirect(fd, "/dev/null", flags) >= 0) {
+		return 0;
 	} else {
-		return redirect(fd, "/dev/null", flags);
+		return -1;
 	}
 }
 
