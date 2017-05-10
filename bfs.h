@@ -57,14 +57,16 @@ typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
  * Various debugging flags.
  */
 enum debug_flags {
+	/** Print executed command details. */
+	DEBUG_EXEC  = 1 << 0,
 	/** Print optimization details. */
-	DEBUG_OPT   = 1 << 0,
+	DEBUG_OPT   = 1 << 1,
 	/** Print rate information. */
-	DEBUG_RATES = 1 << 1,
+	DEBUG_RATES = 1 << 2,
 	/** Trace all stat() calls. */
-	DEBUG_STAT  = 1 << 2,
+	DEBUG_STAT  = 1 << 3,
 	/** Print the parse tree. */
-	DEBUG_TREE  = 1 << 3,
+	DEBUG_TREE  = 1 << 4,
 };
 
 /**

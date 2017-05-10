@@ -15,6 +15,8 @@
 #include "bftw.h"
 #include "color.h"
 
+struct cmdline;
+
 /**
  * Flags for the -exec actions.
  */
@@ -25,6 +27,8 @@ enum bfs_exec_flags {
 	BFS_EXEC_CHDIR   = 1 << 1,
 	/** Pass multiple files at once to the command (-exec ... {} +). */
 	BFS_EXEC_MULTI   = 1 << 2,
+	/** Print debugging information (-D exec). */
+	BFS_EXEC_DEBUG   = 1 << 3,
 };
 
 /**
@@ -72,11 +76,11 @@ struct bfs_exec {
  *         The (bfs) command line argument to parse.
  * @param flags
  *         Any flags for this exec action.
- * @param cerr
- *         For error messages.
+ * @param cmdline
+ *         The command line.
  * @return The parsed exec action, or NULL on failure.
  */
-struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *cerr);
+struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct cmdline *cmdline);
 
 /**
  * Execute the command for a file.

@@ -697,6 +697,8 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 
 		state->just_info = true;
 		return NULL;
+	} else if (strcmp(flag, "exec") == 0) {
+		cmdline->debug |= DEBUG_EXEC;
 	} else if (strcmp(flag, "opt") == 0) {
 		cmdline->debug |= DEBUG_OPT;
 	} else if (strcmp(flag, "rates") == 0) {
@@ -912,7 +914,7 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
-	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->cmdline->cerr);
+	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->cmdline);
 	if (!execbuf) {
 		return NULL;
 	}
@@ -2741,6 +2743,9 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		fprintf(stderr, "-O%d ", cmdline->optlevel);
 	}
 
+	if (cmdline->debug & DEBUG_EXEC) {
+		fputs("-D exec ", stderr);
+	}
 	if (cmdline->debug & DEBUG_OPT) {
 		fputs("-D opt ", stderr);
 	}

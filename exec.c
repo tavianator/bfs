@@ -10,6 +10,7 @@
  *********************************************************************/
 
 #include "exec.h"
+#include "bfs.h"
 #include "bftw.h"
 #include "color.h"
 #include "dstring.h"
@@ -18,12 +19,35 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+/** Print some debugging info. */
+static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
+	if (!(execbuf->flags & BFS_EXEC_DEBUG)) {
+		return;
+	}
+
+	if (execbuf->flags & BFS_EXEC_CONFIRM) {
+		fputs("-ok", stderr);
+	} else {
+		fputs("-exec", stderr);
+	}
+	if (execbuf->flags & BFS_EXEC_CHDIR) {
+		fputs("dir", stderr);
+	}
+	fputs(": ", stderr);
+
+	va_list args;
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
+}
 
 extern char **environ;
 
@@ -38,14 +62,17 @@ static size_t bfs_exec_arg_size(const char *arg) {
 /** Determine the maximum argv size. */
 static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	long arg_max = sysconf(_SC_ARG_MAX);
+	bfs_exec_debug(execbuf, "ARG_MAX: %ld according to sysconf()\n", arg_max);
 	if (arg_max < 0) {
 		arg_max = BFS_EXEC_ARG_MAX;
+		bfs_exec_debug(execbuf, "ARG_MAX: %ld assumed\n", arg_max);
 	}
 
 	// We have to share space with the environment variables
 	for (char **envp = environ; *envp; ++envp) {
 		arg_max -= bfs_exec_arg_size(*envp);
 	}
+	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after environment variables\n", arg_max);
 
 	// Account for the non-placeholder arguments
 	for (size_t i = 0; i < execbuf->placeholder; ++i) {
@@ -54,9 +81,11 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	for (size_t i = execbuf->placeholder + 1; i < execbuf->tmpl_argc; ++i) {
 		arg_max -= bfs_exec_arg_size(execbuf->tmpl_argv[i]);
 	}
+	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after fixed arguments\n", arg_max);
 
 	// POSIX recommends subtracting 2048, for some wiggle room
 	arg_max -= 2048;
+	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after headroom\n", arg_max);
 
 	if (arg_max < 0) {
 		arg_max = 0;
@@ -64,10 +93,13 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 		arg_max = BFS_EXEC_ARG_MAX;
 	}
 
+	bfs_exec_debug(execbuf, "ARG_MAX: %ld final value\n", arg_max);
 	return arg_max;
 }
 
-struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *cerr) {
+struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct cmdline *cmdline) {
+	CFILE *cerr = cmdline->cerr;
+
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
 		perror("malloc()");
@@ -85,6 +117,10 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, CFILE *c
 	execbuf->wd_path = NULL;
 	execbuf->wd_len = 0;
 	execbuf->ret = 0;
+
+	if (cmdline->debug & DEBUG_EXEC) {
+		execbuf->flags |= BFS_EXEC_DEBUG;
+	}
 
 	size_t i;
 	const char *arg;
@@ -319,6 +355,8 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		}
 	}
 
+	bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
+
 	pid_t pid = fork();
 
 	if (pid < 0) {
@@ -425,15 +463,15 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 /** Check if a flush is needed before a new file is processed. */
 static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ftwbuf, const char *arg) {
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
-		if (ftwbuf->nameoff > execbuf->wd_len) {
-			return true;
-		}
-		if (execbuf->wd_path && strncmp(ftwbuf->path, execbuf->wd_path, execbuf->wd_len) != 0) {
+		if (ftwbuf->nameoff > execbuf->wd_len
+		    || (execbuf->wd_path && strncmp(ftwbuf->path, execbuf->wd_path, execbuf->wd_len) != 0)) {
+			bfs_exec_debug(execbuf, "Changed directories, executing buffered command\n");
 			return true;
 		}
 	}
 
 	if (execbuf->arg_size + bfs_exec_arg_size(arg) > execbuf->arg_max) {
+		bfs_exec_debug(execbuf, "Reached max command size, executing buffered command\n");
 		return true;
 	}
 
@@ -518,6 +556,7 @@ int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 
 int bfs_exec_finish(struct bfs_exec *execbuf) {
 	if (execbuf->flags & BFS_EXEC_MULTI) {
+		bfs_exec_debug(execbuf, "Finishing execution, executing buffered command\n");
 		if (bfs_exec_flush(execbuf) != 0) {
 			execbuf->ret = -1;
 		}
