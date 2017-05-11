@@ -219,11 +219,12 @@ bsd_tests=(
     test_quit_child
     test_quit_depth
     test_quit_depth_child
+    test_quit_after_print
+    test_quit_before_print
+    test_quit_implicit_print
     test_inum
     test_nogroup
     test_nouser
-    test_quit_after_print
-    test_quit_before_print
 )
 
 gnu_tests=(
@@ -975,6 +976,10 @@ function test_quit_after_print() {
 
 function test_quit_before_print() {
     bfs_diff basic basic -quit -print
+}
+
+function test_quit_implicit_print() {
+    bfs_diff basic -name basic -o -quit
 }
 
 function test_inum() {

@@ -623,7 +623,7 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
  * Parse a single action.
  */
 static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t argc) {
-	if (eval != eval_nohidden && eval != eval_prune) {
+	if (eval != eval_nohidden && eval != eval_prune && eval != eval_quit) {
 		state->implicit_print = false;
 	}
 
