@@ -203,6 +203,8 @@ struct expr {
 	bool always_true;
 	/** Whether this expression always evaluates to false. */
 	bool always_false;
+	/** Whether this expression never returns. */
+	bool never_returns;
 
 	/** Number of times this predicate was executed. */
 	size_t evaluations;

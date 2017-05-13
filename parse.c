@@ -93,7 +93,7 @@ static void free_expr(struct expr *expr) {
 /**
  * Create a new expression.
  */
-static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv) {
+static struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
 	struct expr *expr = malloc(sizeof(struct expr));
 	if (!expr) {
 		perror("malloc()");
@@ -103,9 +103,10 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
 	expr->eval = eval;
 	expr->lhs = NULL;
 	expr->rhs = NULL;
-	expr->pure = pure;
+	expr->pure = false;
 	expr->always_true = false;
 	expr->always_false = false;
+	expr->never_returns = false;
 	expr->evaluations = 0;
 	expr->successes = 0;
 	expr->elapsed.tv_sec = 0;
@@ -123,7 +124,7 @@ static struct expr *new_expr(eval_fn *eval, bool pure, size_t argc, char **argv)
  * Create a new unary expression.
  */
 static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **argv) {
-	struct expr *expr = new_expr(eval, rhs->pure, 1, argv);
+	struct expr *expr = new_expr(eval, 1, argv);
 	if (!expr) {
 		free_expr(rhs);
 		return NULL;
@@ -137,7 +138,7 @@ static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **argv)
  * Create a new binary expression.
  */
 static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, char **argv) {
-	struct expr *expr = new_expr(eval, lhs->pure && rhs->pure, 1, argv);
+	struct expr *expr = new_expr(eval, 1, argv);
 	if (!expr) {
 		free_expr(rhs);
 		free_expr(lhs);
@@ -591,7 +592,11 @@ static struct expr *parse_unary_positional_option(struct parser_state *state, co
  */
 static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t argc) {
 	char **argv = parser_advance(state, T_TEST, argc);
-	return new_expr(eval, true, argc, argv);
+	struct expr *expr = new_expr(eval, argc, argv);
+	if (expr) {
+		expr->pure = true;
+	}
+	return expr;
 }
 
 /**
@@ -628,7 +633,7 @@ static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size
 	}
 
 	char **argv = parser_advance(state, T_ACTION, argc);
-	return new_expr(eval, false, argc, argv);
+	return new_expr(eval, argc, argv);
 }
 
 /**
@@ -1638,7 +1643,11 @@ static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) 
  * Parse -quit.
  */
 static struct expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
-	return parse_nullary_action(state, eval_quit);
+	struct expr *expr = parse_nullary_action(state, eval_quit);
+	if (expr) {
+		expr->never_returns = true;
+	}
+	return expr;
 }
 
 /**
@@ -2309,22 +2318,33 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv);
 
 /**
+ * Extract a child expression, freeing the outer expression.
+ */
+static struct expr *extract_child_expr(struct expr *expr, struct expr **child) {
+	struct expr *ret = *child;
+	*child = NULL;
+	free_expr(expr);
+	return ret;
+}
+
+/**
  * Create a "not" expression.
  */
 static struct expr *new_not_expr(const struct parser_state *state, struct expr *rhs, char **argv) {
-	if (state->cmdline->optlevel >= 1) {
+	int optlevel = state->cmdline->optlevel;
+	if (optlevel >= 1) {
 		if (rhs == &expr_true) {
 			debug_opt(state, "-O1: constant propagation: (%s %e) <==> %e\n", argv[0], rhs, &expr_false);
 			return &expr_false;
 		} else if (rhs == &expr_false) {
 			debug_opt(state, "-O1: constant propagation: (%s %e) <==> %e\n", argv[0], rhs, &expr_true);
 			return &expr_true;
+		} else if (optlevel >= 2 && rhs->never_returns) {
+			debug_opt(state, "-O2: reachability: (%s %e) <==> %e\n", argv[0], rhs, rhs);
+			return rhs;
 		} else if (rhs->eval == eval_not) {
-			struct expr *expr = rhs->rhs;
-			debug_opt(state, "-O1: double negation: (%s %e) <==> %e\n", argv[0], rhs, expr);
-			rhs->rhs = NULL;
-			free_expr(rhs);
-			return expr;
+			debug_opt(state, "-O1: double negation: (%s %e) <==> %e\n", argv[0], rhs, rhs->rhs);
+			return extract_child_expr(rhs, &rhs->rhs);
 		} else if ((rhs->eval == eval_and || rhs->eval == eval_or)
 			   && (rhs->lhs->eval == eval_not || rhs->rhs->eval == eval_not)) {
 			bool other_and = rhs->eval == eval_or;
@@ -2355,8 +2375,10 @@ static struct expr *new_not_expr(const struct parser_state *state, struct expr *
 
 	struct expr *expr = new_unary_expr(eval_not, rhs, argv);
 	if (expr) {
+		expr->pure = rhs->pure;
 		expr->always_true = rhs->always_false;
 		expr->always_false = rhs->always_true;
+		expr->never_returns = rhs->never_returns;
 	}
 	return expr;
 }
@@ -2433,17 +2455,20 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
+		} else if (optlevel >= 2 && lhs->never_returns) {
+			debug_opt(state, "-O2: reachability: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
+			free_expr(rhs);
+			return lhs;
 		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
 			char **not_arg = lhs->argv;
 			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
 			          argv[0], lhs, rhs,
 				  *not_arg, fake_or_arg, lhs->rhs, rhs->rhs);
 
-			struct expr *or_expr = new_or_expr(state, lhs->rhs, rhs->rhs, &fake_or_arg);
-			rhs->rhs = NULL;
-			lhs->rhs = NULL;
-			free_expr(rhs);
-			free_expr(lhs);
+			lhs = extract_child_expr(lhs, &lhs->rhs);
+			rhs = extract_child_expr(rhs, &rhs->rhs);
+
+			struct expr *or_expr = new_or_expr(state, lhs, rhs, &fake_or_arg);
 			if (!or_expr) {
 				return NULL;
 			}
@@ -2454,8 +2479,10 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 
 	struct expr *expr = new_binary_expr(eval_and, lhs, rhs, argv);
 	if (expr) {
+		expr->pure = lhs->pure && rhs->pure;
 		expr->always_true = lhs->always_true && rhs->always_true;
 		expr->always_false = lhs->always_false || rhs->always_false;
+		expr->never_returns = lhs->never_returns || (lhs->always_true && rhs->never_returns);
 	}
 	return expr;
 }
@@ -2524,17 +2551,20 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
+		} else if (optlevel >= 2 && lhs->never_returns) {
+			debug_opt(state, "-O2: reachability: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
+			free_expr(rhs);
+			return lhs;
 		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
 			char **not_arg = lhs->argv;
 			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
 			          argv[0], lhs, rhs,
 				  *not_arg, fake_and_arg, lhs->rhs, rhs->rhs);
 
-			struct expr *and_expr = new_and_expr(state, lhs->rhs, rhs->rhs, &fake_and_arg);
-			rhs->rhs = NULL;
-			lhs->rhs = NULL;
-			free_expr(rhs);
-			free_expr(lhs);
+			lhs = extract_child_expr(lhs, &lhs->rhs);
+			rhs = extract_child_expr(rhs, &rhs->rhs);
+
+			struct expr *and_expr = new_and_expr(state, lhs, rhs, &fake_and_arg);
 			if (!and_expr) {
 				return NULL;
 			}
@@ -2545,8 +2575,10 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 
 	struct expr *expr = new_binary_expr(eval_or, lhs, rhs, argv);
 	if (expr) {
+		expr->pure = lhs->pure && rhs->pure;
 		expr->always_true = lhs->always_true || rhs->always_true;
 		expr->always_false = lhs->always_false && rhs->always_false;
+		expr->never_returns = lhs->never_returns || (lhs->always_false && rhs->never_returns);
 	}
 	return expr;
 }
@@ -2599,24 +2631,28 @@ static struct expr *new_comma_expr(const struct parser_state *state, struct expr
 			debug_opt(state, "-O1: ignored result: (%s %e %e) <==> (%s %e %e)\n",
 			          argv[0], lhs, rhs,
 				  argv[0], lhs->rhs, rhs);
-
-			struct expr *old = lhs;
-			lhs = old->rhs;
-			old->rhs = NULL;
-			free_expr(old);
+			lhs = extract_child_expr(lhs, &lhs->rhs);
 		}
 
-		if (optlevel >= 2 && lhs->pure) {
-			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			free_expr(lhs);
-			return rhs;
+		if (optlevel >= 2) {
+			if (lhs->pure) {
+				debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
+				free_expr(lhs);
+				return rhs;
+			} else if (lhs->never_returns) {
+				debug_opt(state, "-O2: reachability: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
+				free_expr(rhs);
+				return lhs;
+			}
 		}
 	}
 
 	struct expr *expr = new_binary_expr(eval_comma, lhs, rhs, argv);
 	if (expr) {
+		expr->pure = lhs->pure && rhs->pure;
 		expr->always_true = rhs->always_true;
 		expr->always_false = rhs->always_false;
+		expr->never_returns = lhs->never_returns || rhs->never_returns;
 	}
 	return expr;
 }
@@ -2664,20 +2700,24 @@ static struct expr *parse_expr(struct parser_state *state) {
 static struct expr *optimize_whole_expr(const struct parser_state *state, struct expr *expr) {
 	int optlevel = state->cmdline->optlevel;
 
-	if (optlevel >= 2) {
-		while ((expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
-		       && expr->rhs->pure) {
-			debug_opt(state, "-O2: top-level purity: %e <==> %e\n", expr, expr->lhs);
-
-			struct expr *old = expr;
-			expr = old->lhs;
-			old->lhs = NULL;
-			free_expr(old);
+	if (optlevel >= 1) {
+		while (true) {
+			if (expr->eval == eval_not) {
+				debug_opt(state, "-O1: ignored result: %e --> %e\n", expr, expr->rhs);
+				expr = extract_child_expr(expr, &expr->rhs);
+			} else if (optlevel >= 2
+			           && (expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
+			           && expr->rhs->pure) {
+				debug_opt(state, "-O2: ignored result: %e --> %e\n", expr, expr->lhs);
+				expr = extract_child_expr(expr, &expr->lhs);
+			} else {
+				break;
+			}
 		}
 	}
 
 	if (optlevel >= 4 && expr->pure && expr != &expr_false) {
-		debug_opt(state, "-O4: top-level purity: %e <==> %e\n", expr, &expr_false);
+		debug_opt(state, "-O4: top-level purity: %e --> %e\n", expr, &expr_false);
 		free_expr(expr);
 		expr = &expr_false;
 	}
@@ -2707,7 +2747,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->implicit_print) {
-		struct expr *print = new_expr(eval_fprint, false, 1, &fake_print_arg);
+		struct expr *print = new_expr(eval_fprint, 1, &fake_print_arg);
 		if (!print) {
 			goto fail;
 		}
