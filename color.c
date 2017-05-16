@@ -484,6 +484,12 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 				}
 				break;
 
+			case 'd':
+				if (fprintf(file, "%d", va_arg(args, int)) < 0) {
+					goto done;
+				}
+				break;
+
 			case 's':
 				if (fputs(va_arg(args, const char *), file) == EOF) {
 					goto done;

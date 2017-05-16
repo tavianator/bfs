@@ -91,6 +91,7 @@ int cfclose(CFILE *cfile);
  *
  *         %%: A literal '%'
  *         %c: A single character
+ *         %d: An integer
  *         %s: A string
  *         %P: A colored file path, from a const struct BFTW * argument
  *         %L: A colored link target, from a const struct BFTW * argument

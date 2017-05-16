@@ -153,14 +153,17 @@ static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr
 /**
  * Dump the parsed expression tree, for debugging.
  */
-static void dump_expr(const struct expr *expr, bool verbose) {
-	fputs("(", stderr);
+static void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
+	fputs("(", cfile->file);
 
-	for (size_t i = 0; i < expr->argc; ++i) {
-		if (i > 0) {
-			fputs(" ", stderr);
-		}
-		fputs(expr->argv[i], stderr);
+	if (expr->lhs || expr->rhs) {
+		cfprintf(cfile, "%{red}%s%{rs}", expr->argv[0]);
+	} else {
+		cfprintf(cfile, "%{blu}%s%{rs}", expr->argv[0]);
+	}
+
+	for (size_t i = 1; i < expr->argc; ++i) {
+		cfprintf(cfile, " %{bld}%s%{rs}", expr->argv[i]);
 	}
 
 	if (verbose) {
@@ -169,20 +172,20 @@ static void dump_expr(const struct expr *expr, bool verbose) {
 			rate = 100.0*expr->successes/expr->evaluations;
 			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
 		}
-		fprintf(stderr, " [%zu/%zu=%g%%; %gns]", expr->successes, expr->evaluations, rate, time);
+		fprintf(cfile->file, " [%zu/%zu=%g%%; %gns]", expr->successes, expr->evaluations, rate, time);
 	}
 
 	if (expr->lhs) {
-		fputs(" ", stderr);
-		dump_expr(expr->lhs, verbose);
+		fputs(" ", cfile->file);
+		dump_expr(cfile, expr->lhs, verbose);
 	}
 
 	if (expr->rhs) {
-		fputs(" ", stderr);
-		dump_expr(expr->rhs, verbose);
+		fputs(" ", cfile->file);
+		dump_expr(cfile, expr->rhs, verbose);
 	}
 
-	fputs(")", stderr);
+	fputs(")", cfile->file);
 }
 
 /**
@@ -277,6 +280,8 @@ static void debug_opt(const struct parser_state *state, const char *format, ...)
 		return;
 	}
 
+	CFILE *cerr = state->cmdline->cerr;
+
 	va_list args;
 	va_start(args, format);
 
@@ -287,12 +292,12 @@ static void debug_opt(const struct parser_state *state, const char *format, ...)
 				fputc('%', stderr);
 				break;
 
-			case 's':
-				fputs(va_arg(args, const char *), stderr);
+			case 'e':
+				dump_expr(cerr, va_arg(args, const struct expr *), false);
 				break;
 
-			case 'e':
-				dump_expr(va_arg(args, const struct expr *), false);
+			case 's':
+				cfprintf(cerr, "%{red}%s%{rs}", va_arg(args, const char *));
 				break;
 			}
 		} else {
@@ -1978,7 +1983,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{cyn}-P%{rs}\n");
 	cfprintf(cout, "      Never follow symbolic links (the default)\n");
 	cfprintf(cout, "  %{cyn}-D%{rs} %{bld}FLAG%{rs}\n");
-	cfprintf(cout, "      Turn on a debugging flag (see -D help)\n");
+	cfprintf(cout, "      Turn on a debugging flag (see %{cyn}-D%{rs} %{bld}help%{rs})\n");
 	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}N%{rs}\n");
 	cfprintf(cout, "      Enable optimization level %{bld}N%{rs} (default: 3)\n\n");
 
@@ -2771,64 +2776,66 @@ fail:
  * Dump the parsed form of the command line, for debugging.
  */
 void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
+	CFILE *cerr = cmdline->cerr;
+
 	if (cmdline->flags & BFTW_LOGICAL) {
-		fputs("-L ", stderr);
+		cfprintf(cerr, "%{cyn}-L%{rs} ");
 	} else if (cmdline->flags & BFTW_COMFOLLOW) {
-		fputs("-H ", stderr);
+		cfprintf(cerr, "%{cyn}-H%{rs} ");
 	} else {
-		fputs("-P ", stderr);
+		cfprintf(cerr, "%{cyn}-P%{rs} ");
 	}
 
 	if (cmdline->optlevel != 3) {
-		fprintf(stderr, "-O%d ", cmdline->optlevel);
+		cfprintf(cerr, "%{cyn}-O%d%{rs} ", cmdline->optlevel);
 	}
 
 	if (cmdline->debug & DEBUG_EXEC) {
-		fputs("-D exec ", stderr);
+		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}exec%{rs} ");
 	}
 	if (cmdline->debug & DEBUG_OPT) {
-		fputs("-D opt ", stderr);
+		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}opt%{rs} ");
 	}
 	if (cmdline->debug & DEBUG_RATES) {
-		fputs("-D rates ", stderr);
+		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}rates%{rs} ");
 	}
 	if (cmdline->debug & DEBUG_STAT) {
-		fputs("-D stat ", stderr);
+		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}stat%{rs} ");
 	}
 	if (cmdline->debug & DEBUG_TREE) {
-		fputs("-D tree ", stderr);
+		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}tree%{rs} ");
 	}
 
 	for (struct root *root = cmdline->roots; root; root = root->next) {
 		char c = root->path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
-			fputs("-f ", stderr);
+			cfprintf(cerr, "%{cyn}-f%{rs} ");
 		}
-		fprintf(stderr, "%s ", root->path);
+		cfprintf(cerr, "%{mag}%s%{rs} ", root->path);
 	}
 
 	if (cmdline->cout->colors) {
-		fputs("-color ", stderr);
+		cfprintf(cerr, "%{blu}-color%{rs} ");
 	} else {
-		fputs("-nocolor ", stderr);
+		cfprintf(cerr, "%{blu}-nocolor%{rs} ");
 	}
 	if (cmdline->flags & BFTW_DEPTH) {
-		fputs("-depth ", stderr);
+		cfprintf(cerr, "%{blu}-depth%{rs} ");
 	}
 	if (cmdline->ignore_races) {
-		fputs("-ignore_readdir_race ", stderr);
+		cfprintf(cerr, "%{blu}-ignore_readdir_race%{rs} ");
 	}
 	if (cmdline->flags & BFTW_XDEV) {
-		fputs("-mount ", stderr);
+		cfprintf(cerr, "%{blu}-mount%{rs} ");
 	}
 	if (cmdline->mindepth != 0) {
-		fprintf(stderr, "-mindepth %d ", cmdline->mindepth);
+		cfprintf(cerr, "%{blu}-mindepth%{rs} %{bld}%d%{rs} ", cmdline->mindepth);
 	}
 	if (cmdline->maxdepth != INT_MAX) {
-		fprintf(stderr, "-maxdepth %d ", cmdline->maxdepth);
+		cfprintf(cerr, "%{blu}-maxdepth%{rs} %{bld}%d%{rs} ", cmdline->maxdepth);
 	}
 
-	dump_expr(cmdline->expr, verbose);
+	dump_expr(cerr, cmdline->expr, verbose);
 
 	fputs("\n", stderr);
 }
