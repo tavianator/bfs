@@ -2,6 +2,18 @@
 ===
 
 
+1.0.1
+-----
+
+**May 17, 2017**
+
+Bugfix release.
+
+- Portability fixes that mostly affect GNU Hurd
+- Implemented `-D exec`
+- Made `-quit` not disable the implicit `-print`
+
+
 1.0
 ---
 
