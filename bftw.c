@@ -249,8 +249,6 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 /**
  * Get the appropriate (fd, path) pair for the *at() family of functions.
  *
- * @param cache
- *         The cache containing the entry.
  * @param entry
  *         The entry being accessed.
  * @param[out] at_fd
@@ -259,7 +257,7 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
  *         Will hold the appropriate path to use.
  * @return The closest open ancestor entry.
  */
-static struct dircache_entry *dircache_entry_base(struct dircache *cache, struct dircache_entry *entry, int *at_fd, const char **at_path) {
+static struct dircache_entry *dircache_entry_base(struct dircache_entry *entry, int *at_fd, const char **at_path) {
 	struct dircache_entry *base = entry;
 
 	do {
@@ -319,7 +317,7 @@ static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *e
 
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
-	struct dircache_entry *base = dircache_entry_base(cache, entry, &at_fd, &at_path);
+	struct dircache_entry *base = dircache_entry_base(entry, &at_fd, &at_path);
 
 	int flags = O_RDONLY | O_CLOEXEC;
 #ifdef O_DIRECTORY
@@ -699,7 +697,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 			ftwbuf->at_fd = current->fd;
 			ftwbuf->at_path += ftwbuf->nameoff;
 		} else {
-			dircache_entry_base(&state->cache, current, &ftwbuf->at_fd, &ftwbuf->at_path);
+			dircache_entry_base(current, &ftwbuf->at_fd, &ftwbuf->at_path);
 		}
 	} else {
 		ftwbuf->depth = 0;
