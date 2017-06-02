@@ -119,7 +119,7 @@ If you're on Arch Linux, `bfs` is available in the [AUR](https://aur.archlinux.o
 
 If you're on Debian GNU/Linux, `bfs` is available via `apt-get install bfs`.
 
-if you're on MacOS:
+If you're on MacOS:
 
     $ brew tap tavianator/bfs
     $ brew install tavianator/bfs/bfs
