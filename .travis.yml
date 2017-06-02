@@ -27,9 +27,3 @@ matrix:
 
     - os: osx
       compiler: clang
-install:
-  - brew update
-  - brew tap tavianator/bfs
-  - brew install bfs
-  - brew audit bfs
-  - brew test bfs
