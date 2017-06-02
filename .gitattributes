@@ -1,2 +1,4 @@
 .git* export-ignore
 .travis.yml export-ignore
+HomebrewFormula/* export-ignore
+pkg/* export-ignore
