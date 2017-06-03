@@ -2416,13 +2416,15 @@ static struct expr *new_not_expr(const struct parser_state *state, struct expr *
  *        | LITERAL
  */
 static struct expr *parse_factor(struct parser_state *state) {
+	CFILE *cerr = state->cmdline->cerr;
+
 	if (skip_paths(state) != 0) {
 		return NULL;
 	}
 
 	const char *arg = state->argv[0];
 	if (!arg) {
-		fputs("Expression terminated prematurely.\n", stderr);
+		cfprintf(cerr, "%{er}error: Expression terminated prematurely after '%s'.%{rs}\n", state->argv[-1]);
 		return NULL;
 	}
 
@@ -2441,7 +2443,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 
 		arg = state->argv[0];
 		if (!arg || strcmp(arg, ")") != 0) {
-			fputs("Expected a ')'.\n", stderr);
+			cfprintf(cerr, "%{er}error: Expected a ')' after '%s'.%{rs}\n", state->argv[-1]);
 			free_expr(expr);
 			return NULL;
 		}
