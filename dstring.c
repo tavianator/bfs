@@ -95,6 +95,10 @@ int dstrncat(char **dest, const char *src, size_t n) {
 	return dstrcat_impl(dest, src, strnlen(src, n));
 }
 
+int dstrapp(char **str, char c) {
+	return dstrcat_impl(str, &c, 1);
+}
+
 void dstrfree(char *dstr) {
 	if (dstr) {
 		free(dstrheader(dstr));

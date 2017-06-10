@@ -302,6 +302,7 @@ gnu_tests=(
     test_printf_escapes
     test_printf_times
     test_printf_leak
+    test_printf_nul
     test_quit_after_print
     test_quit_before_print
     test_fstype
@@ -1034,6 +1035,11 @@ function test_printf_times() {
 function test_printf_leak() {
     # Memory leak regression test
     bfs_diff basic -maxdepth 0 -printf '%p'
+}
+
+function test_printf_nul() {
+    # NUL byte regression test
+    bfs_diff basic -printf '%h\0%f\n'
 }
 
 function test_fstype() {

@@ -48,7 +48,12 @@ struct bfs_printf_directive {
 
 /** Print some text as-is. */
 static int bfs_printf_literal(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	return fprintf(file, "%s", directive->str);
+	size_t len = dstrlen(directive->str);
+	if (fwrite(directive->str, 1, len, file) == len) {
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 /** \c: flush */
@@ -517,8 +522,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 			if (!directive) {
 				goto directive_error;
 			}
-			if (dstrncat(&directive->str, &c, 1) != 0) {
-				perror("dstralloc()");
+			if (dstrapp(&directive->str, c) != 0) {
+				perror("dstrapp()");
 				goto directive_error;
 			}
 
@@ -540,8 +545,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 						cfprintf(cerr, "%{er}error: '%s': Duplicate flag '%c'.%{rs}\n", format, c);
 						goto directive_error;
 					}
-					if (dstrncat(&directive->str, &c, 1) != 0) {
-						perror("dstrncat()");
+					if (dstrapp(&directive->str, c) != 0) {
+						perror("dstrapp()");
 						goto directive_error;
 					}
 					continue;
@@ -552,8 +557,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 
 			// Parse the field width
 			while (c >= '0' && c <= '9') {
-				if (dstrncat(&directive->str, &c, 1) != 0) {
-					perror("dstrncat()");
+				if (dstrapp(&directive->str, c) != 0) {
+					perror("dstrapp()");
 					goto directive_error;
 				}
 				c = *++i;
@@ -562,8 +567,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 			// Parse the precision
 			if (c == '.') {
 				do {
-					if (dstrncat(&directive->str, &c, 1) != 0) {
-						perror("dstrncat()");
+					if (dstrapp(&directive->str, c) != 0) {
+						perror("dstrapp()");
 						goto directive_error;
 					}
 					c = *++i;
@@ -774,8 +779,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 		}
 
 	one_char:
-		if (dstrncat(&literal->str, &c, 1) != 0) {
-			perror("dstrncat()");
+		if (dstrapp(&literal->str, c) != 0) {
+			perror("dstrapp()");
 			goto error;
 		}
 	}

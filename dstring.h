@@ -78,6 +78,17 @@ int dstrcat(char **dest, const char *src);
 int dstrncat(char **dest, const char *src, size_t n);
 
 /**
+ * Append a single character to a dynamic string.
+ *
+ * @param str
+ *         The string to append to.
+ * @param c
+ *         The character to append.
+ * @return 0 on success, -1 on failure.
+ */
+int dstrapp(char **str, char c);
+
+/**
  * Free a dynamic string.
  *
  * @param dstr
