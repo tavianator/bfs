@@ -1039,7 +1039,13 @@ function test_printf_leak() {
 
 function test_printf_nul() {
     # NUL byte regression test
-    bfs_diff basic -printf '%h\0%f\n'
+    local OUT="$TESTS/${FUNCNAME[0]}.out"
+    local ARGS=(basic -maxdepth 0 -printf '%h\0%f\n')
+    if [ "$UPDATE" ]; then
+        $BFS "${ARGS[@]}" >"$OUT"
+    else
+        diff -u "$OUT" <($BFS "${ARGS[@]}")
+    fi
 }
 
 function test_fstype() {
