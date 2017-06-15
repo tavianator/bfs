@@ -2,6 +2,17 @@
 ===
 
 
+1.0.2
+-----
+
+**June 15, 2017**
+
+Bugfix release.
+
+- Fixed handling of \0 inside -printf format strings
+- Fixed `-perm` interpretation of permcopy actions (e.g. `u=rw,g=r`)
+
+
 1.0.1
 -----
 
