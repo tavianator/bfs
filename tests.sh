@@ -164,6 +164,7 @@ posix_tests=(
     test_perm_symbolic
     test_perm_symbolic_minus
     test_perm_leading_plus_symbolic_minus
+    test_permcopy
     test_ok_stdin
     test_parens
     test_bang
@@ -831,6 +832,10 @@ function test_perm_leading_plus_symbolic_slash() {
 
 function test_perm_octal_plus() {
     ! $BFS perms -perm +777 2>/dev/null
+}
+
+function test_permcopy() {
+    bfs_diff perms -perm u+rw,g+u-w,o=g
 }
 
 function test_ok_stdin() {

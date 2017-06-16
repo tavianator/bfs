@@ -1507,21 +1507,32 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 			break;
 
 		case MODE_OP:
-			file_change = 0;
-			dir_change = 0;
-
 			switch (*i) {
 			case 'u':
+				file_change = (expr->file_mode >> 6) & 07;
+				dir_change = (expr->dir_mode >> 6) & 07;
+				break;
 			case 'g':
+				file_change = (expr->file_mode >> 3) & 07;
+				dir_change = (expr->dir_mode >> 3) & 07;
+				break;
 			case 'o':
-				// PERMCOPY (e.g. u=g) has no effect for -perm
-				mstate = MODE_ACTION_APPLY;
+				file_change = expr->file_mode & 07;
+				dir_change = expr->dir_mode & 07;
 				break;
 
 			default:
+				file_change = 0;
+				dir_change = 0;
 				mstate = MODE_PERM;
 				continue;
 			}
+
+			file_change |= (file_change << 6) | (file_change << 3);
+			file_change &= who;
+			dir_change |= (dir_change << 6) | (dir_change << 3);
+			dir_change &= who;
+			mstate = MODE_ACTION_APPLY;
 			break;
 
 		case MODE_PERM:
