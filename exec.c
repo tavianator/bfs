@@ -449,6 +449,8 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 		}
 	}
 
+	int error = errno;
+
 	bfs_exec_closewd(execbuf, NULL);
 
 	for (size_t i = execbuf->placeholder; i < last_path; ++i) {
@@ -457,6 +459,7 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 	execbuf->argc = execbuf->placeholder;
 	execbuf->arg_size = 0;
 
+	errno = error;
 	return ret;
 }
 
@@ -544,7 +547,9 @@ out:
 
 int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	if (execbuf->flags & BFS_EXEC_MULTI) {
-		if (bfs_exec_multi(execbuf, ftwbuf) != 0) {
+		if (bfs_exec_multi(execbuf, ftwbuf) == 0) {
+			errno = 0;
+		} else {
 			execbuf->ret = -1;
 		}
 		// -exec ... + never returns false
