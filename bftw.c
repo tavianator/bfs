@@ -207,7 +207,7 @@ static void dircache_pop(struct dircache *cache, struct dircache_entry *entry) {
 /** Add an entry to the dircache. */
 static struct dircache_entry *dircache_add(struct dircache *cache, struct dircache_entry *parent, const char *name) {
 	size_t namelen = strlen(name);
-	size_t size = sizeof(struct dircache_entry) + namelen;
+	size_t size = sizeof(struct dircache_entry) + namelen + 1;
 
 	bool needs_slash = false;
 	if (namelen == 0 || name[namelen - 1] != '/') {
@@ -241,6 +241,7 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 	if (needs_slash) {
 		entry->name[namelen++] = '/';
 	}
+	entry->name[namelen] = '\0';
 	entry->namelen = namelen;
 
 	return entry;
