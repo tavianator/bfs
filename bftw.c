@@ -298,7 +298,104 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
 }
 
 /**
+ * Open a dircache_entry relative to another one.
+ *
+ * @param cache
+ *         The cache containing the entry.
+ * @param entry
+ *         The entry to open.
+ * @param base
+ *         The base entry for the relative path (may be NULL).
+ * @param at_fd
+ *         The base file descriptor, AT_CWDFD if base == NULL.
+ * @param at_path
+ *         The relative path to the entry.
+ * @return
+ *         The opened file descriptor, or negative on error.
+ */
+static int dircache_entry_openat(struct dircache *cache, struct dircache_entry *entry, struct dircache_entry *base, int at_fd, const char *at_path) {
+	assert(entry->fd < 0);
+
+	int flags = O_RDONLY | O_CLOEXEC;
+#ifdef O_DIRECTORY
+	flags |= O_DIRECTORY;
+#endif
+
+	int fd = openat(at_fd, at_path, flags);
+
+	if (fd < 0 && dircache_should_retry(cache, base)) {
+		fd = openat(at_fd, at_path, flags);
+	}
+
+	if (fd >= 0) {
+		if (cache->size == cache->capacity) {
+			dircache_pop(cache, cache->heap[0]);
+		}
+
+		entry->fd = fd;
+		dircache_push(cache, entry);
+	}
+
+	return fd;
+}
+
+/**
  * Open a dircache_entry.
+ *
+ * @param cache
+ *         The cache containing the entry.
+ * @param entry
+ *         The entry to open.
+ * @param path
+ *         The full path to the entry.
+ * @return
+ *         The opened file descriptor, or negative on error.
+ */
+static int dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
+	int at_fd = AT_FDCWD;
+	const char *at_path = path;
+	struct dircache_entry *base = dircache_entry_base(entry, &at_fd, &at_path);
+
+	int fd = dircache_entry_openat(cache, entry, base, at_fd, at_path);
+	if (fd >= 0 || errno != ENAMETOOLONG) {
+		return fd;
+	}
+
+	// Handle ENAMETOOLONG by manually traversing the path component-by-component
+
+	size_t offset = base ? base->depth : 0;
+	size_t levels = entry->depth - offset;
+	if (levels < 2) {
+		return fd;
+	}
+
+	struct dircache_entry **components = malloc(levels * sizeof(components));
+	if (!components) {
+		return fd;
+	}
+
+	struct dircache_entry *component = entry;
+	for (size_t i = levels; i-- > 0;) {
+		components[i] = component;
+		component = component->parent;
+	}
+
+	for (size_t i = 0; i < levels; ++i) {
+		fd = dircache_entry_openat(cache, components[i], base, at_fd, components[i]->name);
+		if (fd < 0) {
+			break;
+		}
+
+		base = components[i];
+		at_fd = fd;
+	}
+
+	free(components);
+	return fd;
+}
+
+/**
+ * Open a DIR* for a dircache_entry.
  *
  * @param cache
  *         The cache containing the entry.
@@ -309,50 +406,29 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
  * @return
  *         The opened DIR *, or NULL on error.
  */
-static DIR *dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
-	assert(entry->fd < 0);
-
-	if (cache->size == cache->capacity) {
-		dircache_pop(cache, cache->heap[0]);
-	}
-
-	int at_fd = AT_FDCWD;
-	const char *at_path = path;
-	struct dircache_entry *base = dircache_entry_base(entry, &at_fd, &at_path);
-
-	int flags = O_RDONLY | O_CLOEXEC;
-#ifdef O_DIRECTORY
-	flags |= O_DIRECTORY;
-#endif
-	int fd = openat(at_fd, at_path, flags);
-
-	if (fd < 0 && dircache_should_retry(cache, base)) {
-		fd = openat(at_fd, at_path, flags);
-	}
+static DIR *dircache_entry_opendir(struct dircache *cache, struct dircache_entry *entry, const char *path) {
+	int fd = dircache_entry_open(cache, entry, path);
 	if (fd < 0) {
 		return NULL;
 	}
-
-	entry->fd = fd;
-	dircache_push(cache, entry);
 
 	// Now we dup() the fd and pass it to fdopendir().  This way we can
 	// close the DIR* as soon as we're done with it, reducing the memory
 	// footprint significantly, while keeping the fd around for future
 	// openat() calls.
 
-	fd = dup_cloexec(entry->fd);
+	int dfd = dup_cloexec(fd);
 
-	if (fd < 0 && dircache_should_retry(cache, entry)) {
-		fd = dup_cloexec(entry->fd);
+	if (dfd < 0 && dircache_should_retry(cache, entry)) {
+		dfd = dup_cloexec(fd);
 	}
-	if (fd < 0) {
+	if (dfd < 0) {
 		return NULL;
 	}
 
-	DIR *dir = fdopendir(fd);
+	DIR *dir = fdopendir(dfd);
 	if (!dir) {
-		close(fd);
+		close(dfd);
 	}
 	return dir;
 }
@@ -640,7 +716,7 @@ static void bftw_path_trim(struct bftw_state *state) {
 static int bftw_opendir(struct bftw_state *state) {
 	assert(!state->dir);
 
-	state->dir = dircache_entry_open(&state->cache, state->current, state->path);
+	state->dir = dircache_entry_opendir(&state->cache, state->current, state->path);
 	if (state->dir) {
 		return 0;
 	} else {

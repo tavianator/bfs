@@ -104,6 +104,30 @@ function make_weirdnames() {
 }
 make_weirdnames "$TMP/weirdnames"
 
+# Creates a very deep directory structure for testing PATH_MAX handling
+function make_deep() {
+    mkdir -p "$1"
+
+    # $name will be 255 characters, aka _XOPEN_NAME_MAX
+    local name="0123456789ABCDEF"
+    name="${name}${name}${name}${name}"
+    name="${name}${name}${name}${name}"
+    name="${name:0:255}"
+
+    for i in {1..8}; do
+        (
+            mkdir "$1/$i"
+            cd "$1/$i"
+
+            for j in {1..16}; do
+                mkdir "$name"
+                cd "$name"
+            done
+        )
+    done
+}
+make_deep "$TMP/deep"
+
 # Creates a scratch directory that tests can modify
 function make_scratch() {
     mkdir -p "$1"
@@ -171,6 +195,7 @@ posix_tests=(
     test_implicit_and
     test_a
     test_o
+    test_deep
 )
 
 bsd_tests=(
@@ -1120,6 +1145,11 @@ function test_precedence() {
 
 function test_colors() {
     LS_COLORS= bfs_diff links -color
+}
+
+function test_deep() {
+    ulimit -n 8
+    bfs_diff deep -mindepth 17
 }
 
 passed=0
