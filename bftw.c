@@ -363,8 +363,13 @@ static int dircache_entry_open(struct dircache *cache, struct dircache_entry *en
 
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component
 
-	size_t offset = base ? base->depth : 0;
-	size_t levels = entry->depth - offset;
+	size_t levels = entry->depth;
+	if (base) {
+		levels -= base->depth;
+	} else {
+		// The command-line root has depth == 0, but we need to include it
+		levels += 1;
+	}
 	if (levels < 2) {
 		return fd;
 	}

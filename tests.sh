@@ -119,7 +119,8 @@ function make_deep() {
             mkdir "$1/$i"
             cd "$1/$i"
 
-            for j in {1..16}; do
+            # 17 * 256 > 16 * 256 == 4096 == PATH_MAX
+            for j in {1..17}; do
                 mkdir "$name"
                 cd "$name"
             done
@@ -196,6 +197,7 @@ posix_tests=(
     test_a
     test_o
     test_deep
+    test_deep_strict
 )
 
 bsd_tests=(
@@ -1149,7 +1151,13 @@ function test_colors() {
 
 function test_deep() {
     ulimit -n 8
-    bfs_diff deep -mindepth 17
+    bfs_diff deep -mindepth 18
+}
+
+function test_deep_strict() {
+    # Not even enough fds to keep the root open
+    ulimit -n 6
+    bfs_diff deep -mindepth 18
 }
 
 passed=0
