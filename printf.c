@@ -371,6 +371,7 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive
 			type = "L";
 			break;
 		case ENOENT:
+		case ENOTDIR:
 			type = "N";
 			break;
 		}

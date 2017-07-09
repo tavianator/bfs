@@ -836,7 +836,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	    || (ftwbuf->typeflag == BFTW_LNK && follow)
 	    || (ftwbuf->typeflag == BFTW_DIR && (detect_cycles || xdev))) {
 		int ret = ftwbuf_stat(ftwbuf, &state->statbuf);
-		if (ret != 0 && follow && errno == ENOENT) {
+		if (ret != 0 && follow && (errno == ENOENT || errno == ENOTDIR)) {
 			// Could be a broken symlink, retry without following
 			ftwbuf->at_flags = AT_SYMLINK_NOFOLLOW;
 			ret = ftwbuf_stat(ftwbuf, &state->statbuf);

@@ -74,6 +74,7 @@ function make_links() {
     ln -s ../../d "$1/d/e/g"
     ln -s d/e "$1/h"
     ln -s q "$1/d/e/i"
+    ln -s b/c "$1/j"
 }
 make_links "$TMP/links"
 
@@ -299,6 +300,7 @@ gnu_tests=(
     test_flag_double_dash
     test_ignore_readdir_race
     test_ignore_readdir_race_root
+    test_ignore_readdir_race_notdir
     test_perm_222_slash
     test_perm_644_slash
     test_perm_symbolic_slash
@@ -795,6 +797,14 @@ function test_ignore_readdir_race() {
 function test_ignore_readdir_race_root() {
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
     ! $BFS basic/nonexistent -ignore_readdir_race 2>/dev/null
+}
+
+function test_ignore_readdir_race_notdir() {
+    # Check -ignore_readdir_race handling when a directory is replaced with a file
+    rm -rf scratch/*
+    touchp scratch/foo/bar
+
+    $BFS scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir touch '{}' \;
 }
 
 function test_perm_222() {
