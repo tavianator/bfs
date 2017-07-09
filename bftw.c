@@ -10,14 +10,22 @@
  *********************************************************************/
 
 /**
- * bftw() implementation.
+ * The bftw() implementation consists of the following components:
  *
- * The goal of this implementation is to avoid re-traversal by using openat() as
- * much as possible.  Since the number of open file descriptors is limited, the
- * 'dircache' maintains a priority queue of open 'dircache_entry's, ordered by
- * their reference counts to keep the most-referenced parent directories open.
+ * - struct bftw_dir: A directory that has been encountered during the
+ *   traversal.  They have reference-counted links to their parents in the
+ *   directory tree.
  *
- * The 'dirqueue' is a simple FIFO of 'dircache_entry's left to explore.
+ * - struct bftw_cache: Holds bftw_dir's with open file descriptors, used for
+ *   openat() to minimize the amount of path re-traversals that need to happen.
+ *   Currently implemented as a priority queue based on depth and reference
+ *   count.
+ *
+ * - struct bftw_queue: The queue of bftw_dir's left to explore.  Implemented as
+ *   a simple circular buffer.
+ *
+ * - struct bftw_state: Represents the current state of the traversal, allowing
+ *   bftw() to be factored into various helper functions.
  */
 
 #include "bftw.h"
@@ -37,17 +45,17 @@
 #include <unistd.h>
 
 /**
- * A single entry in the dircache.
+ * A directory.
  */
-struct dircache_entry {
-	/** The parent entry, if any. */
-	struct dircache_entry *parent;
+struct bftw_dir {
+	/** The parent directory, if any. */
+	struct bftw_dir *parent;
 	/** This directory's depth in the walk. */
 	size_t depth;
 
 	/** Reference count. */
 	size_t refcount;
-	/** Index in the priority queue. */
+	/** Index in the bftw_cache priority queue. */
 	size_t heap_index;
 
 	/** An open file descriptor to this directory, or -1. */
@@ -67,20 +75,20 @@ struct dircache_entry {
 };
 
 /**
- * A directory cache.
+ * A cache of open directories.
  */
-struct dircache {
-	/** A min-heap of open entries, ordered by refcount. */
-	struct dircache_entry **heap;
+struct bftw_cache {
+	/** A min-heap of open directories. */
+	struct bftw_dir **heap;
 	/** Current heap size. */
 	size_t size;
 	/** Maximum heap size. */
 	size_t capacity;
 };
 
-/** Initialize a dircache. */
-static int dircache_init(struct dircache *cache, size_t capacity) {
-	cache->heap = malloc(capacity*sizeof(struct dircache_entry *));
+/** Initialize a cache. */
+static int bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
+	cache->heap = malloc(capacity*sizeof(*cache->heap));
 	if (!cache->heap) {
 		return -1;
 	}
@@ -90,14 +98,14 @@ static int dircache_init(struct dircache *cache, size_t capacity) {
 	return 0;
 }
 
-/** Destroy a dircache. */
-static void dircache_free(struct dircache *cache) {
+/** Destroy a cache. */
+static void bftw_cache_destroy(struct bftw_cache *cache) {
 	assert(cache->size == 0);
 	free(cache->heap);
 }
 
-/** Check if two dircache entries are in heap order. */
-static bool dircache_heap_check(const struct dircache_entry *parent, const struct dircache_entry *child) {
+/** Check if two heap entries are in heap order. */
+static bool bftw_heap_check(const struct bftw_dir *parent, const struct bftw_dir *child) {
 	if (parent->depth > child->depth) {
 		return true;
 	} else if (parent->depth < child->depth) {
@@ -107,33 +115,33 @@ static bool dircache_heap_check(const struct dircache_entry *parent, const struc
 	}
 }
 
-/** Move an entry to a particular place in the heap. */
-static void dircache_heap_move(struct dircache *cache, struct dircache_entry *entry, size_t i) {
-	cache->heap[i] = entry;
-	entry->heap_index = i;
+/** Move a bftw_dir to a particular place in the heap. */
+static void bftw_heap_move(struct bftw_cache *cache, struct bftw_dir *dir, size_t i) {
+	cache->heap[i] = dir;
+	dir->heap_index = i;
 }
 
 /** Bubble an entry up the heap. */
-static void dircache_bubble_up(struct dircache *cache, struct dircache_entry *entry) {
-	size_t i = entry->heap_index;
+static void bftw_heap_bubble_up(struct bftw_cache *cache, struct bftw_dir *dir) {
+	size_t i = dir->heap_index;
 
 	while (i > 0) {
 		size_t pi = (i - 1)/2;
-		struct dircache_entry *parent = cache->heap[pi];
-		if (dircache_heap_check(parent, entry)) {
+		struct bftw_dir *parent = cache->heap[pi];
+		if (bftw_heap_check(parent, dir)) {
 			break;
 		}
 
-		dircache_heap_move(cache, parent, i);
+		bftw_heap_move(cache, parent, i);
 		i = pi;
 	}
 
-	dircache_heap_move(cache, entry, i);
+	bftw_heap_move(cache, dir, i);
 }
 
 /** Bubble an entry down the heap. */
-static void dircache_bubble_down(struct dircache *cache, struct dircache_entry *entry) {
-	size_t i = entry->heap_index;
+static void bftw_heap_bubble_down(struct bftw_cache *cache, struct bftw_dir *dir) {
+	size_t i = dir->heap_index;
 
 	while (true) {
 		size_t ci = 2*i + 1;
@@ -141,73 +149,98 @@ static void dircache_bubble_down(struct dircache *cache, struct dircache_entry *
 			break;
 		}
 
-		struct dircache_entry *child = cache->heap[ci];
+		struct bftw_dir *child = cache->heap[ci];
 
 		size_t ri = ci + 1;
 		if (ri < cache->size) {
-			struct dircache_entry *right = cache->heap[ri];
-			if (!dircache_heap_check(child, right)) {
+			struct bftw_dir *right = cache->heap[ri];
+			if (!bftw_heap_check(child, right)) {
 				ci = ri;
 				child = right;
 			}
 		}
 
-		dircache_heap_move(cache, child, i);
+		bftw_heap_move(cache, child, i);
 		i = ci;
 	}
 
-	dircache_heap_move(cache, entry, i);
+	bftw_heap_move(cache, dir, i);
 }
 
-/** Increment a dircache_entry's reference count. */
-static void dircache_entry_incref(struct dircache *cache, struct dircache_entry *entry) {
-	++entry->refcount;
+/** Increment a bftw_dir's reference count. */
+static void bftw_dir_incref(struct bftw_cache *cache, struct bftw_dir *dir) {
+	++dir->refcount;
 
-	if (entry->fd >= 0) {
-		dircache_bubble_down(cache, entry);
+	if (dir->fd >= 0) {
+		bftw_heap_bubble_down(cache, dir);
 	}
 }
 
-/** Decrement a dircache_entry's reference count. */
-static void dircache_entry_decref(struct dircache *cache, struct dircache_entry *entry) {
-	--entry->refcount;
+/** Decrement a bftw_dir's reference count. */
+static void bftw_dir_decref(struct bftw_cache *cache, struct bftw_dir *dir) {
+	--dir->refcount;
 
-	if (entry->fd >= 0) {
-		dircache_bubble_up(cache, entry);
+	if (dir->fd >= 0) {
+		bftw_heap_bubble_up(cache, dir);
 	}
 }
 
-/** Add a dircache_entry to the priority queue. */
-static void dircache_push(struct dircache *cache, struct dircache_entry *entry) {
+/** Add a bftw_dir to the cache. */
+static void bftw_cache_add(struct bftw_cache *cache, struct bftw_dir *dir) {
 	assert(cache->size < cache->capacity);
-	assert(entry->fd >= 0);
+	assert(dir->fd >= 0);
 
 	size_t size = cache->size++;
-	entry->heap_index = size;
-	dircache_bubble_up(cache, entry);
+	dir->heap_index = size;
+	bftw_heap_bubble_up(cache, dir);
 }
 
-/** Close a dircache_entry and remove it from the priority queue. */
-static void dircache_pop(struct dircache *cache, struct dircache_entry *entry) {
+/** Remove a bftw_dir from the cache. */
+static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_dir *dir) {
 	assert(cache->size > 0);
-	assert(entry->fd >= 0);
-
-	close(entry->fd);
-	entry->fd = -1;
+	assert(dir->fd >= 0);
 
 	size_t size = --cache->size;
-	size_t i = entry->heap_index;
+	size_t i = dir->heap_index;
 	if (i != size) {
-		struct dircache_entry *end = cache->heap[size];
+		struct bftw_dir *end = cache->heap[size];
 		end->heap_index = i;
-		dircache_bubble_down(cache, end);
+		bftw_heap_bubble_down(cache, end);
 	}
 }
 
-/** Add an entry to the dircache. */
-static struct dircache_entry *dircache_add(struct dircache *cache, struct dircache_entry *parent, const char *name) {
+/** Close a bftw_dir. */
+static void bftw_dir_close(struct bftw_cache *cache, struct bftw_dir *dir) {
+	assert(dir->fd >= 0);
+
+	bftw_cache_remove(cache, dir);
+
+	close(dir->fd);
+	dir->fd = -1;
+}
+
+/** Pop a directory from the cache. */
+static void bftw_cache_pop(struct bftw_cache *cache) {
+	assert(cache->size > 0);
+	bftw_dir_close(cache, cache->heap[0]);
+}
+
+/** Pop a directory other than 'saved' from the cache. */
+static void bftw_cache_pop_other(struct bftw_cache *cache, const struct bftw_dir *saved) {
+	assert(cache->size > 1);
+
+	struct bftw_dir *dir = cache->heap[0];
+	if (dir == saved) {
+		dir = cache->heap[1];
+	}
+
+	bftw_dir_close(cache, dir);
+}
+
+/** Create a new bftw_dir. */
+static struct bftw_dir *bftw_dir_new(struct bftw_cache *cache, struct bftw_dir *parent, const char *name) {
 	size_t namelen = strlen(name);
-	size_t size = sizeof(struct dircache_entry) + namelen + 1;
+	size_t size = sizeof(struct bftw_dir) + namelen + 1;
 
 	bool needs_slash = false;
 	if (namelen == 0 || name[namelen - 1] != '/') {
@@ -215,51 +248,51 @@ static struct dircache_entry *dircache_add(struct dircache *cache, struct dircac
 		++size;
 	}
 
-	struct dircache_entry *entry = malloc(size);
-	if (!entry) {
+	struct bftw_dir *dir = malloc(size);
+	if (!dir) {
 		return NULL;
 	}
 
-	entry->parent = parent;
+	dir->parent = parent;
 
 	if (parent) {
-		entry->depth = parent->depth + 1;
-		entry->nameoff = parent->nameoff + parent->namelen;
-		dircache_entry_incref(cache, parent);
+		dir->depth = parent->depth + 1;
+		dir->nameoff = parent->nameoff + parent->namelen;
+		bftw_dir_incref(cache, parent);
 	} else {
-		entry->depth = 0;
-		entry->nameoff = 0;
+		dir->depth = 0;
+		dir->nameoff = 0;
 	}
 
-	entry->refcount = 1;
-	entry->fd = -1;
+	dir->refcount = 1;
+	dir->fd = -1;
 
-	entry->dev = -1;
-	entry->ino = -1;
+	dir->dev = -1;
+	dir->ino = -1;
 
-	memcpy(entry->name, name, namelen);
+	memcpy(dir->name, name, namelen);
 	if (needs_slash) {
-		entry->name[namelen++] = '/';
+		dir->name[namelen++] = '/';
 	}
-	entry->name[namelen] = '\0';
-	entry->namelen = namelen;
+	dir->name[namelen] = '\0';
+	dir->namelen = namelen;
 
-	return entry;
+	return dir;
 }
 
 /**
  * Get the appropriate (fd, path) pair for the *at() family of functions.
  *
- * @param entry
- *         The entry being accessed.
+ * @param dir
+ *         The directory being accessed.
  * @param[out] at_fd
  *         Will hold the appropriate file descriptor to use.
  * @param[in,out] at_path
  *         Will hold the appropriate path to use.
- * @return The closest open ancestor entry.
+ * @return The closest open ancestor file.
  */
-static struct dircache_entry *dircache_entry_base(struct dircache_entry *entry, int *at_fd, const char **at_path) {
-	struct dircache_entry *base = entry;
+static struct bftw_dir *bftw_dir_base(struct bftw_dir *dir, int *at_fd, const char **at_path) {
+	struct bftw_dir *base = dir;
 
 	do {
 		base = base->parent;
@@ -278,18 +311,13 @@ static struct dircache_entry *dircache_entry_base(struct dircache_entry *entry, 
  *
  * @param cache
  *         The cache in question.
- * @param save
- *         A dircache_entry that must be preserved.
+ * @param saved
+ *         A bftw_dir that must be preserved.
  */
-static bool dircache_should_retry(struct dircache *cache, const struct dircache_entry *save) {
+static bool bftw_should_retry(struct bftw_cache *cache, const struct bftw_dir *saved) {
 	if (errno == EMFILE && cache->size > 1) {
 		// Too many open files, shrink the cache
-		struct dircache_entry *entry = cache->heap[0];
-		if (entry == save) {
-			entry = cache->heap[1];
-		}
-
-		dircache_pop(cache, entry);
+		bftw_cache_pop_other(cache, saved);
 		cache->capacity = cache->size;
 		return true;
 	} else {
@@ -298,23 +326,23 @@ static bool dircache_should_retry(struct dircache *cache, const struct dircache_
 }
 
 /**
- * Open a dircache_entry relative to another one.
+ * Open a bftw_dir relative to another one.
  *
  * @param cache
- *         The cache containing the entry.
- * @param entry
- *         The entry to open.
+ *         The cache containing the dir.
+ * @param dir
+ *         The directory to open.
  * @param base
- *         The base entry for the relative path (may be NULL).
+ *         The base directory for the relative path (may be NULL).
  * @param at_fd
  *         The base file descriptor, AT_CWDFD if base == NULL.
  * @param at_path
- *         The relative path to the entry.
+ *         The relative path to the dir.
  * @return
  *         The opened file descriptor, or negative on error.
  */
-static int dircache_entry_openat(struct dircache *cache, struct dircache_entry *entry, struct dircache_entry *base, int at_fd, const char *at_path) {
-	assert(entry->fd < 0);
+static int bftw_dir_openat(struct bftw_cache *cache, struct bftw_dir *dir, const struct bftw_dir *base, int at_fd, const char *at_path) {
+	assert(dir->fd < 0);
 
 	int flags = O_RDONLY | O_CLOEXEC;
 #ifdef O_DIRECTORY
@@ -323,96 +351,92 @@ static int dircache_entry_openat(struct dircache *cache, struct dircache_entry *
 
 	int fd = openat(at_fd, at_path, flags);
 
-	if (fd < 0 && dircache_should_retry(cache, base)) {
+	if (fd < 0 && bftw_should_retry(cache, base)) {
 		fd = openat(at_fd, at_path, flags);
 	}
 
 	if (fd >= 0) {
 		if (cache->size == cache->capacity) {
-			dircache_pop(cache, cache->heap[0]);
+			bftw_cache_pop(cache);
 		}
 
-		entry->fd = fd;
-		dircache_push(cache, entry);
+		dir->fd = fd;
+		bftw_cache_add(cache, dir);
 	}
 
 	return fd;
 }
 
 /**
- * Open a dircache_entry.
+ * Open a bftw_dir.
  *
  * @param cache
- *         The cache containing the entry.
- * @param entry
- *         The entry to open.
+ *         The cache containing the directory.
+ * @param dir
+ *         The directory to open.
  * @param path
- *         The full path to the entry.
+ *         The full path to the dir.
  * @return
  *         The opened file descriptor, or negative on error.
  */
-static int dircache_entry_open(struct dircache *cache, struct dircache_entry *entry, const char *path) {
+static int bftw_dir_open(struct bftw_cache *cache, struct bftw_dir *dir, const char *path) {
 	int at_fd = AT_FDCWD;
 	const char *at_path = path;
-	struct dircache_entry *base = dircache_entry_base(entry, &at_fd, &at_path);
+	struct bftw_dir *base = bftw_dir_base(dir, &at_fd, &at_path);
 
-	int fd = dircache_entry_openat(cache, entry, base, at_fd, at_path);
+	int fd = bftw_dir_openat(cache, dir, base, at_fd, at_path);
 	if (fd >= 0 || errno != ENAMETOOLONG) {
 		return fd;
 	}
 
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component
 
-	size_t levels = entry->depth;
-	if (base) {
-		levels -= base->depth;
-	} else {
-		// The command-line root has depth == 0, but we need to include it
-		levels += 1;
-	}
+	// -1 to include the root, which has depth == 0
+	size_t offset = base ? base->depth : -1;
+	size_t levels = dir->depth - offset;
 	if (levels < 2) {
 		return fd;
 	}
 
-	struct dircache_entry **components = malloc(levels * sizeof(components));
-	if (!components) {
+	struct bftw_dir **parents = malloc(levels * sizeof(*parents));
+	if (!parents) {
 		return fd;
 	}
 
-	struct dircache_entry *component = entry;
+	struct bftw_dir *parent = dir;
 	for (size_t i = levels; i-- > 0;) {
-		components[i] = component;
-		component = component->parent;
+		parents[i] = parent;
+		parent = parent->parent;
 	}
 
 	for (size_t i = 0; i < levels; ++i) {
-		fd = dircache_entry_openat(cache, components[i], base, at_fd, components[i]->name);
+		fd = bftw_dir_openat(cache, parents[i], base, at_fd, parents[i]->name);
 		if (fd < 0) {
 			break;
 		}
 
-		base = components[i];
+		base = parents[i];
 		at_fd = fd;
 	}
 
-	free(components);
+	free(parents);
 	return fd;
 }
 
 /**
- * Open a DIR* for a dircache_entry.
+ * Open a DIR* for a bftw_dir.
  *
  * @param cache
- *         The cache containing the entry.
- * @param entry
- *         The entry to open.
+ *         The cache containing the directory.
+ * @param dir
+ *         The directory to open.
  * @param path
- *         The full path to the entry.
+ *         The full path to the directory.
  * @return
  *         The opened DIR *, or NULL on error.
  */
-static DIR *dircache_entry_opendir(struct dircache *cache, struct dircache_entry *entry, const char *path) {
-	int fd = dircache_entry_open(cache, entry, path);
+static DIR *bftw_dir_opendir(struct bftw_cache *cache, struct bftw_dir *dir, const char *path) {
+	int fd = bftw_dir_open(cache, dir, path);
 	if (fd < 0) {
 		return NULL;
 	}
@@ -424,39 +448,37 @@ static DIR *dircache_entry_opendir(struct dircache *cache, struct dircache_entry
 
 	int dfd = dup_cloexec(fd);
 
-	if (dfd < 0 && dircache_should_retry(cache, entry)) {
+	if (dfd < 0 && bftw_should_retry(cache, dir)) {
 		dfd = dup_cloexec(fd);
 	}
 	if (dfd < 0) {
 		return NULL;
 	}
 
-	DIR *dir = fdopendir(dfd);
-	if (!dir) {
+	DIR *ret = fdopendir(dfd);
+	if (!ret) {
 		close(dfd);
 	}
-	return dir;
+	return ret;
 }
 
-/** Free a dircache_entry. */
-static void dircache_entry_free(struct dircache *cache, struct dircache_entry *entry) {
-	if (entry) {
-		assert(entry->refcount == 0);
+/** Free a bftw_dir. */
+static void bftw_dir_free(struct bftw_cache *cache, struct bftw_dir *dir) {
+	assert(dir->refcount == 0);
 
-		if (entry->fd >= 0) {
-			dircache_pop(cache, entry);
-		}
-
-		free(entry);
+	if (dir->fd >= 0) {
+		bftw_dir_close(cache, dir);
 	}
+
+	free(dir);
 }
 
 /**
- * A queue of 'dircache_entry's to examine.
+ * A queue of bftw_dir's to examine.
  */
-struct dirqueue {
-	/** The circular buffer of entries. */
-	struct dircache_entry **entries;
+struct bftw_queue {
+	/** The circular buffer of directories. */
+	struct bftw_dir **buffer;
 	/** The head of the queue. */
 	size_t head;
 	/** The size of the queue. */
@@ -465,22 +487,22 @@ struct dirqueue {
 	size_t capacity;
 };
 
-/** Initialize a dirqueue. */
-static int dirqueue_init(struct dirqueue *queue) {
+/** Initialize a bftw_queue. */
+static int bftw_queue_init(struct bftw_queue *queue) {
 	queue->head = 0;
 	queue->size = 0;
 	queue->capacity = 256;
-	queue->entries = malloc(queue->capacity*sizeof(struct dircache_entry *));
-	if (queue->entries) {
+	queue->buffer = malloc(queue->capacity*sizeof(*queue->buffer));
+	if (queue->buffer) {
 		return 0;
 	} else {
 		return -1;
 	}
 }
 
-/** Add an entry to the dirqueue. */
-static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
-	struct dircache_entry **entries = queue->entries;
+/** Add a directory to the bftw_queue. */
+static int bftw_queue_push(struct bftw_queue *queue, struct bftw_dir *dir) {
+	struct bftw_dir **buffer = queue->buffer;
 	size_t head = queue->head;
 	size_t size = queue->size;
 	size_t tail = head + size;
@@ -488,41 +510,41 @@ static int dirqueue_push(struct dirqueue *queue, struct dircache_entry *entry) {
 
 	if (size == capacity) {
 		capacity *= 2;
-		entries = realloc(entries, capacity*sizeof(struct dircache_entry *));
-		if (!entries) {
+		buffer = realloc(buffer, capacity*sizeof(struct bftw_dir *));
+		if (!buffer) {
 			return -1;
 		}
 
 		for (size_t i = size; i < tail; ++i) {
-			entries[i] = entries[i - size];
+			buffer[i] = buffer[i - size];
 		}
 
-		queue->entries = entries;
+		queue->buffer = buffer;
 		queue->capacity = capacity;
 	}
 
 	tail &= capacity - 1;
-	entries[tail] = entry;
+	buffer[tail] = dir;
 	++queue->size;
 	return 0;
 }
 
-/** Remove an entry from the dirqueue. */
-static struct dircache_entry *dirqueue_pop(struct dirqueue *queue) {
+/** Remove a directory from the bftw_queue. */
+static struct bftw_dir *bftw_queue_pop(struct bftw_queue *queue) {
 	if (queue->size == 0) {
 		return NULL;
 	}
 
-	struct dircache_entry *entry = queue->entries[queue->head];
+	struct bftw_dir *dir = queue->buffer[queue->head];
 	--queue->size;
 	++queue->head;
 	queue->head &= queue->capacity - 1;
-	return entry;
+	return dir;
 }
 
-/** Destroy a dirqueue. */
-static void dirqueue_free(struct dirqueue *queue) {
-	free(queue->entries);
+/** Destroy a bftw_queue. */
+static void bftw_queue_destroy(struct bftw_queue *queue) {
+	free(queue->buffer);
 }
 
 /** Call stat() and use the results. */
@@ -546,7 +568,7 @@ enum bftw_status {
 	BFTW_CURRENT,
 	/** The current path is a child of state.current. */
 	BFTW_CHILD,
-	/** dircache_entry's are being garbage collected. */
+	/** bftw_dir's are being garbage collected. */
 	BFTW_GC,
 };
 
@@ -565,14 +587,14 @@ struct bftw_state {
 	int error;
 
 	/** The cache of open directories. */
-	struct dircache cache;
+	struct bftw_cache cache;
 
 	/** The queue of directories left to explore. */
-	struct dirqueue queue;
-	/** The current dircache entry. */
-	struct dircache_entry *current;
-	/** The previous dircache entry. */
-	struct dircache_entry *last;
+	struct bftw_queue queue;
+	/** The current directory. */
+	struct bftw_dir *current;
+	/** The previous directory. */
+	struct bftw_dir *last;
 	/** The currently open directory. */
 	DIR *dir;
 	/** The current traversal status. */
@@ -606,11 +628,11 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 	}
 
 	// -1 to account for dup()
-	if (dircache_init(&state->cache, nopenfd - 1) != 0) {
+	if (bftw_cache_init(&state->cache, nopenfd - 1) != 0) {
 		goto err;
 	}
 
-	if (dirqueue_init(&state->queue) != 0) {
+	if (bftw_queue_init(&state->queue) != 0) {
 		goto err_cache;
 	}
 
@@ -627,42 +649,42 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 	return 0;
 
 err_queue:
-	dirqueue_free(&state->queue);
+	bftw_queue_destroy(&state->queue);
 err_cache:
-	dircache_free(&state->cache);
+	bftw_cache_destroy(&state->cache);
 err:
 	return -1;
 }
 
 /**
- * Compute the path to the current dircache_entry.
+ * Compute the path to the current bftw_dir.
  */
 static int bftw_build_path(struct bftw_state *state) {
-	const struct dircache_entry *entry = state->current;
-	size_t namelen = entry->namelen;
-	size_t pathlen = entry->nameoff + namelen;
+	const struct bftw_dir *dir = state->current;
+	size_t namelen = dir->namelen;
+	size_t pathlen = dir->nameoff + namelen;
 
 	if (dstresize(&state->path, pathlen) != 0) {
 		return -1;
 	}
 
 	// Only rebuild the part of the path that changes
-	const struct dircache_entry *last = state->last;
-	while (last && last->depth > entry->depth) {
+	const struct bftw_dir *last = state->last;
+	while (last && last->depth > dir->depth) {
 		last = last->parent;
 	}
 
 	// Build the path backwards
 	char *path = state->path;
-	while (entry != last) {
-		char *segment = path + entry->nameoff;
-		namelen = entry->namelen;
-		memcpy(segment, entry->name, namelen);
+	while (dir != last) {
+		char *segment = path + dir->nameoff;
+		namelen = dir->namelen;
+		memcpy(segment, dir->name, namelen);
 
-		if (last && last->depth == entry->depth) {
+		if (last && last->depth == dir->depth) {
 			last = last->parent;
 		}
-		entry = entry->parent;
+		dir = dir->parent;
 	}
 
 	state->last = state->current;
@@ -676,7 +698,7 @@ static int bftw_build_path(struct bftw_state *state) {
 static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
 	size_t nameoff = 0;
 
-	struct dircache_entry *current = state->current;
+	struct bftw_dir *current = state->current;
 	if (current) {
 		nameoff = current->nameoff + current->namelen;
 	}
@@ -693,7 +715,7 @@ static int bftw_path_concat(struct bftw_state *state, const char *subpath) {
  * Trim the path to just the current directory.
  */
 static void bftw_path_trim(struct bftw_state *state) {
-	struct dircache_entry *current = state->current;
+	struct bftw_dir *current = state->current;
 
 	size_t length;
 	if (current->depth == 0) {
@@ -721,7 +743,7 @@ static void bftw_path_trim(struct bftw_state *state) {
 static int bftw_opendir(struct bftw_state *state) {
 	assert(!state->dir);
 
-	state->dir = dircache_entry_opendir(&state->cache, state->current, state->path);
+	state->dir = bftw_dir_opendir(&state->cache, state->current, state->path);
 	if (state->dir) {
 		return 0;
 	} else {
@@ -767,7 +789,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
 
-	struct dircache_entry *current = state->current;
+	struct bftw_dir *current = state->current;
 	if (current) {
 		ftwbuf->nameoff = current->nameoff;
 		ftwbuf->depth = current->depth;
@@ -779,7 +801,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 			ftwbuf->at_fd = current->fd;
 			ftwbuf->at_path += ftwbuf->nameoff;
 		} else {
-			dircache_entry_base(current, &ftwbuf->at_fd, &ftwbuf->at_path);
+			bftw_dir_base(current, &ftwbuf->at_fd, &ftwbuf->at_path);
 		}
 	} else {
 		ftwbuf->depth = 0;
@@ -828,8 +850,8 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		if (ftwbuf->typeflag == BFTW_DIR && detect_cycles) {
 			dev_t dev = ftwbuf->statbuf->st_dev;
 			ino_t ino = ftwbuf->statbuf->st_ino;
-			for (const struct dircache_entry *entry = current; entry; entry = entry->parent) {
-				if (dev == entry->dev && ino == entry->ino) {
+			for (const struct bftw_dir *dir = current; dir; dir = dir->parent) {
+				if (dev == dir->dev && ino == dir->ino) {
 					bftw_set_error(state, ELOOP);
 					return;
 				}
@@ -842,7 +864,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 #define BFTW_FAIL (-1)
 
 /**
- * Invoke the callback on the given path.
+ * Invoke the callback on the current file.
  */
 static int bftw_handle_path(struct bftw_state *state) {
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
@@ -868,34 +890,34 @@ static int bftw_handle_path(struct bftw_state *state) {
 }
 
 /**
- * Add a new entry to the cache.
+ * Create a new bftw_dir for the current file.
  */
-static struct dircache_entry *bftw_add(struct bftw_state *state, const char *name) {
-	struct dircache_entry *entry = dircache_add(&state->cache, state->current, name);
-	if (!entry) {
+static struct bftw_dir *bftw_add(struct bftw_state *state, const char *name) {
+	struct bftw_dir *dir = bftw_dir_new(&state->cache, state->current, name);
+	if (!dir) {
 		return NULL;
 	}
 
 	const struct stat *statbuf = state->ftwbuf.statbuf;
 	if (statbuf) {
-		entry->dev = statbuf->st_dev;
-		entry->ino = statbuf->st_ino;
+		dir->dev = statbuf->st_dev;
+		dir->ino = statbuf->st_ino;
 	}
 
-	return entry;
+	return dir;
 }
 
 /**
- * Garbage-collect a dircache entry.
+ * Garbage-collect a bftw_dir.
  */
-static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool invoke_callback) {
+static int bftw_gc(struct bftw_state *state, struct bftw_dir *dir, bool invoke_callback) {
 	int ret = BFTW_CONTINUE;
 
 	if (!(state->flags & BFTW_DEPTH)) {
 		invoke_callback = false;
 	}
 
-	if (entry && invoke_callback) {
+	if (invoke_callback) {
 		if (bftw_build_path(state) != 0) {
 			ret = BFTW_FAIL;
 			invoke_callback = false;
@@ -904,15 +926,14 @@ static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool 
 
 	state->status = BFTW_GC;
 
-	while (entry) {
-		dircache_entry_decref(&state->cache, entry);
-		if (entry->refcount > 0) {
-			state->last = entry;
+	while (dir) {
+		bftw_dir_decref(&state->cache, dir);
+		if (dir->refcount > 0) {
 			break;
 		}
 
 		if (invoke_callback) {
-			state->current = entry;
+			state->current = dir;
 			bftw_path_trim(state);
 			bftw_init_buffers(state, NULL);
 
@@ -931,26 +952,27 @@ static int bftw_gc(struct bftw_state *state, struct dircache_entry *entry, bool 
 			}
 		}
 
-		struct dircache_entry *parent = entry->parent;
-		dircache_entry_free(&state->cache, entry);
-		entry = parent;
+		struct bftw_dir *parent = dir->parent;
+		bftw_dir_free(&state->cache, dir);
+		dir = parent;
 	}
 
+	state->last = dir;
 	return ret;
 }
 
 /**
- * Push a new entry onto the queue.
+ * Push a new directory onto the queue.
  */
 static int bftw_push(struct bftw_state *state, const char *name) {
-	struct dircache_entry *entry = bftw_add(state, name);
-	if (!entry) {
+	struct bftw_dir *dir = bftw_add(state, name);
+	if (!dir) {
 		return -1;
 	}
 
-	if (dirqueue_push(&state->queue, entry) != 0) {
+	if (bftw_queue_push(&state->queue, dir) != 0) {
 		state->error = errno;
-		bftw_gc(state, entry, false);
+		bftw_gc(state, dir, false);
 		return -1;
 	}
 
@@ -958,11 +980,11 @@ static int bftw_push(struct bftw_state *state, const char *name) {
 }
 
 /**
- * Pop an entry off the queue.
+ * Pop a directory off the queue.
  */
 static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 	int ret = bftw_gc(state, state->current, invoke_callback);
-	state->current = dirqueue_pop(&state->queue);
+	state->current = bftw_queue_pop(&state->queue);
 	state->status = BFTW_CURRENT;
 	return ret;
 }
@@ -970,15 +992,15 @@ static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 /**
  * Dispose of the bftw() state.
  */
-static void bftw_state_free(struct bftw_state *state) {
+static void bftw_state_destroy(struct bftw_state *state) {
 	bftw_closedir(state);
 
 	while (state->current) {
 		bftw_pop(state, false);
 	}
-	dirqueue_free(&state->queue);
+	bftw_queue_destroy(&state->queue);
 
-	dircache_free(&state->cache);
+	bftw_cache_destroy(&state->cache);
 
 	dstrfree(state->path);
 }
@@ -1132,7 +1154,7 @@ fail:
 		state.error = errno;
 	}
 
-	bftw_state_free(&state);
+	bftw_state_destroy(&state);
 
 	errno = state.error;
 	return ret;
