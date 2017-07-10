@@ -250,6 +250,11 @@ struct parser_state {
 	/** Whether an information option like -help or -version was passed. */
 	bool just_info;
 
+	/** A "-depth"-type argument if any. */
+	const char *depth_arg;
+	/** A "-prune"-type argument if any. */
+	const char *prune_arg;
+
 	/** The current time. */
 	struct timespec now;
 };
@@ -870,6 +875,7 @@ static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg
  */
 static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2) {
 	state->cmdline->flags |= BFTW_DEPTH;
+	state->depth_arg = state->argv[0];
 	return parse_nullary_action(state, eval_delete);
 }
 
@@ -878,6 +884,7 @@ static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2)
  */
 static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
 	state->cmdline->flags |= BFTW_DEPTH;
+	state->depth_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
 
@@ -1341,6 +1348,7 @@ static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2
  * Parse -nohidden.
  */
 static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg2) {
+	state->prune_arg = state->argv[0];
 	return parse_nullary_action(state, eval_nohidden);
 }
 
@@ -1670,6 +1678,8 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
  * Parse -prune.
  */
 static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
+	state->prune_arg = state->argv[0];
+
 	struct expr *expr = parse_nullary_action(state, eval_prune);
 	if (expr) {
 		expr->always_true = true;
@@ -2800,6 +2810,13 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	expr = optimize_whole_expr(state, expr);
+
+	if (state->warn && state->depth_arg && state->prune_arg) {
+		cfprintf(state->cmdline->cerr,
+		         "%{wr}warning: %s does not work in the presence of %s.%{rs}\n\n",
+		         state->prune_arg, state->depth_arg);
+	}
+
 	return expr;
 
 fail:
@@ -2942,6 +2959,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.warn = isatty(STDIN_FILENO),
 		.non_option_seen = false,
 		.just_info = false,
+		.depth_arg = NULL,
+		.prune_arg = NULL,
 	};
 
 	if (parse_gettime(&state.now) != 0) {
