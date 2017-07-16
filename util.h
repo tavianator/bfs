@@ -143,4 +143,11 @@ enum bftw_typeflag mode_to_typeflag(mode_t mode);
  */
 enum bftw_typeflag dirent_to_typeflag(const struct dirent *de);
 
+/**
+ * Process a yes/no prompt.
+ *
+ * @return 1 for yes, 0 for no, and -1 for unknown.
+ */
+int ynprompt(void);
+
 #endif // BFS_UTIL_H

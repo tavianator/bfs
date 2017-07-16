@@ -11,10 +11,13 @@
 
 #include "util.h"
 #include "bftw.h"
+#include "dstring.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <langinfo.h>
 #include <regex.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -313,4 +316,73 @@ enum bftw_typeflag dirent_to_typeflag(const struct dirent *de) {
 #endif
 
 	return BFTW_UNKNOWN;
+}
+
+/** Read a line from standard input. */
+static char *xgetline() {
+	char *line = dstralloc(0);
+	if (!line) {
+		return NULL;
+	}
+
+	while (true) {
+		int c = getchar();
+		if (c == '\n' || c == EOF) {
+			break;
+		}
+
+		if (dstrapp(&line, c) != 0) {
+			goto error;
+		}
+	}
+
+	return line;
+
+error:
+	dstrfree(line);
+	return NULL;
+}
+
+/** Compile and execute a regular expression for xrpmatch(). */
+static int xrpregex(nl_item item, const char *response) {
+	const char *pattern = nl_langinfo(item);
+	if (!pattern) {
+		return REG_BADPAT;
+	}
+
+	regex_t regex;
+	int ret = regcomp(&regex, pattern, REG_EXTENDED);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = regexec(&regex, response, 0, NULL, 0);
+	regfree(&regex);
+	return ret;
+}
+
+/** Check if a response is affirmative or negative. */
+static int xrpmatch(const char *response) {
+	int ret = xrpregex(NOEXPR, response);
+	if (ret == 0) {
+		return 0;
+	} else if (ret != REG_NOMATCH) {
+		return -1;
+	}
+
+	ret = xrpregex(YESEXPR, response);
+	if (ret == 0) {
+		return 1;
+	} else {
+		return -1;
+	}
+}
+
+int ynprompt() {
+	fflush(stderr);
+
+	char *line = xgetline();
+	int ret = line ? xrpmatch(line) : -1;
+	dstrfree(line);
+	return ret;
 }

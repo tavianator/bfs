@@ -342,14 +342,8 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			fprintf(stderr, "%s ", execbuf->argv[i]);
 		}
 		fprintf(stderr, "? ");
-		fflush(stderr);
 
-		int c = getchar();
-		bool exec = c == 'y' || c == 'Y';
-		while (c != '\n' && c != EOF) {
-			c = getchar();
-		}
-		if (!exec) {
+		if (ynprompt() <= 0) {
 			errno = 0;
 			return -1;
 		}
