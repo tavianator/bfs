@@ -10,6 +10,7 @@
  *********************************************************************/
 
 #include "bfs.h"
+#include "dstring.h"
 #include "exec.h"
 #include "printf.h"
 #include "typo.h"
@@ -208,6 +209,7 @@ void free_cmdline(struct cmdline *cmdline) {
 			root = next;
 		}
 
+		free(cmdline->argv);
 		free(cmdline);
 	}
 }
@@ -237,6 +239,8 @@ struct parser_state {
 	/** The current regex flags to use. */
 	int regex_flags;
 
+	/** Whether this session is interactive. */
+	bool interactive;
 	/** Whether -color or -nocolor has been passed. */
 	enum use_color use_color;
 	/** Whether a -print action is implied. */
@@ -741,7 +745,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
 		return NULL;
 	}
 
-	if (*optlevel > 4) {
+	if (state->warn && *optlevel > 4) {
 		cfprintf(state->cmdline->cerr, "%{wr}warning: %s is the same as -O4.%{rs}\n\n", state->argv[0]);
 	}
 
@@ -2186,7 +2190,7 @@ typedef struct expr *parse_fn(struct parser_state *state, int arg1, int arg2);
  * An entry in the parse table for literals.
  */
 struct table_entry {
-	const char *arg;
+	char *arg;
 	bool prefix;
 	parse_fn *parse;
 	int arg1;
@@ -2197,101 +2201,101 @@ struct table_entry {
  * The parse table for literals.
  */
 static const struct table_entry parse_table[] = {
-	{"D", false, parse_debug},
-	{"E", false, parse_regex_extended},
-	{"O", true, parse_optlevel},
-	{"P", false, parse_follow, 0, false},
-	{"H", false, parse_follow, BFTW_COMFOLLOW, false},
-	{"L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
-	{"X", false, parse_xargs_safe},
-	{"a"},
-	{"amin", false, parse_acmtime, ATIME, MINUTES},
-	{"and"},
-	{"atime", false, parse_acmtime, ATIME, DAYS},
-	{"anewer", false, parse_acnewer, ATIME},
-	{"cmin", false, parse_acmtime, CTIME, MINUTES},
-	{"ctime", false, parse_acmtime, CTIME, DAYS},
-	{"cnewer", false, parse_acnewer, CTIME},
-	{"color", false, parse_color, true},
-	{"d", false, parse_depth},
-	{"daystart", false, parse_daystart},
-	{"delete", false, parse_delete},
-	{"depth", false, parse_depth_n},
-	{"empty", false, parse_empty},
-	{"exec", false, parse_exec, 0},
-	{"execdir", false, parse_exec, BFS_EXEC_CHDIR},
-	{"executable", false, parse_access, X_OK},
-	{"f", false, parse_f},
-	{"false", false, parse_const, false},
-	{"fls", false, parse_fls},
-	{"follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
-	{"fprint", false, parse_fprint},
-	{"fprint0", false, parse_fprint0},
-	{"fprintf", false, parse_fprintf},
-	{"fstype", false, parse_fstype},
-	{"gid", false, parse_group},
-	{"group", false, parse_group},
-	{"help", false, parse_help},
-	{"hidden", false, parse_hidden},
-	{"ignore_readdir_race", false, parse_ignore_races, true},
-	{"ilname", false, parse_lname, true},
-	{"iname", false, parse_name, true},
-	{"inum", false, parse_inum},
-	{"ipath", false, parse_path, true},
-	{"iregex", false, parse_regex, REG_ICASE},
-	{"iwholename", false, parse_path, true},
-	{"links", false, parse_links},
-	{"lname", false, parse_lname, false},
-	{"ls", false, parse_ls},
-	{"maxdepth", false, parse_depth_limit, false},
-	{"mindepth", false, parse_depth_limit, true},
-	{"mmin", false, parse_acmtime, MTIME, MINUTES},
-	{"mnewer", false, parse_acnewer, MTIME},
-	{"mount", false, parse_mount},
-	{"mtime", false, parse_acmtime, MTIME, DAYS},
-	{"name", false, parse_name, false},
-	{"newer", false, parse_acnewer, MTIME},
-	{"newer", true, parse_newerxy},
-	{"nocolor", false, parse_color, false},
-	{"nogroup", false, parse_nogroup},
-	{"nohidden", false, parse_nohidden},
-	{"noignore_readdir_race", false, parse_ignore_races, false},
-	{"noleaf", false, parse_noleaf},
-	{"not"},
-	{"nouser", false, parse_nouser},
-	{"nowarn", false, parse_warn, false},
-	{"o"},
-	{"ok", false, parse_exec, BFS_EXEC_CONFIRM},
-	{"okdir", false, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
-	{"or"},
-	{"path", false, parse_path, false},
-	{"perm", false, parse_perm},
-	{"print", false, parse_print},
-	{"print0", false, parse_print0},
-	{"printf", false, parse_printf},
-	{"prune", false, parse_prune},
-	{"quit", false, parse_quit},
-	{"readable", false, parse_access, R_OK},
-	{"regex", false, parse_regex, 0},
-	{"regextype", false, parse_regextype},
-	{"samefile", false, parse_samefile},
-	{"size", false, parse_size},
-	{"sparse", false, parse_sparse},
-	{"true", false, parse_const, true},
-	{"type", false, parse_type, false},
-	{"uid", false, parse_user},
-	{"used", false, parse_used},
-	{"user", false, parse_user},
-	{"version", false, parse_version},
-	{"warn", false, parse_warn, true},
-	{"wholename", false, parse_path, false},
-	{"writable", false, parse_access, W_OK},
-	{"x", false, parse_mount},
-	{"xdev", false, parse_mount},
-	{"xtype", false, parse_type, true},
-	{"-"},
+	{"-D", false, parse_debug},
+	{"-E", false, parse_regex_extended},
+	{"-O", true, parse_optlevel},
+	{"-P", false, parse_follow, 0, false},
+	{"-H", false, parse_follow, BFTW_COMFOLLOW, false},
+	{"-L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
+	{"-X", false, parse_xargs_safe},
+	{"-a"},
+	{"-amin", false, parse_acmtime, ATIME, MINUTES},
+	{"-and"},
+	{"-atime", false, parse_acmtime, ATIME, DAYS},
+	{"-anewer", false, parse_acnewer, ATIME},
+	{"-cmin", false, parse_acmtime, CTIME, MINUTES},
+	{"-ctime", false, parse_acmtime, CTIME, DAYS},
+	{"-cnewer", false, parse_acnewer, CTIME},
+	{"-color", false, parse_color, true},
+	{"-d", false, parse_depth},
+	{"-daystart", false, parse_daystart},
+	{"-delete", false, parse_delete},
+	{"-depth", false, parse_depth_n},
+	{"-empty", false, parse_empty},
+	{"-exec", false, parse_exec, 0},
+	{"-execdir", false, parse_exec, BFS_EXEC_CHDIR},
+	{"-executable", false, parse_access, X_OK},
+	{"-f", false, parse_f},
+	{"-false", false, parse_const, false},
+	{"-fls", false, parse_fls},
+	{"-follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
+	{"-fprint", false, parse_fprint},
+	{"-fprint0", false, parse_fprint0},
+	{"-fprintf", false, parse_fprintf},
+	{"-fstype", false, parse_fstype},
+	{"-gid", false, parse_group},
+	{"-group", false, parse_group},
 	{"-help", false, parse_help},
+	{"-hidden", false, parse_hidden},
+	{"-ignore_readdir_race", false, parse_ignore_races, true},
+	{"-ilname", false, parse_lname, true},
+	{"-iname", false, parse_name, true},
+	{"-inum", false, parse_inum},
+	{"-ipath", false, parse_path, true},
+	{"-iregex", false, parse_regex, REG_ICASE},
+	{"-iwholename", false, parse_path, true},
+	{"-links", false, parse_links},
+	{"-lname", false, parse_lname, false},
+	{"-ls", false, parse_ls},
+	{"-maxdepth", false, parse_depth_limit, false},
+	{"-mindepth", false, parse_depth_limit, true},
+	{"-mmin", false, parse_acmtime, MTIME, MINUTES},
+	{"-mnewer", false, parse_acnewer, MTIME},
+	{"-mount", false, parse_mount},
+	{"-mtime", false, parse_acmtime, MTIME, DAYS},
+	{"-name", false, parse_name, false},
+	{"-newer", false, parse_acnewer, MTIME},
+	{"-newer", true, parse_newerxy},
+	{"-nocolor", false, parse_color, false},
+	{"-nogroup", false, parse_nogroup},
+	{"-nohidden", false, parse_nohidden},
+	{"-noignore_readdir_race", false, parse_ignore_races, false},
+	{"-noleaf", false, parse_noleaf},
+	{"-not"},
+	{"-nouser", false, parse_nouser},
+	{"-nowarn", false, parse_warn, false},
+	{"-o"},
+	{"-ok", false, parse_exec, BFS_EXEC_CONFIRM},
+	{"-okdir", false, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
+	{"-or"},
+	{"-path", false, parse_path, false},
+	{"-perm", false, parse_perm},
+	{"-print", false, parse_print},
+	{"-print0", false, parse_print0},
+	{"-printf", false, parse_printf},
+	{"-prune", false, parse_prune},
+	{"-quit", false, parse_quit},
+	{"-readable", false, parse_access, R_OK},
+	{"-regex", false, parse_regex, 0},
+	{"-regextype", false, parse_regextype},
+	{"-samefile", false, parse_samefile},
+	{"-size", false, parse_size},
+	{"-sparse", false, parse_sparse},
+	{"-true", false, parse_const, true},
+	{"-type", false, parse_type, false},
+	{"-uid", false, parse_user},
+	{"-used", false, parse_used},
+	{"-user", false, parse_user},
 	{"-version", false, parse_version},
+	{"-warn", false, parse_warn, true},
+	{"-wholename", false, parse_path, false},
+	{"-writable", false, parse_access, W_OK},
+	{"-x", false, parse_mount},
+	{"-xdev", false, parse_mount},
+	{"-xtype", false, parse_type, true},
+	{"--"},
+	{"--help", false, parse_help},
+	{"--version", false, parse_version},
 	{0},
 };
 
@@ -2343,18 +2347,38 @@ static struct expr *parse_literal(struct parser_state *state) {
 		goto unexpected;
 	}
 
-	const struct table_entry *match = table_lookup(arg + 1);
+	const struct table_entry *match = table_lookup(arg);
 	if (match) {
-		if (!match->parse) {
+		if (match->parse) {
+			goto matched;
+		} else {
 			goto unexpected;
 		}
-		return match->parse(state, match->arg1, match->arg2);
 	}
 
-	match = table_lookup_fuzzy(arg + 1);
+	match = table_lookup_fuzzy(arg);
+
 	cfprintf(cmdline->cerr,
-	         "%{er}error: Unknown argument '%s'; did you mean '-%s'?%{rs}\n",
-		 arg, match->arg);
+	         "%{er}error: Unknown argument '%s'; did you mean '%s'?%{rs}",
+	         arg, match->arg);
+
+	if (!state->interactive || !match->parse) {
+		fprintf(stderr, "\n");
+		goto unmatched;
+	}
+
+	fprintf(stderr, " ");
+	if (ynprompt() <= 0) {
+		goto unmatched;
+	}
+
+	fprintf(stderr, "\n");
+	state->argv[0] = match->arg;
+
+matched:
+	return match->parse(state, match->arg1, match->arg2);
+
+unmatched:
 	return NULL;
 
 unexpected:
@@ -2783,6 +2807,8 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 		return NULL;
 	}
 
+	CFILE *cerr = state->cmdline->cerr;
+
 	struct expr *expr = &expr_true;
 	if (state->argv[0]) {
 		expr = parse_expr(state);
@@ -2792,7 +2818,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->argv[0]) {
-		cfprintf(state->cmdline->cerr, "%{er}error: Unexpected argument '%s'.%{rs}\n", state->argv[0]);
+		cfprintf(cerr, "%{er}error: Unexpected argument '%s'.%{rs}\n", state->argv[0]);
 		goto fail;
 	}
 
@@ -2812,9 +2838,16 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	expr = optimize_whole_expr(state, expr);
 
 	if (state->warn && state->depth_arg && state->prune_arg) {
-		cfprintf(state->cmdline->cerr,
-		         "%{wr}warning: %s does not work in the presence of %s.%{rs}\n\n",
-		         state->prune_arg, state->depth_arg);
+		cfprintf(cerr, "%{wr}warning: %s does not work in the presence of %s.%{rs}\n", state->prune_arg, state->depth_arg);
+
+		if (state->interactive) {
+			cfprintf(cerr, "%{wr}Do you want to continue?%{rs} ");
+			if (ynprompt() == 0) {
+				goto fail;
+			}
+		}
+
+		fprintf(stderr, "\n");
 	}
 
 	return expr;
@@ -2925,6 +2958,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
+	cmdline->argv = NULL;
 	cmdline->roots = NULL;
 	cmdline->colors = NULL;
 	cmdline->cout = NULL;
@@ -2940,6 +2974,14 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->expr = &expr_true;
 	cmdline->nopen_files = 0;
 
+	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));
+	if (!cmdline->argv) {
+		goto fail;
+	}
+	for (int i = 0; i <= argc; ++i) {
+		cmdline->argv[i] = argv[i];
+	}
+
 	cmdline->colors = parse_colors(getenv("LS_COLORS"));
 	cmdline->cout = cfdup(stdout, cmdline->colors);
 	cmdline->cerr = cfdup(stderr, cmdline->colors);
@@ -2948,15 +2990,19 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
+	bool stderr_tty = cmdline->cerr->colors;
+	bool stdin_tty = isatty(STDIN_FILENO);
+
 	struct parser_state state = {
 		.cmdline = cmdline,
-		.argv = argv + 1,
-		.command = argv[0],
+		.argv = cmdline->argv + 1,
+		.command = cmdline->argv[0],
 		.roots_tail = &cmdline->roots,
 		.regex_flags = 0,
+		.interactive = stderr_tty && stdin_tty,
 		.use_color = COLOR_AUTO,
 		.implicit_print = true,
-		.warn = isatty(STDIN_FILENO),
+		.warn = stdin_tty,
 		.non_option_seen = false,
 		.just_info = false,
 		.depth_arg = NULL,

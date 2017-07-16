@@ -83,6 +83,9 @@ struct root {
  * The parsed command line.
  */
 struct cmdline {
+	/** The unparsed command line arguments. */
+	char **argv;
+
 	/** The list of root paths. */
 	struct root *roots;
 
