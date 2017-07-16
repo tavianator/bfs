@@ -433,6 +433,19 @@ function bfs_diff() {
     fi
 }
 
+function closefrom() {
+    for fd in /dev/fd/*; do
+        if [ ! -e "$fd" ]; then
+            continue
+        fi
+
+        fd="${fd##*/}"
+        if [ "$fd" -gt "$1" ]; then
+            eval "exec ${fd}<&-"
+        fi
+    done
+}
+
 cd "$TMP"
 
 # Test cases
@@ -1160,11 +1173,15 @@ function test_colors() {
 }
 
 function test_deep() {
+    closefrom 2
+
     ulimit -n 8
     bfs_diff deep -mindepth 18
 }
 
 function test_deep_strict() {
+    closefrom 2
+
     # Not even enough fds to keep the root open
     ulimit -n 6
     bfs_diff deep -mindepth 18
