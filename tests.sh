@@ -440,7 +440,7 @@ function closefrom() {
         fi
 
         fd="${fd##*/}"
-        if [ "$fd" -gt "$1" ]; then
+        if [ "$fd" -ge "$1" ]; then
             eval "exec ${fd}<&-"
         fi
     done
@@ -1173,14 +1173,14 @@ function test_colors() {
 }
 
 function test_deep() {
-    closefrom 2
+    closefrom 3
 
     ulimit -n 8
     bfs_diff deep -mindepth 18
 }
 
 function test_deep_strict() {
-    closefrom 2
+    closefrom 3
 
     # Not even enough fds to keep the root open
     ulimit -n 6
