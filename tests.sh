@@ -223,7 +223,8 @@ bsd_tests=(
     test_flag_double_dash
     test_ok_stdin
     test_okdir_stdin
-    test_delete_root
+    test_delete
+    test_rm
     test_execdir_slash
     test_execdir_slash_pwd
     test_execdir_slashes
@@ -305,7 +306,7 @@ gnu_tests=(
     test_perm_644_slash
     test_perm_symbolic_slash
     test_perm_leading_plus_symbolic_slash
-    test_delete_root
+    test_delete
     test_execdir_slash
     test_execdir_slash_pwd
     test_execdir_slashes
@@ -899,9 +900,23 @@ function test_okdir_stdin() {
     yes | bfs_diff basic -okdir bash -c "printf '%s? ' {} && head -n1" \; 2>/dev/null
 }
 
-function test_delete_root() {
+function test_delete() {
+    rm -rf scratch/*
+    touchp scratch/foo/bar/baz
+
     # Don't try to delete '.'
-    (cd scratch && $BFS . -delete)
+    (cd scratch && $BFS -delete)
+
+    bfs_diff scratch
+}
+
+function test_rm() {
+    rm -rf scratch/*
+    touchp scratch/foo/bar/baz
+
+    (cd scratch && $BFS -rm)
+
+    bfs_diff scratch
 }
 
 function test_execdir_slash() {

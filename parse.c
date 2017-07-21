@@ -2156,6 +2156,9 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-sparse%{rs}\n");
 	cfprintf(cout, "      Find files that occupy fewer disk blocks than expected\n\n");
 
+	cfprintf(cout, "  %{blu}-rm%{rs}\n");
+	cfprintf(cout, "      Delete any found files (same as %{blu}-delete%{rs}; implies %{blu}-depth%{rs})\n\n");
+
 	cfprintf(cout, "%{bld}Extra features:%{rs}\n\n");
 
 	cfprintf(cout, "  %{blu}-color%{rs}\n");
@@ -2278,6 +2281,7 @@ static const struct table_entry parse_table[] = {
 	{"-readable", false, parse_access, R_OK},
 	{"-regex", false, parse_regex, 0},
 	{"-regextype", false, parse_regextype},
+	{"-rm", false, parse_delete},
 	{"-samefile", false, parse_samefile},
 	{"-size", false, parse_size},
 	{"-sparse", false, parse_sparse},
