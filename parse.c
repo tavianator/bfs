@@ -960,6 +960,26 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 }
 
 /**
+ * Parse -exit [STATUS].
+ */
+static struct expr *parse_exit(struct parser_state *state, int arg1, int arg2) {
+	size_t argc = 1;
+	const char *value = state->argv[1];
+
+	int status = EXIT_SUCCESS;
+	if (value && parse_int(state, value, &status, IF_INT | IF_UNSIGNED | IF_QUIET)) {
+		argc = 2;
+	}
+
+	struct expr *expr = parse_action(state, eval_exit, argc);
+	if (expr) {
+		expr->never_returns = true;
+		expr->idata = status;
+	}
+	return expr;
+}
+
+/**
  * Parse -f PATH.
  */
 static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
@@ -2156,6 +2176,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-sparse%{rs}\n");
 	cfprintf(cout, "      Find files that occupy fewer disk blocks than expected\n\n");
 
+	cfprintf(cout, "  %{blu}-exit%{rs} %{bld}[STATUS]%{rs}\n");
+	cfprintf(cout, "      Exit immediately with the given status (%d if unspecified)\n", EXIT_SUCCESS);
 	cfprintf(cout, "  %{blu}-rm%{rs}\n");
 	cfprintf(cout, "      Delete any found files (same as %{blu}-delete%{rs}; implies %{blu}-depth%{rs})\n\n");
 
@@ -2228,6 +2250,7 @@ static const struct table_entry parse_table[] = {
 	{"-exec", false, parse_exec, 0},
 	{"-execdir", false, parse_exec, BFS_EXEC_CHDIR},
 	{"-executable", false, parse_access, X_OK},
+	{"-exit", false, parse_exit},
 	{"-f", false, parse_f},
 	{"-false", false, parse_const, false},
 	{"-fls", false, parse_fls},

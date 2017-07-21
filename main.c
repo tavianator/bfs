@@ -48,9 +48,7 @@ int main(int argc, char *argv[]) {
 
 	struct cmdline *cmdline = parse_cmdline(argc, argv);
 	if (cmdline) {
-		if (eval_cmdline(cmdline) == 0) {
-			ret = EXIT_SUCCESS;
-		}
+		ret = eval_cmdline(cmdline);
 	}
 
 	free_cmdline(cmdline);

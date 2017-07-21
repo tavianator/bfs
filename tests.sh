@@ -255,6 +255,7 @@ bsd_tests=(
     test_inum
     test_nogroup
     test_nouser
+    test_exit
 )
 
 gnu_tests=(
@@ -1200,6 +1201,20 @@ function test_deep_strict() {
     # Not even enough fds to keep the root open
     ulimit -n 6
     bfs_diff deep -mindepth 18
+}
+
+function test_exit() {
+    $BFS basic -name foo -exit 42
+    if [ $? -ne 42 ]; then
+        return 1
+    fi
+
+    $BFS basic -name qux -exit 42
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+
+    bfs_diff basic -name bar -exit -o -print
 }
 
 passed=0

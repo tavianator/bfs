@@ -61,7 +61,7 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
 static void eval_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
 		cfprintf(state->cmdline->cerr, "%{er}'%s': %s%{rs}\n", state->ftwbuf->path, strerror(errno));
-		*state->ret = -1;
+		*state->ret = EXIT_FAILURE;
 	}
 }
 
@@ -302,6 +302,16 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 		eval_error(state);
 	}
 	return ret;
+}
+
+/**
+ * -exit action.
+ */
+bool eval_exit(const struct expr *expr, struct eval_state *state) {
+	state->action = BFTW_STOP;
+	*state->ret = expr->idata;
+	*state->quit = true;
+	return true;
 }
 
 /**
@@ -703,7 +713,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 			perror("xregerror()");
 		}
 
-		*state->ret = -1;
+		*state->ret = EXIT_FAILURE;
 	}
 
 	return false;
@@ -971,7 +981,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
-			args->ret = -1;
+			args->ret = EXIT_FAILURE;
 			cfprintf(cmdline->cerr, "%{er}'%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
 		}
 		state.action = BFTW_SKIP_SUBTREE;
@@ -979,7 +989,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	}
 
 	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
-		args->ret = -1;
+		args->ret = EXIT_FAILURE;
 		cfprintf(cmdline->cerr, "%{er}'%s': Path is not safe for xargs.%{rs}\n", ftwbuf->path);
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
@@ -1064,33 +1074,33 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
  */
 int eval_cmdline(const struct cmdline *cmdline) {
 	if (!cmdline->expr) {
-		return 0;
+		return EXIT_SUCCESS;
 	}
 
 	if (cmdline->optlevel >= 4 && cmdline->expr->eval == eval_false) {
 		if (cmdline->debug & DEBUG_OPT) {
 			fputs("-O4: skipping evaluation of top-level -false\n", stderr);
 		}
-		return 0;
+		return EXIT_SUCCESS;
 	}
 
 	int nopenfd = infer_fdlimit(cmdline);
 
 	struct callback_args args = {
 		.cmdline = cmdline,
-		.ret = 0,
+		.ret = EXIT_SUCCESS,
 		.quit = false,
 	};
 
 	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
 		if (bftw(root->path, cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
-			args.ret = -1;
+			args.ret = EXIT_FAILURE;
 			perror("bftw()");
 		}
 	}
 
 	if (eval_exec_finish(cmdline->expr) != 0) {
-		args.ret = -1;
+		args.ret = EXIT_FAILURE;
 	}
 
 	if (cmdline->debug & DEBUG_RATES) {
