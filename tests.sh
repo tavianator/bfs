@@ -1193,10 +1193,11 @@ failed=0
 for test in ${!run_*}; do
     test=${test#run_}
 
-    if [ -t 1 -a $((passed + failed)) -gt 0 ]; then
-        printf '\033[A\033[J'
+    if [ -t 1 ]; then
+        printf '\r\033[J%s' "$test"
+    else
+        echo "$test"
     fi
-    echo "$test"
 
     ("$test" "$dir")
     status=$?
@@ -1210,7 +1211,7 @@ for test in ${!run_*}; do
 done
 
 if [ -t 1 ]; then
-    printf '\033[A\033[J'
+    printf '\r\033[J'
 fi
 
 if [ $passed -gt 0 ]; then
