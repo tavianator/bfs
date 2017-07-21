@@ -373,6 +373,16 @@ static int xrpmatch(const char *response) {
 	ret = xrpregex(YESEXPR, response);
 	if (ret == 0) {
 		return 1;
+	} else if (ret != REG_NOMATCH) {
+		return -1;
+	}
+
+	// Failsafe: always handle y/n
+	char c = response[0];
+	if (c == 'n' || c == 'N') {
+		return 0;
+	} else if (c == 'y' || c == 'Y') {
+		return 1;
 	} else {
 		return -1;
 	}

@@ -13,6 +13,7 @@
 #include "util.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -45,6 +46,9 @@ int main(int argc, char *argv[]) {
 	if (ensure_fd_open(STDERR_FILENO, O_WRONLY) != 0) {
 		goto done;
 	}
+
+	// Use the system locale instead of "C"
+	setlocale(LC_ALL, "");
 
 	struct cmdline *cmdline = parse_cmdline(argc, argv);
 	if (cmdline) {
