@@ -1699,6 +1699,18 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
+ * Parse -printx.
+ */
+static struct expr *parse_printx(struct parser_state *state, int arg1, int arg2) {
+	struct expr *expr = parse_nullary_action(state, eval_fprintx);
+	if (expr) {
+		expr->always_true = true;
+		expr->cfile = state->cmdline->cout;
+	}
+	return expr;
+}
+
+/**
  * Parse -prune.
  */
 static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
@@ -2178,6 +2190,9 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 
 	cfprintf(cout, "  %{blu}-exit%{rs} %{bld}[STATUS]%{rs}\n");
 	cfprintf(cout, "      Exit immediately with the given status (%d if unspecified)\n", EXIT_SUCCESS);
+	cfprintf(cout, "  %{blu}-printx%{rs}\n");
+	cfprintf(cout, "      Like %{blu}-print%{rs}, but escape whitespace and quotation characters, to make the\n");
+	cfprintf(cout, "      output safe for %{ex}xargs%{rs}.  Consider using %{blu}-print0%{rs} and %{ex}xargs%{rs} %{bld}-0%{rs} instead.\n");
 	cfprintf(cout, "  %{blu}-rm%{rs}\n");
 	cfprintf(cout, "      Delete any found files (same as %{blu}-delete%{rs}; implies %{blu}-depth%{rs})\n\n");
 
@@ -2299,6 +2314,7 @@ static const struct table_entry parse_table[] = {
 	{"-print", false, parse_print},
 	{"-print0", false, parse_print0},
 	{"-printf", false, parse_printf},
+	{"-printx", false, parse_printx},
 	{"-prune", false, parse_prune},
 	{"-quit", false, parse_quit},
 	{"-readable", false, parse_access, R_OK},

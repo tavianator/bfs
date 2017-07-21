@@ -670,6 +670,44 @@ done:
 }
 
 /**
+ * -printx action.
+ */
+bool eval_fprintx(const struct expr *expr, struct eval_state *state) {
+	FILE *file = expr->cfile->file;
+	const char *path = state->ftwbuf->path;
+
+	while (true) {
+		size_t span = strcspn(path, " \t\n\\$'\"`");
+		if (fwrite(path, 1, span, file) != span) {
+			goto error;
+		}
+		path += span;
+
+		char c = path[0];
+		if (!c) {
+			break;
+		}
+
+		char escaped[] = {'\\', c};
+		if (fwrite(escaped, 1, sizeof(escaped), file) != sizeof(escaped)) {
+			goto error;
+		}
+		++path;
+	}
+
+
+	if (fputc('\n', file) == EOF) {
+		goto error;
+	}
+
+	return true;
+
+error:
+	eval_error(state);
+	return true;
+}
+
+/**
  * -prune action.
  */
 bool eval_prune(const struct expr *expr, struct eval_state *state) {

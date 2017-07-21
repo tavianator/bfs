@@ -256,6 +256,7 @@ bsd_tests=(
     test_nogroup
     test_nouser
     test_exit
+    test_printx
 )
 
 gnu_tests=(
@@ -1225,6 +1226,10 @@ function test_exit() {
     fi
 
     bfs_diff basic -name bar -exit -o -print
+}
+
+function test_printx() {
+    bfs_diff weirdnames -printx
 }
 
 passed=0
