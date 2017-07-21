@@ -2568,7 +2568,7 @@ static struct expr *new_and_expr(const struct parser_state *state, struct expr *
 			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			free_expr(rhs);
 			return lhs;
-		} else if (optlevel >= 2 && rhs->always_false && lhs->pure) {
+		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_false) {
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;
@@ -2664,7 +2664,7 @@ static struct expr *new_or_expr(const struct parser_state *state, struct expr *l
 		} else if (rhs == &expr_false) {
 			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
 			return lhs;
-		} else if (optlevel >= 2 && rhs->always_true && lhs->pure) {
+		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_true) {
 			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
 			free_expr(lhs);
 			return rhs;

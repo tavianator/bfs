@@ -346,6 +346,8 @@ gnu_tests=(
     test_or
     test_comma
     test_precedence
+    test_and_purity
+    test_or_purity
 )
 
 bfs_tests=(
@@ -1230,6 +1232,16 @@ function test_exit() {
 
 function test_printx() {
     bfs_diff weirdnames -printx
+}
+
+function test_and_purity() {
+    # Regression test: (-a lhs(pure) rhs(always_false)) <==> rhs is only valid if rhs is pure
+    bfs_diff basic -name nonexistent \( -print , -false \)
+}
+
+function test_or_purity() {
+    # Regression test: (-o lhs(pure) rhs(always_true)) <==> rhs is only valid if rhs is pure
+    bfs_diff basic -name '*' -o -print
 }
 
 passed=0
