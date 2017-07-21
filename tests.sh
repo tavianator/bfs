@@ -259,6 +259,8 @@ bsd_tests=(
 )
 
 gnu_tests=(
+    test_true
+    test_false
     test_executable
     test_readable
     test_writable
@@ -526,6 +528,14 @@ function test_name_slashes() {
 
 function test_path() {
     bfs_diff basic -path 'basic/*f*'
+}
+
+function test_true() {
+    bfs_diff basic -true
+}
+
+function test_false() {
+    bfs_diff basic -false
 }
 
 function test_executable() {

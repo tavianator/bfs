@@ -858,6 +858,8 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 		}
 	}
 
+	assert(!*state->quit);
+
 	bool ret = expr->eval(expr, state);
 
 	if (time) {
@@ -870,6 +872,10 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 	if (ret) {
 		++expr->successes;
 	}
+
+	assert(!expr->always_true || ret);
+	assert(!expr->always_false || !ret);
+	assert(!expr->never_returns || *state->quit);
 
 	return ret;
 }
