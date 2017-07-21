@@ -911,9 +911,12 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 		++expr->successes;
 	}
 
-	assert(!expr->always_true || ret);
-	assert(!expr->always_false || !ret);
-	assert(!expr->never_returns || *state->quit);
+	if (expr_never_returns(expr)) {
+		assert(*state->quit);
+	} else if (!*state->quit) {
+		assert(!expr->always_true || ret);
+		assert(!expr->always_false || !ret);
+	}
 
 	return ret;
 }

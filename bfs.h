@@ -206,8 +206,6 @@ struct expr {
 	bool always_true;
 	/** Whether this expression always evaluates to false. */
 	bool always_false;
-	/** Whether this expression never returns. */
-	bool never_returns;
 
 	/** Number of times this predicate was executed. */
 	size_t evaluations;
@@ -264,6 +262,11 @@ struct expr {
 	/** Optional string data for this expression. */
 	const char *sdata;
 };
+
+/**
+ * @return Whether expr is known to always quit.
+ */
+bool expr_never_returns(const struct expr *expr);
 
 /**
  * Parse the command line.
