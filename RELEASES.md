@@ -2,6 +2,24 @@
 ===
 
 
+1.1
+---
+
+**July 22, 2017**
+
+- Implemented some primaries from NetBSD `find`:
+  - `-exit [STATUS]` (like `-quit`, but with an optional explicit exit status)
+  - `-printx` (escape special characters for `xargs`)
+  - `-rm` (alias for `-delete`)
+- Warn if `-prune` will have no effect due to `-depth`
+- Handle y/n prompts according to the user's locale
+- Prompt the user to correct typos without having to re-run `bfs`
+- Fixed handling of paths longer than `PATH_MAX`
+- Fixed spurious "Inappropriate ioctl for device" errors when redirecting `-exec ... +` output
+- Fixed the handling of paths that treat a file as a directory (e.g. `a/b/c` where `a/b` is a regular file)
+- Fixed an expression optimizer bug that broke command lines like `bfs -name '*' -o -print`
+
+
 1.0.2
 -----
 
