@@ -50,6 +50,10 @@
 #	define S_ISWHT(mode) false
 #endif
 
+#ifndef O_DIRECTORY
+#	define O_DIRECTORY 0
+#endif
+
 /**
  * readdir() wrapper that makes error handling cleaner.
  */

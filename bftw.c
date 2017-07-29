@@ -349,11 +349,7 @@ static bool bftw_should_retry(struct bftw_cache *cache, const struct bftw_dir *s
 static int bftw_dir_openat(struct bftw_cache *cache, struct bftw_dir *dir, const struct bftw_dir *base, int at_fd, const char *at_path) {
 	assert(dir->fd < 0);
 
-	int flags = O_RDONLY | O_CLOEXEC;
-#ifdef O_DIRECTORY
-	flags |= O_DIRECTORY;
-#endif
-
+	int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
 	int fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && bftw_should_retry(cache, base)) {

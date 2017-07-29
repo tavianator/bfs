@@ -306,11 +306,7 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 	}
 
 	if (execbuf->wd_fd < 0) {
-		int flags = O_RDONLY | O_CLOEXEC;
-#ifdef O_DIRECTORY
-		flags |= O_DIRECTORY;
-#endif
-		execbuf->wd_fd = open(execbuf->wd_path, flags);
+		execbuf->wd_fd = open(execbuf->wd_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
 	}
 
 	if (execbuf->wd_fd < 0) {

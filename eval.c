@@ -334,11 +334,7 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
 	if (ftwbuf->typeflag == BFTW_DIR) {
-		int flags = O_RDONLY | O_CLOEXEC;
-#ifdef O_DIRECTORY
-		flags |= O_DIRECTORY;
-#endif
-		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, flags);
+		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
 		if (dfd < 0) {
 			eval_error(state);
 			goto done;
