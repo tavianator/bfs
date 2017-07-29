@@ -187,6 +187,7 @@ posix_tests=(
     test_size_bytes
     test_exec
     test_exec_plus
+    test_exec_plus_semicolon
     test_flag_comma
     test_perm_222
     test_perm_222_minus
@@ -224,15 +225,15 @@ bsd_tests=(
     test_size_big
     test_exec_substring
     test_execdir_pwd
+    test_execdir_slash
+    test_execdir_slash_pwd
+    test_execdir_slashes
     test_double_dash
     test_flag_double_dash
     test_ok_stdin
     test_okdir_stdin
     test_delete
     test_rm
-    test_execdir_slash
-    test_execdir_slash_pwd
-    test_execdir_slashes
     test_regex
     test_iregex
     test_regex_parens
@@ -301,7 +302,11 @@ gnu_tests=(
     test_exec_substring
     test_execdir
     test_execdir_substring
+    test_execdir_plus_semicolon
     test_execdir_pwd
+    test_execdir_slash
+    test_execdir_slash_pwd
+    test_execdir_slashes
     test_weird_names
     test_flag_weird_names
     test_follow_comma
@@ -316,9 +321,6 @@ gnu_tests=(
     test_perm_symbolic_slash
     test_perm_leading_plus_symbolic_slash
     test_delete
-    test_execdir_slash
-    test_execdir_slash_pwd
-    test_execdir_slashes
     test_regex
     test_iregex
     test_regex_parens
@@ -363,9 +365,7 @@ bfs_tests=(
     test_perm_symbolic_missing_action
     test_perm_leading_plus_symbolic
     test_perm_octal_plus
-    test_exec_plus_substring
     test_execdir_plus
-    test_execdir_plus_substring
     test_hidden
     test_nohidden
     test_path_flag_expr
@@ -746,12 +746,16 @@ function test_exec_plus() {
     bfs_diff basic -exec "$TESTS/sort-args.sh" '{}' +
 }
 
-function test_exec_substring() {
-    bfs_diff basic -exec echo '-{}-' ';'
+function test_exec_plus_semicolon() {
+    # POSIX says:
+    #     Only a <plus-sign> that immediately follows an argument containing only the two characters "{}"
+    #     shall punctuate the end of the primary expression. Other uses of the <plus-sign> shall not be
+    #     treated as special.
+    bfs_diff basic -exec "$TESTS/sort-args.sh" foo '{}' bar + baz \;
 }
 
-function test_exec_plus_substring() {
-    bfs_diff basic -exec "$TESTS/sort-args.sh" a '-{}-' z +
+function test_exec_substring() {
+    bfs_diff basic -exec echo '-{}-' ';'
 }
 
 function test_execdir() {
@@ -766,14 +770,27 @@ function test_execdir_substring() {
     bfs_diff basic -execdir echo '-{}-' ';'
 }
 
-function test_execdir_plus_substring() {
-    bfs_diff basic -execdir "$TESTS/sort-args.sh" a '-{}-' z +
+function test_execdir_plus_semicolon() {
+    bfs_diff basic -execdir "$TESTS/sort-args.sh" foo '{}' bar + baz \;
 }
 
 function test_execdir_pwd() {
     local TMP_REAL="$(cd "$TMP" && pwd)"
     local OFFSET="$((${#TMP_REAL} + 2))"
     bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" ';'
+}
+
+function test_execdir_slash() {
+    # Don't prepend ./ for absolute paths in -execdir
+    bfs_diff / -maxdepth 0 -execdir echo '{}' ';'
+}
+
+function test_execdir_slash_pwd() {
+    bfs_diff / -maxdepth 0 -execdir pwd ';'
+}
+
+function test_execdir_slashes() {
+    bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
 }
 
 function test_weird_names() {
@@ -936,19 +953,6 @@ function test_rm() {
     (cd scratch && $BFS -rm)
 
     bfs_diff scratch
-}
-
-function test_execdir_slash() {
-    # Don't prepend ./ for absolute paths in -execdir
-    bfs_diff / -maxdepth 0 -execdir echo '{}' ';'
-}
-
-function test_execdir_slash_pwd() {
-    bfs_diff / -maxdepth 0 -execdir pwd ';'
-}
-
-function test_execdir_slashes() {
-    bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
 }
 
 function test_regex() {

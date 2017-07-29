@@ -79,11 +79,8 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	}
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after environment variables\n", arg_max);
 
-	// Account for the non-placeholder arguments
-	for (size_t i = 0; i < execbuf->placeholder; ++i) {
-		arg_max -= bfs_exec_arg_size(execbuf->tmpl_argv[i]);
-	}
-	for (size_t i = execbuf->placeholder + 1; i < execbuf->tmpl_argc; ++i) {
+	// Account for the fixed arguments
+	for (size_t i = 0; i < execbuf->tmpl_argc - 1; ++i) {
 		arg_max -= bfs_exec_arg_size(execbuf->tmpl_argv[i]);
 	}
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after fixed arguments\n", arg_max);
@@ -112,7 +109,6 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	}
 
 	execbuf->flags = flags;
-	execbuf->placeholder = 0;
 	execbuf->argv = NULL;
 	execbuf->argc = 0;
 	execbuf->argv_cap = 0;
@@ -128,18 +124,17 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	}
 
 	size_t i;
-	const char *arg;
-	for (i = 1, arg = argv[i]; arg; arg = argv[++i]) {
-		if (strcmp(arg, ";") == 0) {
+	for (i = 1; ; ++i) {
+		const char *arg = argv[i];
+		if (!arg) {
+			cfprintf(cerr, "%{er}error: %s: Expected ';' or '+'.%{rs}\n", argv[0]);
+			goto fail;
+		} else if (strcmp(arg, ";") == 0) {
 			break;
-		} else if (strcmp(arg, "+") == 0) {
+		} else if (strcmp(arg, "+") == 0 && strcmp(argv[i - 1], "{}") == 0) {
 			execbuf->flags |= BFS_EXEC_MULTI;
 			break;
 		}
-	}
-	if (!arg) {
-		cfprintf(cerr, "%{er}error: %s: Expected ';' or '+'.%{rs}\n", argv[0]);
-		goto fail;
 	}
 
 	if ((execbuf->flags & BFS_EXEC_CONFIRM) && (execbuf->flags & BFS_EXEC_MULTI)) {
@@ -158,29 +153,17 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	}
 
 	if (execbuf->flags & BFS_EXEC_MULTI) {
-		for (i = 0; i < execbuf->tmpl_argc; ++i) {
-			if (strstr(execbuf->tmpl_argv[i], "{}")) {
-				execbuf->placeholder = i;
-				break;
-			}
-		}
-		if (i == execbuf->tmpl_argc) {
-			cfprintf(cerr, "%{er}error: %s ... +: Expected '{}'.%{rs}\n", argv[0]);
-			goto fail;
-		}
-		for (++i; i < execbuf->tmpl_argc; ++i) {
-			if (strstr(execbuf->tmpl_argv[i], "{}")) {
+		for (i = 0; i < execbuf->tmpl_argc - 1; ++i) {
+			char *arg = execbuf->tmpl_argv[i];
+			if (strstr(arg, "{}")) {
 				cfprintf(cerr, "%{er}error: %s ... +: Only one '{}' is supported.%{rs}\n", argv[0]);
 				goto fail;
 			}
+			execbuf->argv[i] = arg;
 		}
+		execbuf->argc = execbuf->tmpl_argc - 1;
 
 		execbuf->arg_max = bfs_exec_arg_max(execbuf);
-
-		for (i = 0; i < execbuf->placeholder; ++i) {
-			execbuf->argv[i] = execbuf->tmpl_argv[i];
-		}
-		execbuf->argc = i;
 	}
 
 	return execbuf;
@@ -191,43 +174,28 @@ fail:
 }
 
 /** Format the current path for use as a command line argument. */
-static const char *bfs_exec_format_path(const struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
+static char *bfs_exec_format_path(const struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	if (!(execbuf->flags & BFS_EXEC_CHDIR)) {
-		return ftwbuf->path;
+		return strdup(ftwbuf->path);
 	}
 
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
 
 	if (name[0] == '/') {
 		// Must be a root path ("/", "//", etc.)
-		return name;
+		return strdup(name);
 	}
 
 	// For compatibility with GNU find, use './name' instead of just 'name'
-	char *path = dstralloc(2 + strlen(name));
+	char *path = malloc(2 + strlen(name) + 1);
 	if (!path) {
 		return NULL;
 	}
 
-	if (dstrcat(&path, "./") != 0) {
-		goto err;
-	}
-	if (dstrcat(&path, name) != 0) {
-		goto err;
-	}
+	strcpy(path, "./");
+	strcpy(path + 2, name);
 
 	return path;
-
-err:
-	dstrfree(path);
-	return NULL;
-}
-
-/** Free a formatted path. */
-static void bfs_exec_free_path(const char *path, const struct BFTW *ftwbuf) {
-	if (path != ftwbuf->path && path != ftwbuf->path + ftwbuf->nameoff) {
-		dstrfree((char *)path);
-	}
 }
 
 /** Format an argument, expanding "{}" to the current path. */
@@ -388,7 +356,7 @@ fail:
 static int bfs_exec_single(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	int ret = -1, error = 0;
 
-	const char *path = bfs_exec_format_path(execbuf, ftwbuf);
+	char *path = bfs_exec_format_path(execbuf, ftwbuf);
 	if (!path) {
 		goto out;
 	}
@@ -420,7 +388,7 @@ out_free:
 		bfs_exec_free_arg(execbuf->argv[j], execbuf->tmpl_argv[j]);
 	}
 
-	bfs_exec_free_path(path, ftwbuf);
+	free(path);
 
 	errno = error;
 
@@ -432,13 +400,8 @@ out:
 static int bfs_exec_flush(struct bfs_exec *execbuf) {
 	int ret = 0;
 
-	size_t last_path = execbuf->argc;
-	if (last_path > execbuf->placeholder) {
-		for (size_t i = execbuf->placeholder + 1; i < execbuf->tmpl_argc; ++i, ++execbuf->argc) {
-			execbuf->argv[execbuf->argc] = execbuf->tmpl_argv[i];
-		}
+	if (execbuf->argc > execbuf->tmpl_argc - 1) {
 		execbuf->argv[execbuf->argc] = NULL;
-
 		if (bfs_exec_spawn(execbuf) != 0) {
 			ret = -1;
 		}
@@ -448,10 +411,10 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 
 	bfs_exec_closewd(execbuf, NULL);
 
-	for (size_t i = execbuf->placeholder; i < last_path; ++i) {
-		bfs_exec_free_arg(execbuf->argv[i], execbuf->tmpl_argv[execbuf->placeholder]);
+	for (size_t i = execbuf->tmpl_argc - 1; i < execbuf->argc; ++i) {
+		free(execbuf->argv[i]);
 	}
-	execbuf->argc = execbuf->placeholder;
+	execbuf->argc = execbuf->tmpl_argc - 1;
 	execbuf->arg_size = 0;
 
 	errno = error;
@@ -499,16 +462,10 @@ static int bfs_exec_push(struct bfs_exec *execbuf, char *arg) {
 static int bfs_exec_multi(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	int ret = 0;
 
-	const char *path = bfs_exec_format_path(execbuf, ftwbuf);
-	if (!path) {
-		ret = -1;
-		goto out;
-	}
-
-	char *arg = bfs_exec_format_arg(execbuf->tmpl_argv[execbuf->placeholder], path);
+	char *arg = bfs_exec_format_path(execbuf, ftwbuf);
 	if (!arg) {
 		ret = -1;
-		goto out_path;
+		goto out;
 	}
 
 	if (bfs_exec_needs_flush(execbuf, ftwbuf, arg)) {
@@ -530,12 +487,10 @@ static int bfs_exec_multi(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	}
 
 	// arg will get cleaned up later by bfs_exec_flush()
-	goto out_path;
+	goto out;
 
 out_arg:
-	bfs_exec_free_arg(arg, execbuf->tmpl_argv[execbuf->placeholder]);
-out_path:
-	bfs_exec_free_path(path, ftwbuf);
+	free(arg);
 out:
 	return ret;
 }

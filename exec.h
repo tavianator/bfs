@@ -48,9 +48,6 @@ struct bfs_exec {
 	/** Command line template size. */
 	size_t tmpl_argc;
 
-	/** For BFS_EXEC_MULTI, the index of the placeholder argument. */
-	size_t placeholder;
-
 	/** The built command line. */
 	char **argv;
 	/** Number of command line arguments. */
