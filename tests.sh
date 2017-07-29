@@ -414,6 +414,9 @@ for arg; do
         --update)
             UPDATE=yes
             ;;
+        --verbose)
+            VERBOSE=yes
+            ;;
         test_*)
             EXPLICIT=yes
             enable_tests "$arg"
@@ -436,14 +439,42 @@ function bfs_sort() {
     awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
 }
 
-function bfs_diff() {
+
+if [ "$VERBOSE" ]; then
+    # dup stdout for verbose logging even when redirected
+    exec 3>&1
+fi
+
+function bfs_verbose() {
+    if [ "$VERBOSE" ]; then
+        if [ -t 3 ]; then
+            printf '\033[1;32m%s\033[0m ' $BFS >&3
+            echo "$@" >&3
+        else
+            echo $BFS "$@" >&3
+        fi
+    fi
+}
+
+function invoke_bfs() {
+    bfs_verbose "$@"
+    $BFS "$@"
+}
+
+function bfs_diff() (
+    bfs_verbose "$@"
+
+    # Close the dup()'d stdout to make sure we have enough fd's for the process
+    # substitution, even with low ulimit -n
+    exec 3>&-
+
     local OUT="$TESTS/${FUNCNAME[1]}.out"
     if [ "$UPDATE" ]; then
         $BFS "$@" | bfs_sort >"$OUT"
     else
         diff -u "$OUT" <($BFS "$@" | bfs_sort)
     fi
-}
+)
 
 function closefrom() {
     for fd in /dev/fd/*; do
@@ -817,10 +848,10 @@ function test_follow_comma() {
 
 function test_fprint() {
     if [ "$UPDATE" ]; then
-        $BFS basic -fprint "$TESTS/test_fprint.out"
+        invoke_bfs basic -fprint "$TESTS/test_fprint.out"
         sort -o "$TESTS/test_fprint.out" "$TESTS/test_fprint.out"
     else
-        $BFS basic -fprint scratch/test_fprint.out
+        invoke_bfs basic -fprint scratch/test_fprint.out
         sort -o scratch/test_fprint.out scratch/test_fprint.out
         diff -u scratch/test_fprint.out "$TESTS/test_fprint.out"
     fi
@@ -841,12 +872,12 @@ function test_ignore_readdir_race() {
     touch scratch/{foo,bar}
 
     # -links 1 forces a stat() call, which will fail for the second file
-    $BFS scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
+    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
 }
 
 function test_ignore_readdir_race_root() {
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
-    ! $BFS basic/nonexistent -ignore_readdir_race 2>/dev/null
+    ! invoke_bfs basic/nonexistent -ignore_readdir_race 2>/dev/null
 }
 
 function test_ignore_readdir_race_notdir() {
@@ -854,7 +885,7 @@ function test_ignore_readdir_race_notdir() {
     rm -rf scratch/*
     touchp scratch/foo/bar
 
-    $BFS scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir touch '{}' \;
+    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir touch '{}' \;
 }
 
 function test_perm_222() {
@@ -894,15 +925,15 @@ function test_perm_symbolic_slash() {
 }
 
 function test_perm_symbolic_trailing_comma() {
-    ! $BFS perms -perm a+r, 2>/dev/null
+    ! invoke_bfs perms -perm a+r, 2>/dev/null
 }
 
 function test_perm_symbolic_double_comma() {
-    ! $BFS perms -perm a+r,,u+w 2>/dev/null
+    ! invoke_bfs perms -perm a+r,,u+w 2>/dev/null
 }
 
 function test_perm_symbolic_missing_action() {
-    ! $BFS perms -perm a 2>/dev/null
+    ! invoke_bfs perms -perm a 2>/dev/null
 }
 
 function test_perm_leading_plus_symbolic() {
@@ -918,7 +949,7 @@ function test_perm_leading_plus_symbolic_slash() {
 }
 
 function test_perm_octal_plus() {
-    ! $BFS perms -perm +777 2>/dev/null
+    ! invoke_bfs perms -perm +777 2>/dev/null
 }
 
 function test_permcopy() {
@@ -941,7 +972,7 @@ function test_delete() {
     touchp scratch/foo/bar/baz
 
     # Don't try to delete '.'
-    (cd scratch && $BFS -delete)
+    (cd scratch && invoke_bfs -delete)
 
     bfs_diff scratch
 }
@@ -950,7 +981,7 @@ function test_rm() {
     rm -rf scratch/*
     touchp scratch/foo/bar/baz
 
-    (cd scratch && $BFS -rm)
+    (cd scratch && invoke_bfs -rm)
 
     bfs_diff scratch
 }
@@ -1135,14 +1166,14 @@ function test_printf_nul() {
     local OUT="$TESTS/${FUNCNAME[0]}.out"
     local ARGS=(basic -maxdepth 0 -printf '%h\0%f\n')
     if [ "$UPDATE" ]; then
-        $BFS "${ARGS[@]}" >"$OUT"
+        invoke_bfs "${ARGS[@]}" >"$OUT"
     else
-        diff -u "$OUT" <($BFS "${ARGS[@]}")
+        diff -u "$OUT" <(invoke_bfs "${ARGS[@]}")
     fi
 }
 
 function test_fstype() {
-    fstype="$($BFS -printf '%F\n' | head -n1)"
+    fstype="$(invoke_bfs -printf '%F\n' | head -n1)"
     bfs_diff basic -fstype "$fstype"
 }
 
@@ -1211,14 +1242,15 @@ function test_colors() {
 }
 
 function test_deep() {
-    closefrom 3
+    closefrom 4
 
     ulimit -n 8
     bfs_diff deep -mindepth 18
 }
 
 function test_deep_strict() {
-    closefrom 3
+    # Low ulimit would interfere with the dup()'d stdout for verbose logging
+    closefrom 4
 
     # Not even enough fds to keep the root open
     ulimit -n 6
@@ -1226,12 +1258,12 @@ function test_deep_strict() {
 }
 
 function test_exit() {
-    $BFS basic -name foo -exit 42
+    invoke_bfs basic -name foo -exit 42
     if [ $? -ne 42 ]; then
         return 1
     fi
 
-    $BFS basic -name qux -exit 42
+    invoke_bfs basic -name qux -exit 42
     if [ $? -ne 0 ]; then
         return 1
     fi
@@ -1253,13 +1285,17 @@ function test_or_purity() {
     bfs_diff basic -name '*' -o -print
 }
 
+if [ -t 1 -a ! "$VERBOSE" ]; then
+    in_place=yes
+fi
+
 passed=0
 failed=0
 
 for test in ${!run_*}; do
     test=${test#run_}
 
-    if [ -t 1 ]; then
+    if [ "$in_place" ]; then
         printf '\r\033[J%s' "$test"
     else
         echo "$test"
@@ -1276,7 +1312,7 @@ for test in ${!run_*}; do
     fi
 done
 
-if [ -t 1 ]; then
+if [ "$in_place" ]; then
     printf '\r\033[J'
 fi
 
