@@ -127,19 +127,20 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	for (i = 1; ; ++i) {
 		const char *arg = argv[i];
 		if (!arg) {
-			cfprintf(cerr, "%{er}error: %s: Expected ';' or '+'.%{rs}\n", argv[0]);
+			if (execbuf->flags & BFS_EXEC_CONFIRM) {
+				cfprintf(cerr, "%{er}error: %s: Expected '... ;'.%{rs}\n", argv[0]);
+			} else {
+				cfprintf(cerr, "%{er}error: %s: Expected '... ;' or '... {} +'.%{rs}\n", argv[0]);
+			}
 			goto fail;
 		} else if (strcmp(arg, ";") == 0) {
 			break;
-		} else if (strcmp(arg, "+") == 0 && strcmp(argv[i - 1], "{}") == 0) {
-			execbuf->flags |= BFS_EXEC_MULTI;
-			break;
+		} else if (strcmp(arg, "+") == 0) {
+			if (!(execbuf->flags & BFS_EXEC_CONFIRM) && strcmp(argv[i - 1], "{}") == 0) {
+				execbuf->flags |= BFS_EXEC_MULTI;
+				break;
+			}
 		}
-	}
-
-	if ((execbuf->flags & BFS_EXEC_CONFIRM) && (execbuf->flags & BFS_EXEC_MULTI)) {
-		cfprintf(cerr, "%{er}error: %s ... + is not supported.%{rs}\n", argv[0]);
-		goto fail;
 	}
 
 	execbuf->tmpl_argv = argv + 1;

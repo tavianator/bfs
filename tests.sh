@@ -198,6 +198,7 @@ posix_tests=(
     test_perm_leading_plus_symbolic_minus
     test_permcopy
     test_ok_stdin
+    test_ok_plus_semicolon
     test_parens
     test_bang
     test_implicit_and
@@ -307,6 +308,7 @@ gnu_tests=(
     test_execdir_slash
     test_execdir_slash_pwd
     test_execdir_slashes
+    test_okdir_plus_semicolon
     test_weird_names
     test_flag_weird_names
     test_follow_comma
@@ -965,6 +967,14 @@ function test_ok_stdin() {
 function test_okdir_stdin() {
     # -okdir should *not* close stdin
     yes | bfs_diff basic -okdir bash -c "printf '%s? ' {} && head -n1" \; 2>/dev/null
+}
+
+function test_ok_plus_semicolon() {
+    yes | bfs_diff basic -ok echo '{}' + \; 2>/dev/null
+}
+
+function test_okdir_plus_semicolon() {
+    yes | bfs_diff basic -okdir echo '{}' + \; 2>/dev/null
 }
 
 function test_delete() {
