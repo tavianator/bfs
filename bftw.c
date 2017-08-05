@@ -545,6 +545,7 @@ static struct bftw_dir *bftw_queue_pop(struct bftw_queue *queue) {
 
 /** Destroy a bftw_queue. */
 static void bftw_queue_destroy(struct bftw_queue *queue) {
+	assert(queue->size == 0);
 	free(queue->buffer);
 }
 
