@@ -760,7 +760,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
 
 	if (strcmp(state->argv[0], "-Ofast") == 0) {
 		*optlevel = 4;
-	} else if (!parse_int(state, state->argv[0] + 2, optlevel, IF_INT)) {
+	} else if (!parse_int(state, state->argv[0] + 2, optlevel, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
 
