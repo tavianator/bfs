@@ -2,6 +2,15 @@
 ===
 
 
+1.1.1
+-----
+
+**August 10, 2017**
+
+- Re-licensed under the BSD Zero Clause License
+- Fixed some corner cases with `-exec` and `-ok` parsing
+
+
 1.1
 ---
 
