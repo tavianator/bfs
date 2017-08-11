@@ -1,11 +1,21 @@
 `bfs`
 =====
 
+[![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/master/COPYING)
+[![LOC](https://tokei.rs/b1/github/tavianator/bfs?category=code)](https://github.com/Aaronepower/tokei)
+[![Build Status](https://api.travis-ci.org/tavianator/bfs.svg?branch=master)](https://travis-ci.org/tavianator/bfs)
+
 Breadth-first search for your files.
 
 `bfs` is a variant of the UNIX `find` command that operates [breadth-first](https://en.wikipedia.org/wiki/Breadth-first_search) rather than [depth-first](https://en.wikipedia.org/wiki/Depth-first_search).
-It is otherwise intended to be [compatible](https://github.com/tavianator/bfs/issues/6) with GNU `find`.
-If you're not familiar with `find`, have a look at the [GNU find manual](https://www.gnu.org/software/findutils/manual/html_mono/find.html) to get acquainted first.
+It is otherwise intended to be compatible with many versions of `find`, including
+
+- [POSIX `find`](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)
+- [GNU `find`](https://www.gnu.org/software/findutils/)
+- {[Free](https://www.freebsd.org/cgi/man.cgi?find(1)),[Open](https://man.openbsd.org/find.1),[Net](http://netbsd.gw.com/cgi-bin/man-cgi?find+1+NetBSD-current)}BSD `find`
+- [macOS `find`](https://developer.apple.com/legacy/library/documentation/Darwin/Reference/ManPages/man1/find.1.html)
+
+If you're not familiar with `find`, the [GNU find manual](https://www.gnu.org/software/findutils/manual/html_mono/find.html) provides a good introduction.
 
 
 Breadth vs. depth
@@ -81,7 +91,9 @@ $ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'
 </pre>
 
 `bfs` also adds some extra options that make some common tasks easier.
-Compare `bfs -nohidden` to `find -name '.?*' -prune -o -print`.
+Compare `bfs -nohidden` to
+
+    find -name '.?*' -prune -o -print
 
 
 Pretty
@@ -90,7 +102,7 @@ Pretty
 When `bfs` detects that its output is a terminal, it automatically colors its output with the same colors `ls` uses.
 This makes it easier to identify relevant files at a glance.
 
-![Screenshot](http://i.imgur.com/5V6Sxw5.png)
+<img src="https://tavianator.github.io/bfs/screenshot.svg" alt="Screenshot" width="100%" />
 
 
 Try it!
