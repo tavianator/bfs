@@ -76,7 +76,7 @@ static void eval_error(struct eval_state *state) {
 static const struct stat *fill_statbuf(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
-		if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, ftwbuf->at_flags) == 0) {
+		if (xfstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, &ftwbuf->at_flags) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
 			eval_error(state);
@@ -821,29 +821,19 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
-	int follow_flags = BFTW_LOGICAL;
-	if (ftwbuf->depth == 0) {
-		follow_flags |= BFTW_COMFOLLOW;
-	}
-	bool follow = state->cmdline->flags & follow_flags;
-
+	bool follow = !(ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW);
 	bool is_link = ftwbuf->typeflag == BFTW_LNK;
 	if (follow == is_link) {
 		return eval_type(expr, state);
 	}
 
 	// -xtype does the opposite of everything else
-	int at_flags = follow ? AT_SYMLINK_NOFOLLOW : 0;
+	int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
 
 	struct stat sb;
-	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, at_flags) != 0) {
-		if (!follow && (errno == ENOENT || errno == ENOTDIR)) {
-			// Broken symlink
-			return eval_type(expr, state);
-		} else {
-			eval_error(state);
-			return false;
-		}
+	if (xfstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, &at_flags) != 0) {
+		eval_error(state);
+		return false;
 	}
 
 	return mode_to_typeflag(sb.st_mode) & expr->idata;

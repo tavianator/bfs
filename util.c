@@ -226,6 +226,17 @@ const char *xbasename(const char *path) {
 	return i;
 }
 
+int xfstatat(int fd, const char *path, struct stat *buf, int *flags) {
+	int ret = fstatat(fd, path, buf, *flags);
+
+	if (ret != 0 && !(*flags & AT_SYMLINK_NOFOLLOW) && (errno == ENOENT || errno == ENOTDIR)) {
+		*flags |= AT_SYMLINK_NOFOLLOW;
+		ret = fstatat(fd, path, buf, *flags);
+	}
+
+	return ret;
+}
+
 enum bftw_typeflag mode_to_typeflag(mode_t mode) {
 	switch (mode & S_IFMT) {
 #ifdef S_IFBLK

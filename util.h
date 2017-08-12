@@ -143,6 +143,21 @@ void format_mode(mode_t mode, char str[11]);
 const char *xbasename(const char *path);
 
 /**
+ * stat() a file, falling back on the link itself for broken symbolic links.
+ *
+ * @param fd
+ *         The base directory descriptor.
+ * @param path
+ *         The path to the file, relative to fd.
+ * @param buf
+ *         The stat buffer to fill.
+ * @param flags
+ *         AT_* flags for this call.  Will be updated if a fallback happens.
+ * @return 0 on success, -1 on failure.
+ */
+int xfstatat(int fd, const char *path, struct stat *buf, int *flags);
+
+/**
  * Convert a stat() st_mode to a bftw() typeflag.
  */
 enum bftw_typeflag mode_to_typeflag(mode_t mode);

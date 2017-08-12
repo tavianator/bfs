@@ -551,15 +551,12 @@ static void bftw_queue_destroy(struct bftw_queue *queue) {
 
 /** Call stat() and use the results. */
 static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
-	int ret = fstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, ftwbuf->at_flags);
-	if (ret != 0) {
-		return ret;
+	int ret = xfstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, &ftwbuf->at_flags);
+	if (ret == 0) {
+		ftwbuf->statbuf = sb;
+		ftwbuf->typeflag = mode_to_typeflag(sb->st_mode);
 	}
-
-	ftwbuf->statbuf = sb;
-	ftwbuf->typeflag = mode_to_typeflag(sb->st_mode);
-
-	return 0;
+	return ret;
 }
 
 /**
@@ -837,14 +834,7 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 	    || ftwbuf->typeflag == BFTW_UNKNOWN
 	    || (ftwbuf->typeflag == BFTW_LNK && follow)
 	    || (ftwbuf->typeflag == BFTW_DIR && (detect_cycles || xdev))) {
-		int ret = ftwbuf_stat(ftwbuf, &state->statbuf);
-		if (ret != 0 && follow && (errno == ENOENT || errno == ENOTDIR)) {
-			// Could be a broken symlink, retry without following
-			ftwbuf->at_flags = AT_SYMLINK_NOFOLLOW;
-			ret = ftwbuf_stat(ftwbuf, &state->statbuf);
-		}
-
-		if (ret != 0) {
+		if (ftwbuf_stat(ftwbuf, &state->statbuf) != 0) {
 			bftw_set_error(state, errno);
 			return;
 		}

@@ -169,6 +169,7 @@ posix_tests=(
     test_name_trailing_slash
     test_path
     test_newer
+    test_newer_link
     test_links
     test_links_plus
     test_links_minus
@@ -215,6 +216,10 @@ bsd_tests=(
     test_X
     test_follow
     test_samefile
+    test_samefile_symlink
+    test_H_samefile_symlink
+    test_samefile_broken
+    test_H_samefile_broken
     test_name_slash
     test_name_slashes
     test_iname
@@ -285,6 +290,10 @@ gnu_tests=(
     test_P_slash
     test_follow
     test_samefile
+    test_samefile_symlink
+    test_H_samefile_symlink
+    test_samefile_broken
+    test_H_samefile_broken
     test_xtype_l
     test_xtype_f
     test_L_xtype_l
@@ -624,6 +633,10 @@ function test_newer() {
     bfs_diff times -newer times/a
 }
 
+function test_newer_link() {
+    bfs_diff times -newer times/l
+}
+
 function test_anewer() {
     bfs_diff times -anewer times/a
 }
@@ -682,6 +695,22 @@ function test_L_depth() {
 
 function test_samefile() {
     bfs_diff links -samefile links/a
+}
+
+function test_samefile_symlink() {
+    bfs_diff links -samefile links/b
+}
+
+function test_H_samefile_symlink() {
+    bfs_diff -H links -samefile links/b
+}
+
+function test_samefile_broken() {
+    bfs_diff links -samefile links/d/e/i
+}
+
+function test_H_samefile_broken() {
+    bfs_diff -H links -samefile links/d/e/i
 }
 
 function test_xtype_l() {
