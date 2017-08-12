@@ -187,6 +187,7 @@ posix_tests=(
     test_size_bytes
     test_exec
     test_exec_plus
+    test_exec_plus_status
     test_exec_plus_semicolon
     test_flag_comma
     test_perm_222
@@ -777,6 +778,13 @@ function test_exec() {
 
 function test_exec_plus() {
     bfs_diff basic -exec "$TESTS/sort-args.sh" '{}' +
+}
+
+function test_exec_plus_status() {
+    # -exec ... {} + should always return true, but if the command fails, bfs
+    # should exit with a non-zero status
+    bfs_diff basic -exec false '{}' + -print
+    ! invoke_bfs basic -exec false '{}' +
 }
 
 function test_exec_plus_semicolon() {
