@@ -460,11 +460,30 @@ fi
 function bfs_verbose() {
     if [ "$VERBOSE" ]; then
         if [ -t 3 ]; then
-            printf '\033[1;32m%s\033[0m ' $BFS >&3
-            echo "$@" >&3
+            printf '\033[1;32m%q\033[0m ' $BFS >&3
+
+            local expr_started=
+            for arg; do
+                if [[ $arg == -[A-Z]* ]]; then
+                    printf '\033[1;36m%q\033[0m ' "$arg" >&3
+                elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
+                    expr_started=yes
+                    printf '\033[1;31m%q\033[0m ' "$arg" >&3
+                elif [[ $expr_started && $arg == [\),] ]]; then
+                    printf '\033[1;31m%q\033[0m ' "$arg" >&3
+                elif [[ $arg == -?* ]]; then
+                    expr_started=yes
+                    printf '\033[1;34m%q\033[0m ' "$arg" >&3
+                elif [ "$expr_started" ]; then
+                    printf '\033[1m%q\033[0m ' "$arg" >&3
+                else
+                    printf '\033[1;35m%q\033[0m ' "$arg" >&3
+                fi
+            done
         else
-            echo $BFS "$@" >&3
+            printf '%q ' $BFS "$@" >&3
         fi
+        printf '\n' >&3
     fi
 }
 
