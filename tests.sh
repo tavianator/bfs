@@ -840,7 +840,7 @@ function test_exec_plus_semicolon() {
     #     Only a <plus-sign> that immediately follows an argument containing only the two characters "{}"
     #     shall punctuate the end of the primary expression. Other uses of the <plus-sign> shall not be
     #     treated as special.
-    bfs_diff basic -exec "$TESTS/sort-args.sh" foo '{}' bar + baz \;
+    bfs_diff basic -exec echo foo '{}' bar + baz \;
 }
 
 function test_exec_substring() {
@@ -860,7 +860,7 @@ function test_execdir_substring() {
 }
 
 function test_execdir_plus_semicolon() {
-    bfs_diff basic -execdir "$TESTS/sort-args.sh" foo '{}' bar + baz \;
+    bfs_diff basic -execdir echo foo '{}' bar + baz \;
 }
 
 function test_execdir_pwd() {
