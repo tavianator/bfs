@@ -345,7 +345,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 	bool follow = cmdline->flags & (BFTW_COMFOLLOW | BFTW_LOGICAL);
 	int flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
 
-	int ret = xfstatat(AT_FDCWD, expr->sdata, sb, &flags);
+	int ret = xfstatat(AT_FDCWD, expr->sdata, sb, flags);
 	if (ret != 0) {
 		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", expr->sdata, strerror(errno));
 	}

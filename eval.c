@@ -76,7 +76,7 @@ static void eval_error(struct eval_state *state) {
 static const struct stat *fill_statbuf(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
-		if (xfstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, &ftwbuf->at_flags) == 0) {
+		if (xfstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, ftwbuf->at_flags) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
 			eval_error(state);
@@ -831,9 +831,14 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
 
 	struct stat sb;
-	if (xfstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, &at_flags) != 0) {
-		eval_error(state);
-		return false;
+	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, at_flags) != 0) {
+		if (!follow && (errno == ENOENT || errno == ENOTDIR)) {
+			// Broken symlink
+			return eval_type(expr, state);
+		} else {
+			eval_error(state);
+			return false;
+		}
 	}
 
 	return mode_to_typeflag(sb.st_mode) & expr->idata;

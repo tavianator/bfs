@@ -152,10 +152,10 @@ const char *xbasename(const char *path);
  * @param buf
  *         The stat buffer to fill.
  * @param flags
- *         AT_* flags for this call.  Will be updated if a fallback happens.
+ *         AT_* flags for this call.
  * @return 0 on success, -1 on failure.
  */
-int xfstatat(int fd, const char *path, struct stat *buf, int *flags);
+int xfstatat(int fd, const char *path, struct stat *buf, int flags);
 
 /**
  * Convert a stat() st_mode to a bftw() typeflag.

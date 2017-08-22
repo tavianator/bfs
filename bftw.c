@@ -551,7 +551,7 @@ static void bftw_queue_destroy(struct bftw_queue *queue) {
 
 /** Call stat() and use the results. */
 static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
-	int ret = xfstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, &ftwbuf->at_flags);
+	int ret = xfstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, ftwbuf->at_flags);
 	if (ret == 0) {
 		ftwbuf->statbuf = sb;
 		ftwbuf->typeflag = mode_to_typeflag(sb->st_mode);
