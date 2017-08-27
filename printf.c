@@ -706,45 +706,13 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				directive->fn = bfs_printf_strftime;
 				command->needs_stat = true;
 				c = *++i;
-				switch (c) {
-				case '@':
-				case 'H':
-				case 'I':
-				case 'k':
-				case 'l':
-				case 'M':
-				case 'p':
-				case 'r':
-				case 'S':
-				case 'T':
-				case '+':
-				case 'X':
-				case 'Z':
-				case 'a':
-				case 'A':
-				case 'b':
-				case 'B':
-				case 'c':
-				case 'd':
-				case 'D':
-				case 'h':
-				case 'j':
-				case 'm':
-				case 'U':
-				case 'w':
-				case 'W':
-				case 'x':
-				case 'y':
-				case 'Y':
-					directive->c = c;
-					break;
-
-				case '\0':
+				if (!c) {
 					cfprintf(cerr, "%{er}error: '%s': Incomplete time specifier '%s%c'.%{rs}\n",
 					         format, directive->str, i[-1]);
 					goto directive_error;
-
-				default:
+				} else if (strchr("@HIklMprST+XZaAbBcdDhjmUwWxyY", c)) {
+					directive->c = c;
+				} else {
 					cfprintf(cerr, "%{er}error: '%s': Unrecognized time specifier '%%%c%c'.%{rs}\n",
 					         format, i[-1], c);
 					goto directive_error;
