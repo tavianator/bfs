@@ -62,16 +62,18 @@ typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
  * Various debugging flags.
  */
 enum debug_flags {
+	/** Print cost estimates. */
+	DEBUG_COST  = 1 << 0,
 	/** Print executed command details. */
-	DEBUG_EXEC  = 1 << 0,
+	DEBUG_EXEC  = 1 << 1,
 	/** Print optimization details. */
-	DEBUG_OPT   = 1 << 1,
+	DEBUG_OPT   = 1 << 2,
 	/** Print rate information. */
-	DEBUG_RATES = 1 << 2,
+	DEBUG_RATES = 1 << 3,
 	/** Trace all stat() calls. */
-	DEBUG_STAT  = 1 << 3,
+	DEBUG_STAT  = 1 << 4,
 	/** Print the parse tree. */
-	DEBUG_TREE  = 1 << 4,
+	DEBUG_TREE  = 1 << 5,
 };
 
 /**
@@ -212,6 +214,10 @@ struct expr {
 	/** Whether this expression always evaluates to false. */
 	bool always_false;
 
+	/** Estimated cost. */
+	double cost;
+	/** Estimated probability of success. */
+	double probability;
 	/** Number of times this predicate was executed. */
 	size_t evaluations;
 	/** Number of times this predicate succeeded. */
@@ -272,6 +278,11 @@ struct expr {
  * @return Whether expr is known to always quit.
  */
 bool expr_never_returns(const struct expr *expr);
+
+/**
+ * @return The result of the comparison for this expression.
+ */
+bool expr_cmp(const struct expr *expr, long long n);
 
 /**
  * Parse the command line.

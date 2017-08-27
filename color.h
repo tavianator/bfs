@@ -97,7 +97,9 @@ int cfclose(CFILE *cfile);
  *         %%: A literal '%'
  *         %c: A single character
  *         %d: An integer
+ *         %g: A double
  *         %s: A string
+ *         %zu: A size_t
  *         %P: A colored file path, from a const struct BFTW * argument
  *         %L: A colored link target, from a const struct BFTW * argument
  *         %{cc}: Change the color to 'cc'

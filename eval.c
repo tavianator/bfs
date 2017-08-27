@@ -96,10 +96,7 @@ static time_t timespec_diff(const struct timespec *lhs, const struct timespec *r
 	return ret;
 }
 
-/**
- * Perform a comparison.
- */
-static bool do_cmp(const struct expr *expr, long long n) {
+bool expr_cmp(const struct expr *expr, long long n) {
 	switch (expr->cmp_flag) {
 	case CMP_EXACT:
 		return n == expr->idata;
@@ -167,7 +164,7 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 		break;
 	}
 
-	return do_cmp(expr, diff);
+	return expr_cmp(expr, diff);
 }
 
 /**
@@ -208,7 +205,7 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
 
 	time_t diff = timespec_diff(&statbuf->st_atim, &statbuf->st_ctim);
 	diff /= 60*60*24;
-	return do_cmp(expr, diff);
+	return expr_cmp(expr, diff);
 }
 
 /**
@@ -220,7 +217,7 @@ bool eval_gid(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	return do_cmp(expr, statbuf->st_gid);
+	return expr_cmp(expr, statbuf->st_gid);
 }
 
 /**
@@ -232,7 +229,7 @@ bool eval_uid(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	return do_cmp(expr, statbuf->st_uid);
+	return expr_cmp(expr, statbuf->st_uid);
 }
 
 /**
@@ -323,7 +320,7 @@ bool eval_exit(const struct expr *expr, struct eval_state *state) {
  * -depth N test.
  */
 bool eval_depth(const struct expr *expr, struct eval_state *state) {
-	return do_cmp(expr, state->ftwbuf->depth);
+	return expr_cmp(expr, state->ftwbuf->depth);
 }
 
 /**
@@ -420,7 +417,7 @@ bool eval_inum(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	return do_cmp(expr, statbuf->st_ino);
+	return expr_cmp(expr, statbuf->st_ino);
 }
 
 /**
@@ -432,7 +429,7 @@ bool eval_links(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	return do_cmp(expr, statbuf->st_nlink);
+	return expr_cmp(expr, statbuf->st_nlink);
 }
 
 /**
@@ -779,7 +776,7 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	static off_t scales[] = {
+	static const off_t scales[] = {
 		[SIZE_BLOCKS] = 512,
 		[SIZE_BYTES] = 1,
 		[SIZE_WORDS] = 2,
@@ -792,7 +789,7 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
 
 	off_t scale = scales[expr->size_unit];
 	off_t size = (statbuf->st_size + scale - 1)/scale; // Round up
-	return do_cmp(expr, size);
+	return expr_cmp(expr, size);
 }
 
 /**

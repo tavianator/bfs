@@ -495,8 +495,24 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 				}
 				break;
 
+			case 'g':
+				if (fprintf(file, "%g", va_arg(args, double)) < 0) {
+					goto done;
+				}
+				break;
+
 			case 's':
 				if (fputs(va_arg(args, const char *), file) == EOF) {
+					goto done;
+				}
+				break;
+
+			case 'z':
+				++i;
+				if (*i != 'u') {
+					goto invalid;
+				}
+				if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
 					goto done;
 				}
 				break;
