@@ -22,9 +22,20 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if __GLIBC__
-#	include <mntent.h>
+#ifndef __has_include
+#	define __has_include(header) 0
+#endif
+
+#if __GLIBC__ || __has_include(<mntent.h>)
+#	define BFS_MNTENT 1
 #elif BSD
+#	define BFS_MNTINFO 1
+#endif
+
+#if BFS_MNTENT
+#	include <mntent.h>
+#	include <paths.h>
+#elif BFS_MNTINFO
 #	include <sys/mount.h>
 #	include <sys/ucred.h>
 #endif
@@ -76,7 +87,7 @@ static int bfs_mtab_push(struct bfs_mtab *mtab, dev_t dev, const char *type) {
 }
 
 struct bfs_mtab *parse_bfs_mtab() {
-#if __GLIBC__
+#if BFS_MNTENT
 
 	FILE *file = setmntent(_PATH_MOUNTED, "r");
 	if (!file) {
@@ -113,7 +124,7 @@ fail_file:
 fail:
 	return NULL;
 
-#elif BSD
+#elif BFS_MNTINFO
 
 	struct statfs *mntbuf;
 	int size = getmntinfo(&mntbuf, MNT_WAIT);
