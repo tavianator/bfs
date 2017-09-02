@@ -992,6 +992,59 @@ static void debug_stat(const struct eval_state *state) {
 }
 
 /**
+ * Dump the bftw_typeflag for -D search.
+ */
+static const char *dump_bftw_typeflag(enum bftw_typeflag type) {
+#define DUMP_BFTW_TYPEFLAG_CASE(flag)		\
+	case flag:				\
+		return #flag
+
+	switch (type) {
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_BLK);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_CHR);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_DIR);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_DOOR);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_FIFO);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_LNK);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_PORT);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_REG);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_SOCK);
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_WHT);
+
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_ERROR);
+
+	default:
+		DUMP_BFTW_TYPEFLAG_CASE(BFTW_UNKNOWN);
+	}
+}
+
+#define DUMP_BFTW_MAP(value) [value] = #value
+
+/**
+ * Dump the bftw_visit for -D search.
+ */
+static const char *dump_bftw_visit(enum bftw_visit visit) {
+	static const char *visits[] = {
+		DUMP_BFTW_MAP(BFTW_PRE),
+		DUMP_BFTW_MAP(BFTW_POST),
+	};
+	return visits[visit];
+}
+
+/**
+ * Dump the bftw_action for -D search.
+ */
+static const char *dump_bftw_action(enum bftw_action action) {
+	static const char *actions[] = {
+		DUMP_BFTW_MAP(BFTW_CONTINUE),
+		DUMP_BFTW_MAP(BFTW_SKIP_SIBLINGS),
+		DUMP_BFTW_MAP(BFTW_SKIP_SUBTREE),
+		DUMP_BFTW_MAP(BFTW_STOP),
+	};
+	return actions[action];
+}
+
+/**
  * Type passed as the argument to the bftw() callback.
  */
 struct callback_args {
@@ -1058,6 +1111,23 @@ done:
 		debug_stat(&state);
 	}
 
+	if (cmdline->debug & DEBUG_SEARCH) {
+		fprintf(stderr,
+		        "cmdline_callback({ "
+		        ".path = \"%s\", "
+		        ".depth = %zu, "
+		        ".visit = %s, "
+		        ".typeflag = %s, "
+		        ".error = %d "
+		        "}) == %s\n",
+		        ftwbuf->path,
+		        ftwbuf->depth,
+		        dump_bftw_visit(ftwbuf->visit),
+			dump_bftw_typeflag(ftwbuf->typeflag),
+			ftwbuf->error,
+		        dump_bftw_action(state.action));
+	}
+
 	return state.action;
 }
 
@@ -1110,6 +1180,30 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
 }
 
 /**
+ * Dump the bftw() flags for -D search.
+ */
+static void dump_bftw_flags(enum bftw_flags flags) {
+#define DUMP_BFTW_FLAG(flag)			\
+	if (flags & flag) {			\
+		fputs(#flag, stderr);		\
+		flags ^= flag;			\
+		if (flags) {			\
+			fputs(" | ", stderr);	\
+		}				\
+	}
+
+	DUMP_BFTW_FLAG(BFTW_STAT);
+	DUMP_BFTW_FLAG(BFTW_RECOVER);
+	DUMP_BFTW_FLAG(BFTW_DEPTH);
+	DUMP_BFTW_FLAG(BFTW_COMFOLLOW);
+	DUMP_BFTW_FLAG(BFTW_LOGICAL);
+	DUMP_BFTW_FLAG(BFTW_DETECT_CYCLES);
+	DUMP_BFTW_FLAG(BFTW_XDEV);
+
+	assert(!flags);
+}
+
+/**
  * Evaluate the command line.
  */
 int eval_cmdline(const struct cmdline *cmdline) {
@@ -1133,6 +1227,12 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	};
 
 	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
+		if (cmdline->debug & DEBUG_SEARCH) {
+			fprintf(stderr, "bftw(\"%s\", cmdline_callback, %d, ", root->path, nopenfd);
+			dump_bftw_flags(cmdline->flags);
+			fprintf(stderr, ", &args)\n");
+		}
+
 		if (bftw(root->path, cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
 			args.ret = EXIT_FAILURE;
 			perror("bftw()");

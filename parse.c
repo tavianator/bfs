@@ -755,6 +755,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		printf("  exec:   Print executed command details.\n");
 		printf("  opt:    Print optimization details.\n");
 		printf("  rates:  Print predicate success rates.\n");
+		printf("  search: Trace the filesystem traversal.\n");
 		printf("  stat:   Trace all stat() calls.\n");
 		printf("  tree:   Print the parse tree.\n");
 
@@ -768,6 +769,8 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		cmdline->debug |= DEBUG_OPT;
 	} else if (strcmp(flag, "rates") == 0) {
 		cmdline->debug |= DEBUG_RATES;
+	} else if (strcmp(flag, "search") == 0) {
+		cmdline->debug |= DEBUG_SEARCH;
 	} else if (strcmp(flag, "stat") == 0) {
 		cmdline->debug |= DEBUG_STAT;
 	} else if (strcmp(flag, "tree") == 0) {
