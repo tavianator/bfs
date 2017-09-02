@@ -72,14 +72,15 @@ make_perms "$TMP/perms"
 
 # Creates a file+directory structure with various symbolic and hard links
 function make_links() {
-    touchp "$1/a"
-    ln -s a "$1/b"
-    ln "$1/a" "$1/c"
-    mkdir -p "$1/d/e/f"
-    ln -s ../../d "$1/d/e/g"
-    ln -s d/e "$1/h"
-    ln -s q "$1/d/e/i"
-    ln -s b/c "$1/j"
+    touchp "$1/file"
+    ln -s file "$1/symlink"
+    ln "$1/file" "$1/hardlink"
+    ln -s nowhere "$1/broken"
+    ln -s symlink/file "$1/notdir"
+    ln -s loop "$1/loop"
+    mkdir -p "$1/deeply/nested/dir"
+    ln -s ../../deeply "$1/deeply/nested/loop"
+    ln -s deeply/nested/loop/nested "$1/skip"
 }
 make_links "$TMP/links"
 
@@ -673,23 +674,23 @@ function test_links_minus() {
 }
 
 function test_P() {
-    bfs_diff -P links/d/e/f
+    bfs_diff -P links/deeply/nested/dir
 }
 
 function test_P_slash() {
-    bfs_diff -P links/d/e/f/
+    bfs_diff -P links/deeply/nested/dir/
 }
 
 function test_H() {
-    bfs_diff -H links/d/e/f
+    bfs_diff -H links/deeply/nested/dir
 }
 
 function test_H_slash() {
-    bfs_diff -H links/d/e/f/
+    bfs_diff -H links/deeply/nested/dir/
 }
 
 function test_H_broken() {
-    bfs_diff -H links/d/e/i
+    bfs_diff -H links/broken
 }
 
 function test_H_newer() {
@@ -713,31 +714,31 @@ function test_L_depth() {
 }
 
 function test_samefile() {
-    bfs_diff links -samefile links/a
+    bfs_diff links -samefile links/file
 }
 
 function test_samefile_symlink() {
-    bfs_diff links -samefile links/b
+    bfs_diff links -samefile links/symlink
 }
 
 function test_H_samefile_symlink() {
-    bfs_diff -H links -samefile links/b
+    bfs_diff -H links -samefile links/symlink
 }
 
 function test_samefile_broken() {
-    bfs_diff links -samefile links/d/e/i
+    bfs_diff links -samefile links/broken
 }
 
 function test_H_samefile_broken() {
-    bfs_diff -H links -samefile links/d/e/i
+    bfs_diff -H links -samefile links/broken
 }
 
 function test_xtype_l() {
-    bfs_diff links -xtype l
+    bfs_diff links -xtype l 2>/dev/null
 }
 
 function test_xtype_f() {
-    bfs_diff links -xtype f
+    bfs_diff links -xtype f 2>/dev/null
 }
 
 function test_L_xtype_l() {
@@ -749,7 +750,7 @@ function test_L_xtype_f() {
 }
 
 function test_xtype_multi() {
-    bfs_diff links -xtype f,d,c
+    bfs_diff links -xtype f,d,c 2>/dev/null
 }
 
 function test_iname() {
@@ -1244,23 +1245,23 @@ function test_fstype() {
 }
 
 function test_path_flag_expr() {
-    bfs_diff links/h -H -type l
+    bfs_diff links/skip -H -type l
 }
 
 function test_path_expr_flag() {
-    bfs_diff links/h -type l -H
+    bfs_diff links/skip -type l -H
 }
 
 function test_flag_expr_path() {
-    bfs_diff -H -type l links/h
+    bfs_diff -H -type l links/skip
 }
 
 function test_expr_flag_path() {
-    bfs_diff -type l -H links/h
+    bfs_diff -type l -H links/skip
 }
 
 function test_expr_path_flag() {
-    bfs_diff -type l links/h -H
+    bfs_diff -type l links/skip -H
 }
 
 function test_parens() {

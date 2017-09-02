@@ -1,6 +1,6 @@
 links
-links/a
-links/c
-links/d
-links/d/e
-links/d/e/f
+links/deeply
+links/file
+links/hardlink
+links/deeply/nested
+links/deeply/nested/dir

@@ -1,6 +1,5 @@
-links/b
-links/h
-links/j
-links/h/g
-links/h/i
-links/d/e/i
+links/broken
+links/notdir
+links/skip
+links/symlink
+links/skip/loop

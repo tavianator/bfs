@@ -1,3 +1,3 @@
-links/a
-links/b
-links/c
+links/file
+links/hardlink
+links/symlink

@@ -1,9 +1,9 @@
 links
-links/a
-links/b
-links/c
-links/d
-links/h
-links/d/e
-links/d/e/f
-links/d/e/g
+links/deeply
+links/file
+links/hardlink
+links/skip
+links/symlink
+links/deeply/nested
+links/deeply/nested/dir
+links/deeply/nested/loop
