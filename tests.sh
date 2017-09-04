@@ -121,7 +121,7 @@ function make_deep() {
     name="${name}${name}${name}${name}"
     name="${name:0:255}"
 
-    for i in {1..8}; do
+    for i in {0..9} A B C D E F; do
         (
             mkdir "$1/$i"
             cd "$1/$i"
@@ -208,7 +208,6 @@ posix_tests=(
     test_a
     test_o
     test_deep
-    test_deep_strict
 )
 
 bsd_tests=(
@@ -387,6 +386,7 @@ bfs_tests=(
     test_expr_flag_path
     test_expr_path_flag
     test_colors
+    test_deep_strict
 )
 
 BSD=yes
@@ -1311,17 +1311,16 @@ function test_colors() {
 function test_deep() {
     closefrom 4
 
-    ulimit -n 8
-    bfs_diff deep -mindepth 18
+    ulimit -n 16
+    bfs_diff deep -mindepth 18 -exec /bin/bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' /bin/bash '{}' \;
 }
 
 function test_deep_strict() {
-    # Low ulimit would interfere with the dup()'d stdout for verbose logging
     closefrom 4
 
     # Not even enough fds to keep the root open
     ulimit -n 6
-    bfs_diff deep -mindepth 18
+    bfs_diff deep -mindepth 18 -exec /bin/bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' /bin/bash '{}' \;
 }
 
 function test_exit() {
