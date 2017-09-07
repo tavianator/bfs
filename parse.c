@@ -1003,10 +1003,20 @@ static struct expr *parse_depth_limit(struct parser_state *state, int is_min, in
  */
 static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_nullary_test(state, eval_empty);
-	if (expr) {
-		expr->cost = 2000.0;
-		expr->probability = 0.01;
+	if (!expr) {
+		return NULL;
 	}
+
+	expr->cost = 2000.0;
+	expr->probability = 0.01;
+
+	if (state->cmdline->optlevel < 4) {
+		// Since -empty attempts to open and read directories, it may
+		// have side effects such as reporting permission errors, and
+		// thus shouldn't be re-ordered without aggressive optimizations
+		expr->pure = false;
+	}
+
 	return expr;
 }
 
@@ -2103,6 +2113,14 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 
 	expr->idata = types;
 	expr->probability = probability;
+
+	if (x && state->cmdline->optlevel < 4) {
+		// Since -xtype dereferences symbolic links, it may have side
+		// effects such as reporting permission errors, and thus
+		// shouldn't be re-ordered without aggressive optimizations
+		expr->pure = false;
+	}
+
 	return expr;
 
 fail:

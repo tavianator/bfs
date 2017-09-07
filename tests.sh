@@ -374,6 +374,7 @@ gnu_tests=(
 bfs_tests=(
     test_type_multi
     test_xtype_multi
+    test_xtype_reorder
     test_perm_symbolic_trailing_comma
     test_perm_symbolic_double_comma
     test_perm_symbolic_missing_action
@@ -753,6 +754,13 @@ function test_L_xtype_f() {
 
 function test_xtype_multi() {
     bfs_diff links -xtype f,d,c 2>/dev/null
+}
+
+function test_xtype_reorder() {
+    # Make sure -xtype is not reordered in front of anything -- if -xtype runs
+    # before -links 100, it will report an ELOOP error
+    bfs_diff links -links 100 -xtype l
+    invoke_bfs links -links 100 -xtype l
 }
 
 function test_iname() {
