@@ -226,10 +226,14 @@ const char *xbasename(const char *path) {
 	return i;
 }
 
+bool is_nonexistence_error(int error) {
+	return error == ENOENT || errno == ENOTDIR;
+}
+
 int xfstatat(int fd, const char *path, struct stat *buf, int flags) {
 	int ret = fstatat(fd, path, buf, flags);
 
-	if (ret != 0 && !(flags & AT_SYMLINK_NOFOLLOW) && (errno == ENOENT || errno == ENOTDIR)) {
+	if (ret != 0 && !(flags & AT_SYMLINK_NOFOLLOW) && is_nonexistence_error(errno)) {
 		flags |= AT_SYMLINK_NOFOLLOW;
 		ret = fstatat(fd, path, buf, flags);
 	}

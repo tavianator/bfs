@@ -56,7 +56,7 @@ struct eval_state {
  */
 static bool eval_should_ignore(const struct eval_state *state, int error) {
 	return state->cmdline->ignore_races
-		&& (error == ENOENT || errno == ENOTDIR)
+		&& is_nonexistence_error(error)
 		&& state->ftwbuf->depth > 0;
 }
 
@@ -829,7 +829,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 
 	struct stat sb;
 	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, at_flags) != 0) {
-		if (!follow && (errno == ENOENT || errno == ENOTDIR)) {
+		if (!follow && is_nonexistence_error(errno)) {
 			// Broken symlink
 			return eval_type(expr, state);
 		} else {

@@ -143,6 +143,11 @@ void format_mode(mode_t mode, char str[11]);
 const char *xbasename(const char *path);
 
 /**
+ * Return whether an error code is due to a path not existing.
+ */
+bool is_nonexistence_error(int error);
+
+/**
  * stat() a file, falling back on the link itself for broken symbolic links.
  *
  * @param fd
