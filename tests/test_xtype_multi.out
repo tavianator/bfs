@@ -2,7 +2,6 @@ links
 links/deeply
 links/file
 links/hardlink
-links/hardsymlink
 links/skip
 links/symlink
 links/deeply/nested
