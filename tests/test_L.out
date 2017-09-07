@@ -2,7 +2,9 @@ links
 links/broken
 links/deeply
 links/file
+links/hardbroken
 links/hardlink
+links/hardsymlink
 links/notdir
 links/skip
 links/symlink

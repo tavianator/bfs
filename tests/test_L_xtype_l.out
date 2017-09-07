@@ -1,4 +1,6 @@
 links/broken
+links/hardbroken
+links/hardsymlink
 links/notdir
 links/skip
 links/symlink

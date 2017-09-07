@@ -1,8 +1,10 @@
 [01;34m[0m[01;34mlinks[0m
 [01;34mlinks/[0m[01;34mdeeply[0m
+[01;34mlinks/[0m[01;36mhardsymlink[0m
 [01;34mlinks/[0m[01;36mskip[0m
 [01;34mlinks/[0m[01;36msymlink[0m
 [01;34mlinks/[0m[40;31;01mbroken[0m
+[01;34mlinks/[0m[40;31;01mhardbroken[0m
 [01;34mlinks/[0m[40;31;01mloop[0m
 [01;34mlinks/[0m[40;31;01mnotdir[0m
 [01;34mlinks/[0mfile

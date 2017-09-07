@@ -1,3 +1,4 @@
 links/file
 links/hardlink
+links/hardsymlink
 links/symlink
