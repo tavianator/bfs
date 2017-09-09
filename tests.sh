@@ -129,7 +129,7 @@ function make_deep() {
             # 17 * 256 > 16 * 256 == 4096 == PATH_MAX
             for j in {1..17}; do
                 mkdir "$name"
-                cd "$name"
+                cd "$name" 2>/dev/null
             done
         )
     done
