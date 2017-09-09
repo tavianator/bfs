@@ -1170,13 +1170,12 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
 		closedir(dir);
 	}
 
-	// Extra fd needed by -empty
-	int reserved = nopen + 1;
+	// 1 extra fd needed by -empty
+	ret -= nopen + 1;
 
-	if (ret > reserved) {
-		ret -= reserved;
-	} else {
-		ret = 1;
+	// bftw() needs at least 2 available fds
+	if (ret < 2) {
+		ret = 2;
 	}
 
 	return ret;
