@@ -1147,9 +1147,12 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
 	// 3 for std{in,out,err}
 	int nopen = 3 + cmdline->nopen_files;
 
-	// Check /dev/fd for the current number of open fds, if possible (we may
-	// have inherited more than just the standard ones)
-	DIR *dir = opendir("/dev/fd");
+	// Check /proc/self/fd for the current number of open fds, if possible
+	// (we may have inherited more than just the standard ones)
+	DIR *dir = opendir("/proc/self/fd");
+	if (!dir) {
+		dir = opendir("/dev/fd");
+	}
 	if (dir) {
 		// Account for 'dir' itself
 		nopen = -1;

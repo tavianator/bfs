@@ -510,12 +510,18 @@ function bfs_diff() (
 )
 
 function closefrom() {
-    for fd in /dev/fd/*; do
+    if [ -d /proc/self/fd ]; then
+        local fds=/proc/self/fd
+    else
+        local fds=/dev/fd
+    fi
+
+    for fd in "$fds"/*; do
         if [ ! -e "$fd" ]; then
             continue
         fi
 
-        fd="${fd##*/}"
+        local fd="${fd##*/}"
         if [ "$fd" -ge "$1" ]; then
             eval "exec ${fd}<&-"
         fi
