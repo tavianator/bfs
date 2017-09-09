@@ -30,14 +30,20 @@
 #	define BFS_MNTENT 1
 #elif BSD
 #	define BFS_MNTINFO 1
+#elif __SVR4
+#	define BFS_MNTTAB 1
 #endif
 
 #if BFS_MNTENT
 #	include <mntent.h>
 #	include <paths.h>
+#	include <stdio.h>
 #elif BFS_MNTINFO
 #	include <sys/mount.h>
 #	include <sys/ucred.h>
+#elif BFS_MNTTAB
+#	include <stdio.h>
+#	include <sys/mnttab.h>
 #endif
 
 /**
@@ -159,6 +165,43 @@ fail:
 
 fail_mtab:
 	free_bfs_mtab(mtab);
+fail:
+	return NULL;
+
+#elif BFS_MNTTAB
+
+	FILE *file = fopen(MNTTAB, "r");
+	if (!file) {
+		goto fail;
+	}
+
+	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
+	if (!mtab) {
+		goto fail_file;
+	}
+	mtab->table = NULL;
+	mtab->size = 0;
+	mtab->capacity = 0;
+
+	struct mnttab mnt;
+	while (getmntent(file, &mnt) == 0) {
+		struct stat sb;
+		if (stat(mnt.mnt_mountp, &sb) != 0) {
+			continue;
+		}
+
+		if (bfs_mtab_push(mtab, sb.st_dev, mnt.mnt_fstype) != 0) {
+			goto fail_mtab;
+		}
+	}
+
+	fclose(file);
+	return mtab;
+
+fail_mtab:
+	free_bfs_mtab(mtab);
+fail_file:
+	fclose(file);
 fail:
 	return NULL;
 
