@@ -2,6 +2,18 @@
 ===
 
 
+1.1.2
+-----
+
+**September 10, 2017**
+
+- Fixed `-samefile` and similar predicates when passed broken symbolic links
+- Implemented `-fstype` on Solaris
+- Fixed `-fstype` under musl
+- Implemented `-D search`
+- Implemented a cost-based optimizer
+
+
 1.1.1
 -----
 
