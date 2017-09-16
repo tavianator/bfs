@@ -208,6 +208,12 @@ posix_tests=(
     test_a
     test_o
     test_deep
+    test_double_negation
+    test_not_reachability
+    test_de_morgan_not
+    test_de_morgan_and
+    test_de_morgan_or
+    test_data_flow_type
 )
 
 bsd_tests=(
@@ -270,6 +276,7 @@ bsd_tests=(
     test_nouser
     test_exit
     test_printx
+    test_data_flow_depth
 )
 
 gnu_tests=(
@@ -367,6 +374,7 @@ gnu_tests=(
     test_precedence
     test_and_purity
     test_or_purity
+    test_comma_reachability
 )
 
 bfs_tests=(
@@ -1363,6 +1371,38 @@ function test_and_purity() {
 function test_or_purity() {
     # Regression test: (-o lhs(pure) rhs(always_true)) <==> rhs is only valid if rhs is pure
     bfs_diff basic -name '*' -o -print
+}
+
+function test_double_negation() {
+    bfs_diff basic \! \! -name 'foo'
+}
+
+function test_not_reachability() {
+    bfs_diff basic -print \! -quit -print
+}
+
+function test_comma_reachability() {
+    bfs_diff basic -print -quit , -print
+}
+
+function test_de_morgan_not() {
+    bfs_diff basic \! \( -name 'foo' -o \! -type f \)
+}
+
+function test_de_morgan_and() {
+    bfs_diff basic \( \! -name 'foo' -a \! -type f \)
+}
+
+function test_de_morgan_or() {
+    bfs_diff basic \( \! -name 'foo' -o \! -type f \)
+}
+
+function test_data_flow_depth() {
+    bfs_diff basic -depth +1 -depth -4
+}
+
+function test_data_flow_type() {
+    bfs_diff basic \! \( -type f -o \! -type f \)
 }
 
 if [ -t 1 -a ! "$VERBOSE" ]; then
