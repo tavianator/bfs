@@ -15,9 +15,10 @@
  ****************************************************************************/
 
 #include "printf.h"
-#include "bfs.h"
+#include "cmdline.h"
 #include "color.h"
 #include "dstring.h"
+#include "expr.h"
 #include "mtab.h"
 #include "util.h"
 #include <assert.h>

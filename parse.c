@@ -15,8 +15,12 @@
  ****************************************************************************/
 
 #include "bfs.h"
+#include "cmdline.h"
 #include "dstring.h"
+#include "eval.h"
 #include "exec.h"
+#include "expr.h"
+#include "mtab.h"
 #include "printf.h"
 #include "typo.h"
 #include "util.h"
@@ -41,7 +45,6 @@
 // Strings printed by -D tree for "fake" expressions
 static char *fake_and_arg = "-a";
 static char *fake_false_arg = "-false";
-static char *fake_or_arg = "-o";
 static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
 
@@ -50,10 +53,7 @@ static char *fake_true_arg = "-true";
 #define STAT_COST   1000.0
 #define PRINT_COST 20000.0
 
-/**
- * Singleton true expression instance.
- */
-static struct expr expr_true = {
+struct expr expr_true = {
 	.eval = eval_true,
 	.lhs = NULL,
 	.rhs = NULL,
@@ -65,10 +65,7 @@ static struct expr expr_true = {
 	.argv = &fake_true_arg,
 };
 
-/**
- * Singleton false expression instance.
- */
-static struct expr expr_false = {
+struct expr expr_false = {
 	.eval = eval_false,
 	.lhs = NULL,
 	.rhs = NULL,
@@ -83,7 +80,7 @@ static struct expr expr_false = {
 /**
  * Free an expression.
  */
-static void free_expr(struct expr *expr) {
+void free_expr(struct expr *expr) {
 	if (expr && expr != &expr_true && expr != &expr_false) {
 		if (expr->cfile && expr->cfile->close) {
 			if (cfclose(expr->cfile) != 0) {
@@ -105,11 +102,8 @@ static void free_expr(struct expr *expr) {
 	}
 }
 
-/**
- * Create a new expression.
- */
-static struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
-	struct expr *expr = malloc(sizeof(struct expr));
+struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
+	struct expr *expr = malloc(sizeof(*expr));
 	if (!expr) {
 		perror("malloc()");
 		return NULL;
@@ -192,7 +186,7 @@ static void expr_set_never_returns(struct expr *expr) {
 /**
  * Dump the parsed expression tree, for debugging.
  */
-static void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
+void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 	fputs("(", cfile->file);
 
 	if (expr->lhs || expr->rhs) {
@@ -318,46 +312,6 @@ enum token_type {
 	/** An operator. */
 	T_OPERATOR,
 };
-
-/**
- * Log an optimization.
- */
-static void debug_opt(const struct parser_state *state, const char *format, ...) {
-	if (!(state->cmdline->debug & DEBUG_OPT)) {
-		return;
-	}
-
-	CFILE *cerr = state->cmdline->cerr;
-
-	va_list args;
-	va_start(args, format);
-
-	for (const char *i = format; *i != '\0'; ++i) {
-		if (*i == '%') {
-			switch (*++i) {
-			case '%':
-				fputc('%', stderr);
-				break;
-
-			case 'e':
-				dump_expr(cerr, va_arg(args, const struct expr *), false);
-				break;
-
-			case 'g':
-				cfprintf(cerr, "%{ylw}%g%{rs}", va_arg(args, double));
-				break;
-
-			case 's':
-				cfprintf(cerr, "%{red}%s%{rs}", va_arg(args, const char *));
-				break;
-			}
-		} else {
-			fputc(*i, stderr);
-		}
-	}
-
-	va_end(args);
-}
 
 /**
  * Fill in a "-print"-type expression.
@@ -2578,76 +2532,6 @@ unexpected:
 	return NULL;
 }
 
-static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv);
-static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv);
-
-/**
- * Extract a child expression, freeing the outer expression.
- */
-static struct expr *extract_child_expr(struct expr *expr, struct expr **child) {
-	struct expr *ret = *child;
-	*child = NULL;
-	free_expr(expr);
-	return ret;
-}
-
-/**
- * Create a "not" expression.
- */
-static struct expr *new_not_expr(const struct parser_state *state, struct expr *rhs, char **argv) {
-	int optlevel = state->cmdline->optlevel;
-	if (optlevel >= 1) {
-		if (rhs == &expr_true) {
-			debug_opt(state, "-O1: constant propagation: (%s %e) <==> %e\n", argv[0], rhs, &expr_false);
-			return &expr_false;
-		} else if (rhs == &expr_false) {
-			debug_opt(state, "-O1: constant propagation: (%s %e) <==> %e\n", argv[0], rhs, &expr_true);
-			return &expr_true;
-		} else if (expr_never_returns(rhs)) {
-			debug_opt(state, "-O1: reachability: (%s %e) <==> %e\n", argv[0], rhs, rhs);
-			return rhs;
-		} else if (rhs->eval == eval_not) {
-			debug_opt(state, "-O1: double negation: (%s %e) <==> %e\n", argv[0], rhs, rhs->rhs);
-			return extract_child_expr(rhs, &rhs->rhs);
-		} else if ((rhs->eval == eval_and || rhs->eval == eval_or)
-			   && (rhs->lhs->eval == eval_not || rhs->rhs->eval == eval_not)) {
-			bool other_and = rhs->eval == eval_or;
-			char **other_arg = other_and ? &fake_and_arg : &fake_or_arg;
-
-			debug_opt(state, "-O1: De Morgan's laws: (%s %e) <==> (%s (%s %e) (%s %e))\n",
-				  argv[0], rhs,
-				  *other_arg, argv[0], rhs->lhs, argv[0], rhs->rhs);
-
-			struct expr *other_lhs = new_not_expr(state, rhs->lhs, argv);
-			struct expr *other_rhs = new_not_expr(state, rhs->rhs, argv);
-			rhs->rhs = NULL;
-			rhs->lhs = NULL;
-			free_expr(rhs);
-			if (!other_lhs || !other_rhs) {
-				free_expr(other_rhs);
-				free_expr(other_lhs);
-				return NULL;
-			}
-
-			if (other_and) {
-				return new_and_expr(state, other_lhs, other_rhs, other_arg);
-			} else {
-				return new_or_expr(state, other_lhs, other_rhs, other_arg);
-			}
-		}
-	}
-
-	struct expr *expr = new_unary_expr(eval_not, rhs, argv);
-	if (expr) {
-		expr->pure = rhs->pure;
-		expr->always_true = rhs->always_false;
-		expr->always_false = rhs->always_true;
-		expr->cost = rhs->cost;
-		expr->probability = 1.0 - rhs->probability;
-	}
-	return expr;
-}
-
 /**
  * FACTOR : "(" EXPR ")"
  *        | "!" FACTOR | "-not" FACTOR
@@ -2696,73 +2580,10 @@ static struct expr *parse_factor(struct parser_state *state) {
 			return NULL;
 		}
 
-		return new_not_expr(state, factor, argv);
+		return new_unary_expr(eval_not, factor, argv);
 	} else {
 		return parse_literal(state);
 	}
-}
-
-/**
- * Create an "and" expression.
- */
-static struct expr *new_and_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	int optlevel = state->cmdline->optlevel;
-	if (optlevel >= 1) {
-		if (lhs == &expr_true) {
-			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			return rhs;
-		} else if (rhs == &expr_true) {
-			debug_opt(state, "-O1: conjunction elimination: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
-			return lhs;
-		} else if (lhs->always_false) {
-			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
-			free_expr(rhs);
-			return lhs;
-		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_false) {
-			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			free_expr(lhs);
-			return rhs;
-		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
-			char **not_arg = lhs->argv;
-			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
-			          argv[0], lhs, rhs,
-				  *not_arg, fake_or_arg, lhs->rhs, rhs->rhs);
-
-			lhs = extract_child_expr(lhs, &lhs->rhs);
-			rhs = extract_child_expr(rhs, &rhs->rhs);
-
-			struct expr *or_expr = new_or_expr(state, lhs, rhs, &fake_or_arg);
-			if (!or_expr) {
-				return NULL;
-			}
-
-			return new_not_expr(state, or_expr, not_arg);
-		}
-	}
-
-	struct expr *expr = new_binary_expr(eval_and, lhs, rhs, argv);
-	if (!expr) {
-		return NULL;
-	}
-
-	expr->pure = lhs->pure && rhs->pure;
-	expr->always_true = lhs->always_true && rhs->always_true;
-	expr->always_false = lhs->always_false || rhs->always_false;
-	expr->cost = lhs->cost + lhs->probability*rhs->cost;
-	expr->probability = lhs->probability*rhs->probability;
-
-	if (optlevel >= 3 && lhs->pure && rhs->pure) {
-		double swapped_cost = rhs->cost + rhs->probability*lhs->cost;
-		if (swapped_cost < expr->cost) {
-			debug_opt(state, "-O3: cost: %e <==> (%s %e %e) (~%g --> ~%g)\n",
-			          expr, argv[0], rhs, lhs, expr->cost, swapped_cost);
-			expr->cost = swapped_cost;
-			expr->lhs = rhs;
-			expr->rhs = lhs;
-		}
-	}
-
-	return expr;
 }
 
 /**
@@ -2803,74 +2624,10 @@ static struct expr *parse_term(struct parser_state *state) {
 			return NULL;
 		}
 
-		term = new_and_expr(state, lhs, rhs, argv);
+		term = new_binary_expr(eval_and, lhs, rhs, argv);
 	}
 
 	return term;
-}
-
-/**
- * Create an "or" expression.
- */
-static struct expr *new_or_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	int optlevel = state->cmdline->optlevel;
-	if (optlevel >= 1) {
-		if (lhs->always_true) {
-			debug_opt(state, "-O1: short-circuit: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
-			free_expr(rhs);
-			return lhs;
-		} else if (lhs == &expr_false) {
-			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			return rhs;
-		} else if (rhs == &expr_false) {
-			debug_opt(state, "-O1: disjunctive syllogism: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
-			return lhs;
-		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_true) {
-			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			free_expr(lhs);
-			return rhs;
-		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
-			char **not_arg = lhs->argv;
-			debug_opt(state, "-O1: De Morgan's laws: (%s %e %e) <==> (%s (%s %e %e))\n",
-			          argv[0], lhs, rhs,
-				  *not_arg, fake_and_arg, lhs->rhs, rhs->rhs);
-
-			lhs = extract_child_expr(lhs, &lhs->rhs);
-			rhs = extract_child_expr(rhs, &rhs->rhs);
-
-			struct expr *and_expr = new_and_expr(state, lhs, rhs, &fake_and_arg);
-			if (!and_expr) {
-				return NULL;
-			}
-
-			return new_not_expr(state, and_expr, not_arg);
-		}
-	}
-
-	struct expr *expr = new_binary_expr(eval_or, lhs, rhs, argv);
-	if (!expr) {
-		return NULL;
-	}
-
-	expr->pure = lhs->pure && rhs->pure;
-	expr->always_true = lhs->always_true || rhs->always_true;
-	expr->always_false = lhs->always_false && rhs->always_false;
-	expr->cost = lhs->cost + (1 - lhs->probability)*rhs->cost;
-	expr->probability = lhs->probability + rhs->probability - lhs->probability*rhs->probability;
-
-	if (optlevel >= 3 && lhs->pure && rhs->pure) {
-		double swapped_cost = rhs->cost + (1 - rhs->probability)*lhs->cost;
-		if (swapped_cost < expr->cost) {
-			debug_opt(state, "-O3: cost: %e <==> (%s %e %e) (~%g --> ~%g)\n",
-			          expr, argv[0], rhs, lhs, expr->cost, swapped_cost);
-			expr->cost = swapped_cost;
-			expr->lhs = rhs;
-			expr->rhs = lhs;
-		}
-
-	}
-
-	return expr;
 }
 
 /**
@@ -2905,47 +2662,10 @@ static struct expr *parse_clause(struct parser_state *state) {
 			return NULL;
 		}
 
-		clause = new_or_expr(state, lhs, rhs, argv);
+		clause = new_binary_expr(eval_or, lhs, rhs, argv);
 	}
 
 	return clause;
-}
-
-/**
- * Create a "comma" expression.
- */
-static struct expr *new_comma_expr(const struct parser_state *state, struct expr *lhs, struct expr *rhs, char **argv) {
-	int optlevel = state->cmdline->optlevel;
-	if (optlevel >= 1) {
-		if (lhs->eval == eval_not) {
-			debug_opt(state, "-O1: ignored result: (%s %e %e) <==> (%s %e %e)\n",
-			          argv[0], lhs, rhs,
-				  argv[0], lhs->rhs, rhs);
-			lhs = extract_child_expr(lhs, &lhs->rhs);
-		}
-
-		if (expr_never_returns(lhs)) {
-			debug_opt(state, "-O1: reachability: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, lhs);
-			free_expr(rhs);
-			return lhs;
-		}
-
-		if (optlevel >= 2 && lhs->pure) {
-			debug_opt(state, "-O2: purity: (%s %e %e) <==> %e\n", argv[0], lhs, rhs, rhs);
-			free_expr(lhs);
-			return rhs;
-		}
-	}
-
-	struct expr *expr = new_binary_expr(eval_comma, lhs, rhs, argv);
-	if (expr) {
-		expr->pure = lhs->pure && rhs->pure;
-		expr->always_true = expr_never_returns(lhs) || rhs->always_true;
-		expr->always_false = expr_never_returns(lhs) || rhs->always_false;
-		expr->cost = lhs->cost + rhs->cost;
-		expr->probability = rhs->probability;
-	}
-	return expr;
 }
 
 /**
@@ -2979,38 +2699,7 @@ static struct expr *parse_expr(struct parser_state *state) {
 			return NULL;
 		}
 
-		expr = new_comma_expr(state, lhs, rhs, argv);
-	}
-
-	return expr;
-}
-
-/**
- * Apply top-level optimizations.
- */
-static struct expr *optimize_whole_expr(const struct parser_state *state, struct expr *expr) {
-	int optlevel = state->cmdline->optlevel;
-
-	if (optlevel >= 1) {
-		while (true) {
-			if (expr->eval == eval_not) {
-				debug_opt(state, "-O1: ignored result: %e --> %e\n", expr, expr->rhs);
-				expr = extract_child_expr(expr, &expr->rhs);
-			} else if (optlevel >= 2
-			           && (expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
-			           && expr->rhs->pure) {
-				debug_opt(state, "-O2: ignored result: %e --> %e\n", expr, expr->lhs);
-				expr = extract_child_expr(expr, &expr->lhs);
-			} else {
-				break;
-			}
-		}
-	}
-
-	if (optlevel >= 4 && expr->pure && expr != &expr_false) {
-		debug_opt(state, "-O4: top-level purity: %e --> %e\n", expr, &expr_false);
-		free_expr(expr);
-		expr = &expr_false;
+		expr = new_binary_expr(eval_comma, lhs, rhs, argv);
 	}
 
 	return expr;
@@ -3046,13 +2735,11 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 		}
 		init_print_expr(state, print);
 
-		expr = new_and_expr(state, expr, print, &fake_and_arg);
+		expr = new_binary_expr(eval_and, expr, print, &fake_and_arg);
 		if (!expr) {
 			goto fail;
 		}
 	}
-
-	expr = optimize_whole_expr(state, expr);
 
 	if (state->warn && state->depth_arg && state->prune_arg) {
 		cfprintf(cerr, "%{wr}warning: %s does not work in the presence of %s.%{rs}\n", state->prune_arg, state->depth_arg);
@@ -3250,6 +2937,10 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		} else {
 			goto fail;
 		}
+	}
+
+	if (optimize_cmdline(cmdline) != 0) {
+		goto fail;
 	}
 
 	if (!cmdline->roots) {

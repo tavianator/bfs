@@ -14,11 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#include "bfs.h"
+#include "eval.h"
 #include "bftw.h"
+#include "cmdline.h"
 #include "color.h"
 #include "dstring.h"
+#include "exec.h"
 #include "mtab.h"
+#include "printf.h"
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>

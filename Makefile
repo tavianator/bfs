@@ -49,7 +49,7 @@ ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
 
 all: bfs
 
-bfs: bftw.o color.o dstring.o eval.o exec.o main.o mtab.o parse.o printf.o typo.o util.o
+bfs: bftw.o color.o dstring.o eval.o exec.o main.o mtab.o opt.o parse.o printf.o typo.o util.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 release: CFLAGS := -O3 -flto $(WFLAGS) -DNDEBUG -g

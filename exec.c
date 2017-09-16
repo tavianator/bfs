@@ -15,8 +15,8 @@
  ****************************************************************************/
 
 #include "exec.h"
-#include "bfs.h"
 #include "bftw.h"
+#include "cmdline.h"
 #include "color.h"
 #include "dstring.h"
 #include "util.h"
