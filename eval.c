@@ -1091,7 +1091,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		goto done;
 	}
 
-	if (ftwbuf->depth >= cmdline->maxdepth) {
+	if (cmdline->maxdepth < 0 || ftwbuf->depth >= cmdline->maxdepth) {
 		state.action = BFTW_SKIP_SUBTREE;
 	}
 
@@ -1213,13 +1213,6 @@ static void dump_bftw_flags(enum bftw_flags flags) {
  */
 int eval_cmdline(const struct cmdline *cmdline) {
 	if (!cmdline->expr) {
-		return EXIT_SUCCESS;
-	}
-
-	if (cmdline->optlevel >= 4 && cmdline->expr->eval == eval_false) {
-		if (cmdline->debug & DEBUG_OPT) {
-			fputs("-O4: skipping evaluation of top-level -false\n", stderr);
-		}
 		return EXIT_SUCCESS;
 	}
 
