@@ -61,6 +61,13 @@ static bool facts_impossible(const struct opt_facts *facts) {
 	return facts->mindepth > facts->maxdepth || !facts->types;
 }
 
+/** Set some facts to be impossible. */
+static void set_facts_impossible(struct opt_facts *facts) {
+	facts->mindepth = INT_MAX;
+	facts->maxdepth = -1;
+	facts->types = 0;
+}
+
 /**
  * Optimizer state.
  */
@@ -556,7 +563,18 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
-	if (!expr || expr == &expr_true || expr == &expr_false || state->cmdline->optlevel < 2) {
+	if (!expr) {
+		goto done;
+	}
+
+	if (expr->always_true) {
+		set_facts_impossible(&state->facts_when_false);
+	}
+	if (expr->always_false) {
+		set_facts_impossible(&state->facts_when_true);
+	}
+
+	if (state->cmdline->optlevel < 2 || expr == &expr_true || expr == &expr_false) {
 		goto done;
 	}
 
@@ -585,11 +603,8 @@ done:
 }
 
 int optimize_cmdline(struct cmdline *cmdline) {
-	struct opt_facts facts_when_impure = {
-		.mindepth = INT_MAX,
-		.maxdepth = -1,
-		.types = 0,
-	};
+	struct opt_facts facts_when_impure;
+	set_facts_impossible(&facts_when_impure);
 
 	struct opt_state state = {
 		.cmdline = cmdline,
