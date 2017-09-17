@@ -466,7 +466,7 @@ fail:
 }
 
 /** Optimize an expression in an ignored-result context. */
-static struct expr *ignore_result(const struct opt_state *state, struct expr *expr, int purelevel) {
+static struct expr *ignore_result(const struct opt_state *state, struct expr *expr) {
 	int optlevel = state->cmdline->optlevel;
 
 	if (optlevel >= 1) {
@@ -474,18 +474,18 @@ static struct expr *ignore_result(const struct opt_state *state, struct expr *ex
 			if (expr->eval == eval_not) {
 				debug_opt(state, "-O1: ignored result: %e --> %e\n", expr, expr->rhs);
 				expr = extract_child_expr(expr, &expr->rhs);
-			} else if (optlevel >= purelevel
+			} else if (optlevel >= 2
 			           && (expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
 			           && expr->rhs->pure) {
-				debug_opt(state, "-O%d: ignored result: %e --> %e\n", purelevel, expr, expr->lhs);
+				debug_opt(state, "-O2: ignored result: %e --> %e\n", expr, expr->lhs);
 				expr = extract_child_expr(expr, &expr->lhs);
 			} else {
 				break;
 			}
 		}
 
-		if (optlevel >= purelevel && expr->pure && expr != &expr_false) {
-			debug_opt(state, "-O%d: ignored result: %e --> %e\n", purelevel, expr, &expr_false);
+		if (optlevel >= 2 && expr->pure && expr != &expr_false) {
+			debug_opt(state, "-O2: ignored result: %e --> %e\n", expr, &expr_false);
 			free_expr(expr);
 			expr = &expr_false;
 		}
@@ -503,7 +503,7 @@ static struct expr *optimize_comma_expr(const struct opt_state *state, struct ex
 
 	int optlevel = state->cmdline->optlevel;
 	if (optlevel >= 1) {
-		lhs = expr->lhs = ignore_result(state, lhs, 2);
+		lhs = expr->lhs = ignore_result(state, lhs);
 
 		if (expr_never_returns(lhs)) {
 			debug_opt(state, "-O1: reachability: %e <==> %e\n", expr, lhs);
@@ -625,26 +625,17 @@ int optimize_cmdline(struct cmdline *cmdline) {
 		return -1;
 	}
 
-	cmdline->expr = ignore_result(&state, cmdline->expr, 4);
+	cmdline->expr = ignore_result(&state, cmdline->expr);
 
-	int minlevel = 2;
-	if (facts_impossible(&facts_when_impure)) {
-		// If we've detected that all side effects are unreachable, the
-		// following optimization will skip the entire traversal, so
-		// only do it at -O4
-		minlevel = 4;
+	int optlevel = cmdline->optlevel;
+
+	if (optlevel >= 2 && facts_when_impure.mindepth > cmdline->mindepth) {
+		debug_opt(&state, "-O2: data flow: mindepth --> %d\n", facts_when_impure.mindepth);
+		cmdline->mindepth = facts_when_impure.mindepth;
 	}
-
-	if (cmdline->optlevel >= minlevel) {
-		if (facts_when_impure.mindepth > cmdline->mindepth) {
-			debug_opt(&state, "-O%d: data flow: mindepth --> %d\n", minlevel, facts_when_impure.mindepth);
-			cmdline->mindepth = facts_when_impure.mindepth;
-		}
-
-		if (facts_when_impure.maxdepth < cmdline->maxdepth) {
-			debug_opt(&state, "-O%d: data flow: maxdepth --> %d\n", minlevel, facts_when_impure.maxdepth);
-			cmdline->maxdepth = facts_when_impure.maxdepth;
-		}
+	if (optlevel >= 4 && facts_when_impure.maxdepth < cmdline->maxdepth) {
+		debug_opt(&state, "-O4: data flow: maxdepth --> %d\n", facts_when_impure.maxdepth);
+		cmdline->maxdepth = facts_when_impure.maxdepth;
 	}
 
 	return 0;
