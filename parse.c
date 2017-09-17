@@ -2167,7 +2167,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{cyn}-D%{rs} %{bld}FLAG%{rs}\n");
 	cfprintf(cout, "      Turn on a debugging flag (see %{cyn}-D%{rs} %{bld}help%{rs})\n");
 	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}N%{rs}\n");
-	cfprintf(cout, "      Enable optimization level %{bld}N%{rs} (default: 3)\n\n");
+	cfprintf(cout, "      Enable optimization level %{bld}N%{rs} (default: 3; interpreted differently than GNU\n");
+	cfprintf(cout, "      find -- see below)\n\n");
 
 	cfprintf(cout, "  %{blu}-d%{rs}\n");
 	cfprintf(cout, "      Search in post-order (same as %{blu}-depth%{rs})\n");
@@ -2299,7 +2300,19 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-rm%{rs}\n");
 	cfprintf(cout, "      Delete any found files (same as %{blu}-delete%{rs}; implies %{blu}-depth%{rs})\n\n");
 
-	cfprintf(cout, "%{bld}Extra features:%{rs}\n\n");
+	cfprintf(cout, "%{ex}bfs%{rs}%{bld}-specific features:%{rs}\n\n");
+
+	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}0%{rs}\n");
+	cfprintf(cout, "      Disable all optimizations\n");
+	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}1%{rs}\n");
+	cfprintf(cout, "      Basic logical simplification\n");
+	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}2%{rs}\n");
+	cfprintf(cout, "      All %{cyn}-O%{rs}%{bld}1%{rs} optimizations, plus dead code elimination and data flow analysis\n");
+	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}3%{rs} (default)\n");
+	cfprintf(cout, "      All %{cyn}-O%{rs}%{bld}2%{rs} optimizations, plus re-order expressions to reduce expected cost\n");
+	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}4%{rs}/%{cyn}-O%{rs}%{bld}fast%{rs}\n");
+	cfprintf(cout, "      All optimizations, including aggressive optimizations that may alter the\n");
+	cfprintf(cout, "      observed behavior in corner cases\n\n");
 
 	cfprintf(cout, "  %{blu}-color%{rs}\n");
 	cfprintf(cout, "  %{blu}-nocolor%{rs}\n");
