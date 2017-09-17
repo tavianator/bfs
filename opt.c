@@ -151,7 +151,7 @@ static void infer_depth_facts(struct opt_state *state, const struct expr *expr) 
 		break;
 
 	case CMP_GREATER:
-		if (expr->idata == LONG_LONG_MAX) {
+		if (expr->idata == LLONG_MAX) {
 			// Avoid overflow
 			state->facts_when_true.maxdepth = -1;
 		} else {
