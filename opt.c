@@ -120,14 +120,18 @@ static void debug_opt(const struct opt_state *state, const char *format, ...) {
 }
 
 /** Update the inferred mindepth. */
-static void update_mindepth(struct opt_facts *facts, int mindepth) {
+static void update_mindepth(struct opt_facts *facts, long long mindepth) {
 	if (mindepth > facts->mindepth) {
-		facts->mindepth = mindepth;
+		if (mindepth > INT_MAX) {
+			facts->maxdepth = -1;
+		} else {
+			facts->mindepth = mindepth;
+		}
 	}
 }
 
 /** Update the inferred maxdepth. */
-static void update_maxdepth(struct opt_facts *facts, int maxdepth) {
+static void update_maxdepth(struct opt_facts *facts, long long maxdepth) {
 	if (maxdepth < facts->maxdepth) {
 		facts->maxdepth = maxdepth;
 	}
@@ -147,7 +151,7 @@ static void infer_depth_facts(struct opt_state *state, const struct expr *expr) 
 		break;
 
 	case CMP_GREATER:
-		if (expr->idata == INT_MAX) {
+		if (expr->idata == LONG_LONG_MAX) {
 			// Avoid overflow
 			state->facts_when_true.maxdepth = -1;
 		} else {

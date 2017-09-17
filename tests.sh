@@ -259,6 +259,7 @@ bsd_tests=(
     test_depth_depth_n
     test_depth_depth_n_plus
     test_depth_depth_n_minus
+    test_depth_overflow
     test_gid_name
     test_uid_name
     test_mnewer
@@ -1146,6 +1147,10 @@ function test_depth_depth_n_plus() {
 
 function test_depth_depth_n_minus() {
     bfs_diff basic -depth -depth -2
+}
+
+function test_depth_overflow() {
+    bfs_diff basic -depth -4294967296
 }
 
 function test_gid_name() {
