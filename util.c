@@ -226,6 +226,20 @@ const char *xbasename(const char *path) {
 	return i;
 }
 
+int xfaccessat(int fd, const char *path, int amode) {
+	int ret = faccessat(fd, path, amode, 0);
+
+#ifdef AT_EACCESS
+	// Some platforms, like Hurd, only support AT_EACCESS.  Other platforms,
+	// like Android, don't support AT_EACCESS at all.
+	if (ret != 0 && (errno == EINVAL || errno == ENOTSUP)) {
+		ret = faccessat(fd, path, amode, AT_EACCESS);
+	}
+#endif
+
+	return ret;
+}
+
 bool is_nonexistence_error(int error) {
 	return error == ENOENT || errno == ENOTDIR;
 }

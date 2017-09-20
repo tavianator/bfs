@@ -351,7 +351,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFLNK:
-		if (faccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK, AT_EACCESS) == 0) {
+		if (xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) == 0) {
 			color = colors->link;
 		} else {
 			color = colors->orphan;

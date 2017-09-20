@@ -143,6 +143,11 @@ void format_mode(mode_t mode, char str[11]);
 const char *xbasename(const char *path);
 
 /**
+ * Wrapper for faccessat() that handles some portability issues.
+ */
+int xfaccessat(int fd, const char *path, int amode);
+
+/**
  * Return whether an error code is due to a path not existing.
  */
 bool is_nonexistence_error(int error);
