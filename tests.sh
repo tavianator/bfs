@@ -209,7 +209,6 @@ posix_tests=(
     test_o
     test_deep
     test_double_negation
-    test_not_reachability
     test_de_morgan_not
     test_de_morgan_and
     test_de_morgan_or
@@ -375,6 +374,7 @@ gnu_tests=(
     test_precedence
     test_and_purity
     test_or_purity
+    test_not_reachability
     test_comma_reachability
 )
 
