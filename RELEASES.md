@@ -2,6 +2,15 @@
 ===
 
 
+1.1.3
+-----
+
+**October 4, 2017**
+
+- Refactored the optimizer
+- Implemented data flow optimizations
+
+
 1.1.2
 -----
 
