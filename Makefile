@@ -21,12 +21,14 @@ VERSION := $(shell git describe --always)
 endif
 
 CC ?= gcc
+INSTALL ?= install
+MKDIR ?= mkdir -p
+RM ?= rm -f
+
 WFLAGS ?= -Wall -Wmissing-declarations
 CFLAGS ?= -g $(WFLAGS)
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
-RM ?= rm -f
-INSTALL ?= install
 
 DESTDIR ?=
 PREFIX ?= /usr
@@ -65,7 +67,8 @@ clean:
 	$(RM) bfs *.o *.d
 
 install:
-	$(INSTALL) -D -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
+	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
