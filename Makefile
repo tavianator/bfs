@@ -27,6 +27,7 @@ LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 RM ?= rm -f
 INSTALL ?= install
+UNAME_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 
 DESTDIR ?=
 PREFIX ?= /usr
@@ -47,6 +48,7 @@ ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
 
+
 all: bfs
 
 bfs: bftw.o color.o dstring.o eval.o exec.o main.o mtab.o opt.o parse.o printf.o typo.o util.o
@@ -64,8 +66,14 @@ check: all
 clean:
 	$(RM) bfs *.o *.d
 
+ifeq ($(UNAME_S),Darwin)
+install:
+	$(INSTALL) -d $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
+else
 install:
 	$(INSTALL) -D -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
+endif
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
