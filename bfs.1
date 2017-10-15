@@ -1,0 +1,662 @@
+.TH BFS 1
+.SH NAME
+bfs \- breadth-first search for your files
+.SH SYNOPSIS
+.B bfs
+.RB [ flags ...]
+.RI [ paths ...]
+.RB [ expression ...]
+.PP
+flags
+.RB ( \-H / \-L / \-P
+etc.),
+.IR paths ,
+and
+.B expressions
+may be freely mixed in any order.
+.SH DESCRIPTION
+.B bfs
+is a breadth-first version of the UNIX
+.BR find (1)
+command.
+.PP
+.B bfs
+supports almost every feature from every major
+.BR find (1)
+implementation, so your existing command lines should work as-is.
+It also adds some features of its own, such as a more forgiving command line parser and some additional options (see
+.B bfs-SPECIFIC FEATURES
+below).
+.PP
+Each
+.I path
+specified on the command line is treated as a starting path to search through.
+If no paths are specified, the current directory
+.RI ( . )
+is searched by default.
+.PP
+Like
+.BR find (1),
+.B bfs
+interprets its arguments as a short-circuiting Boolean expression.
+For example,
+.PP
+.nf
+.RS
+.B bfs \\\( \-name '*.txt' \-or \-lname '*.txt' \\\\) \-and \-print
+.RE
+.fi
+.PP
+will print the all the paths that are either .txt files or symbolic links to .txt files.
+.B \-and
+is implied between two consecutive expressions, so this is equivalent:
+.PP
+.nf
+.RS
+.B bfs \\\( \-name '*.txt' \-or \-lname '*.txt' \\\\) \-print
+.RE
+.fi
+.PP
+Finally,
+.B \-print
+is implied if no actions are specified, so this too is equivalent:
+.PP
+.nf
+.RS
+.B bfs \-name '*.txt' \-or \-lname '*.txt'
+.RE
+.fi
+.PP
+Most options that take a numeric argument
+.I N
+will also accept
+.I \-N
+or
+.IR +N .
+.IR \-N
+means "less than
+.IR N ,"
+and
+.I +N
+means "greater than
+.IR N ."
+.SH POSIX find FEATURES
+Operators:
+.TP
+\fB( \fIexpression \fB)\fR
+Parentheses are used for grouping expressions together.
+You'll probably have to write
+.B \\\\(
+.I expression
+.B \\\\)
+to avoid the parentheses being interpreted by the shell.
+.TP
+\fB! \fIexpression\fR
+The "not" operator: returns the negation of the truth value of the
+.IR expression .
+You may have to write
+.B \\\\!
+.I expression
+to avoid
+.B !
+being interpreted by the shell.
+.TP
+\fIexpression\fR [\fB\-a\fR] \fIexpression\fR
+Short-circuiting "and" operator: if the left-hand
+.I expression
+is
+.BR true ,
+returns the right-hand
+.IR expression ;
+otherwise, returns
+.BR false .
+.TP
+\fIexpression \fB\-o \fIexpression\fR
+Short-circuiting "or" operator: if the left-hand
+.I expression
+is
+.BR false ,
+returns the right-hand
+.IR expression ;
+otherwise, returns
+.BR true .
+.LP
+Flags:
+.TP
+.B \-H
+Follow symbolic links on the command line, but not while searching.
+.TP
+.B \-L
+Follow all symbolic links.
+.LP
+Options:
+.TP
+.B \-depth
+Search in post-order (descendents first).
+.TP
+.B \-xdev
+Don't descend into other mount points.
+.LP
+Tests:
+.PP
+\fB\-atime\fR [\fI\-+\fR]\fIN\fR
+.br
+\fB\-ctime\fR [\fI\-+\fR]\fIN\fR
+.br
+\fB\-mtime\fR [\fI\-+\fR]\fIN\fR
+.RS
+Find files
+.BR a ccessed/ c hanged/ m odified
+.I N
+days ago.
+.RE
+.PP
+.B \-group NAME
+.br
+.B \-user NAME
+.RS
+Find files owned by the group/user
+.BR NAME .
+.RE
+.TP
+\fB\-links\fR [\fI\-+\fR]\fIN\fR
+Find files with
+.I N
+hard links.
+.TP
+\fB\-name \fIGLOB\fR
+Find files whose name matches the
+.IR GLOB .
+.TP
+\fB\-path \fIGLOB\fR
+Find files whose entire path matches the
+.IR GLOB .
+.TP
+\fB\-newer \fIFILE\fR
+Find files newer than
+.IR FILE .
+.TP
+\fB\-perm\fR [\fI\-\fR]\fIMODE\fR
+Find files with a matching mode.
+.TP
+\fB\-type\fR [\fIbcdlpfs\fR]
+Find files of the given type.
+Possible types are
+.IR b lock
+device,
+.IR c haracter
+device,
+.IR d irectory,
+symbolic
+.IR l ink,
+.IR p ipe,
+regular
+.IR f ile,
+and
+.IR s ocket.
+.TP
+\fB\-size\fR [\fI\-+\fR]\fIN\fR[\fIc\fR]
+Find files with the given size.
+The default unit is 512-byte blocks;
+.I c
+counts
+.IR c haracters/bytes
+instead.
+.LP
+Actions:
+.TP
+.B \-prune
+Don't descend into this directory.
+.TP
+\fB\-exec \fIcommand ... {} ;\fR
+Execute a command.
+.TP
+\fB\-exec \fIcommand ... {} +\fR
+Execute a command with multiple files at once.
+.TP
+\fB\-ok \fIcommand ... {} ;\fR
+Prompt the user whether to execute a command.
+.TP
+.B \-print
+Print the path to the found file.
+.SH GNU find FEATURES
+Operators:
+.TP
+\fB\-not \fIexpression\fR
+Same as
+.B !
+.IR expression .
+.TP
+\fIexpression \fB\-and \fIexpression\fR
+Same as
+.I expression
+.B \-a
+.IR expression .
+.TP
+\fIexpression \fB\-or \fIexpression\fR
+Same as
+.I expression
+.B \-o
+.IR expression .
+.TP
+\fIexpression \fB, \fIexpression\fR
+The "comma" operator: evaluates the left-hand
+.I expression
+but discards the result, returning the right-hand
+.IR expression .
+.LP
+Flags:
+.TP
+.B \-P
+Never follow symbolic links (the default).
+.TP
+\fB\-D \fIFLAG\fR
+Turn on a debugging flag (see
+.B \-D
+.IR help ).
+.TP
+\fB\-O\fIN\fR
+Enable optimization level
+.I N
+(default: 3; interpreted differently than GNU find -- see below).
+.LP
+Options:
+.TP
+.B \-d
+Search in post-order (same as
+.BR \-depth ).
+.TP
+.B \-daystart
+Measure time relative to the start of today.
+.TP
+.B \-follow
+Follow all symbolic links (same as
+.BR \-L ).
+.LP
+.B \-ignore_readdir_race
+.br
+.B \-noignore_readdir_race
+.RS
+Whether to report an error if
+.B bfs
+detects that the file tree is modified during the search (default:
+.BR \-noignore_readdir_race ).
+.RE
+.PP
+\fB\-maxdepth \fIN\fR
+.br
+\fB\-mindepth \fIN\fR
+.RS
+Ignore files deeper/shallower than
+.IR N .
+.RE
+.TP
+.B \-mount
+Don't descend into other mount points (same as
+.BR \-xdev ).
+.TP
+.B \-noleaf
+Ignored; for compatibility with GNU find.
+.TP
+\fB\-regextype \fITYPE\fR
+Use
+.IR TYPE -flavored
+regexes (default:
+.IR posix-basic ;
+see
+.B \-regextype
+.IR help ).
+.LP
+.B \-warn
+.br
+.B \-nowarn
+.RS
+Turn on or off warnings about the command line.
+.RE
+.PP
+Tests:
+.PP
+\fB\-amin\fR [\fI\-+\fR]\fIN\fR
+.br
+\fB\-cmin\fR [\fI\-+\fR]\fIN\fR
+.br
+\fB\-mmin\fR [\fI\-+\fR]\fIN\fR
+.RS
+Find files
+.BR a ccessed/ c hanged/ m odified
+.I N
+minutes ago.
+.RE
+.PP
+\fB\-anewer \fIFILE\fR
+.br
+\fB\-cnewer \fIFILE\fR
+.br
+\fB\-mnewer \fIFILE\fR
+.RS
+Find files
+.BR a ccessed/ c hanged/ m odified
+more recently than
+.I FILE
+was modified.
+.RE
+.TP
+.B \-empty
+Find empty files/directories.
+.LP
+.B \-executable
+.br
+.B \-readable
+.br
+.B \-writable
+.RS
+Find files the current user can execute/read/write.
+.RE
+.PP
+.B \-false
+.br
+.B \-true
+.RS
+Always false/true.
+.RE
+.TP
+.B \-fstype TYPE
+Find files on file systems with the given
+.BR TYPE .
+.LP
+\fB\-gid\fR [\fI\-+\fR]\fIN\fR
+.br
+\fB\-uid\fR [\fI\-+\fR]\fIN\fR
+.RS
+Find files owned by group/user ID
+.IR N .
+.RE
+.TP
+\fB\-inum\fR [\fI\-+\fR]\fIN\fR
+Find files with inode number
+.IR N .
+.TP
+\fB\-lname \fIGLOB\fR
+Find symbolic links whose target matches the
+.IR GLOB .
+.TP
+\fB\-newer\fIXY \fIREFERENCE\fR
+Find files whose
+.I X
+time is newer than the
+.I Y
+time of
+.IR REFERENCE .
+.I X
+and
+.I Y
+can be any of
+.RI [ acm ]
+.RI ( a ccess/ c hange/ m odification).
+.TP
+\fB\-regex \fIREGEX\fR
+Find files whose entire path matches the regular expression
+.IR REGEX .
+.TP
+\fB\-samefile \fIFILE\fR
+Find hard links to
+.IR FILE .
+.TP
+\fB\-size\fR [\fI\-+\fR]\fIN\fR[\fIcwbkMG\fR]
+1-byte
+.IR c haracters,
+2-byte
+.IR w ords,
+512-byte
+.IR b locks,
+and
+.IR k iB/ M iB/ G iB.
+.TP
+\fB\-type\fR [\fIbcdlpfsD\fR]
+The
+.IR D oor
+file type is also supported on platforms that have it (Solaris).
+.TP
+\fB\-used\fR [\fI\-+\fR]\fIN\fR
+Find files last accessed
+.I N
+days after they were changed.
+.TP
+\fB\-wholename \fIGLOB\fR
+Find files whose entire path matches the
+.I GLOB
+(same as
+.BR \-path ).
+.LP
+\fB\-ilname \fIGLOB\fR
+.br
+\fB\-iname \fIGLOB\fR
+.br
+\fB\-ipath \fIGLOB\fR
+.br
+\fB\-iregex \fIREGEX\fR
+.br
+\fB\-iwholename \fIGLOB\fR
+.RS
+Case-insensitive versions of
+.BR \-lname / \-name / \-path / \-regex / \-wholename .
+.RE
+.TP
+\fB\-xtype\fR [\fIbcdlpfsD\fR]
+Find files of the given type, following links when
+.B \-type
+would not, and vice versa.
+.LP
+Actions:
+.TP
+.B \-delete
+Delete any found files (implies \fB-depth\fR).
+.LP
+\fB\-execdir \fIcommand ... {} ;\fR
+.br
+\fB\-execdir \fIcommand ... {} +\fR
+.br
+\fB\-okdir \fIcommand ... {} ;\fR
+.RS
+Like
+.BR \-exec / \-ok ,
+but run the command in the same directory as the found file(s).
+.RE
+.TP
+.B \-ls
+List files like
+.B ls
+.IR \-dils .
+.TP
+.B \-print0
+Like
+.BR \-print ,
+but use the null character ('\\0') as a separator rather than newlines.
+Useful in conjunction with
+.B xargs
+.IR -0 .
+.TP
+\fB\-printf \fIFORMAT\fR
+Print according to a format string (see
+.BR find (1)).
+.LP
+\fB\-fls \fIFILE\fR
+.br
+\fB\-fprint \fIFILE\fR
+.br
+\fB\-fprint0 \fIFILE\fR
+.br
+\fB\-fprintf \fIFORMAT FILE\fR
+.RS
+Like
+.BR \-ls / \-print / \-print0 / \-printf ,
+but write to
+.I FILE
+instead of standard output.
+.RE
+.TP
+.B \-quit
+Quit immediately.
+.TP
+.B \-version
+Print version information.
+.TP
+.B \-help
+Print usage information.
+.SH BSD find FEATURES
+Flags:
+.TP
+.B \-E
+Use extended regular expressions (same as \fB\-regextype posix-extended\fR).
+.TP
+.B \-X
+Filter out files with
+.RB non- xargs (1)-safe
+names.
+.TP
+.B \-x
+Don't descend into other mount points (same as \fB\-xdev\fR).
+.TP
+\fB\-f \fIPATH\fR
+Treat
+.I PATH
+as a path to search (useful if it begins with a dash).
+.LP
+Tests:
+.TP
+\fB\-depth\fR [\fI\-+\fR]\fIN\fR
+Find files with depth
+.IR N .
+.LP
+.B \-gid NAME
+.br
+.B \-uid NAME
+.RS
+Group/user names are supported in addition to numeric IDs.
+.RE
+.TP
+\fB\-size\fR [\fI\-+\fR]\fIN\fR[\fIcwbkMGTP\fR]
+Units of
+.IR T iB/ P iB
+are additionally supported.
+.TP
+.B \-sparse
+Find files that occupy fewer disk blocks than expected.
+.LP
+Actions:
+.TP
+\fB\-exit\fR [\fISTATUS\fR]
+Exit immediately with the given status (0 if unspecified).
+.TP
+.B \-printx
+Like
+.BR \-print ,
+but escape whitespace and quotation characters, to make the output safe for
+.BR xargs (1).
+Consider using
+.B \-print0
+and
+.B xargs
+.I \-0
+instead.
+.TP
+.B \-rm
+Delete any found files (same as
+.BR \-delete ;
+implies
+.BR \-depth ).
+.SH bfs-SPECIFIC FEATURES
+Flags:
+.TP
+\fB\-O\fI0\fR
+Disable all optimizations.
+.TP
+\fB\-O\fI1\fR
+Basic logical simplifications.
+.TP
+\fB\-O\fI2\fR
+All
+.BI \-O 1
+optimizations, plus dead code elimination and data flow analysis.
+.TP
+\fB\-O\fI3\fR
+All
+.BI \-O 2
+optimizations, plus re-order expressions to reduce expected cost.
+.TP
+\fB\-O\fI4\fR/\fB\-O\fIfast\fR
+All optimizations, including aggressive optimizations that may alter the observed behavior in corner cases.
+.LP
+Options:
+.PP
+.B \-color
+.br
+.B \-nocolor
+.RS
+Turn colors on or off (default:
+.B \-color
+if outputting to a terminal,
+.B \-nocolor
+otherwise).
+.RE
+.PP
+Tests:
+.TP
+.B \-hidden
+Match hidden files (those beginning with
+.IR . ).
+.LP
+Actions:
+.TP
+.B \-nohidden
+Filter out hidden files and directories.
+.SH EXAMPLES
+.TP
+.B bfs
+With no arguments,
+.B bfs
+prints all files under the current directory in breadth-first order.
+.TP
+.B bfs \-name '*.txt'
+Prints all the .txt files under the current directory.
+.B *.txt
+is quoted to ensure the glob is processed by
+.B bfs
+rather than the shell.
+.TP
+\fBbfs \-name access_log -L \fI/var\fR
+Finds all files named
+.B access_log
+under
+.IR /var ,
+following symbolic links.
+.B bfs
+allows flags and paths to appear anywhere on the command line.
+.TP
+\fBbfs \fI~ \fB\-not \-user $USER\fR
+Prints all files in your home directory not owned by you.
+.TP
+.B bfs \-xtype l
+Finds broken symbolic links.
+.TP
+.B bfs \-name .git \-prune \-false \-o \-name config
+Finds all files named
+.BR config,
+skipping every
+.B .git
+directory.
+.TP
+.B bfs \-type f \-executable \-exec strip '{}' +
+Runs
+.BR strip (1)
+on all executable files it finds, passing it multiple files at a time.
+.SH BUGS
+https://github.com/tavianator/bfs/issues
+.SH AUTHOR
+Tavian Barnes <tavianator@tavianator.com>
+.PP
+https://github.com/tavianator/bfs
+.SH SEE ALSO
+.BR find (1),
+.BR locate (1),
+.BR xargs (1)

@@ -1916,7 +1916,7 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
 }
 
 /**
- * Parse -size N[bcwkMG]?.
+ * Parse -size N[cwbkMGTP]?.
  */
 static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_size);
@@ -1971,7 +1971,7 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 
 bad_unit:
 	cfprintf(state->cmdline->cerr,
-	         "%{er}error: %s %s: Expected a size unit (one of bcwkMGTP); found %s.%{rs}\n",
+	         "%{er}error: %s %s: Expected a size unit (one of cwbkMGTP); found %s.%{rs}\n",
 	         expr->argv[0], expr->argv[1], unit);
 fail:
 	free_expr(expr);
@@ -2186,9 +2186,10 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-mount%{rs}\n");
 	cfprintf(cout, "      Don't descend into other mount points (same as %{blu}-xdev%{rs})\n");
 	cfprintf(cout, "  %{blu}-noleaf%{rs}\n");
-	cfprintf(cout, "      Ignored, for compatibility with GNU find\n");
+	cfprintf(cout, "      Ignored; for compatibility with GNU find\n");
 	cfprintf(cout, "  %{blu}-regextype%{rs} %{bld}TYPE%{rs}\n");
-	cfprintf(cout, "      Use TYPE-flavored regexes (see -regextype help)\n");
+	cfprintf(cout, "      Use %{bld}TYPE%{rs}-flavored regexes (default: %{bld}posix-basic%{rs}; see %{blu}-regextype%{rs}"
+	                " %{bld}help%{rs})\n");
 	cfprintf(cout, "  %{blu}-warn%{rs}\n");
 	cfprintf(cout, "  %{blu}-nowarn%{rs}\n");
 	cfprintf(cout, "      Turn on or off warnings about the command line\n\n");
@@ -2221,15 +2222,17 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find symbolic links whose target matches the %{bld}GLOB%{rs}\n");
 	cfprintf(cout, "  %{blu}-newer%{rs}%{bld}XY%{rs} %{bld}REFERENCE%{rs}\n");
 	cfprintf(cout, "      Find files whose %{bld}X%{rs} time is newer than the %{bld}Y%{rs} time of"
-	               " %{bld}REFERENCE%{bld}.  %{bld}X%{rs} and %{bld}Y%{rs}\n");
+	               " %{bld}REFERENCE%{rs}.  %{bld}X%{rs} and %{bld}Y%{rs}\n");
 	cfprintf(cout, "      can be any of [acm].\n");
 	cfprintf(cout, "  %{blu}-regex%{rs} %{bld}REGEX%{rs}\n");
 	cfprintf(cout, "      Find files whose entire path matches the regular expression %{bld}REGEX%{rs}\n");
 	cfprintf(cout, "  %{blu}-samefile%{rs} %{bld}FILE%{rs}\n");
 	cfprintf(cout, "      Find hard links to %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[wbkMG]%{rs}\n");
-	cfprintf(cout, "      2-byte %{bld}w%{rs}ords, 512-byte %{bld}b%{rs}locks, and %{bld}k%{rs}iB/%{bld}M%{rs}iB"
-	               "/%{bld}G%{rs}iB\n");
+	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[cwbkMG]%{rs}\n");
+	cfprintf(cout, "      1-byte %{bld}c%{rs}haracters, 2-byte %{bld}w%{rs}ords, 512-byte %{bld}b%{rs}locks, and"
+	               " %{bld}k%{rs}iB/%{bld}M%{rs}iB/%{bld}G%{rs}iB\n");
+	cfprintf(cout, "  %{blu}-type%{rs} %{bld}[bcdlpfsD]%{rs}\n");
+	cfprintf(cout, "      The %{bld}D%{rs}oor file type is also supported on platforms that have it (Solaris)\n");
 	cfprintf(cout, "  %{blu}-used%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files last accessed %{bld}N%{rs} days after they were changed\n");
 	cfprintf(cout, "  %{blu}-wholename%{rs} %{bld}GLOB%{rs}\n");
@@ -2241,7 +2244,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-iwholename%{rs} %{bld}GLOB%{rs}\n");
 	cfprintf(cout, "      Case-insensitive versions of %{blu}-lname%{rs}/%{blu}-name%{rs}/%{blu}-path%{rs}"
 	               "/%{blu}-regex%{rs}/%{blu}-wholename%{rs}\n");
-	cfprintf(cout, "  %{blu}-xtype%{rs} %{bld}[bcdlpfs]%{rs}\n");
+	cfprintf(cout, "  %{blu}-xtype%{rs} %{bld}[bcdlpfsD]%{rs}\n");
 	cfprintf(cout, "      Find files of the given type, following links when %{blu}-type%{rs} would not, and\n");
 	cfprintf(cout, "      vice versa\n\n");
 
@@ -2252,16 +2255,19 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-okdir%{rs}   %{bld}command ... {} ;%{rs}\n");
 	cfprintf(cout, "      Like %{blu}-exec%{rs}/%{blu}-ok%{rs}, but run the command in the same directory as the found\n");
 	cfprintf(cout, "      file(s)\n");
+	cfprintf(cout, "  %{blu}-ls%{rs}\n");
+	cfprintf(cout, "      List files like %{ex}ls%{rs} %{bld}-dils%{rs}\n");
 	cfprintf(cout, "  %{blu}-print0%{rs}\n");
 	cfprintf(cout, "      Like %{blu}-print%{rs}, but use the null character ('\\0') as a separator rather than\n");
 	cfprintf(cout, "      newlines\n");
 	cfprintf(cout, "  %{blu}-printf%{rs} %{bld}FORMAT%{rs}\n");
 	cfprintf(cout, "      Print according to a format string (see %{ex}man%{rs} %{bld}find%{rs})\n");
+	cfprintf(cout, "  %{blu}-fls%{rs} %{bld}FILE%{rs}\n");
 	cfprintf(cout, "  %{blu}-fprint%{rs} %{bld}FILE%{rs}\n");
 	cfprintf(cout, "  %{blu}-fprint0%{rs} %{bld}FILE%{rs}\n");
 	cfprintf(cout, "  %{blu}-fprintf%{rs} %{bld}FORMAT%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Like %{blu}-print%{rs}/%{blu}-print0%{rs}/%{blu}-printf%{rs}, but write to %{bld}FILE%{rs} instead"
-	               " of standard output\n");
+	cfprintf(cout, "      Like %{blu}-ls%{rs}/%{blu}-print%{rs}/%{blu}-print0%{rs}/%{blu}-printf%{rs}, but write to"
+	               " %{bld}FILE%{rs} instead of standard output\n");
 	cfprintf(cout, "  %{blu}-quit%{rs}\n");
 	cfprintf(cout, "      Quit immediately\n\n");
 
@@ -2280,15 +2286,15 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Don't descend into other mount points (same as %{blu}-xdev%{rs})\n\n");
 
 	cfprintf(cout, "  %{cyn}-f%{rs} %{mag}PATH%{rs}\n");
-	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if it may begin with a dash)\n\n");
+	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if begins with a dash)\n\n");
 
 	cfprintf(cout, "  %{blu}-depth%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files with depth %{bld}N%{rs}\n");
 	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}NAME%{rs}\n");
 	cfprintf(cout, "  %{blu}-uid%{rs} %{bld}NAME%{rs}\n");
 	cfprintf(cout, "      Group/user names are supported in addition to numeric IDs\n");
-	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[TP]%{rs}\n");
-	cfprintf(cout, "      %{bld}T%{rs}iB/%{bld}P%{rs}iB\n");
+	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[cwbkMGTP]%{rs}\n");
+	cfprintf(cout, "      Units of %{bld}T%{rs}iB/%{bld}P%{rs}iB are additionally supported\n");
 	cfprintf(cout, "  %{blu}-sparse%{rs}\n");
 	cfprintf(cout, "      Find files that occupy fewer disk blocks than expected\n\n");
 
@@ -2316,7 +2322,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 
 	cfprintf(cout, "  %{blu}-color%{rs}\n");
 	cfprintf(cout, "  %{blu}-nocolor%{rs}\n");
-	cfprintf(cout, "      Turn on or off file type colorization\n\n");
+	cfprintf(cout, "      Turn colors on or off (default: %{blu}-color%{rs} if outputting to a terminal,\n");
+	cfprintf(cout, "      %{blu}-nocolor%{rs} otherwise)\n\n");
 
 	cfprintf(cout, "  %{blu}-hidden%{rs}\n");
 	cfprintf(cout, "  %{blu}-nohidden%{rs}\n");

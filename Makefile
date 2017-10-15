@@ -69,6 +69,8 @@ clean:
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
+	$(MKDIR) $(DESTDIR)$(PREFIX)/share/man/man1
+	$(INSTALL) -m644 bfs.1 $(DESTDIR)$(PREFIX)/share/man/man1/bfs.1
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
