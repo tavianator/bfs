@@ -330,6 +330,7 @@ gnu_tests=(
     test_flag_weird_names
     test_follow_comma
     test_fprint
+    test_fprint_duplicate
     test_double_dash
     test_flag_double_dash
     test_ignore_readdir_race
@@ -931,13 +932,28 @@ function test_follow_comma() {
 }
 
 function test_fprint() {
+    invoke_bfs basic -fprint scratch/test_fprint.out
+    sort -o scratch/test_fprint.out scratch/test_fprint.out
+
     if [ "$UPDATE" ]; then
-        invoke_bfs basic -fprint "$TESTS/test_fprint.out"
-        sort -o "$TESTS/test_fprint.out" "$TESTS/test_fprint.out"
+        cp scratch/test_fprint.out "$TESTS/test_fprint.out"
     else
-        invoke_bfs basic -fprint scratch/test_fprint.out
-        sort -o scratch/test_fprint.out scratch/test_fprint.out
         diff -u scratch/test_fprint.out "$TESTS/test_fprint.out"
+    fi
+}
+
+function test_fprint_duplicate() {
+    touchp scratch/test_fprint_duplicate.out
+    ln scratch/test_fprint_duplicate.out scratch/test_fprint_duplicate.hard
+    ln -s test_fprint_duplicate.out scratch/test_fprint_duplicate.soft
+
+    invoke_bfs basic -fprint scratch/test_fprint_duplicate.out -fprint scratch/test_fprint_duplicate.hard -fprint scratch/test_fprint_duplicate.soft
+    sort -o scratch/test_fprint_duplicate.out scratch/test_fprint_duplicate.out
+
+    if [ "$UPDATE" ]; then
+        cp scratch/test_fprint_duplicate.out "$TESTS/test_fprint_duplicate.out"
+    else
+        diff -u scratch/test_fprint_duplicate.out "$TESTS/test_fprint_duplicate.out"
     fi
 }
 

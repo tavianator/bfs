@@ -80,36 +80,23 @@ struct expr expr_false = {
 /**
  * Free an expression.
  */
-int free_expr(struct expr *expr) {
-	int ret = 0;
-
-	if (expr && expr != &expr_true && expr != &expr_false) {
-		if (expr->cfile && expr->cfile->close) {
-			if (cfclose(expr->cfile) != 0) {
-				perror("cfclose()");
-				ret = -1;
-			}
-		}
-
-		if (expr->regex) {
-			regfree(expr->regex);
-			free(expr->regex);
-		}
-
-		free_bfs_printf(expr->printf);
-		free_bfs_exec(expr->execbuf);
-
-		if (free_expr(expr->lhs) != 0) {
-			ret = -1;
-		}
-		if (free_expr(expr->rhs) != 0) {
-			ret = -1;
-		}
-
-		free(expr);
+void free_expr(struct expr *expr) {
+	if (!expr || expr == &expr_true || expr == &expr_false) {
+		return;
 	}
 
-	return ret;
+	if (expr->regex) {
+		regfree(expr->regex);
+		free(expr->regex);
+	}
+
+	free_bfs_printf(expr->printf);
+	free_bfs_exec(expr->execbuf);
+
+	free_expr(expr->lhs);
+	free_expr(expr->rhs);
+
+	free(expr);
 }
 
 struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
@@ -232,26 +219,59 @@ void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 }
 
 /**
+ * An open file for the command line.
+ */
+struct open_file {
+	/** The file itself. */
+	CFILE *cfile;
+	/** The path to the file (for diagnostics). */
+	const char *path;
+	/** Device number (for deduplication). */
+	dev_t dev;
+	/** Inode number (for deduplication). */
+	ino_t ino;
+	/** The next open file in the chain. */
+	struct open_file *next;
+};
+
+/**
  * Free the parsed command line.
  */
 int free_cmdline(struct cmdline *cmdline) {
 	int ret = 0;
 
 	if (cmdline) {
-		if (free_expr(cmdline->expr) != 0) {
-			ret = -1;
-		}
+		CFILE *cout = cmdline->cout;
+		CFILE *cerr = cmdline->cerr;
+
+		free_expr(cmdline->expr);
 
 		free_bfs_mtab(cmdline->mtab);
 
-		if (cfclose(cmdline->cerr) != 0) {
-			perror("cfclose()");
+		struct open_file *ofile = cmdline->open_files;
+		while (ofile) {
+			struct open_file *next = ofile->next;
+
+			if (cfclose(ofile->cfile) != 0) {
+				if (cerr) {
+					cfprintf(cerr, "%{er}error: '%s': %s%{rs}\n", ofile->path, strerror(errno));
+				}
+				ret = -1;
+			}
+
+			free(ofile);
+			ofile = next;
+		}
+
+		if (cout && fflush(cout->file) != 0) {
+			if (cerr) {
+				cfprintf(cerr, "%{er}error: standard output: %s%{rs}\n", strerror(errno));
+			}
 			ret = -1;
 		}
-		if (cfclose(cmdline->cout) != 0) {
-			perror("cfclose()");
-			ret = -1;
-		}
+
+		cfclose(cout);
+		cfclose(cerr);
 
 		free_colors(cmdline->colors);
 
@@ -349,14 +369,52 @@ static void init_print_expr(struct parser_state *state, struct expr *expr) {
  * Open a file for an expression.
  */
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
-	expr->cfile = cfopen(path, state->use_color ? state->cmdline->colors : NULL);
-	if (!expr->cfile) {
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
-		return -1;
+	int ret = -1;
+
+	struct cmdline *cmdline = state->cmdline;
+
+	CFILE *cfile = cfopen(path, state->use_color ? cmdline->colors : NULL);
+	if (!cfile) {
+		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
+		goto out;
 	}
 
-	++state->cmdline->nopen_files;
-	return 0;
+	struct stat sb;
+	if (fstat(fileno(cfile->file), &sb) != 0) {
+		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
+		goto out_close;
+	}
+
+	for (struct open_file *ofile = cmdline->open_files; ofile; ofile = ofile->next) {
+		if (ofile->dev == sb.st_dev && ofile->ino == sb.st_ino) {
+			expr->cfile = ofile->cfile;
+			ret = 0;
+			goto out_close;
+		}
+	}
+
+	struct open_file *ofile = malloc(sizeof(*ofile));
+	if (!ofile) {
+		goto out_close;
+	}
+
+	ofile->cfile = cfile;
+	ofile->path = path;
+	ofile->dev = sb.st_dev;
+	ofile->ino = sb.st_ino;
+	ofile->next = cmdline->open_files;
+	cmdline->open_files = ofile;
+	++cmdline->nopen_files;
+
+	expr->cfile = cfile;
+
+	ret = 0;
+	goto out;
+
+out_close:
+	cfclose(cfile);
+out:
+	return ret;
 }
 
 /**
@@ -2932,6 +2990,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->xargs_safe = false;
 	cmdline->ignore_races = false;
 	cmdline->expr = &expr_true;
+	cmdline->open_files = NULL;
 	cmdline->nopen_files = 0;
 
 	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));

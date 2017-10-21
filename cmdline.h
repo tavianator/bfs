@@ -50,6 +50,11 @@ struct root {
 };
 
 /**
+ * An open file for the command line.
+ */
+struct open_file;
+
+/**
  * The parsed command line.
  */
 struct cmdline {
@@ -89,7 +94,9 @@ struct cmdline {
 	/** The command line expression. */
 	struct expr *expr;
 
-	/** The number of open files used by the expression tree. */
+	/** All the open files owned by the command line. */
+	struct open_file *open_files;
+	/** The number of open files owned by the command line. */
 	int nopen_files;
 };
 

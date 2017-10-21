@@ -288,8 +288,6 @@ int cfclose(CFILE *cfile) {
 	if (cfile) {
 		if (cfile->close) {
 			ret = fclose(cfile->file);
-		} else if (cfile->file) {
-			ret = fflush(cfile->file);
 		}
 		free(cfile);
 	}
