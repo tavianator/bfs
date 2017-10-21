@@ -101,13 +101,6 @@ struct cmdline {
 };
 
 /**
- * Optimize the parsed command line.
- *
- * @return 0 if successful, -1 on error.
- */
-int optimize_cmdline(struct cmdline *cmdline);
-
-/**
  * Parse the command line.
  */
 struct cmdline *parse_cmdline(int argc, char *argv[]);
@@ -116,6 +109,13 @@ struct cmdline *parse_cmdline(int argc, char *argv[]);
  * Dump the parsed command line.
  */
 void dump_cmdline(const struct cmdline *cmdline, bool verbose);
+
+/**
+ * Optimize the parsed command line.
+ *
+ * @return 0 if successful, -1 on error.
+ */
+int optimize_cmdline(struct cmdline *cmdline);
 
 /**
  * Evaluate the command line.
