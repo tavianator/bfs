@@ -219,7 +219,9 @@ void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose);
 
 /**
  * Free an expression tree.
+ *
+ * @return 0 if successful, -1 on error.
  */
-void free_expr(struct expr *expr);
+int free_expr(struct expr *expr);
 
 #endif // EXPR_H

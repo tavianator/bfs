@@ -80,11 +80,14 @@ struct expr expr_false = {
 /**
  * Free an expression.
  */
-void free_expr(struct expr *expr) {
+int free_expr(struct expr *expr) {
+	int ret = 0;
+
 	if (expr && expr != &expr_true && expr != &expr_false) {
 		if (expr->cfile && expr->cfile->close) {
 			if (cfclose(expr->cfile) != 0) {
 				perror("cfclose()");
+				ret = -1;
 			}
 		}
 
@@ -96,10 +99,17 @@ void free_expr(struct expr *expr) {
 		free_bfs_printf(expr->printf);
 		free_bfs_exec(expr->execbuf);
 
-		free_expr(expr->lhs);
-		free_expr(expr->rhs);
+		if (free_expr(expr->lhs) != 0) {
+			ret = -1;
+		}
+		if (free_expr(expr->rhs) != 0) {
+			ret = -1;
+		}
+
 		free(expr);
 	}
+
+	return ret;
 }
 
 struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
@@ -224,14 +234,25 @@ void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 /**
  * Free the parsed command line.
  */
-void free_cmdline(struct cmdline *cmdline) {
+int free_cmdline(struct cmdline *cmdline) {
+	int ret = 0;
+
 	if (cmdline) {
-		free_expr(cmdline->expr);
+		if (free_expr(cmdline->expr) != 0) {
+			ret = -1;
+		}
 
 		free_bfs_mtab(cmdline->mtab);
 
-		cfclose(cmdline->cerr);
-		cfclose(cmdline->cout);
+		if (cfclose(cmdline->cerr) != 0) {
+			perror("cfclose()");
+			ret = -1;
+		}
+		if (cfclose(cmdline->cout) != 0) {
+			perror("cfclose()");
+			ret = -1;
+		}
+
 		free_colors(cmdline->colors);
 
 		struct root *root = cmdline->roots;
@@ -244,6 +265,8 @@ void free_cmdline(struct cmdline *cmdline) {
 		free(cmdline->argv);
 		free(cmdline);
 	}
+
+	return ret;
 }
 
 /**

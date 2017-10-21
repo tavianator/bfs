@@ -376,6 +376,8 @@ gnu_tests=(
     test_or_purity
     test_not_reachability
     test_comma_reachability
+    test_print_error
+    test_fprint_error
 )
 
 bfs_tests=(
@@ -1410,6 +1412,18 @@ function test_data_flow_type() {
     bfs_diff basic \! \( -type f -o \! -type f \)
 }
 
+function test_print_error() {
+    if [ -e /dev/full ]; then
+        ! invoke_bfs basic -maxdepth 0 >/dev/full 2>/dev/null
+    fi
+}
+
+function test_fprint_error() {
+    if [ -e /dev/full ]; then
+        ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/null
+    fi
+}
+
 if [ -t 1 -a ! "$VERBOSE" ]; then
     in_place=yes
 fi
@@ -1433,7 +1447,11 @@ for test in ${!run_*}; do
         ((++passed))
     else
         ((++failed))
-        echo "$test failed!"
+        if [ "$in_place" ]; then
+            printf '\r\033[J%s\n' "$test failed!"
+        else
+            echo "$test failed!"
+        fi
     fi
 done
 

@@ -117,7 +117,9 @@ int eval_cmdline(const struct cmdline *cmdline);
 
 /**
  * Free the parsed command line.
+ *
+ * @return 0 if successful, -1 on error.
  */
-void free_cmdline(struct cmdline *cmdline);
+int free_cmdline(struct cmdline *cmdline);
 
 #endif // CMDLINE_H
