@@ -77,16 +77,21 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	for (char **envp = environ; *envp; ++envp) {
 		arg_max -= bfs_exec_arg_size(*envp);
 	}
+	// Account for the terminating NULL entry
+	arg_max -= sizeof(char *);
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after environment variables\n", arg_max);
 
 	// Account for the fixed arguments
 	for (size_t i = 0; i < execbuf->tmpl_argc - 1; ++i) {
 		arg_max -= bfs_exec_arg_size(execbuf->tmpl_argv[i]);
 	}
+	// Account for the terminating NULL entry
+	arg_max -= sizeof(char *);
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after fixed arguments\n", arg_max);
 
 	// POSIX recommends subtracting 2048, for some wiggle room
-	arg_max -= 2048;
+	// We subtract 4096 for extra insurance, based on some experimentation
+	arg_max -= 4096;
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after headroom\n", arg_max);
 
 	if (arg_max < 0) {
@@ -319,7 +324,12 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		}
 	}
 
-	bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
+	if (execbuf->flags & BFS_EXEC_MULTI) {
+		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments] (size %zu)\n",
+		               execbuf->argv[0], execbuf->argc - 1, execbuf->arg_size);
+	} else {
+		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
+	}
 
 	pid_t pid = fork();
 
@@ -432,8 +442,10 @@ static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ft
 		}
 	}
 
-	if (execbuf->arg_size + bfs_exec_arg_size(arg) > execbuf->arg_max) {
-		bfs_exec_debug(execbuf, "Reached max command size, executing buffered command\n");
+	size_t next_size = execbuf->arg_size + bfs_exec_arg_size(arg);
+	if (next_size > execbuf->arg_max) {
+		bfs_exec_debug(execbuf, "Command size (%zu) would exceed maximum (%zu), executing buffered command\n",
+		               next_size, execbuf->arg_max);
 		return true;
 	}
 
