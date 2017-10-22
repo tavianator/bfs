@@ -68,7 +68,7 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
  */
 static void eval_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
-		cfprintf(state->cmdline->cerr, "%{er}'%s': %s%{rs}\n", state->ftwbuf->path, strerror(errno));
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", state->ftwbuf->path, strerror(errno));
 		*state->ret = EXIT_FAILURE;
 	}
 }
@@ -746,7 +746,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	} else if (err != REG_NOMATCH) {
 		char *str = xregerror(err, expr->regex);
 		if (str) {
-			cfprintf(state->cmdline->cerr, "%{er}'%s': %s%{rs}\n", path, str);
+			cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, str);
 			free(str);
 		} else {
 			perror("xregerror()");
@@ -1078,7 +1078,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = EXIT_FAILURE;
-			cfprintf(cmdline->cerr, "%{er}'%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
+			cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
 		}
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
@@ -1086,7 +1086,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 
 	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
 		args->ret = EXIT_FAILURE;
-		cfprintf(cmdline->cerr, "%{er}'%s': Path is not safe for xargs.%{rs}\n", ftwbuf->path);
+		cfprintf(cmdline->cerr, "%{er}error: '%s': Path is not safe for xargs.%{rs}\n", ftwbuf->path);
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
 	}
