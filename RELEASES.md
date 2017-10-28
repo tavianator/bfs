@@ -2,6 +2,17 @@
 ===
 
 
+1.1.4
+-----
+
+**October 27, 2017**
+
+- Added a man page
+- Fixed cases where multiple actions write to the same file
+- Report errors that occur when closing files/flushing streams
+- Fixed "argument list too long" errors with `-exec ... '{}' +`
+
+
 1.1.3
 -----
 
