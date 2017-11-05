@@ -263,6 +263,8 @@ bsd_tests=(
     test_uid_name
     test_mnewer
     test_H_mnewer
+    test_perm_222_plus
+    test_perm_644_plus
     test_size_T
     test_quit
     test_quit_child
@@ -389,7 +391,6 @@ bfs_tests=(
     test_perm_symbolic_double_comma
     test_perm_symbolic_missing_action
     test_perm_leading_plus_symbolic
-    test_perm_octal_plus
     test_execdir_plus
     test_hidden
     test_nohidden
@@ -1000,6 +1001,10 @@ function test_perm_222_slash() {
     bfs_diff perms -perm /222
 }
 
+function test_perm_222_plus() {
+    bfs_diff perms -perm +222
+}
+
 function test_perm_644() {
     bfs_diff perms -perm 644
 }
@@ -1010,6 +1015,10 @@ function test_perm_644_minus() {
 
 function test_perm_644_slash() {
     bfs_diff perms -perm /644
+}
+
+function test_perm_644_plus() {
+    bfs_diff perms -perm +644
 }
 
 function test_perm_symbolic() {
@@ -1046,10 +1055,6 @@ function test_perm_leading_plus_symbolic_minus() {
 
 function test_perm_leading_plus_symbolic_slash() {
     bfs_diff perms -perm /+rwx
-}
-
-function test_perm_octal_plus() {
-    ! invoke_bfs perms -perm +777 2>/dev/null
 }
 
 function test_permcopy() {
