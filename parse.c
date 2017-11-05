@@ -893,38 +893,57 @@ static struct expr *parse_access(struct parser_state *state, int flag, int arg2)
 }
 
 /**
- * Parse -[acm]{min,time}.
+ * Parse -[aBcm]?newer.
  */
-static struct expr *parse_acmtime(struct parser_state *state, int field, int unit) {
-	struct expr *expr = parse_test_icmp(state, eval_acmtime);
-	if (expr) {
-		expr->cost = STAT_COST;
-		expr->reftime = state->now;
-		expr->time_field = field;
-		expr->time_unit = unit;
-	}
-	return expr;
-}
-
-/**
- * Parse -[ac]?newer.
- */
-static struct expr *parse_acnewer(struct parser_state *state, int field, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_acnewer);
+static struct expr *parse_newer(struct parser_state *state, int field, int arg2) {
+	struct expr *expr = parse_unary_test(state, eval_newer);
 	if (!expr) {
 		return NULL;
 	}
 
+#if !BFS_HAVE_ST_BIRTHTIM
+	if (field == BTIME) {
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: File birth times are not supported on this platform.%{rs}\n", expr->argv[0]);
+		goto fail;
+	}
+#endif
+
 	struct stat sb;
 	if (stat_arg(state, expr, &sb) != 0) {
-		free_expr(expr);
-		return NULL;
+		goto fail;
 	}
 
 	expr->cost = STAT_COST;
 	expr->reftime = sb.st_mtim;
 	expr->time_field = field;
+	return expr;
 
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
+ * Parse -[aBcm]{min,time}.
+ */
+static struct expr *parse_time(struct parser_state *state, int field, int unit) {
+	struct expr *expr = parse_test_icmp(state, eval_time);
+	if (!expr) {
+		return NULL;
+	}
+
+#if !BFS_HAVE_ST_BIRTHTIM
+	if (field == BTIME) {
+		cfprintf(state->cmdline->cerr, "%{er}error: %s: File birth times are not supported on this platform.%{rs}\n", expr->argv[0]);
+		free_expr(expr);
+		return NULL;
+	}
+#endif
+
+	expr->cost = STAT_COST;
+	expr->reftime = state->now;
+	expr->time_field = field;
+	expr->time_unit = unit;
 	return expr;
 }
 
@@ -1445,13 +1464,15 @@ static struct expr *parse_lname(struct parser_state *state, int casefold, int ar
  * Parse -newerXY.
  */
 static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
+	CFILE *cerr = state->cmdline->cerr;
+
 	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
-		cfprintf(state->cmdline->cerr, "%{er}error: Expected -newerXY; found %s.%{rs}\n", arg);
+		cfprintf(cerr, "%{er}error: Expected -newerXY; found %s.%{rs}\n", arg);
 		return NULL;
 	}
 
-	struct expr *expr = parse_unary_test(state, eval_acnewer);
+	struct expr *expr = parse_unary_test(state, eval_newer);
 	if (!expr) {
 		goto fail;
 	}
@@ -1468,16 +1489,21 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 		break;
 
 	case 'B':
-		cfprintf(state->cmdline->cerr, "%{er}error: %s: File birth times ('B') are not supported.%{rs}\n", arg);
+#if BFS_HAVE_ST_BIRTHTIM
+		expr->time_field = BTIME;
+		break;
+#else
+		cfprintf(cerr, "%{er}error: %s: File birth times ('B') are not supported on this platform.%{rs}\n", arg);
 		goto fail;
+#endif
 
 	default:
-		cfprintf(state->cmdline->cerr, "%{er}error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.%{rs}\n", arg);
+		cfprintf(cerr, "%{er}error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.%{rs}\n", arg);
 		goto fail;
 	}
 
 	if (arg[7] == 't') {
-		cfprintf(state->cmdline->cerr, "%{er}error: %s: Explicit reference times ('t') are not supported.%{rs}\n", arg);
+		cfprintf(cerr, "%{er}error: %s: Explicit reference times ('t') are not supported.%{rs}\n", arg);
 		goto fail;
 	} else {
 		struct stat sb;
@@ -1497,12 +1523,15 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 			break;
 
 		case 'B':
-			cfprintf(state->cmdline->cerr, "%{er}error: %s: File birth times ('B') are not supported.%{rs}\n", arg);
+#if BFS_HAVE_ST_BIRTHTIM
+			expr->reftime = sb.st_birthtim;
+#else
+			cfprintf(cerr, "%{er}error: %s: File birth times ('B') are not supported on this platform.%{rs}\n", arg);
 			goto fail;
+#endif
 
 		default:
-			cfprintf(state->cmdline->cerr,
-			         "%{er}error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.%{rs}\n", arg);
+			cfprintf(cerr, "%{er}error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.%{rs}\n", arg);
 			goto fail;
 		}
 	}
@@ -2310,7 +2339,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-newer%{rs}%{bld}XY%{rs} %{bld}REFERENCE%{rs}\n");
 	cfprintf(cout, "      Find files whose %{bld}X%{rs} time is newer than the %{bld}Y%{rs} time of"
 	               " %{bld}REFERENCE%{rs}.  %{bld}X%{rs} and %{bld}Y%{rs}\n");
-	cfprintf(cout, "      can be any of [acm].\n");
+	cfprintf(cout, "      can be any of [aBcm].\n");
 	cfprintf(cout, "  %{blu}-regex%{rs} %{bld}REGEX%{rs}\n");
 	cfprintf(cout, "      Find files whose entire path matches the regular expression %{bld}REGEX%{rs}\n");
 	cfprintf(cout, "  %{blu}-samefile%{rs} %{bld}FILE%{rs}\n");
@@ -2375,6 +2404,11 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{cyn}-f%{rs} %{mag}PATH%{rs}\n");
 	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if begins with a dash)\n\n");
 
+	cfprintf(cout, "  %{blu}-Bmin%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "  %{blu}-Btime%{rs} %{bld}[-+]N%{rs}\n");
+	cfprintf(cout, "      Find files Birthed %{bld}N%{rs} minutes/days ago\n");
+	cfprintf(cout, "  %{blu}-Bnewer%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "      Find files Birthed more recently than %{bld}FILEa%{rs} was modified\n");
 	cfprintf(cout, "  %{blu}-depth%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files with depth %{bld}N%{rs}\n");
 	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}NAME%{rs}\n");
@@ -2451,6 +2485,9 @@ struct table_entry {
  * The parse table for literals.
  */
 static const struct table_entry parse_table[] = {
+	{"-Bmin", false, parse_time, BTIME, MINUTES},
+	{"-Bnewer", false, parse_newer, BTIME},
+	{"-Btime", false, parse_time, BTIME, DAYS},
 	{"-D", false, parse_debug},
 	{"-E", false, parse_regex_extended},
 	{"-O", true, parse_optlevel},
@@ -2459,13 +2496,13 @@ static const struct table_entry parse_table[] = {
 	{"-L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
 	{"-X", false, parse_xargs_safe},
 	{"-a"},
-	{"-amin", false, parse_acmtime, ATIME, MINUTES},
+	{"-amin", false, parse_time, ATIME, MINUTES},
 	{"-and"},
-	{"-atime", false, parse_acmtime, ATIME, DAYS},
-	{"-anewer", false, parse_acnewer, ATIME},
-	{"-cmin", false, parse_acmtime, CTIME, MINUTES},
-	{"-ctime", false, parse_acmtime, CTIME, DAYS},
-	{"-cnewer", false, parse_acnewer, CTIME},
+	{"-anewer", false, parse_newer, ATIME},
+	{"-atime", false, parse_time, ATIME, DAYS},
+	{"-cmin", false, parse_time, CTIME, MINUTES},
+	{"-cnewer", false, parse_newer, CTIME},
+	{"-ctime", false, parse_time, CTIME, DAYS},
 	{"-color", false, parse_color, true},
 	{"-d", false, parse_depth},
 	{"-daystart", false, parse_daystart},
@@ -2500,12 +2537,12 @@ static const struct table_entry parse_table[] = {
 	{"-ls", false, parse_ls},
 	{"-maxdepth", false, parse_depth_limit, false},
 	{"-mindepth", false, parse_depth_limit, true},
-	{"-mmin", false, parse_acmtime, MTIME, MINUTES},
-	{"-mnewer", false, parse_acnewer, MTIME},
+	{"-mmin", false, parse_time, MTIME, MINUTES},
+	{"-mnewer", false, parse_newer, MTIME},
 	{"-mount", false, parse_mount},
-	{"-mtime", false, parse_acmtime, MTIME, DAYS},
+	{"-mtime", false, parse_time, MTIME, DAYS},
 	{"-name", false, parse_name, false},
-	{"-newer", false, parse_acnewer, MTIME},
+	{"-newer", false, parse_newer, MTIME},
 	{"-newer", true, parse_newerxy},
 	{"-nocolor", false, parse_color, false},
 	{"-nogroup", false, parse_nogroup},

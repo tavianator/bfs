@@ -26,8 +26,8 @@ bool eval_false(const struct expr *expr, struct eval_state *state);
 bool eval_access(const struct expr *expr, struct eval_state *state);
 bool eval_perm(const struct expr *expr, struct eval_state *state);
 
-bool eval_acmtime(const struct expr *expr, struct eval_state *state);
-bool eval_acnewer(const struct expr *expr, struct eval_state *state);
+bool eval_newer(const struct expr *expr, struct eval_state *state);
+bool eval_time(const struct expr *expr, struct eval_state *state);
 bool eval_used(const struct expr *expr, struct eval_state *state);
 
 bool eval_gid(const struct expr *expr, struct eval_state *state);

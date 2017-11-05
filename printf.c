@@ -87,10 +87,16 @@ static const struct timespec *get_time_field(const struct stat *statbuf, enum ti
 		return &statbuf->st_ctim;
 	case MTIME:
 		return &statbuf->st_mtim;
-	}
 
-	assert(false);
-	return NULL;
+#ifdef BFS_HAVE_ST_BIRTHTIM
+	case BTIME:
+		return &statbuf->st_birthtim;
+#endif
+
+	default:
+		assert(false);
+		return NULL;
+	}
 }
 
 /** %c, %c, and %t: ctime() */

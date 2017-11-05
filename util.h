@@ -32,6 +32,11 @@
 #	define st_atim st_atimespec
 #	define st_ctim st_ctimespec
 #	define st_mtim st_mtimespec
+#	define st_birthtim st_birthtimespec
+#endif
+
+#if __APPLE__ || __FreeBSD__ || __NetBSD__
+#	define BFS_HAVE_ST_BIRTHTIM true
 #endif
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)

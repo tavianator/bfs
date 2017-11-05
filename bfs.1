@@ -391,8 +391,8 @@ time of
 and
 .I Y
 can be any of
-.RI [ acm ]
-.RI ( a ccess/ c hange/ m odification).
+.RI [ aBcm ]
+.RI ( a ccess/ B irth/ c hange/ m odification).
 .TP
 \fB\-regex \fIREGEX\fR
 Find files whose entire path matches the regular expression
@@ -523,6 +523,23 @@ Treat
 as a path to search (useful if it begins with a dash).
 .LP
 Tests:
+.PP
+\fB\-Bmin\fR [\fI\-+\fR]\fIN\fR
+.br
+\fB\-Btime\fR [\fI\-+\fR]\fIN\fR
+.RS
+Find files
+.BR B irthed
+.I N
+minutes/days ago.
+.RE
+.TP
+\fB\-Bnewer \fIFILE\fR
+Find files
+.BR B irthed
+more recently than
+.I FILE
+was modified.
 .TP
 \fB\-depth\fR [\fI\-+\fR]\fIN\fR
 Find files with depth

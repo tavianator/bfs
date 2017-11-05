@@ -135,15 +135,15 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -[acm]{min,time} tests.
+ * -[aBcm]?newer tests.
  */
-bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
+bool eval_newer(const struct expr *expr, struct eval_state *state) {
 	const struct stat *statbuf = fill_statbuf(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	const struct timespec *time = NULL;
+	const struct timespec *time;
 	switch (expr->time_field) {
 	case ATIME:
 		time = &statbuf->st_atim;
@@ -154,8 +154,53 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 	case MTIME:
 		time = &statbuf->st_mtim;
 		break;
+
+#if BFS_HAVE_ST_BIRTHTIM
+	case BTIME:
+		time = &statbuf->st_birthtim;
+		break;
+#endif
+
+	default:
+		assert(false);
+		return false;
 	}
-	assert(time);
+
+	return time->tv_sec > expr->reftime.tv_sec
+		|| (time->tv_sec == expr->reftime.tv_sec && time->tv_nsec > expr->reftime.tv_nsec);
+}
+
+/**
+ * -[aBcm]{min,time} tests.
+ */
+bool eval_time(const struct expr *expr, struct eval_state *state) {
+	const struct stat *statbuf = fill_statbuf(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	const struct timespec *time;
+	switch (expr->time_field) {
+	case ATIME:
+		time = &statbuf->st_atim;
+		break;
+	case CTIME:
+		time = &statbuf->st_ctim;
+		break;
+	case MTIME:
+		time = &statbuf->st_mtim;
+		break;
+
+#if BFS_HAVE_ST_BIRTHTIM
+	case BTIME:
+		time = &statbuf->st_birthtim;
+		break;
+#endif
+
+	default:
+		assert(false);
+		return false;
+	}
 
 	time_t diff = timespec_diff(&expr->reftime, time);
 	switch (expr->time_unit) {
@@ -168,33 +213,6 @@ bool eval_acmtime(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return expr_cmp(expr, diff);
-}
-
-/**
- * -[ac]?newer tests.
- */
-bool eval_acnewer(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
-	}
-
-	const struct timespec *time = NULL;
-	switch (expr->time_field) {
-	case ATIME:
-		time = &statbuf->st_atim;
-		break;
-	case CTIME:
-		time = &statbuf->st_ctim;
-		break;
-	case MTIME:
-		time = &statbuf->st_mtim;
-		break;
-	}
-	assert(time);
-
-	return time->tv_sec > expr->reftime.tv_sec
-		|| (time->tv_sec == expr->reftime.tv_sec && time->tv_nsec > expr->reftime.tv_nsec);
 }
 
 /**

@@ -82,6 +82,8 @@ enum time_field {
 	CTIME,
 	/** Modification time. */
 	MTIME,
+	/** Birth time. */
+	BTIME,
 };
 
 /**
