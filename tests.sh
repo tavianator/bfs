@@ -401,6 +401,7 @@ bfs_tests=(
     test_expr_path_flag
     test_colors
     test_deep_strict
+    test_deep_stricter
 )
 
 BSD=yes
@@ -1369,6 +1370,14 @@ function test_deep_strict() {
     closefrom 4
 
     # Not even enough fds to keep the root open
+    ulimit -n 7
+    bfs_diff deep -mindepth 18 -exec /bin/bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' /bin/bash '{}' \;
+}
+
+function test_deep_stricter() {
+    closefrom 4
+
+    # So few fds that pipe() fails in the -exec implementation
     ulimit -n 6
     bfs_diff deep -mindepth 18 -exec /bin/bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' /bin/bash '{}' \;
 }

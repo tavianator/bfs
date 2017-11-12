@@ -336,11 +336,30 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
 	}
 
+	// Use a pipe to report errors from the child
+	int pipefd[2] = { -1, -1 };
+	if (pipe_cloexec(pipefd) != 0) {
+		bfs_exec_debug(execbuf, "pipe() failed: %s\n", strerror(errno));
+	}
+
 	pid_t pid = fork();
 
 	if (pid < 0) {
+		close(pipefd[1]);
+		close(pipefd[0]);
 		return -1;
 	} else if (pid > 0) {
+		// Parent
+		close(pipefd[1]);
+
+		int error;
+		ssize_t nbytes = read(pipefd[0], &error, sizeof(error));
+		close(pipefd[0]);
+		if (nbytes == sizeof(error)) {
+			errno = error;
+			return -1;
+		}
+
 		int status;
 		if (waitpid(pid, &status, 0) < 0) {
 			return -1;
@@ -353,19 +372,22 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			return -1;
 		}
 	} else {
+		// Child
+		close(pipefd[0]);
+
 		if (execbuf->wd_fd >= 0) {
 			if (fchdir(execbuf->wd_fd) != 0) {
-				perror("fchdir()");
-				goto fail;
+				goto child_err;
 			}
 		}
 
 		execvp(execbuf->argv[0], execbuf->argv);
-		perror("execvp()");
+	child_err:
+		write(pipefd[1], &errno, sizeof(errno));
+		close(pipefd[1]);
+		_Exit(EXIT_FAILURE);
 	}
 
-fail:
-	_Exit(EXIT_FAILURE);
 }
 
 /** exec() a command for a single file. */
@@ -412,33 +434,62 @@ out:
 	return ret;
 }
 
+/** Check if any arguments remain in the buffer. */
+static bool bfs_exec_args_remain(const struct bfs_exec *execbuf) {
+	return execbuf->argc >= execbuf->tmpl_argc;
+}
+
 /** Execute the pending command from a BFS_EXEC_MULTI execbuf. */
 static int bfs_exec_flush(struct bfs_exec *execbuf) {
 	int ret = 0;
 
-	if (execbuf->argc > execbuf->tmpl_argc - 1) {
+	size_t orig_argc = execbuf->argc;
+	while (bfs_exec_args_remain(execbuf)) {
 		execbuf->argv[execbuf->argc] = NULL;
-		if (bfs_exec_spawn(execbuf) != 0) {
-			ret = -1;
+		ret = bfs_exec_spawn(execbuf);
+		if (ret == 0 || errno != E2BIG) {
+			break;
 		}
+
+		// Try to recover from E2BIG by trying fewer and fewer arguments
+		// until they fit
+		bfs_exec_debug(execbuf, "Got E2BIG, shrinking argument list...\n");
+		execbuf->argv[execbuf->argc] = execbuf->argv[execbuf->argc - 1];
+		execbuf->arg_size -= bfs_exec_arg_size(execbuf->argv[execbuf->argc]);
+		--execbuf->argc;
 	}
+	size_t new_argc = execbuf->argc;
 
 	int error = errno;
 
-	bfs_exec_closewd(execbuf, NULL);
-
-	for (size_t i = execbuf->tmpl_argc - 1; i < execbuf->argc; ++i) {
+	for (size_t i = execbuf->tmpl_argc - 1; i < new_argc; ++i) {
 		free(execbuf->argv[i]);
 	}
 	execbuf->argc = execbuf->tmpl_argc - 1;
+
+	if (new_argc < orig_argc) {
+		// If we recovered from E2BIG, there are unused arguments at the
+		// end of the list
+		for (size_t i = new_argc + 1; i <= orig_argc; ++i) {
+			if (error == 0) {
+				execbuf->argv[execbuf->argc] = execbuf->argv[i];
+				++execbuf->argc;
+			} else {
+				free(execbuf->argv[i]);
+			}
+		}
+
+		execbuf->arg_max = execbuf->arg_size;
+		bfs_exec_debug(execbuf, "ARG_MAX: %zu\n", execbuf->arg_max);
+	}
 	execbuf->arg_size = 0;
 
 	errno = error;
 	return ret;
 }
 
-/** Check if a flush is needed before a new file is processed. */
-static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ftwbuf, const char *arg) {
+/** Check if we need to flush the execbuf because we're changing directories. */
+static bool bfs_exec_changed_dirs(const struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		if (ftwbuf->nameoff > execbuf->wd_len
 		    || (execbuf->wd_path && strncmp(ftwbuf->path, execbuf->wd_path, execbuf->wd_len) != 0)) {
@@ -447,6 +498,11 @@ static bool bfs_exec_needs_flush(struct bfs_exec *execbuf, const struct BFTW *ft
 		}
 	}
 
+	return false;
+}
+
+/** Check if we need to flush the execbuf because we're too big. */
+static bool bfs_exec_would_overflow(const struct bfs_exec *execbuf, const char *arg) {
 	size_t next_size = execbuf->arg_size + bfs_exec_arg_size(arg);
 	if (next_size > execbuf->arg_max) {
 		bfs_exec_debug(execbuf, "Command size (%zu) would exceed maximum (%zu), executing buffered command\n",
@@ -486,10 +542,13 @@ static int bfs_exec_multi(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 		goto out;
 	}
 
-	if (bfs_exec_needs_flush(execbuf, ftwbuf, arg)) {
-		if (bfs_exec_flush(execbuf) != 0) {
-			ret = -1;
+	if (bfs_exec_changed_dirs(execbuf, ftwbuf)) {
+		while (bfs_exec_args_remain(execbuf)) {
+			ret |= bfs_exec_flush(execbuf);
 		}
+		bfs_exec_closewd(execbuf, ftwbuf);
+	} else if (bfs_exec_would_overflow(execbuf, arg)) {
+		ret |= bfs_exec_flush(execbuf);
 	}
 
 	if ((execbuf->flags & BFS_EXEC_CHDIR) && execbuf->wd_fd < 0) {
@@ -530,8 +589,8 @@ int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 int bfs_exec_finish(struct bfs_exec *execbuf) {
 	if (execbuf->flags & BFS_EXEC_MULTI) {
 		bfs_exec_debug(execbuf, "Finishing execution, executing buffered command\n");
-		if (bfs_exec_flush(execbuf) != 0) {
-			execbuf->ret = -1;
+		while (bfs_exec_args_remain(execbuf)) {
+			execbuf->ret |= bfs_exec_flush(execbuf);
 		}
 	}
 	return execbuf->ret;

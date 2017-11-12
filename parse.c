@@ -1105,12 +1105,16 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 		expr->cost = 1000000.0;
 	}
 
+	int ephemeral_fds = 2;
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		if (execbuf->flags & BFS_EXEC_MULTI) {
 			++cmdline->persistent_fds;
-		} else if (cmdline->ephemeral_fds < 1) {
-			cmdline->ephemeral_fds = 1;
+		} else {
+			++ephemeral_fds;
 		}
+	}
+	if (cmdline->ephemeral_fds < ephemeral_fds) {
+		cmdline->ephemeral_fds = ephemeral_fds;
 	}
 
 	return expr;

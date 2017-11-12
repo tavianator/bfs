@@ -119,6 +119,24 @@ int dup_cloexec(int fd) {
 #endif
 }
 
+int pipe_cloexec(int pipefd[2]) {
+#if __linux__ || BSD
+	return pipe2(pipefd, O_CLOEXEC);
+#else
+	if (pipe(pipefd) != 0) {
+		return -1;
+	}
+
+	if (fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1 || fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1) {
+		close(pipefd[1]);
+		close(pipefd[0]);
+		return -1;
+	}
+
+	return 0;
+#endif
+}
+
 char *xregerror(int err, const regex_t *regex) {
 	size_t len = regerror(err, regex, NULL, 0);
 	char *str = malloc(len);

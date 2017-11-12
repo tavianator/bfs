@@ -107,6 +107,15 @@ int redirect(int fd, const char *path, int flags, ...);
 int dup_cloexec(int fd);
 
 /**
+ * Like pipe(), but set the FD_CLOEXEC flag.
+ *
+ * @param pipefd
+ *         The array to hold the two file descriptors.
+ * @return 0 on success, -1 on failure.
+ */
+int pipe_cloexec(int pipefd[2]);
+
+/**
  * Dynamically allocate a regex error message.
  *
  * @param err
