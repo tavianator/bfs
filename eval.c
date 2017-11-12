@@ -302,15 +302,18 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 }
 
 /** Finish any pending -exec ... + operations. */
-static int eval_exec_finish(const struct expr *expr) {
+static int eval_exec_finish(const struct expr *expr, const struct cmdline *cmdline) {
 	int ret = 0;
 	if (expr->execbuf && bfs_exec_finish(expr->execbuf) != 0) {
+		if (errno != 0) {
+			cfprintf(cmdline->cerr, "%{er}error: %s %s: %s.%{rs}\n", expr->argv[0], expr->argv[1], strerror(errno));
+		}
 		ret = -1;
 	}
-	if (expr->lhs && eval_exec_finish(expr->lhs) != 0) {
+	if (expr->lhs && eval_exec_finish(expr->lhs, cmdline) != 0) {
 		ret = -1;
 	}
-	if (expr->rhs && eval_exec_finish(expr->rhs) != 0) {
+	if (expr->rhs && eval_exec_finish(expr->rhs, cmdline) != 0) {
 		ret = -1;
 	}
 	return ret;
@@ -322,7 +325,8 @@ static int eval_exec_finish(const struct expr *expr) {
 bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	bool ret = bfs_exec(expr->execbuf, state->ftwbuf) == 0;
 	if (errno != 0) {
-		eval_error(state);
+		cfprintf(state->cmdline->cerr, "%{er}error: %s %s: %s.%{rs}\n", expr->argv[0], expr->argv[1], strerror(errno));
+		*state->ret = EXIT_FAILURE;
 	}
 	return ret;
 }
@@ -1254,7 +1258,7 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		}
 	}
 
-	if (eval_exec_finish(cmdline->expr) != 0) {
+	if (eval_exec_finish(cmdline->expr, cmdline) != 0) {
 		args.ret = EXIT_FAILURE;
 	}
 
