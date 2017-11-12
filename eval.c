@@ -1191,8 +1191,7 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
 		closedir(dir);
 	}
 
-	// 1 extra fd needed by -empty
-	ret -= nopen + 1;
+	ret -= nopen + cmdline->persistent_fds + cmdline->ephemeral_fds;
 
 	// bftw() needs at least 2 available fds
 	if (ret < 2) {

@@ -1064,11 +1064,17 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
 	expr->cost = 2000.0;
 	expr->probability = 0.01;
 
-	if (state->cmdline->optlevel < 4) {
+	struct cmdline *cmdline = state->cmdline;
+
+	if (cmdline->optlevel < 4) {
 		// Since -empty attempts to open and read directories, it may
 		// have side effects such as reporting permission errors, and
 		// thus shouldn't be re-ordered without aggressive optimizations
 		expr->pure = false;
+	}
+
+	if (cmdline->ephemeral_fds < 1) {
+		cmdline->ephemeral_fds = 1;
 	}
 
 	return expr;
@@ -1078,13 +1084,11 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
-	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->cmdline);
+	struct cmdline *cmdline = state->cmdline;
+
+	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, cmdline);
 	if (!execbuf) {
 		return NULL;
-	}
-
-	if ((execbuf->flags & BFS_EXEC_CHDIR) && (execbuf->flags & BFS_EXEC_MULTI)) {
-		++state->cmdline->nopen_files;
 	}
 
 	struct expr *expr = parse_action(state, eval_exec, execbuf->tmpl_argc + 2);
@@ -1093,13 +1097,21 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 		return NULL;
 	}
 
+	expr->execbuf = execbuf;
+
 	if (execbuf->flags & BFS_EXEC_MULTI) {
 		expr_set_always_true(expr);
 	} else {
 		expr->cost = 1000000.0;
 	}
 
-	expr->execbuf = execbuf;
+	if (execbuf->flags & BFS_EXEC_CHDIR) {
+		if (execbuf->flags & BFS_EXEC_MULTI) {
+			++cmdline->persistent_fds;
+		} else if (cmdline->ephemeral_fds < 1) {
+			cmdline->ephemeral_fds = 1;
+		}
+	}
 
 	return expr;
 }
@@ -3035,6 +3047,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->expr = &expr_true;
 	cmdline->open_files = NULL;
 	cmdline->nopen_files = 0;
+	cmdline->persistent_fds = 0;
+	cmdline->ephemeral_fds = 0;
 
 	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));
 	if (!cmdline->argv) {
