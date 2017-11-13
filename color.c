@@ -17,6 +17,7 @@
 #include "color.h"
 #include "bftw.h"
 #include "util.h"
+#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -479,102 +480,111 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 	va_start(args, format);
 
 	for (const char *i = format; *i; ++i) {
-		if (*i == '%') {
-			switch (*++i) {
-			case '%':
-				goto one_char;
+		const char *percent = strchr(i, '%');
+		if (!percent) {
+			if (fputs(i, file) == EOF) {
+				goto done;
+			}
+			break;
+		}
 
-			case 'c':
-				if (fputc(va_arg(args, int), file) == EOF) {
-					goto done;
-				}
-				break;
+		size_t len = percent - i;
+		if (fwrite(i, 1, len, file) != len) {
+			goto done;
+		}
 
-			case 'd':
-				if (fprintf(file, "%d", va_arg(args, int)) < 0) {
-					goto done;
-				}
-				break;
+		i = percent + 1;
+		switch (*i) {
+		case '%':
+			if (fputc('%', file) == EOF) {
+				goto done;
+			}
+			break;
 
-			case 'g':
-				if (fprintf(file, "%g", va_arg(args, double)) < 0) {
-					goto done;
-				}
-				break;
+		case 'c':
+			if (fputc(va_arg(args, int), file) == EOF) {
+				goto done;
+			}
+			break;
 
-			case 's':
-				if (fputs(va_arg(args, const char *), file) == EOF) {
-					goto done;
-				}
-				break;
+		case 'd':
+			if (fprintf(file, "%d", va_arg(args, int)) < 0) {
+				goto done;
+			}
+			break;
 
-			case 'z':
-				++i;
-				if (*i != 'u') {
-					goto invalid;
-				}
-				if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
-					goto done;
-				}
-				break;
+		case 'g':
+			if (fprintf(file, "%g", va_arg(args, double)) < 0) {
+				goto done;
+			}
+			break;
 
-			case 'm':
-				if (fputs(strerror(error), file) == EOF) {
-					goto done;
-				}
-				break;
+		case 's':
+			if (fputs(va_arg(args, const char *), file) == EOF) {
+				goto done;
+			}
+			break;
 
-			case 'P':
-				if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
-					goto done;
-				}
-				break;
+		case 'z':
+			++i;
+			if (*i != 'u') {
+				goto invalid;
+			}
+			if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
+				goto done;
+			}
+			break;
 
-			case 'L':
-				if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
-					goto done;
-				}
-				break;
+		case 'm':
+			if (fputs(strerror(error), file) == EOF) {
+				goto done;
+			}
+			break;
 
-			case '{': {
-				++i;
-				const char *end = strchr(i, '}');
-				if (!end) {
-					goto invalid;
-				}
-				if (!colors) {
-					i = end;
-					break;
-				}
+		case 'P':
+			if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
+				goto done;
+			}
+			break;
 
-				size_t len = end - i;
-				char name[len + 1];
-				memcpy(name, i, len);
-				name[len] = '\0';
+		case 'L':
+			if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
+				goto done;
+			}
+			break;
 
-				const char *esc = get_color(colors, name);
-				if (!esc) {
-					goto invalid;
-				}
-				if (print_esc(esc, file) != 0) {
-					goto done;
-				}
-
+		case '{': {
+			++i;
+			const char *end = strchr(i, '}');
+			if (!end) {
+				goto invalid;
+			}
+			if (!colors) {
 				i = end;
 				break;
 			}
 
-			default:
-			invalid:
-				errno = EINVAL;
+			size_t len = end - i;
+			char name[len + 1];
+			memcpy(name, i, len);
+			name[len] = '\0';
+
+			const char *esc = get_color(colors, name);
+			if (!esc) {
+				goto invalid;
+			}
+			if (print_esc(esc, file) != 0) {
 				goto done;
 			}
 
-			continue;
+			i = end;
+			break;
 		}
 
-	one_char:
-		if (fputc(*i, file) == EOF) {
+		default:
+		invalid:
+			assert(false);
+			errno = EINVAL;
 			goto done;
 		}
 	}
