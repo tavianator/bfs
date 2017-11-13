@@ -618,7 +618,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				if (!cmdline->mtab) {
 					cmdline->mtab = parse_bfs_mtab();
 					if (!cmdline->mtab) {
-						cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %s.%{rs}\n\n", strerror(errno));
+						cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %m%{rs}\n");
 						goto directive_error;
 					}
 				}

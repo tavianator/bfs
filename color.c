@@ -473,6 +473,7 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 	FILE *file = cfile->file;
 
 	int ret = -1;
+	int error = errno;
 
 	va_list args;
 	va_start(args, format);
@@ -513,6 +514,12 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 					goto invalid;
 				}
 				if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
+					goto done;
+				}
+				break;
+
+			case 'm':
+				if (fputs(strerror(error), file) == EOF) {
 					goto done;
 				}
 				break;

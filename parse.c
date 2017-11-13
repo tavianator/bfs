@@ -254,7 +254,7 @@ int free_cmdline(struct cmdline *cmdline) {
 
 			if (cfclose(ofile->cfile) != 0) {
 				if (cerr) {
-					cfprintf(cerr, "%{er}error: '%s': %s%{rs}\n", ofile->path, strerror(errno));
+					cfprintf(cerr, "%{er}error: '%s': %m%{rs}\n", ofile->path);
 				}
 				ret = -1;
 			}
@@ -265,7 +265,7 @@ int free_cmdline(struct cmdline *cmdline) {
 
 		if (cout && fflush(cout->file) != 0) {
 			if (cerr) {
-				cfprintf(cerr, "%{er}error: standard output: %s%{rs}\n", strerror(errno));
+				cfprintf(cerr, "%{er}error: standard output: %m%{rs}\n");
 			}
 			ret = -1;
 		}
@@ -375,13 +375,13 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 
 	CFILE *cfile = cfopen(path, state->use_color ? cmdline->colors : NULL);
 	if (!cfile) {
-		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
+		cfprintf(cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", path);
 		goto out;
 	}
 
 	struct stat sb;
 	if (fstat(fileno(cfile->file), &sb) != 0) {
-		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, strerror(errno));
+		cfprintf(cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", path);
 		goto out_close;
 	}
 
@@ -428,7 +428,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 
 	int ret = xfstatat(AT_FDCWD, expr->sdata, sb, flags);
 	if (ret != 0) {
-		cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", expr->sdata, strerror(errno));
+		cfprintf(cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", expr->sdata);
 	}
 	return ret;
 }
@@ -1269,7 +1269,7 @@ static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2)
 	if (!cmdline->mtab) {
 		cmdline->mtab = parse_bfs_mtab();
 		if (!cmdline->mtab) {
-			cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %s.%{rs}\n\n", strerror(errno));
+			cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %m%{rs}\n");
 			return NULL;
 		}
 	}

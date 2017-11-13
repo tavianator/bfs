@@ -68,7 +68,7 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
  */
 static void eval_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", state->ftwbuf->path, strerror(errno));
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", state->ftwbuf->path);
 		*state->ret = EXIT_FAILURE;
 	}
 }
@@ -306,7 +306,7 @@ static int eval_exec_finish(const struct expr *expr, const struct cmdline *cmdli
 	int ret = 0;
 	if (expr->execbuf && bfs_exec_finish(expr->execbuf) != 0) {
 		if (errno != 0) {
-			cfprintf(cmdline->cerr, "%{er}error: %s %s: %s.%{rs}\n", expr->argv[0], expr->argv[1], strerror(errno));
+			cfprintf(cmdline->cerr, "%{er}error: %s %s: %m%{rs}\n", expr->argv[0], expr->argv[1]);
 		}
 		ret = -1;
 	}
@@ -325,7 +325,7 @@ static int eval_exec_finish(const struct expr *expr, const struct cmdline *cmdli
 bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	bool ret = bfs_exec(expr->execbuf, state->ftwbuf) == 0;
 	if (errno != 0) {
-		cfprintf(state->cmdline->cerr, "%{er}error: %s %s: %s.%{rs}\n", expr->argv[0], expr->argv[1], strerror(errno));
+		cfprintf(state->cmdline->cerr, "%{er}error: %s %s: %m%{rs}\n", expr->argv[0], expr->argv[1]);
 		*state->ret = EXIT_FAILURE;
 	}
 	return ret;
@@ -1100,7 +1100,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = EXIT_FAILURE;
-			cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
+			cfprintf(cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", ftwbuf->path);
 		}
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
