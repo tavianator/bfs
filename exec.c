@@ -337,7 +337,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 	}
 
 	// Use a pipe to report errors from the child
-	int pipefd[2] = { -1, -1 };
+	int pipefd[2] = {-1, -1};
 	if (pipe_cloexec(pipefd) != 0) {
 		bfs_exec_debug(execbuf, "pipe() failed: %s\n", strerror(errno));
 	}
