@@ -124,6 +124,8 @@ struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
 	expr->regex = NULL;
 	expr->execbuf = NULL;
 	expr->printf = NULL;
+	expr->persistent_fds = 0;
+	expr->ephemeral_fds = 0;
 	return expr;
 }
 
@@ -138,6 +140,8 @@ static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **argv)
 	}
 
 	expr->rhs = rhs;
+	expr->persistent_fds = rhs->persistent_fds;
+	expr->ephemeral_fds = rhs->ephemeral_fds;
 	return expr;
 }
 
@@ -154,6 +158,12 @@ static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr
 
 	expr->lhs = lhs;
 	expr->rhs = rhs;
+	expr->persistent_fds = lhs->persistent_fds + rhs->persistent_fds;
+	if (lhs->ephemeral_fds > rhs->ephemeral_fds) {
+		expr->ephemeral_fds = lhs->ephemeral_fds;
+	} else {
+		expr->ephemeral_fds = rhs->ephemeral_fds;
+	}
 	return expr;
 }
 
@@ -1073,9 +1083,7 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
 		expr->pure = false;
 	}
 
-	if (cmdline->ephemeral_fds < 1) {
-		cmdline->ephemeral_fds = 1;
-	}
+	expr->ephemeral_fds = 1;
 
 	return expr;
 }
@@ -1105,16 +1113,13 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 		expr->cost = 1000000.0;
 	}
 
-	int ephemeral_fds = 2;
+	expr->ephemeral_fds = 2;
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		if (execbuf->flags & BFS_EXEC_MULTI) {
-			++cmdline->persistent_fds;
+			expr->persistent_fds = 1;
 		} else {
-			++ephemeral_fds;
+			++expr->ephemeral_fds;
 		}
-	}
-	if (cmdline->ephemeral_fds < ephemeral_fds) {
-		cmdline->ephemeral_fds = ephemeral_fds;
 	}
 
 	return expr;
@@ -3051,8 +3056,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->expr = &expr_true;
 	cmdline->open_files = NULL;
 	cmdline->nopen_files = 0;
-	cmdline->persistent_fds = 0;
-	cmdline->ephemeral_fds = 0;
 
 	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));
 	if (!cmdline->argv) {

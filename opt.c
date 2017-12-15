@@ -571,6 +571,19 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		goto done;
 	}
 
+	struct expr *lhs = expr->lhs;
+	struct expr *rhs = expr->rhs;
+	if (rhs) {
+		expr->persistent_fds = rhs->persistent_fds;
+		expr->ephemeral_fds = rhs->ephemeral_fds;
+	}
+	if (lhs) {
+		expr->persistent_fds += lhs->persistent_fds;
+		if (lhs->ephemeral_fds > expr->ephemeral_fds) {
+			expr->ephemeral_fds = lhs->ephemeral_fds;
+		}
+	}
+
 	if (expr->always_true) {
 		set_facts_impossible(&state->facts_when_false);
 	}

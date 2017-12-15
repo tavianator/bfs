@@ -98,10 +98,6 @@ struct cmdline {
 	struct open_file *open_files;
 	/** The number of open files owned by the command line. */
 	int nopen_files;
-	/** The number of files that may stay open between evaluations. */
-	int persistent_fds;
-	/** The number of files that mau be opened during evaluations. */
-	int ephemeral_fds;
 };
 
 /**

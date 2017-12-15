@@ -192,6 +192,11 @@ struct expr {
 
 	/** Optional string data for this expression. */
 	const char *sdata;
+
+	/** The number of files this expression keeps open between evaluations. */
+	int persistent_fds;
+	/** The number of files this expression opens during evaluation. */
+	int ephemeral_fds;
 };
 
 /** Singleton true expression instance. */
