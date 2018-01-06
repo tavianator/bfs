@@ -1074,9 +1074,7 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
 	expr->cost = 2000.0;
 	expr->probability = 0.01;
 
-	struct cmdline *cmdline = state->cmdline;
-
-	if (cmdline->optlevel < 4) {
+	if (state->cmdline->optlevel < 4) {
 		// Since -empty attempts to open and read directories, it may
 		// have side effects such as reporting permission errors, and
 		// thus shouldn't be re-ordered without aggressive optimizations
@@ -1092,9 +1090,7 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-
-	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, cmdline);
+	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->cmdline);
 	if (!execbuf) {
 		return NULL;
 	}
