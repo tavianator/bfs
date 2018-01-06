@@ -593,7 +593,7 @@ struct bftw_state {
 	/** The current directory. */
 	struct bftw_dir *current;
 	/** The previous directory. */
-	struct bftw_dir *last;
+	struct bftw_dir *previous;
 	/** The currently open directory. */
 	DIR *dir;
 	/** The current traversal status. */
@@ -636,7 +636,7 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 	}
 
 	state->current = NULL;
-	state->last = NULL;
+	state->previous = NULL;
 	state->dir = NULL;
 	state->status = BFTW_CURRENT;
 
@@ -668,25 +668,25 @@ static int bftw_build_path(struct bftw_state *state) {
 	}
 
 	// Only rebuild the part of the path that changes
-	const struct bftw_dir *last = state->last;
-	while (last && last->depth > dir->depth) {
-		last = last->parent;
+	const struct bftw_dir *base = state->previous;
+	while (base && base->depth > dir->depth) {
+		base = base->parent;
 	}
 
 	// Build the path backwards
 	char *path = state->path;
-	while (dir != last) {
+	while (dir != base) {
 		char *segment = path + dir->nameoff;
 		namelen = dir->namelen;
 		memcpy(segment, dir->name, namelen);
 
-		if (last && last->depth == dir->depth) {
-			last = last->parent;
+		if (base && base->depth == dir->depth) {
+			base = base->parent;
 		}
 		dir = dir->parent;
 	}
 
-	state->last = state->current;
+	state->previous = state->current;
 
 	return 0;
 }
@@ -726,7 +726,7 @@ static void bftw_path_trim(struct bftw_state *state) {
 		if (current->namelen > 1) {
 			// Trim the trailing slash
 			--length;
-			state->last = current->parent;
+			state->previous = current->parent;
 		}
 	}
 	dstresize(&state->path, length);
@@ -949,7 +949,7 @@ static int bftw_gc(struct bftw_state *state, struct bftw_dir *dir, bool invoke_c
 		dir = parent;
 	}
 
-	state->last = dir;
+	state->previous = dir;
 	return ret;
 }
 
