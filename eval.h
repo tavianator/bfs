@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#ifndef EVAL_H
-#define EVAL_H
+#ifndef BFS_EVAL_H
+#define BFS_EVAL_H
 
 #include "expr.h"
 
@@ -70,4 +70,4 @@ bool eval_and(const struct expr *expr, struct eval_state *state);
 bool eval_or(const struct expr *expr, struct eval_state *state);
 bool eval_comma(const struct expr *expr, struct eval_state *state);
 
-#endif // EVAL_H
+#endif // BFS_EVAL_H

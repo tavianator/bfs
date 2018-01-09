@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#ifndef CMDLINE_H
-#define CMDLINE_H
+#ifndef BFS_CMDLINE_H
+#define BFS_CMDLINE_H
 
 #include "color.h"
 
@@ -129,4 +129,4 @@ int eval_cmdline(const struct cmdline *cmdline);
  */
 int free_cmdline(struct cmdline *cmdline);
 
-#endif // CMDLINE_H
+#endif // BFS_CMDLINE_H

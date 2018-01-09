@@ -92,6 +92,9 @@ struct BFTW {
 	int at_flags;
 };
 
+/**
+ * Walk actions returned by the bftw() callback.
+ */
 enum bftw_action {
 	/** Keep walking. */
 	BFTW_CONTINUE,

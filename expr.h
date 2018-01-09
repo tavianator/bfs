@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#ifndef EXPR_H
-#define EXPR_H
+#ifndef BFS_EXPR_H
+#define BFS_EXPR_H
 
 #include "color.h"
 #include "exec.h"
@@ -229,4 +229,4 @@ void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose);
  */
 void free_expr(struct expr *expr);
 
-#endif // EXPR_H
+#endif // BFS_EXPR_H
