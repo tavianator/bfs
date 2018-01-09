@@ -23,21 +23,10 @@
 #include <fnmatch.h>
 #include <regex.h>
 #include <stdbool.h>
-#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
 
 // Some portability concerns
-
-#if __APPLE__
-#	define st_atim st_atimespec
-#	define st_ctim st_ctimespec
-#	define st_mtim st_mtimespec
-#	define st_birthtim st_birthtimespec
-#endif
-
-#if __APPLE__ || __FreeBSD__ || __NetBSD__
-#	define BFS_HAVE_ST_BIRTHTIM true
-#endif
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
@@ -167,22 +156,7 @@ int xfaccessat(int fd, const char *path, int amode);
 bool is_nonexistence_error(int error);
 
 /**
- * stat() a file, falling back on the link itself for broken symbolic links.
- *
- * @param fd
- *         The base directory descriptor.
- * @param path
- *         The path to the file, relative to fd.
- * @param buf
- *         The stat buffer to fill.
- * @param flags
- *         AT_* flags for this call.
- * @return 0 on success, -1 on failure.
- */
-int xfstatat(int fd, const char *path, struct stat *buf, int flags);
-
-/**
- * Convert a stat() st_mode to a bftw() typeflag.
+ * Convert a bfs_stat() mode to a bftw() typeflag.
  */
 enum bftw_typeflag mode_to_typeflag(mode_t mode);
 

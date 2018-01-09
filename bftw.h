@@ -17,8 +17,8 @@
 #ifndef BFS_BFTW_H
 #define BFS_BFTW_H
 
+#include "stat.h"
 #include <stddef.h>
-#include <sys/stat.h>
 
 /**
  * Possible file types.
@@ -81,8 +81,8 @@ struct BFTW {
 	/** The errno that occurred, if typeflag == BFTW_ERROR. */
 	int error;
 
-	/** A stat() buffer; may be NULL if no stat() call was needed. */
-	const struct stat *statbuf;
+	/** A bfs_stat() buffer; may be NULL if no stat() call was needed. */
+	const struct bfs_stat *statbuf;
 
 	/** A parent file descriptor for the *at() family of calls. */
 	int at_fd;

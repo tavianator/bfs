@@ -22,6 +22,7 @@
 #include "exec.h"
 #include "mtab.h"
 #include "printf.h"
+#include "stat.h"
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
@@ -51,7 +52,9 @@ struct eval_state {
 	/** Whether to quit immediately. */
 	bool *quit;
 	/** A stat() buffer, if necessary. */
-	struct stat statbuf;
+	struct bfs_stat statbuf;
+	/** A bfs_stat() buffer, if necessary. */
+	struct bfs_stat bfs_statbuf;
 };
 
 /**
@@ -74,13 +77,13 @@ static void eval_error(struct eval_state *state) {
 }
 
 /**
- * Perform a stat() call if necessary.
+ * Perform a bfs_stat() call if necessary.
  */
-static const struct stat *fill_statbuf(struct eval_state *state) {
+static const struct bfs_stat *eval_bfs_stat(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
-		if (xfstatat(ftwbuf->at_fd, ftwbuf->at_path, &state->statbuf, ftwbuf->at_flags) == 0) {
-			ftwbuf->statbuf = &state->statbuf;
+		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->bfs_statbuf) == 0) {
+			ftwbuf->statbuf = &state->bfs_statbuf;
 		} else {
 			eval_error(state);
 		}
@@ -135,34 +138,42 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * Get the given timespec field out of a stat buffer.
+ */
+static const struct timespec *eval_stat_time(const struct expr *expr, struct eval_state *state) {
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	if (!statbuf) {
+		return NULL;
+	}
+
+	if (!(statbuf->mask & expr->stat_field)) {
+		assert(expr->stat_field == BFS_STAT_BTIME);
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file birth time.%{rs}\n", state->ftwbuf->path);
+		*state->ret = EXIT_FAILURE;
+		return NULL;
+	}
+
+	switch (expr->stat_field) {
+	case BFS_STAT_ATIME:
+		return &statbuf->atime;
+	case BFS_STAT_BTIME:
+		return &statbuf->btime;
+	case BFS_STAT_CTIME:
+		return &statbuf->ctime;
+	case BFS_STAT_MTIME:
+		return &statbuf->mtime;
+	default:
+		assert(false);
+		return NULL;
+	}
+}
+
+/**
  * -[aBcm]?newer tests.
  */
 bool eval_newer(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
-	}
-
-	const struct timespec *time;
-	switch (expr->time_field) {
-	case ATIME:
-		time = &statbuf->st_atim;
-		break;
-	case CTIME:
-		time = &statbuf->st_ctim;
-		break;
-	case MTIME:
-		time = &statbuf->st_mtim;
-		break;
-
-#if BFS_HAVE_ST_BIRTHTIM
-	case BTIME:
-		time = &statbuf->st_birthtim;
-		break;
-#endif
-
-	default:
-		assert(false);
+	const struct timespec *time = eval_stat_time(expr, state);
+	if (!time) {
 		return false;
 	}
 
@@ -174,31 +185,8 @@ bool eval_newer(const struct expr *expr, struct eval_state *state) {
  * -[aBcm]{min,time} tests.
  */
 bool eval_time(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
-	if (!statbuf) {
-		return false;
-	}
-
-	const struct timespec *time;
-	switch (expr->time_field) {
-	case ATIME:
-		time = &statbuf->st_atim;
-		break;
-	case CTIME:
-		time = &statbuf->st_ctim;
-		break;
-	case MTIME:
-		time = &statbuf->st_mtim;
-		break;
-
-#if BFS_HAVE_ST_BIRTHTIM
-	case BTIME:
-		time = &statbuf->st_birthtim;
-		break;
-#endif
-
-	default:
-		assert(false);
+	const struct timespec *time = eval_stat_time(expr, state);
+	if (!time) {
 		return false;
 	}
 
@@ -219,12 +207,12 @@ bool eval_time(const struct expr *expr, struct eval_state *state) {
  * -used test.
  */
 bool eval_used(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	time_t diff = timespec_diff(&statbuf->st_atim, &statbuf->st_ctim);
+	time_t diff = timespec_diff(&statbuf->atime, &statbuf->ctime);
 	diff /= 60*60*24;
 	return expr_cmp(expr, diff);
 }
@@ -233,48 +221,48 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
  * -gid test.
  */
 bool eval_gid(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->st_gid);
+	return expr_cmp(expr, statbuf->gid);
 }
 
 /**
  * -uid test.
  */
 bool eval_uid(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->st_uid);
+	return expr_cmp(expr, statbuf->uid);
 }
 
 /**
  * -nogroup test.
  */
 bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return getgrgid(statbuf->st_gid) == NULL;
+	return getgrgid(statbuf->gid) == NULL;
 }
 
 /**
  * -nouser test.
  */
 bool eval_nouser(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return getpwuid(statbuf->st_uid) == NULL;
+	return getpwuid(statbuf->uid) == NULL;
 }
 
 /**
@@ -390,9 +378,9 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	done_dir:
 		closedir(dir);
 	} else {
-		const struct stat *statbuf = fill_statbuf(state);
+		const struct bfs_stat *statbuf = eval_bfs_stat(state);
 		if (statbuf) {
-			ret = statbuf->st_size == 0;
+			ret = statbuf->size == 0;
 		}
 	}
 
@@ -404,7 +392,7 @@ done:
  * -fstype test.
  */
 bool eval_fstype(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -437,24 +425,24 @@ bool eval_nohidden(const struct expr *expr, struct eval_state *state) {
  * -inum test.
  */
 bool eval_inum(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->st_ino);
+	return expr_cmp(expr, statbuf->ino);
 }
 
 /**
  * -links test.
  */
 bool eval_links(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->st_nlink);
+	return expr_cmp(expr, statbuf->nlink);
 }
 
 /**
@@ -469,12 +457,12 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 		goto done;
 	}
 
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		goto done;
 	}
 
-	name = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->st_size);
+	name = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->size);
 	if (!name) {
 		eval_error(state);
 		goto done;
@@ -526,12 +514,12 @@ bool eval_path(const struct expr *expr, struct eval_state *state) {
  * -perm test.
  */
 bool eval_perm(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	mode_t mode = statbuf->st_mode;
+	mode_t mode = statbuf->mode;
 	mode_t target;
 	if (state->ftwbuf->typeflag == BFTW_DIR) {
 		target = expr->dir_mode;
@@ -560,21 +548,21 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		goto done;
 	}
 
-	uintmax_t ino = statbuf->st_ino;
-	uintmax_t blocks = (statbuf->st_blocks + 1)/2;
+	uintmax_t ino = statbuf->ino;
+	uintmax_t blocks = (statbuf->blocks + 1)/2;
 	char mode[11];
-	format_mode(statbuf->st_mode, mode);
-	uintmax_t nlink = statbuf->st_nlink;
+	format_mode(statbuf->mode, mode);
+	uintmax_t nlink = statbuf->nlink;
 	if (fprintf(file, "%9ju %6ju %s %3ju ", ino, blocks, mode, nlink) < 0) {
 		goto error;
 	}
 
-	uintmax_t uid = statbuf->st_uid;
+	uintmax_t uid = statbuf->uid;
 	struct passwd *pwd = getpwuid(uid);
 	if (pwd) {
 		if (fprintf(file, " %-8s", pwd->pw_name) < 0) {
@@ -586,7 +574,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	uintmax_t gid = statbuf->st_gid;
+	uintmax_t gid = statbuf->gid;
 	struct group *grp = getgrgid(gid);
 	if (grp) {
 		if (fprintf(file, " %-8s", grp->gr_name) < 0) {
@@ -598,12 +586,12 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	uintmax_t size = statbuf->st_size;
+	uintmax_t size = statbuf->size;
 	if (fprintf(file, " %8ju", size) < 0) {
 		goto error;
 	}
 
-	time_t time = statbuf->st_mtim.tv_sec;
+	time_t time = statbuf->mtime.tv_sec;
 	time_t now = expr->reftime.tv_sec;
 	time_t six_months_ago = now - 6*30*24*60*60;
 	time_t tomorrow = now + 24*60*60;
@@ -652,7 +640,7 @@ error:
 bool eval_fprint(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	if (cfile->colors) {
-		fill_statbuf(state);
+		eval_bfs_stat(state);
 	}
 
 	if (cfprintf(cfile, "%P\n", state->ftwbuf) < 0) {
@@ -679,7 +667,7 @@ bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
 	if (expr->printf->needs_stat) {
-		if (!fill_statbuf(state)) {
+		if (!eval_bfs_stat(state)) {
 			goto done;
 		}
 	}
@@ -784,19 +772,19 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
  * -samefile test.
  */
 bool eval_samefile(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return statbuf->st_dev == expr->dev && statbuf->st_ino == expr->ino;
+	return statbuf->dev == expr->dev && statbuf->ino == expr->ino;
 }
 
 /**
  * -size test.
  */
 bool eval_size(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -813,7 +801,7 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
 	};
 
 	off_t scale = scales[expr->size_unit];
-	off_t size = (statbuf->st_size + scale - 1)/scale; // Round up
+	off_t size = (statbuf->size + scale - 1)/scale; // Round up
 	return expr_cmp(expr, size);
 }
 
@@ -821,13 +809,13 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
  * -sparse test.
  */
 bool eval_sparse(const struct expr *expr, struct eval_state *state) {
-	const struct stat *statbuf = fill_statbuf(state);
+	const struct bfs_stat *statbuf = eval_bfs_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	blkcnt_t expected = (statbuf->st_size + 511)/512;
-	return statbuf->st_blocks < expected;
+	blkcnt_t expected = (statbuf->size + 511)/512;
+	return statbuf->blocks < expected;
 }
 
 /**
@@ -852,8 +840,8 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	// -xtype does the opposite of everything else
 	int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
 
-	struct stat sb;
-	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &sb, at_flags) != 0) {
+	struct bfs_stat sb;
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, at_flags, 0, &sb) != 0) {
 		if (!follow && is_nonexistence_error(errno)) {
 			// Broken symlink
 			return eval_type(expr, state);
@@ -863,7 +851,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	return mode_to_typeflag(sb.st_mode) & expr->idata;
+	return mode_to_typeflag(sb.mode) & expr->idata;
 }
 
 #if _POSIX_MONOTONIC_CLOCK > 0

@@ -16,6 +16,7 @@
 
 #include "color.h"
 #include "bftw.h"
+#include "stat.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
@@ -296,24 +297,24 @@ int cfclose(CFILE *cfile) {
 }
 
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
-	const struct stat *sb = ftwbuf->statbuf;
+	const struct bfs_stat *sb = ftwbuf->statbuf;
 	if (!sb) {
 		return colors->orphan;
 	}
 
 	const char *color = NULL;
 
-	switch (sb->st_mode & S_IFMT) {
+	switch (sb->mode & S_IFMT) {
 	case S_IFREG:
-		if (sb->st_mode & S_ISUID) {
+		if (sb->mode & S_ISUID) {
 			color = colors->setuid;
-		} else if (sb->st_mode & S_ISGID) {
+		} else if (sb->mode & S_ISGID) {
 			color = colors->setgid;
-		} else if (sb->st_mode & 0111) {
+		} else if (sb->mode & 0111) {
 			color = colors->exec;
 		}
 
-		if (!color && sb->st_nlink > 1) {
+		if (!color && sb->nlink > 1) {
 			color = colors->multi_hard;
 		}
 
@@ -335,13 +336,13 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFDIR:
-		if (sb->st_mode & S_ISVTX) {
-			if (sb->st_mode & S_IWOTH) {
+		if (sb->mode & S_ISVTX) {
+			if (sb->mode & S_IWOTH) {
 				color = colors->sticky_ow;
 			} else {
 				color = colors->sticky;
 			}
-		} else if (sb->st_mode & S_IWOTH) {
+		} else if (sb->mode & S_IWOTH) {
 			color = colors->ow;
 		}
 
@@ -455,8 +456,8 @@ static int print_link(CFILE *cfile, const struct BFTW *ftwbuf) {
 	altbuf.path = target;
 	altbuf.nameoff = xbasename(target) - target;
 
-	struct stat statbuf;
-	if (fstatat(ftwbuf->at_fd, ftwbuf->at_path, &statbuf, 0) == 0) {
+	struct bfs_stat statbuf;
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, 0, 0, &statbuf) == 0) {
 		altbuf.statbuf = &statbuf;
 	} else {
 		altbuf.statbuf = NULL;

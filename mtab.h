@@ -17,7 +17,7 @@
 #ifndef BFS_MTAB_H
 #define BFS_MTAB_H
 
-#include <sys/stat.h>
+#include "stat.h"
 
 /**
  * A file system mount table.
@@ -37,11 +37,11 @@ struct bfs_mtab *parse_bfs_mtab(void);
  * @param mtab
  *         The current mount table.
  * @param statbuf
- *         The stat() buffer for the file in question.
+ *         The bfs_stat() buffer for the file in question.
  * @return The type of file system containing this file, "unknown" if not known,
  *         or NULL on error.
  */
-const char *bfs_fstype(const struct bfs_mtab *mtab, const struct stat *statbuf);
+const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statbuf);
 
 /**
  * Free a mount table.

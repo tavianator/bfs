@@ -20,6 +20,7 @@
 #include "color.h"
 #include "exec.h"
 #include "printf.h"
+#include "stat.h"
 #include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -70,20 +71,6 @@ enum mode_cmp {
 	MODE_ALL,
 	/** Mode has any of these bits (/MODE). */
 	MODE_ANY,
-};
-
-/**
- * Available struct stat time fields.
- */
-enum time_field {
-	/** Access time. */
-	ATIME,
-	/** Status change time. */
-	CTIME,
-	/** Modification time. */
-	MTIME,
-	/** Birth time. */
-	BTIME,
 };
 
 /**
@@ -160,10 +147,10 @@ struct expr {
 	/** Mode to use for directories (different due to X). */
 	mode_t dir_mode;
 
+	/** The optional stat field to look at. */
+	enum bfs_stat_field stat_field;
 	/** The optional reference time. */
 	struct timespec reftime;
-	/** The optional time field. */
-	enum time_field time_field;
 	/** The optional time unit. */
 	enum time_unit time_unit;
 

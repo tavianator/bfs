@@ -35,6 +35,7 @@
 
 #include "bftw.h"
 #include "dstring.h"
+#include "stat.h"
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
@@ -45,8 +46,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 /**
@@ -550,11 +549,11 @@ static void bftw_queue_destroy(struct bftw_queue *queue) {
 }
 
 /** Call stat() and use the results. */
-static int ftwbuf_stat(struct BFTW *ftwbuf, struct stat *sb) {
-	int ret = xfstatat(ftwbuf->at_fd, ftwbuf->at_path, sb, ftwbuf->at_flags);
+static int ftwbuf_stat(struct BFTW *ftwbuf, struct bfs_stat *sb) {
+	int ret = bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, sb);
 	if (ret == 0) {
 		ftwbuf->statbuf = sb;
-		ftwbuf->typeflag = mode_to_typeflag(sb->st_mode);
+		ftwbuf->typeflag = mode_to_typeflag(sb->mode);
 	}
 	return ret;
 }
@@ -606,8 +605,8 @@ struct bftw_state {
 
 	/** Extra data about the current file. */
 	struct BFTW ftwbuf;
-	/** stat() buffer for the current file. */
-	struct stat statbuf;
+	/** bfs_stat() buffer for the current file. */
+	struct bfs_stat statbuf;
 };
 
 /**
@@ -840,8 +839,8 @@ static void bftw_init_buffers(struct bftw_state *state, const struct dirent *de)
 		}
 
 		if (ftwbuf->typeflag == BFTW_DIR && detect_cycles) {
-			dev_t dev = ftwbuf->statbuf->st_dev;
-			ino_t ino = ftwbuf->statbuf->st_ino;
+			dev_t dev = ftwbuf->statbuf->dev;
+			ino_t ino = ftwbuf->statbuf->ino;
 			for (const struct bftw_dir *dir = current; dir; dir = dir->parent) {
 				if (dev == dir->dev && ino == dir->ino) {
 					bftw_set_error(state, ELOOP);
@@ -890,10 +889,10 @@ static struct bftw_dir *bftw_add(struct bftw_state *state, const char *name) {
 		return NULL;
 	}
 
-	const struct stat *statbuf = state->ftwbuf.statbuf;
+	const struct bfs_stat *statbuf = state->ftwbuf.statbuf;
 	if (statbuf) {
-		dir->dev = statbuf->st_dev;
-		dir->ino = statbuf->st_ino;
+		dir->dev = statbuf->dev;
+		dir->ino = statbuf->ino;
 	}
 
 	return dir;
@@ -1083,10 +1082,10 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 			}
 
 			if (state.ftwbuf.typeflag == BFTW_DIR) {
-				const struct stat *statbuf = state.ftwbuf.statbuf;
+				const struct bfs_stat *statbuf = state.ftwbuf.statbuf;
 				if ((flags & BFTW_XDEV)
 				    && statbuf
-				    && statbuf->st_dev != state.current->dev) {
+				    && statbuf->dev != state.current->dev) {
 					continue;
 				}
 

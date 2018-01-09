@@ -31,7 +31,7 @@ struct bfs_printf_directive;
 struct bfs_printf {
 	/** The chain of printf directives. */
 	struct bfs_printf_directive *directives;
-	/** Whether the struct stat must be filled in. */
+	/** Whether the struct bfs_stat must be filled in. */
 	bool needs_stat;
 };
 
