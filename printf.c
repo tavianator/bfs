@@ -81,6 +81,7 @@ static int bfs_printf_flush(FILE *file, const struct bfs_printf_directive *direc
  */
 static const struct timespec *get_time_field(const struct bfs_stat *statbuf, enum bfs_stat_field stat_field) {
 	if (!(statbuf->mask & stat_field)) {
+		errno = ENOTSUP;
 		return NULL;
 	}
 
@@ -700,6 +701,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				directive->fn = bfs_printf_U;
 				command->needs_stat = true;
 				break;
+			case 'w':
+				directive->fn = bfs_printf_ctime;
+				directive->stat_field = BFS_STAT_BTIME;
+				command->needs_stat = true;
+				break;
 			case 'y':
 				directive->fn = bfs_printf_y;
 				break;
@@ -715,6 +721,9 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				goto directive_strftime;
 			case 'T':
 				directive->stat_field = BFS_STAT_MTIME;
+				goto directive_strftime;
+			case 'W':
+				directive->stat_field = BFS_STAT_BTIME;
 				goto directive_strftime;
 
 			directive_strftime:

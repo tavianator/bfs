@@ -2406,7 +2406,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-Btime%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files Birthed %{bld}N%{rs} minutes/days ago\n");
 	cfprintf(cout, "  %{blu}-Bnewer%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Find files Birthed more recently than %{bld}FILEa%{rs} was modified\n");
+	cfprintf(cout, "      Find files Birthed more recently than %{bld}FILE%{rs} was modified\n");
 	cfprintf(cout, "  %{blu}-depth%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files with depth %{bld}N%{rs}\n");
 	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}NAME%{rs}\n");
@@ -2447,6 +2447,11 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-hidden%{rs}\n");
 	cfprintf(cout, "  %{blu}-nohidden%{rs}\n");
 	cfprintf(cout, "      Match hidden files, or filter them out\n\n");
+
+	cfprintf(cout, "  %{blu}-printf%{rs} %{bld}FORMAT%{rs}\n");
+	cfprintf(cout, "  %{blu}-fprintf%{rs} %{bld}FORMAT%{rs} %{bld}FILE%{rs}\n");
+	cfprintf(cout, "      The additional format directives %%w and %%W%{bld}k%{rs} for printing file birth times\n");
+	cfprintf(cout, "      are supported.\n\n");
 
 	cfprintf(cout, "%s\n", BFS_HOMEPAGE);
 

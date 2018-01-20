@@ -394,6 +394,7 @@ bfs_tests=(
     test_execdir_plus
     test_hidden
     test_nohidden
+    test_printf_w
     test_path_flag_expr
     test_path_expr_flag
     test_flag_expr_path
@@ -1288,6 +1289,11 @@ function test_printf_nul() {
     else
         diff -u "$OUT" <(invoke_bfs "${ARGS[@]}")
     fi
+}
+
+function test_printf_w() {
+    # Birth times may not be supported, so just check that %w/%W can be parsed
+    bfs_diff times -false -printf '%w %WY\n'
 }
 
 function test_fstype() {

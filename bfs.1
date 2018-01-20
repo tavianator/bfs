@@ -627,6 +627,22 @@ Actions:
 .TP
 .B \-nohidden
 Filter out hidden files and directories.
+.LP
+\fB\-printf \fIFORMAT\fR
+.br
+\fB\-fprintf \fIFORMAT FILE\fR
+.RS
+These additional format directives are supported:
+.TP
+%w
+The file's birth time, in the same format as %a/%c/%t.
+.TP
+.RI %W k
+Field
+.I k
+of the file's birth time, in the same format as
+.RI %A k /%C k /%T k .
+.RE
 .SH EXAMPLES
 .TP
 .B bfs
