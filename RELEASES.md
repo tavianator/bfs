@@ -2,6 +2,20 @@
 ===
 
 
+1.2
+---
+
+**January 20, 2018**
+
+- Added support for the `-perm +7777` syntax deprecated by GNU find (equivalent to `-perm /7777`), for compatibility with BSD finds
+- Added support for file birth/creation times on platforms that report it
+  - `-Bmin`/`-Btime`/`-Bnewer`
+  - `B` flag for `-newerXY`
+  - `%w` and `%Wk` directives for `-printf`
+  - Uses the `statx(2)` system call on new enough Linux kernels
+- More robustness to `E2BIG` added to the `-exec` implementation
+
+
 1.1.4
 -----
 
