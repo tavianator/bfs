@@ -1074,11 +1074,12 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 				break;
 			}
 
-			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) {
+			const char *name = de->d_name;
+			if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) {
 				continue;
 			}
 
-			if (bftw_path_concat(&state, de->d_name) != 0) {
+			if (bftw_path_concat(&state, name) != 0) {
 				goto fail;
 			}
 
@@ -1109,7 +1110,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 					continue;
 				}
 
-				if (bftw_push(&state, de->d_name) != 0) {
+				if (bftw_push(&state, name) != 0) {
 					goto fail;
 				}
 			}
