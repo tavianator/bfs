@@ -1077,13 +1077,12 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 
 	const struct cmdline *cmdline = args->cmdline;
 
-	struct eval_state state = {
-		.ftwbuf = ftwbuf,
-		.cmdline = cmdline,
-		.action = BFTW_CONTINUE,
-		.ret = &args->ret,
-		.quit = &args->quit,
-	};
+	struct eval_state state;
+	state.ftwbuf = ftwbuf;
+	state.cmdline = cmdline;
+	state.action = BFTW_CONTINUE;
+	state.ret = &args->ret;
+	state.quit = &args->quit;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
