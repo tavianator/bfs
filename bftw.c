@@ -164,11 +164,31 @@ static void bftw_heap_bubble_down(struct bftw_cache *cache, struct bftw_dir *dir
 			}
 		}
 
+		if (bftw_heap_check(dir, child)) {
+			break;
+		}
+
 		bftw_heap_move(cache, child, i);
 		i = ci;
 	}
 
 	bftw_heap_move(cache, dir, i);
+}
+
+/** Bubble an entry up or down the heap. */
+static void bftw_heap_bubble(struct bftw_cache *cache, struct bftw_dir *dir) {
+	size_t i = dir->heap_index;
+
+	if (i > 0) {
+		size_t pi = (i - 1)/2;
+		struct bftw_dir *parent = cache->heap[pi];
+		if (!bftw_heap_check(parent, dir)) {
+			bftw_heap_bubble_up(cache, dir);
+			return;
+		}
+	}
+
+	bftw_heap_bubble_down(cache, dir);
 }
 
 /** Increment a bftw_dir's reference count. */
@@ -209,7 +229,7 @@ static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_dir *dir) {
 	if (i != size) {
 		struct bftw_dir *end = cache->heap[size];
 		end->heap_index = i;
-		bftw_heap_bubble_down(cache, end);
+		bftw_heap_bubble(cache, end);
 	}
 }
 
