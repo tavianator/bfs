@@ -382,8 +382,13 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		}
 
 		execvp(execbuf->argv[0], execbuf->argv);
+
+		int error;
 	child_err:
-		write(pipefd[1], &errno, sizeof(errno));
+		error = errno;
+		if (write(pipefd[1], &error, sizeof(error)) != sizeof(error)) {
+			// Parent will still see that we exited unsuccessfully, but won't know why
+		}
 		close(pipefd[1]);
 		_Exit(EXIT_FAILURE);
 	}
