@@ -2,6 +2,14 @@
 ===
 
 
+1.2.1
+-----
+
+**February 8, 2018**
+
+- Performance optimizations
+
+
 1.2
 ---
 

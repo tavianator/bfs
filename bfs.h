@@ -18,7 +18,7 @@
 #define BFS_H
 
 #ifndef BFS_VERSION
-#	define BFS_VERSION "1.2"
+#	define BFS_VERSION "1.2.1"
 #endif
 
 #ifndef BFS_HOMEPAGE
