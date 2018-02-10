@@ -464,6 +464,7 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 		--execbuf->argc;
 	}
 	size_t new_argc = execbuf->argc;
+	size_t new_size = execbuf->arg_size;
 
 	int error = errno;
 
@@ -471,23 +472,24 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 		free(execbuf->argv[i]);
 	}
 	execbuf->argc = execbuf->tmpl_argc - 1;
+	execbuf->arg_size = 0;
 
 	if (new_argc < orig_argc) {
+		execbuf->arg_max = new_size;
+		bfs_exec_debug(execbuf, "ARG_MAX: %zu\n", execbuf->arg_max);
+
 		// If we recovered from E2BIG, there are unused arguments at the
 		// end of the list
 		for (size_t i = new_argc + 1; i <= orig_argc; ++i) {
 			if (error == 0) {
 				execbuf->argv[execbuf->argc] = execbuf->argv[i];
+				execbuf->arg_size += bfs_exec_arg_size(execbuf->argv[execbuf->argc]);
 				++execbuf->argc;
 			} else {
 				free(execbuf->argv[i]);
 			}
 		}
-
-		execbuf->arg_max = execbuf->arg_size;
-		bfs_exec_debug(execbuf, "ARG_MAX: %zu\n", execbuf->arg_max);
 	}
-	execbuf->arg_size = 0;
 
 	errno = error;
 	return ret;
