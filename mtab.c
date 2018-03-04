@@ -99,6 +99,10 @@ struct bfs_mtab *parse_bfs_mtab() {
 
 	FILE *file = setmntent(_PATH_MOUNTED, "r");
 	if (!file) {
+		// In case we're in a chroot or something with /proc but no /etc/mtab
+		file = setmntent("/proc/mounts", "r");
+	}
+	if (!file) {
 		goto fail;
 	}
 
