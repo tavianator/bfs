@@ -33,6 +33,13 @@ function cleanup() {
         return
     fi
 
+    # Don't force rm to deal with long paths
+    for dir in "$TMP"/deep/*/*; do
+        if [ -d "$dir" ]; then
+            (cd "$dir" && rm -rf *)
+        fi
+    done
+
     rm -rf "$TMP"
 }
 trap cleanup EXIT
