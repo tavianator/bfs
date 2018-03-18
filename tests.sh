@@ -528,11 +528,17 @@ function bfs_diff() (
     # substitution, even with low ulimit -n
     exec 3>&-
 
-    local OUT="$TESTS/${FUNCNAME[1]}.out"
+    local EXPECTED="$TESTS/${FUNCNAME[1]}.out"
     if [ "$UPDATE" ]; then
-        $BFS "$@" | bfs_sort >"$OUT"
+        local ACTUAL="$EXPECTED"
     else
-        diff -u "$OUT" <($BFS "$@" | bfs_sort)
+        local ACTUAL="$TMP/${FUNCNAME[1]}.out"
+    fi
+
+    $BFS "$@" | bfs_sort >"$ACTUAL"
+
+    if [ ! "$UPDATE" ]; then
+        diff -u "$EXPECTED" "$ACTUAL"
     fi
 )
 
@@ -1294,12 +1300,17 @@ function test_printf_leak() {
 
 function test_printf_nul() {
     # NUL byte regression test
-    local OUT="$TESTS/${FUNCNAME[0]}.out"
-    local ARGS=(basic -maxdepth 0 -printf '%h\0%f\n')
+    local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
     if [ "$UPDATE" ]; then
-        invoke_bfs "${ARGS[@]}" >"$OUT"
+        local ACTUAL="$EXPECTED"
     else
-        diff -u "$OUT" <(invoke_bfs "${ARGS[@]}")
+        local ACTUAL="$TMP/${FUNCNAME[0]}.out"
+    fi
+
+    invoke_bfs basic -maxdepth 0 -printf '%h\0%f\n' >"$ACTUAL"
+
+    if [ ! "$UPDATE" ]; then
+        diff -u "$EXPECTED" "$ACTUAL"
     fi
 }
 
