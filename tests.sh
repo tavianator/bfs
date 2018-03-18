@@ -1239,7 +1239,7 @@ function test_quit_implicit_print() {
 }
 
 function test_inum() {
-    local inode="$(ls -id basic/k/foo/bar | cut -f1 -d' ')"
+    local inode="$(ls -id basic/k/foo/bar | awk '{ print $1 }')"
     bfs_diff basic -inum "$inode"
 }
 
