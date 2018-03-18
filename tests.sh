@@ -24,10 +24,15 @@ export TZ=UTC
 
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
-chown "$(id -u)":"$(id -g)" "$TMP"
+chown "$(id -u):$(id -g)" "$TMP"
 
 # Clean up temporary directories on exit
+CLEAN=yes
 function cleanup() {
+    if [ ! "$CLEAN" ]; then
+        return
+    fi
+
     rm -rf "$TMP"
 }
 trap cleanup EXIT
@@ -440,6 +445,9 @@ for arg; do
             GNU=yes
             ALL=yes
             ;;
+        --noclean)
+            CLEAN=
+            ;;
         --update)
             UPDATE=yes
             ;;
@@ -457,7 +465,11 @@ for arg; do
     esac
 done
 
-if [ -z "$EXPLICIT" ]; then
+if [ ! "$CLEAN" ]; then
+    echo "Test files saved to $TMP"
+fi
+
+if [ ! "$EXPLICIT" ]; then
     enable_tests "${posix_tests[@]}"
     [ "$BSD" ] && enable_tests "${bsd_tests[@]}"
     [ "$GNU" ] && enable_tests "${gnu_tests[@]}"
