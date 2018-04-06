@@ -127,8 +127,11 @@ Finally, if you want to install it globally, run
 
     $ sudo make install
 
-If you're on Arch Linux, `bfs` is available in the [AUR](https://aur.archlinux.org/packages/bfs/).
+Alternatively, `bfs` may already be packaged for your distribution of choice:
 
-If you're on Debian GNU/Linux, `bfs` is available via `apt-get install bfs`.
+[![Packaging status](https://repology.org/badge/vertical-allrepos/bfs.svg)](https://repology.org/metapackage/bfs)
 
-If you're on macOS, `bfs` can be installed with Homebrew via `brew install tavianator/tap/bfs`.
+For example:
+
+    # apt install bfs                  # Debian/Ubuntu
+    # brew install tavianator/tap/bfs  # macOS Homebrew
