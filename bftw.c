@@ -57,6 +57,9 @@ struct bftw_dir {
 	/** This directory's depth in the walk. */
 	size_t depth;
 
+	/** The next directory in the queue, if any. */
+	struct bftw_dir *next;
+
 	/** Reference count. */
 	size_t refcount;
 	/** Index in the bftw_cache priority queue. */
@@ -288,6 +291,8 @@ static struct bftw_dir *bftw_dir_new(struct bftw_cache *cache, struct bftw_dir *
 		dir->nameoff = 0;
 	}
 
+	dir->next = NULL;
+
 	dir->refcount = 1;
 	dir->fd = -1;
 
@@ -497,75 +502,35 @@ static void bftw_dir_free(struct bftw_cache *cache, struct bftw_dir *dir) {
  * A queue of bftw_dir's to examine.
  */
 struct bftw_queue {
-	/** The circular buffer of directories. */
-	struct bftw_dir **buffer;
-	/** The head of the queue. */
-	size_t head;
-	/** The size of the queue. */
-	size_t size;
-	/** The capacity of the queue (always a power of two). */
-	size_t capacity;
+	struct bftw_dir *head;
+	struct bftw_dir **tail;
 };
 
 /** Initialize a bftw_queue. */
-static int bftw_queue_init(struct bftw_queue *queue) {
-	queue->head = 0;
-	queue->size = 0;
-	queue->capacity = 256;
-	queue->buffer = malloc(queue->capacity*sizeof(*queue->buffer));
-	if (queue->buffer) {
-		return 0;
-	} else {
-		return -1;
-	}
+static void bftw_queue_init(struct bftw_queue *queue) {
+	queue->head = NULL;
+	queue->tail = &queue->head;
 }
 
 /** Add a directory to the bftw_queue. */
-static int bftw_queue_push(struct bftw_queue *queue, struct bftw_dir *dir) {
-	struct bftw_dir **buffer = queue->buffer;
-	size_t head = queue->head;
-	size_t size = queue->size;
-	size_t tail = head + size;
-	size_t capacity = queue->capacity;
-
-	if (size == capacity) {
-		capacity *= 2;
-		buffer = realloc(buffer, capacity*sizeof(struct bftw_dir *));
-		if (!buffer) {
-			return -1;
-		}
-
-		for (size_t i = size; i < tail; ++i) {
-			buffer[i] = buffer[i - size];
-		}
-
-		queue->buffer = buffer;
-		queue->capacity = capacity;
-	}
-
-	tail &= capacity - 1;
-	buffer[tail] = dir;
-	++queue->size;
-	return 0;
+static void bftw_queue_push(struct bftw_queue *queue, struct bftw_dir *dir) {
+	*queue->tail = dir;
+	queue->tail = &dir->next;
 }
 
 /** Remove a directory from the bftw_queue. */
 static struct bftw_dir *bftw_queue_pop(struct bftw_queue *queue) {
-	if (queue->size == 0) {
-		return NULL;
+	struct bftw_dir *dir = queue->head;
+
+	if (dir) {
+		queue->head = dir->next;
+		if (!queue->head) {
+			queue->tail = &queue->head;
+		}
+		dir->next = NULL;
 	}
 
-	struct bftw_dir *dir = queue->buffer[queue->head];
-	--queue->size;
-	++queue->head;
-	queue->head &= queue->capacity - 1;
 	return dir;
-}
-
-/** Destroy a bftw_queue. */
-static void bftw_queue_destroy(struct bftw_queue *queue) {
-	assert(queue->size == 0);
-	free(queue->buffer);
 }
 
 /** Call stat() and use the results. */
@@ -650,9 +615,7 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 		goto err;
 	}
 
-	if (bftw_queue_init(&state->queue) != 0) {
-		goto err_cache;
-	}
+	bftw_queue_init(&state->queue);
 
 	state->current = NULL;
 	state->previous = NULL;
@@ -661,13 +624,11 @@ static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *
 
 	state->path = dstralloc(0);
 	if (!state->path) {
-		goto err_queue;
+		goto err_cache;
 	}
 
 	return 0;
 
-err_queue:
-	bftw_queue_destroy(&state->queue);
 err_cache:
 	bftw_cache_destroy(&state->cache);
 err:
@@ -919,10 +880,24 @@ static struct bftw_dir *bftw_add(struct bftw_state *state, const char *name) {
 }
 
 /**
- * Garbage-collect a bftw_dir.
+ * Push a new directory onto the queue.
  */
-static int bftw_gc(struct bftw_state *state, struct bftw_dir *dir, bool invoke_callback) {
+static int bftw_push(struct bftw_state *state, const char *name) {
+	struct bftw_dir *dir = bftw_add(state, name);
+	if (!dir) {
+		return -1;
+	}
+
+	bftw_queue_push(&state->queue, dir);
+	return 0;
+}
+
+/**
+ * Pop a directory off the queue.
+ */
+static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
 	int ret = BFTW_CONTINUE;
+	struct bftw_dir *dir = state->current;
 
 	if (!(state->flags & BFTW_DEPTH)) {
 		invoke_callback = false;
@@ -969,32 +944,6 @@ static int bftw_gc(struct bftw_state *state, struct bftw_dir *dir, bool invoke_c
 	}
 
 	state->previous = dir;
-	return ret;
-}
-
-/**
- * Push a new directory onto the queue.
- */
-static int bftw_push(struct bftw_state *state, const char *name) {
-	struct bftw_dir *dir = bftw_add(state, name);
-	if (!dir) {
-		return -1;
-	}
-
-	if (bftw_queue_push(&state->queue, dir) != 0) {
-		state->error = errno;
-		bftw_gc(state, dir, false);
-		return -1;
-	}
-
-	return 0;
-}
-
-/**
- * Pop a directory off the queue.
- */
-static int bftw_pop(struct bftw_state *state, bool invoke_callback) {
-	int ret = bftw_gc(state, state->current, invoke_callback);
 	state->current = bftw_queue_pop(&state->queue);
 	state->status = BFTW_CURRENT;
 	return ret;
@@ -1009,7 +958,6 @@ static void bftw_state_destroy(struct bftw_state *state) {
 	while (state->current) {
 		bftw_pop(state, false);
 	}
-	bftw_queue_destroy(&state->queue);
 
 	bftw_cache_destroy(&state->cache);
 
