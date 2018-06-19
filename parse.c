@@ -1826,8 +1826,8 @@ static struct expr *parse_perm(struct parser_state *state, int field, int arg2) 
 		if (mode[1] >= '0' && mode[1] <= '9') {
 			expr->mode_cmp = MODE_ANY;
 			++mode;
+			break;
 		}
-		break;
 	default:
 		expr->mode_cmp = MODE_EXACT;
 		break;
