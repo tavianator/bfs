@@ -1087,7 +1087,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = EXIT_FAILURE;
-			cfprintf(cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", ftwbuf->path);
+			cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
 		}
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
