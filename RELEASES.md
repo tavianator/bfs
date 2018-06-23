@@ -2,6 +2,20 @@
 ===
 
 
+1.2.2
+-----
+
+**June 23, 2018**
+
+- Minor bug fixes:
+  - Fixed `-exec ... '{}' +` argument size tracking after recovering from `E2BIG`
+  - Fixed `-fstype` if `/proc` is available but `/etc/mtab` is not
+  - Fixed an uninitialized variable when given `-perm +rw...`
+  - Fixed some potential "error: 'path': Success" messages
+- Reduced reliance on GNU coreutils in the testsuite
+- Refactored and simplified the internals of `bftw()`
+
+
 1.2.1
 -----
 
