@@ -176,6 +176,7 @@ posix_tests=(
     test_depth_mindepth_2
     test_depth_maxdepth_1
     test_depth_maxdepth_2
+    test_depth_error
     test_name
     test_name_root
     test_name_root_depth
@@ -618,6 +619,23 @@ function test_depth_maxdepth_1() {
 
 function test_depth_maxdepth_2() {
     bfs_diff basic -maxdepth 2 -depth
+}
+
+function test_depth_error() {
+    rm -rf scratch/*
+    touchp scratch/foo/bar
+    touchp scratch/baz/qux
+    chmod -r scratch/foo
+    chmod -x scratch/baz
+
+    bfs_diff scratch -depth 2>/dev/null
+    local ret=$?
+
+    chmod +r scratch/foo
+    chmod +x scratch/baz
+    rm -rf scratch/*
+
+    return $ret
 }
 
 function test_name() {
