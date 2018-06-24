@@ -624,15 +624,12 @@ function test_depth_maxdepth_2() {
 function test_depth_error() {
     rm -rf scratch/*
     touchp scratch/foo/bar
-    touchp scratch/baz/qux
     chmod -r scratch/foo
-    chmod -x scratch/baz
 
     bfs_diff scratch -depth 2>/dev/null
     local ret=$?
 
     chmod +r scratch/foo
-    chmod +x scratch/baz
     rm -rf scratch/*
 
     return $ret
