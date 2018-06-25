@@ -856,7 +856,7 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 /**
  * Invoke the callback.
  */
-static int bftw_visit_path(struct bftw_state *state) {
+static enum bftw_action bftw_visit_path(struct bftw_state *state) {
 	if (state->reader.dir) {
 		if (bftw_update_path(state) != 0) {
 			state->error = errno;
@@ -923,8 +923,8 @@ static struct bftw_reader *bftw_pop(struct bftw_state *state) {
 /**
  * Finalize and free a directory we're done with.
  */
-static int bftw_release_dir(struct bftw_state *state, struct bftw_dir *dir, bool do_visit) {
-	int ret = BFTW_CONTINUE;
+static enum bftw_action bftw_release_dir(struct bftw_state *state, struct bftw_dir *dir, bool do_visit) {
+	enum bftw_action ret = BFTW_CONTINUE;
 
 	if (!(state->flags & BFTW_DEPTH)) {
 		do_visit = false;
@@ -958,8 +958,8 @@ static int bftw_release_dir(struct bftw_state *state, struct bftw_dir *dir, bool
 /**
  * Close and release the reader.
  */
-static int bftw_release_reader(struct bftw_state *state, bool do_visit) {
-	int ret = BFTW_CONTINUE;
+static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_visit) {
+	enum bftw_action ret = BFTW_CONTINUE;
 
 	struct bftw_reader *reader = &state->reader;
 	if (reader->handle) {
@@ -1027,6 +1027,8 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 	case BFTW_SKIP_SUBTREE:
 	case BFTW_STOP:
 		goto done;
+	default:
+		break;
 	}
 
 	if (state.ftwbuf.typeflag != BFTW_DIR) {
@@ -1081,7 +1083,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 	next:
 		if (bftw_release_reader(&state, true) == BFTW_STOP) {
-			goto done;
+			break;
 		}
 	}
 
