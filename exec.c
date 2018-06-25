@@ -446,13 +446,14 @@ static bool bfs_exec_args_remain(const struct bfs_exec *execbuf) {
 
 /** Execute the pending command from a BFS_EXEC_MULTI execbuf. */
 static int bfs_exec_flush(struct bfs_exec *execbuf) {
-	int ret = 0;
+	int ret = 0, error = 0;
 
 	size_t orig_argc = execbuf->argc;
 	while (bfs_exec_args_remain(execbuf)) {
 		execbuf->argv[execbuf->argc] = NULL;
 		ret = bfs_exec_spawn(execbuf);
-		if (ret == 0 || errno != E2BIG) {
+		error = errno;
+		if (ret == 0 || error != E2BIG) {
 			break;
 		}
 
@@ -465,8 +466,6 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 	}
 	size_t new_argc = execbuf->argc;
 	size_t new_size = execbuf->arg_size;
-
-	int error = errno;
 
 	for (size_t i = execbuf->tmpl_argc - 1; i < new_argc; ++i) {
 		free(execbuf->argv[i]);
