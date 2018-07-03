@@ -231,13 +231,22 @@ int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag fl
 
 int bfs_fstat(int fd, struct bfs_stat *buf) {
 #ifdef AT_EMPTY_PATH
-	return bfs_stat(fd, "", AT_EMPTY_PATH, 0, buf);
-#else
+	static bool has_at_ep = true;
+
+	if (has_at_ep) {
+		int ret = bfs_stat(fd, "", AT_EMPTY_PATH, 0, buf);
+		if (ret != 0 && errno == EINVAL) {
+			has_at_ep = false;
+		} else {
+			return ret;
+		}
+	}
+#endif
+
 	struct stat statbuf;
 	int ret = fstat(fd, &statbuf);
 	if (ret == 0) {
 		bfs_stat_convert(&statbuf, buf);
 	}
 	return ret;
-#endif
 }
