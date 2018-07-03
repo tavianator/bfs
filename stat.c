@@ -108,7 +108,7 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, enum bfs_
 	return ret;
 }
 
-#ifdef STATX_BASIC_STATS
+#ifdef __NR_statx
 
 /**
  * Wrapper for the statx() system call, which has no native glibc wrapper.
@@ -213,7 +213,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 #endif // STATX_BASIC_STATS
 
 int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag flags, struct bfs_stat *buf) {
-#ifdef STATX_BASIC_STATS
+#ifdef __NR_statx
 	static bool has_statx = true;
 
 	if (has_statx) {
