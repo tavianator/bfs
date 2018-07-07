@@ -190,8 +190,11 @@ posix_tests=(
     test_H
     test_H_slash
     test_H_broken
+    test_H_notdir
     test_H_newer
     test_L
+    test_L_broken
+    test_L_notdir
     test_L_depth
     test_user_name
     test_user_id
@@ -236,8 +239,13 @@ bsd_tests=(
     test_samefile
     test_samefile_symlink
     test_H_samefile_symlink
+    test_L_samefile_symlink
     test_samefile_broken
     test_H_samefile_broken
+    test_L_samefile_broken
+    test_samefile_notdir
+    test_H_samefile_notdir
+    test_L_samefile_notdir
     test_name_slash
     test_name_slashes
     test_iname
@@ -314,8 +322,13 @@ gnu_tests=(
     test_samefile
     test_samefile_symlink
     test_H_samefile_symlink
+    test_L_samefile_symlink
     test_samefile_broken
     test_H_samefile_broken
+    test_L_samefile_broken
+    test_samefile_notdir
+    test_H_samefile_notdir
+    test_L_samefile_notdir
     test_xtype_l
     test_xtype_f
     test_L_xtype_l
@@ -755,12 +768,24 @@ function test_H_broken() {
     bfs_diff -H links/broken
 }
 
+function test_H_notdir() {
+    bfs_diff -H links/notdir
+}
+
 function test_H_newer() {
     bfs_diff -H times -newer times/l
 }
 
 function test_L() {
     bfs_diff -L links 2>/dev/null
+}
+
+function test_L_broken() {
+    bfs_diff -H links/broken
+}
+
+function test_L_notdir() {
+    bfs_diff -H links/notdir
 }
 
 function test_X() {
@@ -787,12 +812,32 @@ function test_H_samefile_symlink() {
     bfs_diff -H links -samefile links/symlink
 }
 
+function test_L_samefile_symlink() {
+    bfs_diff -L links -samefile links/symlink 2>/dev/null
+}
+
 function test_samefile_broken() {
     bfs_diff links -samefile links/broken
 }
 
 function test_H_samefile_broken() {
     bfs_diff -H links -samefile links/broken
+}
+
+function test_L_samefile_broken() {
+    bfs_diff -L links -samefile links/broken 2>/dev/null
+}
+
+function test_samefile_notdir() {
+    bfs_diff links -samefile links/notdir
+}
+
+function test_H_samefile_notdir() {
+    bfs_diff -H links -samefile links/notdir
+}
+
+function test_L_samefile_notdir() {
+    bfs_diff -L links -samefile links/notdir 2>/dev/null
 }
 
 function test_xtype_l() {
