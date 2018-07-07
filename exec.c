@@ -94,6 +94,10 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	long page_size = sysconf(_SC_PAGESIZE);
 	if (page_size < 4096) {
 		page_size = 4096;
+	} else {
+		if (page_size > (BFS_EXEC_ARG_MAX/1024)) {
+			page_size = BFS_EXEC_ARG_MAX/1024;
+		}
 	}
 	arg_max -= page_size;
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after page cushion\n", arg_max);
