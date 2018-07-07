@@ -1342,7 +1342,7 @@ function test_printf_w() {
 }
 
 function test_fstype() {
-    fstype="$(invoke_bfs -printf '%F\n' | head -n1)"
+    fstype="$(invoke_bfs basic -maxdepth 0 -printf '%F\n')"
     bfs_diff basic -fstype "$fstype"
 }
 
