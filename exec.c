@@ -90,13 +90,16 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after fixed arguments\n", arg_max);
 
 	// Assume arguments are counted with the granularity of a single page,
-	// and allow two pages of headroom to account for rounding as well as
-	// any other data we may not be counting
+	// so allow a one page cushion to account for rounding up
 	long page_size = sysconf(_SC_PAGESIZE);
 	if (page_size < 4096) {
 		page_size = 4096;
 	}
-	arg_max -= 2*page_size;
+	arg_max -= page_size;
+	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after page cushion\n", arg_max);
+
+	// POSIX recommends an additional 2048 bytes of headroom
+	arg_max -= 2048;
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld remaining after headroom\n", arg_max);
 
 	if (arg_max < 0) {
