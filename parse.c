@@ -406,6 +406,7 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 
 	struct open_file *ofile = malloc(sizeof(*ofile));
 	if (!ofile) {
+		perror("malloc()");
 		goto out_close;
 	}
 
@@ -3041,6 +3042,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));
 	if (!cmdline->argv) {
+		perror("malloc()");
 		goto fail;
 	}
 	for (int i = 0; i <= argc; ++i) {
