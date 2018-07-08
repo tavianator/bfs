@@ -363,17 +363,28 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			return -1;
 		}
 
-		int status;
-		if (waitpid(pid, &status, 0) < 0) {
+		int wstatus;
+		if (waitpid(pid, &wstatus, 0) < 0) {
 			return -1;
 		}
 
 		errno = 0;
-		if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS) {
-			return 0;
+
+		if (WIFEXITED(wstatus)) {
+			int status = WEXITSTATUS(wstatus);
+			if (status == EXIT_SUCCESS) {
+				return 0;
+			} else {
+				bfs_exec_debug(execbuf, "Command '%s' failed with status %d\n", execbuf->argv[0], status);
+			}
+		} else if (WIFSIGNALED(wstatus)) {
+			int sig = WTERMSIG(wstatus);
+			bfs_exec_debug(execbuf, "Command '%s' terminated by signal %d\n", execbuf->argv[0], sig);
 		} else {
-			return -1;
+			bfs_exec_debug(execbuf, "Command '%s' terminated abnormally\n", execbuf->argv[0]);
 		}
+
+		return -1;
 	} else {
 		// Child
 		close(pipefd[0]);
@@ -600,6 +611,9 @@ int bfs_exec_finish(struct bfs_exec *execbuf) {
 		bfs_exec_debug(execbuf, "Finishing execution, executing buffered command\n");
 		while (bfs_exec_args_remain(execbuf)) {
 			execbuf->ret |= bfs_exec_flush(execbuf);
+		}
+		if (execbuf->ret != 0) {
+			bfs_exec_debug(execbuf, "One or more executions of '%s' failed\n", execbuf->argv[0]);
 		}
 	}
 	return execbuf->ret;
