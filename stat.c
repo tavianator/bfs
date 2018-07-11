@@ -23,11 +23,19 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#if __linux__
+#ifdef STATX_BASIC_STATS
+#	define HAVE_STATX true
+#elif __linux__
 #	include <linux/stat.h>
 #	include <sys/syscall.h>
+#endif
+
+#if HAVE_STATX || defined(__NR_statx)
+#	define HAVE_BFS_STATX true
 #	include <sys/sysmacros.h>
-#elif __APPLE__
+#endif
+
+#if __APPLE__
 #	define st_atim st_atimespec
 #	define st_ctim st_ctimespec
 #	define st_mtim st_mtimespec
@@ -108,13 +116,17 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, enum bfs_
 	return ret;
 }
 
-#ifdef __NR_statx
+#if HAVE_BFS_STATX
 
 /**
- * Wrapper for the statx() system call, which has no native glibc wrapper.
+ * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
  */
 static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int mask, struct statx *buf) {
+#if HAVE_STATX
+	return statx(at_fd, at_path, at_flags, mask, buf);
+#else
 	return syscall(__NR_statx, at_fd, at_path, at_flags, mask, buf);
+#endif
 }
 
 /**
@@ -210,10 +222,10 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 	return ret;
 }
 
-#endif // STATX_BASIC_STATS
+#endif // HAVE_BFS_STATX
 
 int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag flags, struct bfs_stat *buf) {
-#ifdef __NR_statx
+#if HAVE_BFS_STATX
 	static bool has_statx = true;
 
 	if (has_statx) {
