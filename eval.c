@@ -277,8 +277,21 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	}
 
 	int flag = 0;
-	if (ftwbuf->typeflag == BFTW_DIR) {
-		flag |= AT_REMOVEDIR;
+	if (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW) {
+		if (ftwbuf->typeflag == BFTW_DIR) {
+			flag |= AT_REMOVEDIR;
+		}
+	} else {
+		// We need to know the actual type of the path, not what it points to
+		struct bfs_stat sb;
+		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags | AT_SYMLINK_NOFOLLOW, 0, &sb) == 0) {
+			if (S_ISDIR(sb.mode)) {
+				flag |= AT_REMOVEDIR;
+			}
+		} else {
+			eval_error(state);
+			return false;
+		}
 	}
 
 	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {

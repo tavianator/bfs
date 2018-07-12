@@ -266,6 +266,7 @@ bsd_tests=(
     test_ok_stdin
     test_okdir_stdin
     test_delete
+    test_L_delete
     test_rm
     test_regex
     test_iregex
@@ -369,6 +370,7 @@ gnu_tests=(
     test_perm_symbolic_slash
     test_perm_leading_plus_symbolic_slash
     test_delete
+    test_L_delete
     test_regex
     test_iregex
     test_regex_parens
@@ -1173,6 +1175,18 @@ function test_delete() {
 
     # Don't try to delete '.'
     (cd scratch && invoke_bfs -delete)
+
+    bfs_diff scratch
+}
+
+function test_L_delete() {
+    rm -rf scratch/*
+    mkdir scratch/foo
+    mkdir scratch/bar
+    ln -s ../foo scratch/bar/baz
+
+    # Don't try to rmdir() a symlink
+    invoke_bfs -L scratch/bar -delete || return 1
 
     bfs_diff scratch
 }
