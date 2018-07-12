@@ -53,6 +53,8 @@ struct eval_state {
 	bool *quit;
 	/** A bfs_stat() buffer, if necessary. */
 	struct bfs_stat statbuf;
+	/** A bfs_stat() buffer for -xtype style tests. */
+	struct bfs_stat xstatbuf;
 };
 
 /**
@@ -87,6 +89,21 @@ static const struct bfs_stat *eval_stat(struct eval_state *state) {
 		}
 	}
 	return ftwbuf->statbuf;
+}
+
+/**
+ * Perform a bfs_stat() call for tests that flip the follow flag, like -xtype.
+ */
+static const struct bfs_stat *eval_xstat(struct eval_state *state) {
+	struct BFTW *ftwbuf = state->ftwbuf;
+	struct bfs_stat *statbuf = &state->xstatbuf;
+	if (!statbuf->mask) {
+		int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
+		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, at_flags, 0, statbuf) != 0) {
+			return NULL;
+		}
+	}
+	return statbuf;
 }
 
 /**
@@ -279,11 +296,11 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 		if (ftwbuf->typeflag == BFTW_DIR) {
 			flag |= AT_REMOVEDIR;
 		}
-	} else {
+	} else if (ftwbuf->typeflag != BFTW_LNK) {
 		// We need to know the actual type of the path, not what it points to
-		struct bfs_stat sb;
-		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags | AT_SYMLINK_NOFOLLOW, 0, &sb) == 0) {
-			if (S_ISDIR(sb.mode)) {
+		const struct bfs_stat *statbuf = eval_xstat(state);
+		if (statbuf) {
+			if (S_ISDIR(statbuf->mode)) {
 				flag |= AT_REMOVEDIR;
 			}
 		} else {
@@ -848,21 +865,16 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		return eval_type(expr, state);
 	}
 
-	// -xtype does the opposite of everything else
-	int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
-
-	struct bfs_stat sb;
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, at_flags, 0, &sb) != 0) {
-		if (!follow && is_nonexistence_error(errno)) {
-			// Broken symlink
-			return eval_type(expr, state);
-		} else {
-			eval_error(state);
-			return false;
-		}
+	const struct bfs_stat *statbuf = eval_xstat(state);
+	if (statbuf) {
+		return mode_to_typeflag(statbuf->mode) & expr->idata;
+	} else if (!follow && is_nonexistence_error(errno)) {
+		// Broken symlink
+		return eval_type(expr, state);
+	} else {
+		eval_error(state);
+		return false;
 	}
-
-	return mode_to_typeflag(sb.mode) & expr->idata;
 }
 
 #if _POSIX_MONOTONIC_CLOCK > 0
@@ -1094,6 +1106,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
 	state.quit = &args->quit;
+	state.xstatbuf.mask = 0;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
