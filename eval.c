@@ -51,10 +51,8 @@ struct eval_state {
 	int *ret;
 	/** Whether to quit immediately. */
 	bool *quit;
-	/** A stat() buffer, if necessary. */
-	struct bfs_stat statbuf;
 	/** A bfs_stat() buffer, if necessary. */
-	struct bfs_stat bfs_statbuf;
+	struct bfs_stat statbuf;
 };
 
 /**
@@ -79,11 +77,11 @@ static void eval_error(struct eval_state *state) {
 /**
  * Perform a bfs_stat() call if necessary.
  */
-static const struct bfs_stat *eval_bfs_stat(struct eval_state *state) {
+static const struct bfs_stat *eval_stat(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
-		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->bfs_statbuf) == 0) {
-			ftwbuf->statbuf = &state->bfs_statbuf;
+		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->statbuf) == 0) {
+			ftwbuf->statbuf = &state->statbuf;
 		} else {
 			eval_error(state);
 		}
@@ -141,7 +139,7 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
  * Get the given timespec field out of a stat buffer.
  */
 static const struct timespec *eval_stat_time(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return NULL;
 	}
@@ -207,7 +205,7 @@ bool eval_time(const struct expr *expr, struct eval_state *state) {
  * -used test.
  */
 bool eval_used(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -221,7 +219,7 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
  * -gid test.
  */
 bool eval_gid(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -233,7 +231,7 @@ bool eval_gid(const struct expr *expr, struct eval_state *state) {
  * -uid test.
  */
 bool eval_uid(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -245,7 +243,7 @@ bool eval_uid(const struct expr *expr, struct eval_state *state) {
  * -nogroup test.
  */
 bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -257,7 +255,7 @@ bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
  * -nouser test.
  */
 bool eval_nouser(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -391,7 +389,7 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	done_dir:
 		closedir(dir);
 	} else {
-		const struct bfs_stat *statbuf = eval_bfs_stat(state);
+		const struct bfs_stat *statbuf = eval_stat(state);
 		if (statbuf) {
 			ret = statbuf->size == 0;
 		}
@@ -405,7 +403,7 @@ done:
  * -fstype test.
  */
 bool eval_fstype(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -438,7 +436,7 @@ bool eval_nohidden(const struct expr *expr, struct eval_state *state) {
  * -inum test.
  */
 bool eval_inum(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -450,7 +448,7 @@ bool eval_inum(const struct expr *expr, struct eval_state *state) {
  * -links test.
  */
 bool eval_links(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -470,7 +468,7 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 		goto done;
 	}
 
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		goto done;
 	}
@@ -527,7 +525,7 @@ bool eval_path(const struct expr *expr, struct eval_state *state) {
  * -perm test.
  */
 bool eval_perm(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -561,7 +559,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		goto done;
 	}
@@ -653,7 +651,7 @@ error:
 bool eval_fprint(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	if (cfile->colors) {
-		eval_bfs_stat(state);
+		eval_stat(state);
 	}
 
 	if (cfprintf(cfile, "%P\n", state->ftwbuf) < 0) {
@@ -680,7 +678,7 @@ bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
 	if (expr->printf->needs_stat) {
-		if (!eval_bfs_stat(state)) {
+		if (!eval_stat(state)) {
 			goto done;
 		}
 	}
@@ -785,7 +783,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
  * -samefile test.
  */
 bool eval_samefile(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -797,7 +795,7 @@ bool eval_samefile(const struct expr *expr, struct eval_state *state) {
  * -size test.
  */
 bool eval_size(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
@@ -822,7 +820,7 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
  * -sparse test.
  */
 bool eval_sparse(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_bfs_stat(state);
+	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
