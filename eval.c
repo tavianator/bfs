@@ -76,12 +76,55 @@ static void eval_error(struct eval_state *state) {
 	}
 }
 
+#define DEBUG_FLAG(flags, flag)			\
+	if ((flags & flag) || flags == flag) {	\
+		fputs(#flag, stderr);		\
+		flags ^= flag;			\
+		if (flags) {			\
+			fputs(" | ", stderr);	\
+		}				\
+	}
+
+/**
+ * Debug stat() calls.
+ */
+static void debug_stat(const struct eval_state *state, int at_flags, enum bfs_stat_flag flags) {
+	if (!(state->cmdline->debug & DEBUG_STAT)) {
+		return;
+	}
+
+	struct BFTW *ftwbuf = state->ftwbuf;
+
+	fprintf(stderr, "bfs_stat(");
+	if (ftwbuf->at_fd == AT_FDCWD) {
+		fprintf(stderr, "AT_FDCWD");
+	} else {
+		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);
+		fprintf(stderr, "\"");
+		fwrite(ftwbuf->path, 1, baselen, stderr);
+		fprintf(stderr, "\"");
+	}
+
+	fprintf(stderr, ", \"%s\", ", ftwbuf->at_path);
+
+	DEBUG_FLAG(at_flags, 0);
+	DEBUG_FLAG(at_flags, AT_SYMLINK_NOFOLLOW);
+
+	fprintf(stderr, ", ");
+
+	DEBUG_FLAG(flags, 0);
+	DEBUG_FLAG(flags, BFS_STAT_BROKEN_OK);
+
+	fprintf(stderr, ")\n");
+}
+
 /**
  * Perform a bfs_stat() call if necessary.
  */
 static const struct bfs_stat *eval_stat(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	if (!ftwbuf->statbuf) {
+		debug_stat(state, ftwbuf->at_flags, BFS_STAT_BROKEN_OK);
 		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->statbuf) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
@@ -99,6 +142,7 @@ static const struct bfs_stat *eval_xstat(struct eval_state *state) {
 	struct bfs_stat *statbuf = &state->xstatbuf;
 	if (!statbuf->mask) {
 		int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
+		debug_stat(state, at_flags, 0);
 		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, at_flags, 0, statbuf) != 0) {
 			return NULL;
 		}
@@ -1001,33 +1045,6 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * Debug stat() calls.
- */
-static void debug_stat(const struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
-
-	fprintf(stderr, "fstatat(");
-	if (ftwbuf->at_fd == AT_FDCWD) {
-		fprintf(stderr, "AT_FDCWD");
-	} else {
-		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);
-		fprintf(stderr, "\"");
-		fwrite(ftwbuf->path, 1, baselen, stderr);
-		fprintf(stderr, "\"");
-	}
-
-	fprintf(stderr, ", \"%s\", ", ftwbuf->at_path);
-
-	if (ftwbuf->at_flags == AT_SYMLINK_NOFOLLOW) {
-		fprintf(stderr, "AT_SYMLINK_NOFOLLOW");
-	} else {
-		fprintf(stderr, "%d", ftwbuf->at_flags);
-	}
-
-	fprintf(stderr, ")\n");
-}
-
-/**
  * Dump the bftw_typeflag for -D search.
  */
 static const char *dump_bftw_typeflag(enum bftw_typeflag type) {
@@ -1108,6 +1125,10 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	state.quit = &args->quit;
 	state.xstatbuf.mask = 0;
 
+	if (ftwbuf->statbuf) {
+		debug_stat(&state, ftwbuf->at_flags, BFS_STAT_BROKEN_OK);
+	}
+
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = EXIT_FAILURE;
@@ -1143,10 +1164,6 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	}
 
 done:
-	if ((cmdline->debug & DEBUG_STAT) && ftwbuf->statbuf) {
-		debug_stat(&state);
-	}
-
 	if (cmdline->debug & DEBUG_SEARCH) {
 		fprintf(stderr,
 		        "cmdline_callback({ "
@@ -1222,22 +1239,14 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
  * Dump the bftw() flags for -D search.
  */
 static void dump_bftw_flags(enum bftw_flags flags) {
-#define DUMP_BFTW_FLAG(flag)			\
-	if (flags & flag) {			\
-		fputs(#flag, stderr);		\
-		flags ^= flag;			\
-		if (flags) {			\
-			fputs(" | ", stderr);	\
-		}				\
-	}
-
-	DUMP_BFTW_FLAG(BFTW_STAT);
-	DUMP_BFTW_FLAG(BFTW_RECOVER);
-	DUMP_BFTW_FLAG(BFTW_DEPTH);
-	DUMP_BFTW_FLAG(BFTW_COMFOLLOW);
-	DUMP_BFTW_FLAG(BFTW_LOGICAL);
-	DUMP_BFTW_FLAG(BFTW_DETECT_CYCLES);
-	DUMP_BFTW_FLAG(BFTW_XDEV);
+	DEBUG_FLAG(flags, 0);
+	DEBUG_FLAG(flags, BFTW_STAT);
+	DEBUG_FLAG(flags, BFTW_RECOVER);
+	DEBUG_FLAG(flags, BFTW_DEPTH);
+	DEBUG_FLAG(flags, BFTW_COMFOLLOW);
+	DEBUG_FLAG(flags, BFTW_LOGICAL);
+	DEBUG_FLAG(flags, BFTW_DETECT_CYCLES);
+	DEBUG_FLAG(flags, BFTW_XDEV);
 
 	assert(!flags);
 }
