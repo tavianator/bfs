@@ -2,6 +2,18 @@
 ===
 
 
+1.2.3
+-----
+
+**July 15, 2018**
+
+- Fixed `test_depth_error` on filesystems that don't fill in `d_type`
+- Fixed the build on Linux architectures that don't have the `statx()` syscall (ia64, sh4)
+- Fixed use of AT_EMPTY_PATH for fstatat on systems that don't support it (Hurd)
+- Fixed `ARG_MAX` accounting on architectures with large pages (ppc64le)
+- Fixed the build against the upcoming glibc 2.28 release that includes its own `statx()` wrapper
+
+
 1.2.2
 -----
 
