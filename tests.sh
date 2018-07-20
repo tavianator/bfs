@@ -73,6 +73,7 @@ make_basic "$TMP/basic"
 
 # Creates a file+directory structure with various permissions for tests
 function make_perms() {
+    installp -m000 /dev/null "$1/0"
     installp -m444 /dev/null "$1/r"
     installp -m222 /dev/null "$1/w"
     installp -m644 /dev/null "$1/rw"
@@ -208,6 +209,8 @@ posix_tests=(
     test_exec_plus_status
     test_exec_plus_semicolon
     test_flag_comma
+    test_perm_000
+    test_perm_000_minus
     test_perm_222
     test_perm_222_minus
     test_perm_644
@@ -285,6 +288,7 @@ bsd_tests=(
     test_uid_name
     test_mnewer
     test_H_mnewer
+    test_perm_000_plus
     test_perm_222_plus
     test_perm_644_plus
     test_size_T
@@ -365,6 +369,7 @@ gnu_tests=(
     test_ignore_readdir_race
     test_ignore_readdir_race_root
     test_ignore_readdir_race_notdir
+    test_perm_000_slash
     test_perm_222_slash
     test_perm_644_slash
     test_perm_symbolic_slash
@@ -1077,6 +1082,22 @@ function test_ignore_readdir_race_notdir() {
     touchp scratch/foo/bar
 
     invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir touch '{}' \;
+}
+
+function test_perm_000() {
+    bfs_diff perms -perm 000
+}
+
+function test_perm_000_minus() {
+    bfs_diff perms -perm -000
+}
+
+function test_perm_000_slash() {
+    bfs_diff perms -perm /000
+}
+
+function test_perm_000_plus() {
+    bfs_diff perms -perm +000
 }
 
 function test_perm_222() {
