@@ -395,6 +395,7 @@ gnu_tests=(
     test_printf_times
     test_printf_leak
     test_printf_nul
+    test_printf_Y_error
     test_quit_after_print
     test_quit_before_print
     test_fstype
@@ -1398,6 +1399,21 @@ function test_printf_nul() {
 function test_printf_w() {
     # Birth times may not be supported, so just check that %w/%W can be parsed
     bfs_diff times -false -printf '%w %WY\n'
+}
+
+function test_printf_Y_error() {
+    rm -rf scratch/*
+    mkdir scratch/foo
+    chmod -x scratch/foo
+    ln -s foo/bar scratch/bar
+
+    bfs_diff scratch -printf '(%p) (%l) %y %Y\n' 2>/dev/null
+    local ret=$?
+
+    chmod +x scratch/foo
+    rm -rf scratch/*
+
+    return $ret
 }
 
 function test_fstype() {

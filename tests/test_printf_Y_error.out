@@ -1,0 +1,3 @@
+(scratch) () d d
+(scratch/foo) () d d
+(scratch/bar) (foo/bar) l ?

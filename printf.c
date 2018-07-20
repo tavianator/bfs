@@ -377,6 +377,8 @@ static int bfs_printf_y(FILE *file, const struct bfs_printf_directive *directive
 
 /** %Y: target type */
 static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
+	int error = 0;
+
 	if (ftwbuf->typeflag != BFTW_LNK) {
 		return bfs_printf_y(file, directive, ftwbuf);
 	}
@@ -395,10 +397,19 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive
 		case ENOTDIR:
 			type = "N";
 			break;
+		default:
+			type = "?";
+			error = errno;
+			break;
 		}
 	}
 
-	return fprintf(file, directive->str, type);
+	int ret = fprintf(file, directive->str, type);
+	if (error != 0) {
+		ret = -1;
+		errno = error;
+	}
+	return ret;
 }
 
 /**
@@ -798,16 +809,16 @@ error:
 }
 
 int bfs_printf(FILE *file, const struct bfs_printf *command, const struct BFTW *ftwbuf) {
-	int ret = -1;
+	int ret = 0, error = 0;
 
 	for (struct bfs_printf_directive *directive = command->directives; directive; directive = directive->next) {
 		if (directive->fn(file, directive, ftwbuf) < 0) {
-			goto done;
+			ret = -1;
+			error = errno;
 		}
 	}
 
-	ret = 0;
-done:
+	errno = error;
 	return ret;
 }
 
