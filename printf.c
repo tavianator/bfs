@@ -149,15 +149,6 @@ static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *di
 	case '@':
 		ret = snprintf(buf, sizeof(buf), "%lld.%09ld0", (long long)ts->tv_sec, (long)ts->tv_nsec);
 		break;
-	case 'k':
-		ret = snprintf(buf, sizeof(buf), "%2d", tm.tm_hour);
-		break;
-	case 'l':
-		ret = snprintf(buf, sizeof(buf), "%2d", (tm.tm_hour + 11)%12 + 1);
-		break;
-	case 'S':
-		ret = snprintf(buf, sizeof(buf), "%.2d.%09ld0", tm.tm_sec, (long)ts->tv_nsec);
-		break;
 	case '+':
 		ret = snprintf(buf, sizeof(buf), "%4d-%.2d-%.2d+%.2d:%.2d:%.2d.%09ld0",
 		               1900 + tm.tm_year,
@@ -167,6 +158,25 @@ static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *di
 		               tm.tm_min,
 		               tm.tm_sec,
 		               (long)ts->tv_nsec);
+		break;
+	case 'k':
+		ret = snprintf(buf, sizeof(buf), "%2d", tm.tm_hour);
+		break;
+	case 'l':
+		ret = snprintf(buf, sizeof(buf), "%2d", (tm.tm_hour + 11)%12 + 1);
+		break;
+	case 's':
+		ret = snprintf(buf, sizeof(buf), "%lld", (long long)ts->tv_sec);
+		break;
+	case 'S':
+		ret = snprintf(buf, sizeof(buf), "%.2d.%09ld0", tm.tm_sec, (long)ts->tv_nsec);
+		break;
+	case 'T':
+		ret = snprintf(buf, sizeof(buf), "%.2d:%.2d:%.2d.%09ld0",
+			       tm.tm_hour,
+			       tm.tm_min,
+			       tm.tm_sec,
+			       (long)ts->tv_nsec);
 		break;
 
 	// POSIX strftime() features
@@ -754,7 +764,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 					cfprintf(cerr, "%{er}error: '%s': Incomplete time specifier '%s%c'.%{rs}\n",
 					         format, directive->str, i[-1]);
 					goto directive_error;
-				} else if (strchr("@HIklMprST+XZaAbBcdDhjmUwWxyY", c)) {
+				} else if (strchr("%+@aAbBcCdDeFgGhHIjklmMnprRsStTuUVwWxXyYzZ", c)) {
 					directive->c = c;
 				} else {
 					cfprintf(cerr, "%{er}error: '%s': Unrecognized time specifier '%%%c%c'.%{rs}\n",
