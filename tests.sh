@@ -1418,8 +1418,8 @@ function test_printf_nul() {
 }
 
 function test_printf_w() {
-    # Birth times may not be supported, so just check that %w/%W can be parsed
-    bfs_diff times -false -printf '%w %WY\n'
+    # Birth times may not be supported, so just check that %w/%W/%B can be parsed
+    bfs_diff times -false -printf '%w %WY %BY\n'
 }
 
 function test_printf_Y_error() {

@@ -100,7 +100,7 @@ static const struct timespec *get_time_field(const struct bfs_stat *statbuf, enu
 	}
 }
 
-/** %c, %c, and %t: ctime() */
+/** %a, %c, %t: ctime() */
 static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	// Not using ctime() itself because GNU find adds nanoseconds
 	static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
@@ -129,7 +129,7 @@ static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *direc
 	return fprintf(file, directive->str, buf);
 }
 
-/** %A, %C, %T: strftime() */
+/** %A, %B/%W, %C, %T: strftime() */
 static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->stat_field);
 	if (!ts) {
@@ -735,14 +735,15 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 			case 'A':
 				directive->stat_field = BFS_STAT_ATIME;
 				goto directive_strftime;
+			case 'B':
+			case 'W':
+				directive->stat_field = BFS_STAT_BTIME;
+				goto directive_strftime;
 			case 'C':
 				directive->stat_field = BFS_STAT_CTIME;
 				goto directive_strftime;
 			case 'T':
 				directive->stat_field = BFS_STAT_MTIME;
-				goto directive_strftime;
-			case 'W':
-				directive->stat_field = BFS_STAT_BTIME;
 				goto directive_strftime;
 
 			directive_strftime:
