@@ -626,7 +626,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	}
 
 	uintmax_t ino = statbuf->ino;
-	uintmax_t blocks = (statbuf->blocks + 1)/2;
+	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 1023)/1024;
 	char mode[11];
 	format_mode(statbuf->mode, mode);
 	uintmax_t nlink = statbuf->nlink;
@@ -886,7 +886,7 @@ bool eval_sparse(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	blkcnt_t expected = (statbuf->size + 511)/512;
+	blkcnt_t expected = (statbuf->size + BFS_STAT_BLKSIZE - 1)/BFS_STAT_BLKSIZE;
 	return statbuf->blocks < expected;
 }
 

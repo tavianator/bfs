@@ -17,7 +17,9 @@
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
 
+#include <sys/param.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 
 /**
@@ -47,6 +49,14 @@ enum bfs_stat_flag {
 	BFS_STAT_BROKEN_OK = 1 << 0,
 };
 
+#ifdef DEV_BSIZE
+#	define BFS_STAT_BLKSIZE DEV_BSIZE
+#elif defined(S_BLKSIZE)
+#	define BFS_STAT_BLKSIZE S_BLKSIZE
+#else
+#	define BFS_STAT_BLKSIZE 512
+#endif
+
 /**
  * Facade over struct stat.
  */
@@ -68,7 +78,7 @@ struct bfs_stat {
 	uid_t uid;
 	/** File size in bytes. */
 	off_t size;
-	/** Number of 512B blocks allocated. */
+	/** Number of disk blocks allocated (of size BFS_STAT_BLKSIZE). */
 	blkcnt_t blocks;
 
 	/** Access time. */

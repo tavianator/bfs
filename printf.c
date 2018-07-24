@@ -184,7 +184,8 @@ static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *di
 
 /** %b: blocks */
 static int bfs_printf_b(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)ftwbuf->statbuf->blocks);
+	uintmax_t blocks = ((uintmax_t)ftwbuf->statbuf->blocks*BFS_STAT_BLKSIZE + 511)/512;
+	BFS_PRINTF_BUF(buf, "%ju", blocks);
 	return fprintf(file, directive->str, buf);
 }
 
@@ -266,7 +267,8 @@ static int bfs_printf_i(FILE *file, const struct bfs_printf_directive *directive
 
 /** %k: 1K blocks */
 static int bfs_printf_k(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)(ftwbuf->statbuf->blocks + 1)/2);
+	uintmax_t blocks = ((uintmax_t)ftwbuf->statbuf->blocks*BFS_STAT_BLKSIZE + 1023)/1024;
+	BFS_PRINTF_BUF(buf, "%ju", blocks);
 	return fprintf(file, directive->str, buf);
 }
 
@@ -326,7 +328,13 @@ static int bfs_printf_s(FILE *file, const struct bfs_printf_directive *directive
 
 /** %S: sparseness */
 static int bfs_printf_S(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	double sparsity = 512.0 * ftwbuf->statbuf->blocks / ftwbuf->statbuf->size;
+	double sparsity;
+	const struct bfs_stat *sb = ftwbuf->statbuf;
+	if (sb->size == 0 && sb->blocks == 0) {
+		sparsity = 1.0;
+	} else {
+		sparsity = (double)BFS_STAT_BLKSIZE*sb->blocks/sb->size;
+	}
 	return fprintf(file, directive->str, sparsity);
 }
 
