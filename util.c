@@ -129,8 +129,10 @@ int pipe_cloexec(int pipefd[2]) {
 	}
 
 	if (fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1 || fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1) {
+		int error = errno;
 		close(pipefd[1]);
 		close(pipefd[0]);
+		errno = error;
 		return -1;
 	}
 
