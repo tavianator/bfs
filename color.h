@@ -29,7 +29,7 @@ struct colors;
 /**
  * Parse a color table.
  *
- * @param ls_color
+ * @param ls_colors
  *         A color table in the LS_COLORS environment variable format.
  * @return The parsed color table.
  */
