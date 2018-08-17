@@ -590,6 +590,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				case '0':
 				case '+':
 					must_be_numeric = true;
+					// Fallthrough
 				case ' ':
 				case '-':
 					if (strchr(directive->str, c)) {

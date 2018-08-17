@@ -1829,6 +1829,7 @@ static struct expr *parse_perm(struct parser_state *state, int field, int arg2) 
 			++mode;
 			break;
 		}
+		// Fallthrough
 	default:
 		expr->mode_cmp = MODE_EXACT;
 		break;
