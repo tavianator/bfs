@@ -355,17 +355,6 @@ static struct expr *optimize_and_expr(const struct opt_state *state, struct expr
 	expr->cost = lhs->cost + lhs->probability*rhs->cost;
 	expr->probability = lhs->probability*rhs->probability;
 
-	if (optlevel >= 3 && lhs->pure && rhs->pure) {
-		double swapped_cost = rhs->cost + rhs->probability*lhs->cost;
-		if (swapped_cost < expr->cost) {
-			debug_opt(state, "-O3: cost: %e", expr);
-			expr->lhs = rhs;
-			expr->rhs = lhs;
-			debug_opt(state, " <==> %e (~%g --> ~%g)\n", expr, expr->cost, swapped_cost);
-			expr->cost = swapped_cost;
-		}
-	}
-
 	return expr;
 }
 
@@ -425,17 +414,6 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 	expr->always_false = lhs->always_false && rhs->always_false;
 	expr->cost = lhs->cost + (1 - lhs->probability)*rhs->cost;
 	expr->probability = lhs->probability + rhs->probability - lhs->probability*rhs->probability;
-
-	if (optlevel >= 3 && lhs->pure && rhs->pure) {
-		double swapped_cost = rhs->cost + (1 - rhs->probability)*lhs->cost;
-		if (swapped_cost < expr->cost) {
-			debug_opt(state, "-O3: cost: %e", expr);
-			expr->lhs = rhs;
-			expr->rhs = lhs;
-			debug_opt(state, " <==> %e (~%g --> ~%g)\n", expr, expr->cost, swapped_cost);
-			expr->cost = swapped_cost;
-		}
-	}
 
 	return expr;
 }
@@ -619,6 +597,52 @@ done:
 	return expr;
 }
 
+/** Swap the children of a binary expression if it would reduce the cost. */
+static bool reorder_expr(const struct opt_state *state, struct expr *expr, double swapped_cost) {
+	if (swapped_cost < expr->cost) {
+		debug_opt(state, "-O3: cost: %e", expr);
+		struct expr *lhs = expr->lhs;
+		expr->lhs = expr->rhs;
+		expr->rhs = lhs;
+		debug_opt(state, " <==> %e (~%g --> ~%g)\n", expr, expr->cost, swapped_cost);
+		expr->cost = swapped_cost;
+		return true;
+	} else {
+		return false;
+	}
+}
+
+/**
+ * Recursively reorder sub-expressions to reduce the overall cost.
+ *
+ * @param expr
+ *         The expression to optimize.
+ * @return
+ *         Whether any subexpression was reordered.
+ */
+static bool reorder_expr_recursive(const struct opt_state *state, struct expr *expr) {
+	bool ret = false;
+	struct expr *lhs = expr->lhs;
+	struct expr *rhs = expr->rhs;
+
+	if (lhs) {
+		ret |= reorder_expr_recursive(state, lhs);
+	}
+	if (rhs) {
+		ret |= reorder_expr_recursive(state, rhs);
+	}
+
+	if (expr->eval == eval_and || expr->eval == eval_or) {
+		if (lhs->pure && rhs->pure) {
+			double rhs_prob = expr->eval == eval_and ? rhs->probability : 1.0 - rhs->probability;
+			double swapped_cost = rhs->cost + rhs_prob*lhs->cost;
+			ret |= reorder_expr(state, expr, swapped_cost);
+		}
+	}
+
+	return ret;
+}
+
 int optimize_cmdline(struct cmdline *cmdline) {
 	struct opt_facts facts_when_impure;
 	set_facts_impossible(&facts_when_impure);
@@ -633,14 +657,23 @@ int optimize_cmdline(struct cmdline *cmdline) {
 		.facts_when_impure = &facts_when_impure,
 	};
 
+	int optlevel = cmdline->optlevel;
+
 	cmdline->expr = optimize_expr_recursive(&state, cmdline->expr);
 	if (!cmdline->expr) {
 		return -1;
 	}
 
-	cmdline->expr = ignore_result(&state, cmdline->expr);
+	if (optlevel >= 3 && reorder_expr_recursive(&state, cmdline->expr)) {
+		// Re-do optimizations to account for the new ordering
+		set_facts_impossible(&facts_when_impure);
+		cmdline->expr = optimize_expr_recursive(&state, cmdline->expr);
+		if (!cmdline->expr) {
+			return -1;
+		}
+	}
 
-	int optlevel = cmdline->optlevel;
+	cmdline->expr = ignore_result(&state, cmdline->expr);
 
 	if (optlevel >= 2 && facts_when_impure.mindepth > cmdline->mindepth) {
 		debug_opt(&state, "-O2: data flow: mindepth --> %d\n", facts_when_impure.mindepth);

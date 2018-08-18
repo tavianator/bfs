@@ -227,11 +227,14 @@ posix_tests=(
     test_a
     test_o
     test_deep
+    test_or_purity
     test_double_negation
     test_de_morgan_not
     test_de_morgan_and
     test_de_morgan_or
     test_data_flow_type
+    test_data_flow_and_swap
+    test_data_flow_or_swap
 )
 
 bsd_tests=(
@@ -410,7 +413,6 @@ gnu_tests=(
     test_comma
     test_precedence
     test_and_purity
-    test_or_purity
     test_not_reachability
     test_comma_reachability
     test_print_error
@@ -1587,6 +1589,14 @@ function test_data_flow_depth() {
 
 function test_data_flow_type() {
     bfs_diff basic \! \( -type f -o \! -type f \)
+}
+
+function test_data_flow_and_swap() {
+    bfs_diff basic \! -type f -a -type d
+}
+
+function test_data_flow_or_swap() {
+    bfs_diff basic \! \( -type f -o -not -type d \)
 }
 
 function test_print_error() {
