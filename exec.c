@@ -368,12 +368,12 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			return -1;
 		}
 
-		errno = 0;
+		int ret = -1;
 
 		if (WIFEXITED(wstatus)) {
 			int status = WEXITSTATUS(wstatus);
 			if (status == EXIT_SUCCESS) {
-				return 0;
+				ret = 0;
 			} else {
 				bfs_exec_debug(execbuf, "Command '%s' failed with status %d\n", execbuf->argv[0], status);
 			}
@@ -384,7 +384,8 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			bfs_exec_debug(execbuf, "Command '%s' terminated abnormally\n", execbuf->argv[0]);
 		}
 
-		return -1;
+		errno = 0;
+		return ret;
 	} else {
 		// Child
 		close(pipefd[0]);
