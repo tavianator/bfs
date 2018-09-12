@@ -355,12 +355,14 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		// Parent
 		close(pipefd[1]);
 
-		int error;
+		int ret, error;
 		ssize_t nbytes = read(pipefd[0], &error, sizeof(error));
 		close(pipefd[0]);
 		if (nbytes == sizeof(error)) {
-			errno = error;
-			return -1;
+			ret = -1;
+		} else {
+			ret = 0;
+			error = 0;
 		}
 
 		int wstatus;
@@ -368,23 +370,22 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			return -1;
 		}
 
-		int ret = -1;
-
 		if (WIFEXITED(wstatus)) {
 			int status = WEXITSTATUS(wstatus);
-			if (status == EXIT_SUCCESS) {
-				ret = 0;
-			} else {
+			if (status != EXIT_SUCCESS) {
 				bfs_exec_debug(execbuf, "Command '%s' failed with status %d\n", execbuf->argv[0], status);
+				ret = -1;
 			}
 		} else if (WIFSIGNALED(wstatus)) {
 			int sig = WTERMSIG(wstatus);
 			bfs_exec_debug(execbuf, "Command '%s' terminated by signal %d\n", execbuf->argv[0], sig);
+			ret = -1;
 		} else {
 			bfs_exec_debug(execbuf, "Command '%s' terminated abnormally\n", execbuf->argv[0]);
+			ret = -1;
 		}
 
-		errno = 0;
+		errno = error;
 		return ret;
 	} else {
 		// Child
@@ -407,7 +408,6 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		close(pipefd[1]);
 		_Exit(EXIT_FAILURE);
 	}
-
 }
 
 /** exec() a command for a single file. */
