@@ -63,6 +63,7 @@ int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags) {
 	return 0;
 }
 
+/** Add a spawn action to the chain. */
 static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_spawn_op op) {
 	struct bfs_spawn_action *action = malloc(sizeof(*action));
 	if (action) {
@@ -91,17 +92,19 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	}
 }
 
-static int bfs_execvpe(const char *file, char **argv, char **envp) {
+/** Facade for execvpe() which is non-standard. */
+static int bfs_execvpe(const char *exe, char **argv, char **envp) {
 #if __GLIBC__ || __linux__ || __NetBSD__ || __OpenBSD__
-	return execvpe(file, argv, envp);
+	return execvpe(exe, argv, envp);
 #else
 	extern char **environ;
 	environ = envp;
-	return execvp(file, argv);
+	return execvp(exe, argv);
 #endif
 }
 
-static void bfs_spawn_exec(const char *file, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
+/** Actually exec() the new process. */
+static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	int error;
 	enum bfs_spawn_flags flags = ctx ? ctx->flags : 0;
 	const struct bfs_spawn_action *actions = ctx ? ctx->actions : NULL;
@@ -119,9 +122,9 @@ static void bfs_spawn_exec(const char *file, const struct bfs_spawn *ctx, char *
 	}
 
 	if (flags & BFS_SPAWN_USEPATH) {
-		bfs_execvpe(file, argv, envp);
+		bfs_execvpe(exe, argv, envp);
 	} else {
-		execve(file, argv, envp);
+		execve(exe, argv, envp);
 	}
 
 fail:
@@ -131,7 +134,7 @@ fail:
 	_Exit(127);
 }
 
-pid_t bfs_spawn(const char *file, const struct bfs_spawn *ctx, char **argv, char **envp) {
+pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	// Use a pipe to report errors from the child
 	int pipefd[2];
 	if (pipe_cloexec(pipefd) != 0) {
@@ -149,7 +152,7 @@ pid_t bfs_spawn(const char *file, const struct bfs_spawn *ctx, char **argv, char
 		return -1;
 	} else if (pid == 0) {
 		// Child
-		bfs_spawn_exec(file, ctx, argv, envp, pipefd);
+		bfs_spawn_exec(exe, ctx, argv, envp, pipefd);
 	}
 
 	// Parent
