@@ -91,6 +91,16 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	}
 }
 
+static int bfs_execvpe(const char *file, char **argv, char **envp) {
+#if __GLIBC__ || __linux__ || __NetBSD__ || __OpenBSD__
+	return execvpe(file, argv, envp);
+#else
+	extern char **environ;
+	environ = envp;
+	return execvp(file, argv);
+#endif
+}
+
 static void bfs_spawn_exec(const char *file, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	int error;
 	enum bfs_spawn_flags flags = ctx ? ctx->flags : 0;
@@ -109,7 +119,7 @@ static void bfs_spawn_exec(const char *file, const struct bfs_spawn *ctx, char *
 	}
 
 	if (flags & BFS_SPAWN_USEPATH) {
-		execvpe(file, argv, envp);
+		bfs_execvpe(file, argv, envp);
 	} else {
 		execve(file, argv, envp);
 	}
