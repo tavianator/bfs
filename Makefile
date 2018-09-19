@@ -1,6 +1,6 @@
 ############################################################################
 # bfs                                                                      #
-# Copyright (C) 2015-2017 Tavian Barnes <tavianator@tavianator.com>        #
+# Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        #
 #                                                                          #
 # Permission to use, copy, modify, and/or distribute this software for any #
 # purpose with or without fee is hereby granted.                           #
@@ -51,7 +51,7 @@ ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
 
 all: bfs
 
-bfs: bftw.o color.o dstring.o eval.o exec.o main.o mtab.o opt.o parse.o printf.o stat.o typo.o util.o
+bfs: bftw.o color.o dstring.o eval.o exec.o main.o mtab.o opt.o parse.o printf.o spawn.o stat.o typo.o util.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 sanitized: CFLAGS := -g $(WFLAGS) -fsanitize=address -fsanitize=undefined

@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2017-2018 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -19,6 +19,7 @@
 #include "cmdline.h"
 #include "color.h"
 #include "dstring.h"
+#include "spawn.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
@@ -339,75 +340,56 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
 	}
 
-	// Use a pipe to report errors from the child
-	int pipefd[2] = {-1, -1};
-	if (pipe_cloexec(pipefd) != 0) {
-		bfs_exec_debug(execbuf, "pipe() failed: %s\n", strerror(errno));
-	}
+	pid_t pid = -1;
+	int error;
 
-	pid_t pid = fork();
-
-	if (pid < 0) {
-		close(pipefd[1]);
-		close(pipefd[0]);
+	struct bfs_spawn ctx;
+	if (bfs_spawn_init(&ctx) != 0) {
 		return -1;
-	} else if (pid > 0) {
-		// Parent
-		close(pipefd[1]);
-
-		int ret, error;
-		ssize_t nbytes = read(pipefd[0], &error, sizeof(error));
-		close(pipefd[0]);
-		if (nbytes == sizeof(error)) {
-			ret = -1;
-		} else {
-			ret = 0;
-			error = 0;
-		}
-
-		int wstatus;
-		if (waitpid(pid, &wstatus, 0) < 0) {
-			return -1;
-		}
-
-		if (WIFEXITED(wstatus)) {
-			int status = WEXITSTATUS(wstatus);
-			if (status != EXIT_SUCCESS) {
-				bfs_exec_debug(execbuf, "Command '%s' failed with status %d\n", execbuf->argv[0], status);
-				ret = -1;
-			}
-		} else if (WIFSIGNALED(wstatus)) {
-			int sig = WTERMSIG(wstatus);
-			bfs_exec_debug(execbuf, "Command '%s' terminated by signal %d\n", execbuf->argv[0], sig);
-			ret = -1;
-		} else {
-			bfs_exec_debug(execbuf, "Command '%s' terminated abnormally\n", execbuf->argv[0]);
-			ret = -1;
-		}
-
-		errno = error;
-		return ret;
-	} else {
-		// Child
-		close(pipefd[0]);
-
-		if (execbuf->wd_fd >= 0) {
-			if (fchdir(execbuf->wd_fd) != 0) {
-				goto child_err;
-			}
-		}
-
-		execvp(execbuf->argv[0], execbuf->argv);
-
-		int error;
-	child_err:
-		error = errno;
-		if (write(pipefd[1], &error, sizeof(error)) != sizeof(error)) {
-			// Parent will still see that we exited unsuccessfully, but won't know why
-		}
-		close(pipefd[1]);
-		_Exit(EXIT_FAILURE);
 	}
+
+	if (bfs_spawn_setflags(&ctx, BFS_SPAWN_USEPATH) != 0) {
+		goto fail;
+	}
+
+	if (execbuf->wd_fd >= 0) {
+		if (bfs_spawn_addfchdir(&ctx, execbuf->wd_fd) != 0) {
+			goto fail;
+		}
+	}
+
+	pid = bfs_spawn(execbuf->argv[0], &ctx, execbuf->argv, environ);
+fail:
+	error = errno;
+	bfs_spawn_destroy(&ctx);
+	if (pid < 0) {
+		errno = error;
+		return -1;
+	}
+
+	int wstatus;
+	if (waitpid(pid, &wstatus, 0) < 0) {
+		return -1;
+	}
+
+	int ret = -1;
+
+	if (WIFEXITED(wstatus)) {
+		int status = WEXITSTATUS(wstatus);
+		if (status == EXIT_SUCCESS) {
+			ret = 0;
+		} else {
+			bfs_exec_debug(execbuf, "Command '%s' failed with status %d\n", execbuf->argv[0], status);
+		}
+	} else if (WIFSIGNALED(wstatus)) {
+		int sig = WTERMSIG(wstatus);
+		bfs_exec_debug(execbuf, "Command '%s' terminated by signal %d\n", execbuf->argv[0], sig);
+	} else {
+		bfs_exec_debug(execbuf, "Command '%s' terminated abnormally\n", execbuf->argv[0]);
+	}
+
+	errno = 0;
+	return ret;
 }
 
 /** exec() a command for a single file. */
