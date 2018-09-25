@@ -15,7 +15,7 @@
 ############################################################################
 
 ifeq ($(wildcard .git),)
-VERSION := 1.2.3
+VERSION := 1.2.4
 else
 VERSION := $(shell git describe --always)
 endif

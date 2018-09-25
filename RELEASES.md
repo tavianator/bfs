@@ -2,6 +2,19 @@
 ===
 
 
+1.2.4
+-----
+
+**September 24, 2018**
+
+- GNU find compatibility fixes for `-printf`:
+  - `%Y` now prints `?` if an error occurs resolving the link
+  - `%B` is now supported for birth/creation time (as well as `%W`/`%w`)
+  - All standard `strftime()` formats are supported, not just the ones from the GNU find manual
+- Optimizations are now re-run if any expressions are reordered
+- `-exec` and friends no longer leave zombie processes around when `exec()` fails
+
+
 1.2.3
 -----
 
