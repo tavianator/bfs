@@ -139,11 +139,13 @@ function make_deep() {
             mkdir "$1/$i"
             cd "$1/$i"
 
-            # 17 * 256 > 16 * 256 == 4096 == PATH_MAX
-            for j in {1..17}; do
+            # 16 * 256 == 4096 == PATH_MAX
+            for j in {1..16}; do
                 mkdir "$name"
                 cd "$name" 2>/dev/null
             done
+
+            touch "$name"
         )
     done
 }
@@ -169,14 +171,8 @@ posix_tests=(
     test_basic
     test_type_d
     test_type_f
-    test_mindepth
-    test_maxdepth
     test_depth
     test_depth_slash
-    test_depth_mindepth_1
-    test_depth_mindepth_2
-    test_depth_maxdepth_1
-    test_depth_maxdepth_2
     test_depth_error
     test_name
     test_name_root
@@ -242,6 +238,12 @@ bsd_tests=(
     test_P_slash
     test_X
     test_follow
+    test_mindepth
+    test_maxdepth
+    test_depth_mindepth_1
+    test_depth_mindepth_2
+    test_depth_maxdepth_1
+    test_depth_maxdepth_2
     test_samefile
     test_samefile_symlink
     test_H_samefile_symlink
@@ -311,6 +313,12 @@ bsd_tests=(
 )
 
 gnu_tests=(
+    test_mindepth
+    test_maxdepth
+    test_depth_mindepth_1
+    test_depth_mindepth_2
+    test_depth_maxdepth_1
+    test_depth_maxdepth_2
     test_true
     test_false
     test_executable
@@ -1176,12 +1184,12 @@ function test_permcopy() {
 function test_ok_stdin() {
     # -ok should *not* close stdin
     # See https://savannah.gnu.org/bugs/?24561
-    yes | bfs_diff basic -ok bash -c "printf '%s? ' {} && head -n1" \; 2>/dev/null
+    yes | bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \; 2>/dev/null
 }
 
 function test_okdir_stdin() {
     # -okdir should *not* close stdin
-    yes | bfs_diff basic -okdir bash -c "printf '%s? ' {} && head -n1" \; 2>/dev/null
+    yes | bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \; 2>/dev/null
 }
 
 function test_ok_plus_semicolon() {
@@ -1511,7 +1519,7 @@ function test_deep() {
     closefrom 4
 
     ulimit -n 16
-    bfs_diff deep -mindepth 18 -exec /bin/bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' /bin/bash '{}' \;
+    bfs_diff deep -type f -exec bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' bash '{}' \;
 }
 
 function test_deep_strict() {
@@ -1519,7 +1527,7 @@ function test_deep_strict() {
 
     # Not even enough fds to keep the root open
     ulimit -n 7
-    bfs_diff deep -mindepth 18 -exec /bin/bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' /bin/bash '{}' \;
+    bfs_diff deep -type f -exec bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' bash '{}' \;
 }
 
 function test_exit() {
@@ -1587,7 +1595,7 @@ function test_data_flow_and_swap() {
 }
 
 function test_data_flow_or_swap() {
-    bfs_diff basic \! \( -type f -o -not -type d \)
+    bfs_diff basic \! \( -type f -o \! -type d \)
 }
 
 function test_print_error() {
