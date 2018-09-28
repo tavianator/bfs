@@ -188,7 +188,6 @@ posix_tests=(
     test_H_slash
     test_H_broken
     test_H_notdir
-    test_H_newer
     test_L
     test_L_broken
     test_L_notdir
@@ -262,6 +261,7 @@ bsd_tests=(
     test_ilname
     test_L_lname
     test_L_ilname
+    test_H_newer
     test_newerma
     test_size_big
     test_exec_substring
@@ -331,6 +331,7 @@ gnu_tests=(
     test_uid
     test_uid_plus
     test_uid_minus
+    test_H_newer
     test_anewer
     test_P
     test_P_slash
