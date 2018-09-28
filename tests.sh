@@ -168,42 +168,60 @@ BFS="$(_realpath ./bfs)"
 TESTS="$(_realpath ./tests)"
 
 posix_tests=(
+    # General parsing
+    test_parens
+    test_bang
+    test_implicit_and
+    test_a
+    test_o
+
     test_basic
-    test_type_d
-    test_type_f
-    test_depth
-    test_depth_slash
-    test_depth_error
-    test_name
-    test_name_root
-    test_name_root_depth
-    test_name_trailing_slash
-    test_path
-    test_newer
-    test_newer_link
-    test_links
-    test_links_plus
-    test_links_minus
+
+    # Flags
+
     test_H
     test_H_slash
     test_H_broken
     test_H_notdir
+
     test_L
     test_L_broken
     test_L_notdir
+
+    test_flag_comma
+
+    # Primaries
+
+    test_depth
+    test_depth_slash
+    test_depth_error
     test_L_depth
-    test_user_name
-    test_user_id
-    test_group_name
-    test_group_id
-    test_size
-    test_size_plus
-    test_size_bytes
+
     test_exec
     test_exec_plus
     test_exec_plus_status
     test_exec_plus_semicolon
-    test_flag_comma
+
+    test_group_name
+    test_group_id
+
+    test_links
+    test_links_plus
+    test_links_minus
+
+    test_name
+    test_name_root
+    test_name_root_depth
+    test_name_trailing_slash
+
+    test_newer
+    test_newer_link
+
+    test_ok_stdin
+    test_ok_plus_semicolon
+
+    test_path
+
     test_perm_000
     test_perm_000_minus
     test_perm_222
@@ -214,14 +232,21 @@ posix_tests=(
     test_perm_symbolic_minus
     test_perm_leading_plus_symbolic_minus
     test_permcopy
-    test_ok_stdin
-    test_ok_plus_semicolon
-    test_parens
-    test_bang
-    test_implicit_and
-    test_a
-    test_o
+
+    test_size
+    test_size_plus
+    test_size_bytes
+
+    test_type_d
+    test_type_f
+
+    test_user_name
+    test_user_id
+
+    # PATH_MAX handling
     test_deep
+
+    # Optimizer tests
     test_or_purity
     test_double_negation
     test_de_morgan_not
@@ -233,55 +258,32 @@ posix_tests=(
 )
 
 bsd_tests=(
+    # Flags
+
+    test_E
+
     test_P
     test_P_slash
+
     test_X
-    test_follow
-    test_mindepth
-    test_maxdepth
-    test_depth_mindepth_1
-    test_depth_mindepth_2
-    test_depth_maxdepth_1
-    test_depth_maxdepth_2
-    test_samefile
-    test_samefile_symlink
-    test_H_samefile_symlink
-    test_L_samefile_symlink
-    test_samefile_broken
-    test_H_samefile_broken
-    test_L_samefile_broken
-    test_samefile_notdir
-    test_H_samefile_notdir
-    test_L_samefile_notdir
-    test_name_slash
-    test_name_slashes
-    test_iname
-    test_ipath
-    test_lname
-    test_ilname
-    test_L_lname
-    test_L_ilname
-    test_H_newer
-    test_newerma
-    test_size_big
-    test_exec_substring
-    test_execdir_pwd
-    test_execdir_slash
-    test_execdir_slash_pwd
-    test_execdir_slashes
+
+    test_d_path
+
+    test_f
+
     test_double_dash
     test_flag_double_dash
-    test_ok_stdin
-    test_okdir_stdin
+
+    # Primaries
+
     test_delete
     test_L_delete
-    test_rm
-    test_regex
-    test_iregex
-    test_regex_parens
-    test_E
-    test_d_path
-    test_f
+
+    test_depth_maxdepth_1
+    test_depth_maxdepth_2
+    test_depth_mindepth_1
+    test_depth_mindepth_2
+
     test_depth_n
     test_depth_n_plus
     test_depth_n_minus
@@ -289,14 +291,63 @@ bsd_tests=(
     test_depth_depth_n_plus
     test_depth_depth_n_minus
     test_depth_overflow
+    test_data_flow_depth
+
+    test_exec_substring
+
+    test_execdir_pwd
+    test_execdir_slash
+    test_execdir_slash_pwd
+    test_execdir_slashes
+
+    test_exit
+
+    test_follow
+
     test_gid_name
-    test_uid_name
+
+    test_ilname
+    test_L_ilname
+
+    test_iname
+
+    test_inum
+
+    test_ipath
+
+    test_iregex
+
+    test_lname
+    test_L_lname
+
+    test_maxdepth
+
+    test_mindepth
+
     test_mnewer
     test_H_mnewer
+
+    test_name_slash
+    test_name_slashes
+
+    test_H_newer
+
+    test_newerma
+
+    test_nogroup
+
+    test_nouser
+
+    test_ok_stdin
+
+    test_okdir_stdin
+
     test_perm_000_plus
     test_perm_222_plus
     test_perm_644_plus
-    test_size_T
+
+    test_printx
+
     test_quit
     test_quit_child
     test_quit_depth
@@ -304,38 +355,12 @@ bsd_tests=(
     test_quit_after_print
     test_quit_before_print
     test_quit_implicit_print
-    test_inum
-    test_nogroup
-    test_nouser
-    test_exit
-    test_printx
-    test_data_flow_depth
-)
 
-gnu_tests=(
-    test_mindepth
-    test_maxdepth
-    test_depth_mindepth_1
-    test_depth_mindepth_2
-    test_depth_maxdepth_1
-    test_depth_maxdepth_2
-    test_true
-    test_false
-    test_executable
-    test_readable
-    test_writable
-    test_empty
-    test_gid
-    test_gid_plus
-    test_gid_minus
-    test_uid
-    test_uid_plus
-    test_uid_minus
-    test_H_newer
-    test_anewer
-    test_P
-    test_P_slash
-    test_follow
+    test_rm
+
+    test_regex
+    test_regex_parens
+
     test_samefile
     test_samefile_symlink
     test_H_samefile_symlink
@@ -346,23 +371,56 @@ gnu_tests=(
     test_samefile_notdir
     test_H_samefile_notdir
     test_L_samefile_notdir
-    test_xtype_l
-    test_xtype_f
-    test_L_xtype_l
-    test_L_xtype_f
-    test_name_slash
-    test_name_slashes
-    test_iname
-    test_ipath
-    test_lname
-    test_ilname
-    test_L_lname
-    test_L_ilname
+
+    test_size_T
+    test_size_big
+
+    test_uid_name
+)
+
+gnu_tests=(
+    # General parsing
+
+    test_not
+    test_and
+    test_or
+    test_comma
+    test_precedence
+
+    test_weird_names
+    test_flag_weird_names
+
+    test_follow_comma
+
+    # Flags
+
+    test_P
+    test_P_slash
+
+    test_double_dash
+    test_flag_double_dash
+
+    # Primaries
+
+    test_anewer
+
+    test_path_d
+
     test_daystart
     test_daystart_twice
-    test_newerma
-    test_size_big
+
+    test_delete
+    test_L_delete
+
+    test_depth_mindepth_1
+    test_depth_mindepth_2
+    test_depth_maxdepth_1
+    test_depth_maxdepth_2
+
+    test_empty
+
     test_exec_substring
+
     test_execdir
     test_execdir_substring
     test_execdir_plus_semicolon
@@ -370,37 +428,66 @@ gnu_tests=(
     test_execdir_slash
     test_execdir_slash_pwd
     test_execdir_slashes
-    test_okdir_plus_semicolon
-    test_weird_names
-    test_flag_weird_names
-    test_follow_comma
+
+    test_executable
+
+    test_false
+
+    test_follow
+
     test_fprint
     test_fprint_duplicate
-    test_double_dash
-    test_flag_double_dash
+    test_fprint_error
+
+    test_fstype
+
+    test_gid
+    test_gid_plus
+    test_gid_minus
+
     test_ignore_readdir_race
     test_ignore_readdir_race_root
     test_ignore_readdir_race_notdir
+
+    test_ilname
+    test_L_ilname
+
+    test_iname
+
+    test_inum
+
+    test_ipath
+
+    test_iregex
+
+    test_lname
+    test_L_lname
+
+    test_maxdepth
+
+    test_mindepth
+
+    test_name_slash
+    test_name_slashes
+
+    test_H_newer
+
+    test_newerma
+
+    test_nogroup
+
+    test_nouser
+
+    test_okdir_plus_semicolon
+
     test_perm_000_slash
     test_perm_222_slash
     test_perm_644_slash
     test_perm_symbolic_slash
     test_perm_leading_plus_symbolic_slash
-    test_delete
-    test_L_delete
-    test_regex
-    test_iregex
-    test_regex_parens
-    test_regextype_posix_basic
-    test_regextype_posix_extended
-    test_path_d
-    test_quit
-    test_quit_child
-    test_quit_depth
-    test_quit_depth_child
-    test_inum
-    test_nogroup
-    test_nouser
+
+    test_print_error
+
     test_printf
     test_printf_slash
     test_printf_slashes
@@ -413,39 +500,85 @@ gnu_tests=(
     test_printf_leak
     test_printf_nul
     test_printf_Y_error
+
+    test_quit
+    test_quit_child
+    test_quit_depth
+    test_quit_depth_child
     test_quit_after_print
     test_quit_before_print
-    test_fstype
-    test_not
-    test_and
-    test_or
-    test_comma
-    test_precedence
+
+    test_readable
+
+    test_regex
+    test_regex_parens
+
+    test_regextype_posix_basic
+    test_regextype_posix_extended
+
+    test_samefile
+    test_samefile_symlink
+    test_H_samefile_symlink
+    test_L_samefile_symlink
+    test_samefile_broken
+    test_H_samefile_broken
+    test_L_samefile_broken
+    test_samefile_notdir
+    test_H_samefile_notdir
+    test_L_samefile_notdir
+
+    test_size_big
+
+    test_true
+
+    test_uid
+    test_uid_plus
+    test_uid_minus
+
+    test_writable
+
+    test_xtype_l
+    test_xtype_f
+    test_L_xtype_l
+    test_L_xtype_f
+
+    # Optimizer tests
     test_and_purity
     test_not_reachability
     test_comma_reachability
-    test_print_error
-    test_fprint_error
 )
 
 bfs_tests=(
-    test_type_multi
-    test_xtype_multi
-    test_xtype_reorder
-    test_perm_symbolic_trailing_comma
-    test_perm_symbolic_double_comma
-    test_perm_symbolic_missing_action
-    test_perm_leading_plus_symbolic
-    test_execdir_plus
-    test_hidden
-    test_nohidden
-    test_printf_w
+    # General parsing
     test_path_flag_expr
     test_path_expr_flag
     test_flag_expr_path
     test_expr_flag_path
     test_expr_path_flag
+
+    # Primaries
+
     test_colors
+
+    test_execdir_plus
+
+    test_hidden
+
+    test_nohidden
+
+    test_perm_symbolic_trailing_comma
+    test_perm_symbolic_double_comma
+    test_perm_symbolic_missing_action
+    test_perm_leading_plus_symbolic
+
+    test_printf_w
+
+    test_type_multi
+
+    test_xtype_multi
+    test_xtype_reorder
+
+    # PATH_MAX handling
     test_deep_strict
 )
 
