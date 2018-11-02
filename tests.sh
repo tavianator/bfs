@@ -169,13 +169,15 @@ TESTS="$(_realpath ./tests)"
 
 posix_tests=(
     # General parsing
+    test_basic
+
     test_parens
     test_bang
     test_implicit_and
     test_a
     test_o
 
-    test_basic
+    test_weird_names
 
     # Flags
 
@@ -188,6 +190,7 @@ posix_tests=(
     test_L_broken
     test_L_notdir
 
+    test_flag_weird_names
     test_flag_comma
 
     # Primaries
@@ -390,9 +393,6 @@ gnu_tests=(
     test_or
     test_comma
     test_precedence
-
-    test_weird_names
-    test_flag_weird_names
 
     test_follow_comma
 
@@ -1154,12 +1154,12 @@ function test_execdir_slashes() {
 
 function test_weird_names() {
     cd weirdnames
-    bfs_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
+    bfs_diff '-' '(-' '!-' ',' ')' './(' './!' \( \! -print -o -print \)
 }
 
 function test_flag_weird_names() {
     cd weirdnames
-    bfs_diff -L '-' '(-' '!-' ',' ')' './(' './!' \( \! -print , -print \)
+    bfs_diff -L '-' '(-' '!-' ',' ')' './(' './!' \( \! -print -o -print \)
 }
 
 function test_flag_comma() {
