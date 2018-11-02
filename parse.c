@@ -805,6 +805,22 @@ static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
 }
 
 /**
+ * Print usage information for -D.
+ */
+static void debug_help(CFILE *cfile) {
+	cfprintf(cfile, "Supported debug flags:\n\n");
+
+	cfprintf(cfile, "  %{bld}help%{rs}:   This message.\n");
+	cfprintf(cfile, "  %{bld}cost%{rs}:   Show cost estimates.\n");
+	cfprintf(cfile, "  %{bld}exec%{rs}:   Print executed command details.\n");
+	cfprintf(cfile, "  %{bld}opt%{rs}:    Print optimization details.\n");
+	cfprintf(cfile, "  %{bld}rates%{rs}:  Print predicate success rates.\n");
+	cfprintf(cfile, "  %{bld}search%{rs}: Trace the filesystem traversal.\n");
+	cfprintf(cfile, "  %{bld}stat%{rs}:   Trace all stat() calls.\n");
+	cfprintf(cfile, "  %{bld}tree%{rs}:   Print the parse tree.\n");
+}
+
+/**
  * Parse -D FLAG.
  */
 static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) {
@@ -813,22 +829,13 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 	const char *arg = state->argv[0];
 	const char *flag = state->argv[1];
 	if (!flag) {
-		cfprintf(cmdline->cerr, "%{er}error: %s needs a flag.%{rs}\n", arg);
+		cfprintf(cmdline->cerr, "%{er}error: %s needs a flag.%{rs}\n\n", arg);
+		debug_help(cmdline->cerr);
 		return NULL;
 	}
 
 	if (strcmp(flag, "help") == 0) {
-		printf("Supported debug flags:\n\n");
-
-		printf("  help:   This message.\n");
-		printf("  cost:   Show cost estimates.\n");
-		printf("  exec:   Print executed command details.\n");
-		printf("  opt:    Print optimization details.\n");
-		printf("  rates:  Print predicate success rates.\n");
-		printf("  search: Trace the filesystem traversal.\n");
-		printf("  stat:   Trace all stat() calls.\n");
-		printf("  tree:   Print the parse tree.\n");
-
+		debug_help(cmdline->cout);
 		state->just_info = true;
 		return NULL;
 	} else if (strcmp(flag, "cost") == 0) {
@@ -847,6 +854,8 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		cmdline->debug |= DEBUG_TREE;
 	} else {
 		cfprintf(cmdline->cerr, "%{wr}warning: Unrecognized debug flag '%s'.%{rs}\n\n", flag);
+		debug_help(cmdline->cerr);
+		cfprintf(cmdline->cerr, "\n");
 	}
 
 	return parse_unary_flag(state);
@@ -2916,6 +2925,8 @@ fail:
 void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	CFILE *cerr = cmdline->cerr;
 
+	cfprintf(cerr, "%{ex}%s%{rs} ", cmdline->argv[0]);
+
 	if (cmdline->flags & BFTW_LOGICAL) {
 		cfprintf(cerr, "%{cyn}-L%{rs} ");
 	} else if (cmdline->flags & BFTW_COMFOLLOW) {
@@ -2939,6 +2950,9 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	}
 	if (cmdline->debug & DEBUG_RATES) {
 		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}rates%{rs} ");
+	}
+	if (cmdline->debug & DEBUG_SEARCH) {
+		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}search%{rs} ");
 	}
 	if (cmdline->debug & DEBUG_STAT) {
 		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}stat%{rs} ");
