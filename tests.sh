@@ -233,6 +233,10 @@ posix_tests=(
     test_perm_leading_plus_symbolic_minus
     test_permcopy
 
+    test_prune
+    test_prune_or_print
+    test_not_prune
+
     test_size
     test_size_plus
     test_size_bytes
@@ -1313,6 +1317,18 @@ function test_perm_leading_plus_symbolic_slash() {
 
 function test_permcopy() {
     bfs_diff perms -perm u+rw,g+u-w,o=g
+}
+
+function test_prune() {
+    bfs_diff basic -name foo -prune
+}
+
+function test_prune_or_print() {
+    bfs_diff basic -name foo -prune -o -print
+}
+
+function test_not_prune() {
+    bfs_diff basic \! \( -name foo -prune \)
 }
 
 function test_ok_stdin() {
