@@ -30,6 +30,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#if __GLIBC__ || __has_include(<sys/sysmacros.h>)
+#	include <sys/sysmacros.h>
+#endif
+
 int xreaddir(DIR *dir, struct dirent **de) {
 	errno = 0;
 	*de = readdir(dir);
@@ -439,4 +443,16 @@ int ynprompt() {
 	int ret = line ? xrpmatch(line) : -1;
 	dstrfree(line);
 	return ret;
+}
+
+dev_t bfs_makedev(int ma, int mi) {
+	return makedev(ma, mi);
+}
+
+int bfs_major(dev_t dev) {
+	return major(dev);
+}
+
+int bfs_minor(dev_t dev) {
+	return minor(dev);
 }

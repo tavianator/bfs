@@ -172,4 +172,19 @@ enum bftw_typeflag dirent_to_typeflag(const struct dirent *de);
  */
 int ynprompt(void);
 
+/**
+ * Portable version of makedev().
+ */
+dev_t bfs_makedev(int ma, int mi);
+
+/**
+ * Portable version of major().
+ */
+int bfs_major(dev_t dev);
+
+/**
+ * Portable version of minor().
+ */
+int bfs_minor(dev_t dev);
+
 #endif // BFS_UTIL_H

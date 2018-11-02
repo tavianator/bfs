@@ -35,10 +35,11 @@ enum bfs_stat_field {
 	BFS_STAT_UID    = 1 << 6,
 	BFS_STAT_SIZE   = 1 << 7,
 	BFS_STAT_BLOCKS = 1 << 8,
-	BFS_STAT_ATIME  = 1 << 9,
-	BFS_STAT_BTIME  = 1 << 10,
-	BFS_STAT_CTIME  = 1 << 11,
-	BFS_STAT_MTIME  = 1 << 12,
+	BFS_STAT_RDEV   = 1 << 9,
+	BFS_STAT_ATIME  = 1 << 10,
+	BFS_STAT_BTIME  = 1 << 11,
+	BFS_STAT_CTIME  = 1 << 12,
+	BFS_STAT_MTIME  = 1 << 13,
 };
 
 /**
@@ -80,6 +81,8 @@ struct bfs_stat {
 	off_t size;
 	/** Number of disk blocks allocated (of size BFS_STAT_BLKSIZE). */
 	blkcnt_t blocks;
+	/** The device ID represented by this file. */
+	dev_t rdev;
 
 	/** Access time. */
 	struct timespec atime;

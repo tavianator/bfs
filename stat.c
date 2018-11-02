@@ -32,7 +32,6 @@
 
 #if HAVE_STATX || defined(__NR_statx)
 #	define HAVE_BFS_STATX true
-#	include <sys/sysmacros.h>
 #endif
 
 #if __APPLE__
@@ -81,6 +80,9 @@ static void bfs_stat_convert(const struct stat *statbuf, struct bfs_stat *buf) {
 
 	buf->blocks = statbuf->st_blocks;
 	buf->mask |= BFS_STAT_BLOCKS;
+
+	buf->rdev = statbuf->st_rdev;
+	buf->mask |= BFS_STAT_RDEV;
 
 	buf->atime = statbuf->st_atim;
 	buf->mask |= BFS_STAT_ATIME;
@@ -154,7 +156,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 
 	buf->mask = 0;
 
-	buf->dev = makedev(xbuf.stx_dev_major, xbuf.stx_dev_minor);
+	buf->dev = bfs_makedev(xbuf.stx_dev_major, xbuf.stx_dev_minor);
 	buf->mask |= BFS_STAT_DEV;
 
 	if (xbuf.stx_mask & STATX_INO) {
@@ -194,6 +196,9 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 		buf->blocks = xbuf.stx_blocks;
 		buf->mask |= BFS_STAT_BLOCKS;
 	}
+
+	buf->rdev = bfs_makedev(xbuf.stx_rdev_major, xbuf.stx_rdev_minor);
+	buf->mask |= BFS_STAT_RDEV;
 
 	if (xbuf.stx_mask & STATX_ATIME) {
 		buf->atime.tv_sec = xbuf.stx_atime.tv_sec;

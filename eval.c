@@ -658,9 +658,17 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	uintmax_t size = statbuf->size;
-	if (fprintf(file, " %8ju", size) < 0) {
-		goto error;
+	if (ftwbuf->typeflag & (BFTW_BLK | BFTW_CHR)) {
+		int ma = bfs_major(statbuf->rdev);
+		int mi = bfs_minor(statbuf->rdev);
+		if (fprintf(file, " %3d, %3d", ma, mi) < 0) {
+			goto error;
+		}
+	} else {
+		uintmax_t size = statbuf->size;
+		if (fprintf(file, " %8ju", size) < 0) {
+			goto error;
+		}
 	}
 
 	time_t time = statbuf->mtime.tv_sec;
