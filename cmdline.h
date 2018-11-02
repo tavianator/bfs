@@ -37,6 +37,8 @@ enum debug_flags {
 	DEBUG_STAT   = 1 << 5,
 	/** Print the parse tree. */
 	DEBUG_TREE   = 1 << 6,
+	/** All debug flags. */
+	DEBUG_ALL    = (1 << 7) - 1,
 };
 
 /**

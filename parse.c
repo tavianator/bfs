@@ -818,6 +818,7 @@ static void debug_help(CFILE *cfile) {
 	cfprintf(cfile, "  %{bld}search%{rs}: Trace the filesystem traversal.\n");
 	cfprintf(cfile, "  %{bld}stat%{rs}:   Trace all stat() calls.\n");
 	cfprintf(cfile, "  %{bld}tree%{rs}:   Print the parse tree.\n");
+	cfprintf(cfile, "  %{bld}all%{rs}:    All debug flags at once.\n");
 }
 
 /**
@@ -852,6 +853,8 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		cmdline->debug |= DEBUG_STAT;
 	} else if (strcmp(flag, "tree") == 0) {
 		cmdline->debug |= DEBUG_TREE;
+	} else if (strcmp(flag, "all") == 0) {
+		cmdline->debug |= DEBUG_ALL;
 	} else {
 		cfprintf(cmdline->cerr, "%{wr}warning: Unrecognized debug flag '%s'.%{rs}\n\n", flag);
 		debug_help(cmdline->cerr);
