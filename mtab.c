@@ -24,11 +24,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#ifndef __has_include
-#	define __has_include(header) 0
-#endif
-
-#if __GLIBC__ || __has_include(<mntent.h>)
+#if __GLIBC__ || BFS_HAS_INCLUDE(<mntent.h>)
 #	define BFS_MNTENT 1
 #elif BSD
 #	define BFS_MNTINFO 1

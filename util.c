@@ -30,7 +30,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#if __GLIBC__ || __has_include(<sys/sysmacros.h>)
+#if __GLIBC__ || BFS_HAS_INCLUDE(<sys/sysmacros.h>)
 #	include <sys/sysmacros.h>
 #endif
 

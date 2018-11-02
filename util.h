@@ -28,6 +28,12 @@
 
 // Some portability concerns
 
+#ifdef __has_include
+#	define BFS_HAS_INCLUDE(header) __has_include(header)
+#else
+#	define BFS_HAS_INCLUDE(header) false
+#endif
+
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
 #endif
