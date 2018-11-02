@@ -77,6 +77,7 @@ install:
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
+	$(RM) $(DESTDIR)$(PREFIX)/share/man/man1/bfs.1
 
 .PHONY: all release check clean install uninstall
 
