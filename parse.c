@@ -340,6 +340,8 @@ struct parser_state {
 	/** Whether an information option like -help or -version was passed. */
 	bool just_info;
 
+	/** The last non-path argument. */
+	const char *last_arg;
 	/** A "-depth"-type argument if any. */
 	const char *depth_arg;
 	/** A "-prune"-type argument if any. */
@@ -460,6 +462,10 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
 		if (type != T_OPTION) {
 			state->non_option_seen = true;
 		}
+	}
+
+	if (type != T_PATH) {
+		state->last_arg = *state->argv;
 	}
 
 	char **argv = state->argv;
@@ -2707,7 +2713,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 
 	const char *arg = state->argv[0];
 	if (!arg) {
-		cfprintf(cerr, "%{er}error: Expression terminated prematurely after '%s'.%{rs}\n", state->argv[-1]);
+		cfprintf(cerr, "%{er}error: Expression terminated prematurely after '%s'.%{rs}\n", state->last_arg);
 		return NULL;
 	}
 
@@ -3090,6 +3096,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.warn = stdin_tty,
 		.non_option_seen = false,
 		.just_info = false,
+		.last_arg = NULL,
 		.depth_arg = NULL,
 		.prune_arg = NULL,
 	};
