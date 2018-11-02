@@ -547,7 +547,7 @@ static void bftw_queue_init(struct bftw_queue *queue) {
 	queue->tail = NULL;
 }
 
-/** Add a directory to the bftw_queue. */
+/** Add a directory to the tail of the bftw_queue. */
 static void bftw_queue_push(struct bftw_queue *queue, struct bftw_dir *dir) {
 	assert(dir->next == NULL);
 
@@ -560,7 +560,22 @@ static void bftw_queue_push(struct bftw_queue *queue, struct bftw_dir *dir) {
 	queue->tail = dir;
 }
 
-/** Pop the next directory from the queue. */
+/** Prepend a queue to the head of another one. */
+static void bftw_queue_prepend(struct bftw_queue *head, struct bftw_queue *tail) {
+	if (head->tail) {
+		head->tail->next = tail->head;
+	}
+	if (head->head) {
+		tail->head = head->head;
+	}
+	if (!tail->tail) {
+		tail->tail = head->tail;
+	}
+	head->head = NULL;
+	head->tail = NULL;
+}
+
+/** Pop the next directory from the head of the queue. */
 static struct bftw_dir *bftw_queue_pop(struct bftw_queue *queue) {
 	struct bftw_dir *dir = queue->head;
 	queue->head = dir->next;
@@ -651,6 +666,8 @@ struct bftw_state {
 	void *ptr;
 	/** bftw() flags. */
 	enum bftw_flags flags;
+	/** Search strategy. */
+	enum bftw_strategy strategy;
 	/** The mount table. */
 	const struct bfs_mtab *mtab;
 
@@ -661,6 +678,8 @@ struct bftw_state {
 	struct bftw_cache cache;
 	/** The queue of directories left to explore. */
 	struct bftw_queue queue;
+	/** An intermediate queue used for depth-first searches. */
+	struct bftw_queue prequeue;
 
 	/** The current path. */
 	char *path;
@@ -678,6 +697,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	state->callback = args->callback;
 	state->ptr = args->ptr;
 	state->flags = args->flags;
+	state->strategy = args->strategy;
 	state->mtab = args->mtab;
 
 	state->error = 0;
@@ -693,6 +713,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 
 	bftw_queue_init(&state->queue);
+	bftw_queue_init(&state->prequeue);
 
 	state->path = dstralloc(0);
 	if (!state->path) {
@@ -1079,7 +1100,11 @@ static int bftw_push(struct bftw_state *state, const char *name) {
 		dir->ino = statbuf->ino;
 	}
 
-	bftw_queue_push(&state->queue, dir);
+	if (state->strategy == BFTW_DFS) {
+		bftw_queue_push(&state->prequeue, dir);
+	} else {
+		bftw_queue_push(&state->queue, dir);
+	}
 	return 0;
 }
 
@@ -1087,6 +1112,14 @@ static int bftw_push(struct bftw_state *state, const char *name) {
  * Pop a directory from the queue and start reading it.
  */
 static struct bftw_reader *bftw_pop(struct bftw_state *state) {
+	if (state->strategy == BFTW_DFS) {
+		bftw_queue_prepend(&state->prequeue, &state->queue);
+	}
+
+	if (!state->queue.head) {
+		return NULL;
+	}
+
 	struct bftw_reader *reader = &state->reader;
 	struct bftw_dir *dir = state->queue.head;
 	if (bftw_dir_path(dir, &state->path) != 0) {
@@ -1160,6 +1193,16 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_vi
 }
 
 /**
+ * Drain all the entries from a bftw_queue.
+ */
+static void bftw_drain_queue(struct bftw_state *state, struct bftw_queue *queue) {
+	while (queue->head) {
+		struct bftw_dir *dir = bftw_queue_pop(queue);
+		bftw_release_dir(state, dir, false);
+	}
+}
+
+/**
  * Dispose of the bftw() state.
  *
  * @return
@@ -1169,11 +1212,8 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	bftw_release_reader(state, false);
 	dstrfree(state->path);
 
-	struct bftw_queue *queue = &state->queue;
-	while (queue->head) {
-		struct bftw_dir *dir = bftw_queue_pop(queue);
-		bftw_release_dir(state, dir, false);
-	}
+	bftw_drain_queue(state, &state->prequeue);
+	bftw_drain_queue(state, &state->queue);
 
 	bftw_cache_destroy(&state->cache);
 
@@ -1181,7 +1221,10 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	return state->error ? -1 : 0;
 }
 
-int bftw(const struct bftw_args *args) {
+/**
+ * bftw() implementation for breadth- and depth-first search.
+ */
+static int bftw_impl(const struct bftw_args *args) {
 	struct bftw_state state;
 	if (bftw_state_init(&state, args) != 0) {
 		return -1;
@@ -1207,7 +1250,7 @@ int bftw(const struct bftw_args *args) {
 	}
 
 start:
-	while (state.queue.head) {
+	while (true) {
 		struct bftw_reader *reader = bftw_pop(&state);
 		if (!reader) {
 			goto done;
@@ -1243,4 +1286,64 @@ start:
 
 done:
 	return bftw_state_destroy(&state);
+}
+
+/**
+ * Depth-first search state.
+ */
+struct bftw_dfs_state {
+	/** The wrapped callback. */
+	bftw_callback *delegate;
+	/** The wrapped callback arguments. */
+	void *ptr;
+	/** Whether to quit the search. */
+	bool quit;
+};
+
+/** Depth-first callback function. */
+static enum bftw_action bftw_dfs_callback(const struct BFTW *ftwbuf, void *ptr) {
+	struct bftw_dfs_state *state = ptr;
+	enum bftw_action ret = state->delegate(ftwbuf, state->ptr);
+	if (ret == BFTW_STOP || (ret == BFTW_SKIP_SIBLINGS && ftwbuf->depth == 0)) {
+		state->quit = true;
+	}
+	return ret;
+}
+
+/**
+ * Depth-first bftw() wrapper.
+ */
+static int bftw_dfs(const struct bftw_args *args) {
+	// bftw_impl() will process all the roots first, but we don't want that
+	// for depth-first searches
+
+	struct bftw_dfs_state state = {
+		.delegate = args->callback,
+		.ptr = args->ptr,
+		.quit = false,
+	};
+
+	struct bftw_args dfs_args = *args;
+	dfs_args.npaths = 1;
+	dfs_args.callback = bftw_dfs_callback;
+	dfs_args.ptr = &state;
+
+	int ret = 0;
+	for (size_t i = 0; i < args->npaths && ret == 0 && !state.quit; ++i) {
+		ret = bftw_impl(&dfs_args);
+		++dfs_args.paths;
+	}
+	return ret;
+}
+
+int bftw(const struct bftw_args *args) {
+	switch (args->strategy) {
+	case BFTW_BFS:
+		return bftw_impl(args);
+	case BFTW_DFS:
+		return bftw_dfs(args);
+	}
+
+	errno = EINVAL;
+	return -1;
 }

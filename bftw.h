@@ -190,6 +190,16 @@ enum bftw_flags {
 };
 
 /**
+ * Tree search strategies for bftw().
+ */
+enum bftw_strategy {
+	/** Breadth-first search. */
+	BFTW_BFS,
+	/** Depth-first search. */
+	BFTW_DFS,
+};
+
+/**
  * Structure for holding the arguments passed to bftw().
  */
 struct bftw_args {
@@ -205,6 +215,8 @@ struct bftw_args {
 	int nopenfd;
 	/** Flags that control bftw() behaviour. */
 	enum bftw_flags flags;
+	/** The search strategy to use. */
+	enum bftw_strategy strategy;
 	/** The parsed mount table, if available. */
 	const struct bfs_mtab *mtab;
 };
@@ -213,8 +225,7 @@ struct bftw_args {
  * Breadth First Tree Walk (or Better File Tree Walk).
  *
  * Like ftw(3) and nftw(3), this function walks a directory tree recursively,
- * and invokes a callback for each path it encounters.  However, bftw() operates
- * breadth-first.
+ * and invokes a callback for each path it encounters.
  *
  * @param args
  *         The arguments that control the walk.

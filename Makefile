@@ -98,7 +98,8 @@ tests/mksock: tests/mksock.o
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 check: all
-	./tests.sh
+	./tests.sh --bfs="$(realpath bfs)"
+	./tests.sh --bfs="$(realpath bfs) -dfs"
 
 distcheck:
 	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -fsanitize=undefined -fsanitize=address"

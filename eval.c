@@ -1326,6 +1326,17 @@ static void dump_bftw_flags(enum bftw_flags flags) {
 }
 
 /**
+ * Dump the bftw_strategy for -D search.
+ */
+static const char *dump_bftw_strategy(enum bftw_strategy strategy) {
+	static const char *strategies[] = {
+		DUMP_BFTW_MAP(BFTW_BFS),
+		DUMP_BFTW_MAP(BFTW_DFS),
+	};
+	return strategies[strategy];
+}
+
+/**
  * Evaluate the command line.
  */
 int eval_cmdline(const struct cmdline *cmdline) {
@@ -1352,6 +1363,7 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		.ptr = &args,
 		.nopenfd = infer_fdlimit(cmdline),
 		.flags = cmdline->flags,
+		.strategy = cmdline->strategy,
 		.mtab = cmdline->mtab,
 	};
 
@@ -1368,7 +1380,8 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		fprintf(stderr, "\t.nopenfd = %d,\n", bftw_args.nopenfd);
 		fprintf(stderr, "\t.flags = ");
 		dump_bftw_flags(bftw_args.flags);
-		fprintf(stderr, ",\n\t.mtab = ");
+		fprintf(stderr, ",\n\t.strategy = %s,\n", dump_bftw_strategy(bftw_args.strategy));
+		fprintf(stderr, "\t.mtab = ");
 		if (bftw_args.mtab) {
 			fprintf(stderr, "cmdline->mtab");
 		} else {

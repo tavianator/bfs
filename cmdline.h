@@ -77,6 +77,8 @@ struct cmdline {
 
 	/** bftw() flags. */
 	enum bftw_flags flags;
+	/** bftw() search strategy. */
+	enum bftw_strategy strategy;
 
 	/** Optimization level. */
 	int optlevel;
