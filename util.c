@@ -32,6 +32,8 @@
 
 #if __GLIBC__ || BFS_HAS_INCLUDE(<sys/sysmacros.h>)
 #	include <sys/sysmacros.h>
+#elif BFS_HAS_INCLUDE(<sys/mkdev.h>)
+#	include <sys/mkdev.h>
 #endif
 
 int xreaddir(DIR *dir, struct dirent **de) {
@@ -446,13 +448,25 @@ int ynprompt() {
 }
 
 dev_t bfs_makedev(int ma, int mi) {
+#ifdef makedev
 	return makedev(ma, mi);
+#else
+	return (ma << 8) | mi;
+#endif
 }
 
 int bfs_major(dev_t dev) {
+#ifdef major
 	return major(dev);
+#else
+	return dev >> 8;
+#endif
 }
 
 int bfs_minor(dev_t dev) {
+#ifdef minor
 	return minor(dev);
+#else
+	return dev & 0xFF;
+#endif
 }
