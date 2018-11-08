@@ -17,10 +17,14 @@
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
 
-#include <sys/param.h>
+#include "util.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+
+#if BFS_HAS_SYS_PARAM
+#	include <sys/param.h>
+#endif
 
 /**
  * bfs_stat field bitmask.

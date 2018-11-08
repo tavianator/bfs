@@ -20,11 +20,14 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if __GLIBC__ || BFS_HAS_INCLUDE(<mntent.h>)
+#if BFS_HAS_SYS_PARAM
+#	include <sys/param.h>
+#endif
+
+#if BFS_HAS_MNTENT
 #	define BFS_MNTENT 1
 #elif BSD
 #	define BFS_MNTINFO 1

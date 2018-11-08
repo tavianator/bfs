@@ -22,17 +22,21 @@
 #include <langinfo.h>
 #include <regex.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#if __GLIBC__ || BFS_HAS_INCLUDE(<sys/sysmacros.h>)
+#if BFS_HAS_SYS_PARAM
+#	include <sys/param.h>
+#endif
+
+#if BFS_HAS_SYS_SYSMACROS
 #	include <sys/sysmacros.h>
-#elif BFS_HAS_INCLUDE(<sys/mkdev.h>)
+#elif BFS_HAS_SYS_MKDEV
 #	include <sys/mkdev.h>
 #endif
 

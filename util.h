@@ -17,7 +17,6 @@
 #ifndef BFS_UTIL_H
 #define BFS_UTIL_H
 
-#include "bftw.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -29,10 +28,15 @@
 // Some portability concerns
 
 #ifdef __has_include
-#	define BFS_HAS_INCLUDE(header) __has_include(header)
+#	define BFS_HAS_INCLUDE(header, fallback) __has_include(header)
 #else
-#	define BFS_HAS_INCLUDE(header) false
+#	define BFS_HAS_INCLUDE(header, fallback) fallback
 #endif
+
+#define BFS_HAS_MNTENT        BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
+#define BFS_HAS_SYS_MKDEV     BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
+#define BFS_HAS_SYS_PARAM     BFS_HAS_INCLUDE(<sys/param.h>, true)
+#define BFS_HAS_SYS_SYSMACROS BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
