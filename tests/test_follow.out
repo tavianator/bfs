@@ -8,5 +8,8 @@ links/skip
 links/symlink
 links/deeply/nested
 links/skip/dir
-links/skip/loop
+links/skip/file
+links/skip/link
 links/deeply/nested/dir
+links/deeply/nested/file
+links/deeply/nested/link

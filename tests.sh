@@ -90,12 +90,25 @@ function make_links() {
     ln "$1/file" "$1/hardlink"
     ln -s nowhere "$1/broken"
     ln -s symlink/file "$1/notdir"
+    mkdir -p "$1/deeply/nested/dir"
+    touchp "$1/deeply/nested/file"
+    ln -s file "$1/deeply/nested/link"
+    ln -s deeply/nested "$1/skip"
+}
+make_links "$TMP/links"
+
+# Creates a file+directory structure with symbolic link loops
+function make_loops() {
+    touchp "$1/file"
+    ln -s file "$1/symlink"
+    ln -s nowhere "$1/broken"
+    ln -s symlink/file "$1/notdir"
     ln -s loop "$1/loop"
     mkdir -p "$1/deeply/nested/dir"
     ln -s ../../deeply "$1/deeply/nested/loop"
     ln -s deeply/nested/loop/nested "$1/skip"
 }
-make_links "$TMP/links"
+make_loops "$TMP/loops"
 
 # Creates a file+directory structure with varying timestamps
 function make_times() {
@@ -185,10 +198,12 @@ posix_tests=(
     test_H_slash
     test_H_broken
     test_H_notdir
+    test_H_loops
 
     test_L
     test_L_broken
     test_L_notdir
+    test_L_loops
 
     test_flag_weird_names
     test_flag_comma
@@ -400,6 +415,8 @@ gnu_tests=(
 
     test_P
     test_P_slash
+
+    test_L_loops_continue
 
     test_double_dash
     test_flag_double_dash
@@ -931,8 +948,12 @@ function test_H_newer() {
     bfs_diff -H times -newer times/l
 }
 
+function test_H_loops() {
+    bfs_diff -H loops/deeply/nested/loop
+}
+
 function test_L() {
-    bfs_diff -L links 2>/dev/null
+    bfs_diff -L links
 }
 
 function test_L_broken() {
@@ -943,16 +964,27 @@ function test_L_notdir() {
     bfs_diff -H links/notdir
 }
 
+function test_L_loops() {
+    # POSIX says it's okay to either stop of keep going on seeing a filesystem
+    # loop, as long as a diagnostic is printed
+    local errors="$(invoke_bfs -L loops 2>&1 >/dev/null)"
+    [ -n "$errors" ]
+}
+
+function test_L_loops_continue() {
+    bfs_diff -L loops 2>/dev/null
+}
+
 function test_X() {
     bfs_diff -X weirdnames 2>/dev/null
 }
 
 function test_follow() {
-    bfs_diff links -follow 2>/dev/null
+    bfs_diff links -follow
 }
 
 function test_L_depth() {
-    bfs_diff -L links -depth 2>/dev/null
+    bfs_diff -L links -depth
 }
 
 function test_samefile() {
@@ -968,7 +1000,7 @@ function test_H_samefile_symlink() {
 }
 
 function test_L_samefile_symlink() {
-    bfs_diff -L links -samefile links/symlink 2>/dev/null
+    bfs_diff -L links -samefile links/symlink
 }
 
 function test_samefile_broken() {
@@ -980,7 +1012,7 @@ function test_H_samefile_broken() {
 }
 
 function test_L_samefile_broken() {
-    bfs_diff -L links -samefile links/broken 2>/dev/null
+    bfs_diff -L links -samefile links/broken
 }
 
 function test_samefile_notdir() {
@@ -992,27 +1024,27 @@ function test_H_samefile_notdir() {
 }
 
 function test_L_samefile_notdir() {
-    bfs_diff -L links -samefile links/notdir 2>/dev/null
+    bfs_diff -L links -samefile links/notdir
 }
 
 function test_xtype_l() {
-    bfs_diff links -xtype l 2>/dev/null
+    bfs_diff links -xtype l
 }
 
 function test_xtype_f() {
-    bfs_diff links -xtype f 2>/dev/null
+    bfs_diff links -xtype f
 }
 
 function test_L_xtype_l() {
-    bfs_diff -L links -xtype l 2>/dev/null
+    bfs_diff -L links -xtype l
 }
 
 function test_L_xtype_f() {
-    bfs_diff -L links -xtype f 2>/dev/null
+    bfs_diff -L links -xtype f
 }
 
 function test_xtype_multi() {
-    bfs_diff links -xtype f,d,c 2>/dev/null
+    bfs_diff links -xtype f,d,c
 }
 
 function test_xtype_reorder() {
@@ -1544,7 +1576,7 @@ function test_printf_flags() {
 }
 
 function test_printf_types() {
-    bfs_diff links -printf '(%p) (%l) %y %Y\n'
+    bfs_diff loops -printf '(%p) (%l) %y %Y\n'
 }
 
 function test_printf_escapes() {

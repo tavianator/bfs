@@ -1,0 +1,11 @@
+loops
+loops/broken
+loops/deeply
+loops/file
+loops/notdir
+loops/skip
+loops/symlink
+loops/deeply/nested
+loops/skip/dir
+loops/skip/loop
+loops/deeply/nested/dir

@@ -6,4 +6,5 @@ links/skip
 links/symlink
 links/deeply/nested
 links/deeply/nested/dir
-links/deeply/nested/loop
+links/deeply/nested/file
+links/deeply/nested/link

@@ -1,3 +1,5 @@
 links/file
 links/hardlink
 links/symlink
+links/deeply/nested/file
+links/deeply/nested/link
