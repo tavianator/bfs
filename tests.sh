@@ -299,7 +299,6 @@ bsd_tests=(
     # Primaries
 
     test_delete
-    test_L_delete
 
     test_depth_maxdepth_1
     test_depth_maxdepth_2
@@ -1387,7 +1386,7 @@ function test_delete() {
     touchp scratch/foo/bar/baz
 
     # Don't try to delete '.'
-    (cd scratch && invoke_bfs -delete)
+    (cd scratch && invoke_bfs . -delete)
 
     bfs_diff scratch
 }
@@ -1408,7 +1407,7 @@ function test_rm() {
     rm -rf scratch/*
     touchp scratch/foo/bar/baz
 
-    (cd scratch && invoke_bfs -rm)
+    (cd scratch && invoke_bfs . -rm)
 
     bfs_diff scratch
 }
