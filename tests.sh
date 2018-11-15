@@ -439,6 +439,8 @@ gnu_tests=(
 
     test_empty
 
+
+    test_exec_nothing
     test_exec_substring
 
     test_execdir
@@ -497,6 +499,8 @@ gnu_tests=(
     test_nogroup
 
     test_nouser
+
+    test_ok_nothing
 
     test_okdir_plus_semicolon
 
@@ -1122,7 +1126,12 @@ function test_size_big() {
 }
 
 function test_exec() {
-    bfs_diff basic -exec echo '{}' ';'
+    bfs_diff basic -exec echo '{}' \;
+}
+
+function test_exec_nothing() {
+    # Regression test: don't segfault on missing command
+    ! invoke_bfs basic -exec \; 2>/dev/null
 }
 
 function test_exec_plus() {
@@ -1360,6 +1369,11 @@ function test_prune_or_print() {
 
 function test_not_prune() {
     bfs_diff basic \! \( -name foo -prune \)
+}
+
+function test_ok_nothing() {
+    # Regression test: don't segfault on missing command
+    ! invoke_bfs basic -ok \; 2>/dev/null
 }
 
 function test_ok_stdin() {

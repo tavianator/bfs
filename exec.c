@@ -160,6 +160,11 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	execbuf->tmpl_argv = argv + 1;
 	execbuf->tmpl_argc = i - 1;
 
+	if (execbuf->tmpl_argc == 0) {
+		cfprintf(cerr, "%{er}error: %s: Missing command.%{rs}\n", argv[0]);
+		goto fail;
+	}
+
 	execbuf->argv_cap = execbuf->tmpl_argc + 1;
 	execbuf->argv = malloc(execbuf->argv_cap*sizeof(*execbuf->argv));
 	if (!execbuf->argv) {
