@@ -94,12 +94,7 @@ to avoid the parentheses being interpreted by the shell.
 \fB! \fIexpression\fR
 The "not" operator: returns the negation of the truth value of the
 .IR expression .
-You may have to write
-.B \\\\!
-.I expression
-to avoid
-.B !
-being interpreted by the shell.
+You may have to write \fB\\! \fIexpression\fR to avoid \fB!\fR being interpreted by the shell.
 .TP
 \fIexpression\fR [\fB\-a\fR] \fIexpression\fR
 Short-circuiting "and" operator: if the left-hand
@@ -223,9 +218,7 @@ Print the path to the found file.
 Operators:
 .TP
 \fB\-not \fIexpression\fR
-Same as
-.B !
-.IR expression .
+Same as \fB! \fIexpression\fR.
 .TP
 \fIexpression \fB\-and \fIexpression\fR
 Same as
