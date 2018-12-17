@@ -919,7 +919,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 
 	const struct bfs_stat *statbuf = eval_xstat(state);
 	if (statbuf) {
-		return mode_to_typeflag(statbuf->mode) & expr->idata;
+		return bftw_mode_typeflag(statbuf->mode) & expr->idata;
 	} else if (!follow && is_nonexistence_error(errno)) {
 		// Broken symlink
 		return eval_type(expr, state);

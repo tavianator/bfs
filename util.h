@@ -166,16 +166,6 @@ int xfaccessat(int fd, const char *path, int amode);
 bool is_nonexistence_error(int error);
 
 /**
- * Convert a bfs_stat() mode to a bftw() typeflag.
- */
-enum bftw_typeflag mode_to_typeflag(mode_t mode);
-
-/**
- * Convert a directory entry to a bftw() typeflag.
- */
-enum bftw_typeflag dirent_to_typeflag(const struct dirent *de);
-
-/**
  * Process a yes/no prompt.
  *
  * @return 1 for yes, 0 for no, and -1 for unknown.

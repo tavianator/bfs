@@ -652,12 +652,109 @@ static struct bftw_dir *bftw_queue_pop(struct bftw_queue *queue) {
 	return dir;
 }
 
+enum bftw_typeflag bftw_mode_typeflag(mode_t mode) {
+	switch (mode & S_IFMT) {
+#ifdef S_IFBLK
+	case S_IFBLK:
+		return BFTW_BLK;
+#endif
+#ifdef S_IFCHR
+	case S_IFCHR:
+		return BFTW_CHR;
+#endif
+#ifdef S_IFDIR
+	case S_IFDIR:
+		return BFTW_DIR;
+#endif
+#ifdef S_IFDOOR
+	case S_IFDOOR:
+		return BFTW_DOOR;
+#endif
+#ifdef S_IFIFO
+	case S_IFIFO:
+		return BFTW_FIFO;
+#endif
+#ifdef S_IFLNK
+	case S_IFLNK:
+		return BFTW_LNK;
+#endif
+#ifdef S_IFPORT
+	case S_IFPORT:
+		return BFTW_PORT;
+#endif
+#ifdef S_IFREG
+	case S_IFREG:
+		return BFTW_REG;
+#endif
+#ifdef S_IFSOCK
+	case S_IFSOCK:
+		return BFTW_SOCK;
+#endif
+#ifdef S_IFWHT
+	case S_IFWHT:
+		return BFTW_WHT;
+#endif
+
+	default:
+		return BFTW_UNKNOWN;
+	}
+}
+
+static enum bftw_typeflag bftw_dirent_typeflag(const struct dirent *de) {
+#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
+	switch (de->d_type) {
+#ifdef DT_BLK
+	case DT_BLK:
+		return BFTW_BLK;
+#endif
+#ifdef DT_CHR
+	case DT_CHR:
+		return BFTW_CHR;
+#endif
+#ifdef DT_DIR
+	case DT_DIR:
+		return BFTW_DIR;
+#endif
+#ifdef DT_DOOR
+	case DT_DOOR:
+		return BFTW_DOOR;
+#endif
+#ifdef DT_FIFO
+	case DT_FIFO:
+		return BFTW_FIFO;
+#endif
+#ifdef DT_LNK
+	case DT_LNK:
+		return BFTW_LNK;
+#endif
+#ifdef DT_PORT
+	case DT_PORT:
+		return BFTW_PORT;
+#endif
+#ifdef DT_REG
+	case DT_REG:
+		return BFTW_REG;
+#endif
+#ifdef DT_SOCK
+	case DT_SOCK:
+		return BFTW_SOCK;
+#endif
+#ifdef DT_WHT
+	case DT_WHT:
+		return BFTW_WHT;
+#endif
+	}
+#endif
+
+	return BFTW_UNKNOWN;
+}
+
 /** Call stat() and use the results. */
 static int bftw_stat(struct BFTW *ftwbuf, struct bfs_stat *sb) {
 	int ret = bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, sb);
 	if (ret == 0) {
 		ftwbuf->statbuf = sb;
-		ftwbuf->typeflag = mode_to_typeflag(sb->mode);
+		ftwbuf->typeflag = bftw_mode_typeflag(sb->mode);
 	}
 	return ret;
 }
@@ -809,7 +906,7 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 		ftwbuf->typeflag = BFTW_ERROR;
 		return;
 	} else if (de) {
-		ftwbuf->typeflag = dirent_to_typeflag(de);
+		ftwbuf->typeflag = bftw_dirent_typeflag(de);
 	} else if (ftwbuf->depth > 0) {
 		ftwbuf->typeflag = BFTW_DIR;
 	} else {
