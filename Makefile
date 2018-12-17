@@ -20,6 +20,10 @@ else
 VERSION := $(shell git describe --always)
 endif
 
+ifndef OS
+OS := $(shell uname)
+endif
+
 CC ?= gcc
 INSTALL ?= install
 MKDIR ?= mkdir -p
@@ -44,15 +48,23 @@ LOCAL_CPPFLAGS := \
     -DBFS_VERSION=\"$(VERSION)\"
 
 LOCAL_CFLAGS := -std=c99
+LOCAL_LDFLAGS :=
+LOCAL_LDLIBS :=
+
+ifeq ($(OS),Linux)
+LOCAL_LDFLAGS += -Wl,--as-needed
+LOCAL_LDLIBS += -lrt
+endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
-ALL_LDFLAGS = $(ALL_CFLAGS) $(LDFLAGS)
+ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS)
+ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 
 all: bfs
 
 bfs: bftw.o color.o dstring.o eval.o exec.o main.o mtab.o opt.o parse.o printf.o spawn.o stat.o typo.o util.o
-	$(CC) $(ALL_LDFLAGS) $^ -o $@
+	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
 sanitized: CFLAGS := -g $(WFLAGS) -fsanitize=address -fsanitize=undefined
 sanitized: bfs
