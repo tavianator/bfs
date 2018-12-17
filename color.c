@@ -296,6 +296,23 @@ int cfclose(CFILE *cfile) {
 	return ret;
 }
 
+static const char *ext_color(const struct colors *colors, const char *filename) {
+	size_t namelen = strlen(filename);
+
+	for (const struct ext_color *ext = colors->ext_list; ext; ext = ext->next) {
+		if (namelen < ext->len) {
+			continue;
+		}
+
+		const char *suffix = filename + namelen - ext->len;
+		if (strcasecmp(suffix, ext->ext) == 0) {
+			return ext->color;
+		}
+	}
+
+	return NULL;
+}
+
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
 	const struct bfs_stat *sb = ftwbuf->statbuf;
 	if (!sb) {
@@ -319,14 +336,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		}
 
 		if (!color) {
-			size_t namelen = strlen(filename);
-
-			for (struct ext_color *ext = colors->ext_list; ext; ext = ext->next) {
-				if (namelen >= ext->len && memcmp(filename + namelen - ext->len, ext->ext, ext->len) == 0) {
-					color = ext->color;
-					break;
-				}
-			}
+			color = ext_color(colors, filename);
 		}
 
 		if (!color) {
