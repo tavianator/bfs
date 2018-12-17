@@ -401,6 +401,24 @@ static int print_esc(const char *esc, FILE *file) {
 	return 0;
 }
 
+static int print_colored(const struct colors *colors, const char *esc, const char *str, size_t len, FILE *file) {
+	if (esc) {
+		if (print_esc(esc, file) != 0) {
+			return -1;
+		}
+	}
+	if (fwrite(str, 1, len, file) != len) {
+		return -1;
+	}
+	if (esc) {
+		if (print_esc(colors->reset, file) != 0) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
@@ -410,35 +428,16 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 		return fputs(path, file) == EOF ? -1 : 0;
 	}
 
+	if (ftwbuf->nameoff > 0) {
+		if (print_colored(colors, colors->dir, path, ftwbuf->nameoff, file) != 0) {
+			return -1;
+		}
+	}
+
 	const char *filename = path + ftwbuf->nameoff;
-
-	if (colors->dir) {
-		if (print_esc(colors->dir, file) != 0) {
-			return -1;
-		}
-	}
-	if (fwrite(path, 1, ftwbuf->nameoff, file) != ftwbuf->nameoff) {
-		return -1;
-	}
-	if (colors->dir) {
-		if (print_esc(colors->reset, file) != 0) {
-			return -1;
-		}
-	}
-
 	const char *color = file_color(colors, filename, ftwbuf);
-	if (color) {
-		if (print_esc(color, file) != 0) {
-			return -1;
-		}
-	}
-	if (fputs(filename, file) == EOF) {
+	if (print_colored(colors, color, filename, strlen(filename), file) != 0) {
 		return -1;
-	}
-	if (color) {
-		if (print_esc(colors->reset, file) != 0) {
-			return -1;
-		}
 	}
 
 	return 0;
