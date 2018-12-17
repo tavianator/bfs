@@ -606,6 +606,36 @@ bfs_tests=(
     test_deep_strict
 )
 
+function usage() {
+    local pad=$(printf "%*s" ${#0} "")
+    cat <<EOF
+Usage: $0 [--bfs=path/to/bfs] [--posix|--bsd|--gnu|--all]
+       $pad [--noclean] [--update] [--verbose] [--help]
+       $pad [test_* [test_* ...]]
+
+  --bfs=path/to/bfs
+      Set the path to the bfs executable to test (default: ./bfs)
+
+  --posix|--bsd|--gnu|--all
+      Restrict the set of test cases to run
+
+  --noclean
+      Keep the test directories around after the run
+
+  --update
+      Update the expected outputs for the test cases
+
+  --verbose
+      Log the commands that get executed
+
+  --help
+      This message
+
+  test_*
+      Select individual test cases to run
+EOF
+}
+
 BSD=yes
 GNU=yes
 ALL=yes
@@ -650,12 +680,17 @@ for arg; do
         --verbose)
             VERBOSE=yes
             ;;
+        --help)
+            usage
+            exit 0
+            ;;
         test_*)
             EXPLICIT=yes
             enable_tests "$arg"
             ;;
         *)
-            echo "Unrecognized option '$arg'." >&2
+            printf "Unrecognized option '%s'.\n\n" "$arg" >&2
+            usage >&2
             exit 1
             ;;
     esac
