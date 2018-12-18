@@ -34,6 +34,7 @@
 #endif
 
 #define BFS_HAS_MNTENT         BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
+#define BFS_HAS_SYS_ACL        BFS_HAS_INCLUDE(<sys/acl.h>, true)
 #define BFS_HAS_SYS_CAPABILITY BFS_HAS_INCLUDE(<sys/capability.h>, __linux__)
 #define BFS_HAS_SYS_MKDEV      BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
 #define BFS_HAS_SYS_PARAM      BFS_HAS_INCLUDE(<sys/param.h>, true)
@@ -196,6 +197,11 @@ int bfs_major(dev_t dev);
 int bfs_minor(dev_t dev);
 
 struct BFTW;
+
+/**
+ * Check if a file has a non-trvial Access Control List.
+ */
+bool bfs_check_acl(const struct BFTW *ftwbuf);
 
 /**
  * Check if a file has a non-trvial capability set.

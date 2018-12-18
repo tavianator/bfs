@@ -923,6 +923,22 @@ static struct expr *parse_access(struct parser_state *state, int flag, int arg2)
 }
 
 /**
+ * Parse -acl.
+ */
+static struct expr *parse_acl(struct parser_state *state, int flag, int arg2) {
+#if BFS_HAS_SYS_ACL
+	struct expr *expr = parse_nullary_test(state, eval_acl);
+	if (expr) {
+		expr->cost = 2*STAT_COST;
+	}
+	return expr;
+#else
+	cfprintf(state->cmdline->cerr, "%{er}error: %s is missing platform support.%{rs}\n", state->argv[0]);
+	return NULL;
+#endif
+}
+
+/**
  * Parse -[aBcm]?newer.
  */
 static struct expr *parse_newer(struct parser_state *state, int field, int arg2) {
@@ -2438,6 +2454,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{cyn}-f%{rs} %{mag}PATH%{rs}\n");
 	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if begins with a dash)\n\n");
 
+	cfprintf(cout, "  %{blu}-acl%{rs}\n");
+	cfprintf(cout, "      Find files with non-trivial Access Control Lists\n");
 	cfprintf(cout, "  %{blu}-Bmin%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "  %{blu}-Btime%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files Birthed %{bld}N%{rs} minutes/days ago\n");
@@ -2538,6 +2556,7 @@ static const struct table_entry parse_table[] = {
 	{"-L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
 	{"-X", false, parse_xargs_safe},
 	{"-a"},
+	{"-acl", false, parse_acl},
 	{"-amin", false, parse_time, BFS_STAT_ATIME, MINUTES},
 	{"-and"},
 	{"-anewer", false, parse_newer, BFS_STAT_ATIME},

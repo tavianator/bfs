@@ -197,6 +197,13 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -acl test.
+ */
+bool eval_acl(const struct expr *expr, struct eval_state *state) {
+	return bfs_check_acl(state->ftwbuf);
+}
+
+/**
  * -capable test.
  */
 bool eval_capable(const struct expr *expr, struct eval_state *state) {
