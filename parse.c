@@ -963,6 +963,22 @@ static struct expr *parse_time(struct parser_state *state, int field, int unit) 
 }
 
 /**
+ * Parse -capable.
+ */
+static struct expr *parse_capable(struct parser_state *state, int flag, int arg2) {
+#if BFS_HAS_POSIX1E_CAPABILITIES
+	struct expr *expr = parse_nullary_test(state, eval_capable);
+	if (expr) {
+		expr->cost = 2*STAT_COST;
+	}
+	return expr;
+#else
+	cfprintf(state->cmdline->cerr, "%{er}error: %s is missing platform support.%{rs}\n", state->argv[0]);
+	return NULL;
+#endif
+}
+
+/**
  * Parse -(no)?color.
  */
 static struct expr *parse_color(struct parser_state *state, int color, int arg2) {
@@ -2464,6 +2480,9 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Turn colors on or off (default: %{blu}-color%{rs} if outputting to a terminal,\n");
 	cfprintf(cout, "      %{blu}-nocolor%{rs} otherwise)\n\n");
 
+	cfprintf(cout, "  %{blu}-capable%{rs}\n");
+	cfprintf(cout, "      Match files with POSIX.1e capabilities set\n\n");
+
 	cfprintf(cout, "  %{blu}-hidden%{rs}\n");
 	cfprintf(cout, "  %{blu}-nohidden%{rs}\n");
 	cfprintf(cout, "      Match hidden files, or filter them out\n\n");
@@ -2523,6 +2542,7 @@ static const struct table_entry parse_table[] = {
 	{"-and"},
 	{"-anewer", false, parse_newer, BFS_STAT_ATIME},
 	{"-atime", false, parse_time, BFS_STAT_ATIME, DAYS},
+	{"-capable", false, parse_capable},
 	{"-cmin", false, parse_time, BFS_STAT_CTIME, MINUTES},
 	{"-cnewer", false, parse_newer, BFS_STAT_CTIME},
 	{"-ctime", false, parse_time, BFS_STAT_CTIME, DAYS},

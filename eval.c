@@ -197,6 +197,13 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -capable test.
+ */
+bool eval_capable(const struct expr *expr, struct eval_state *state) {
+	return bfs_check_capabilities(state->ftwbuf);
+}
+
+/**
  * Get the given timespec field out of a stat buffer.
  */
 static const struct timespec *eval_stat_time(const struct expr *expr, struct eval_state *state) {

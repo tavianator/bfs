@@ -24,6 +24,7 @@ bool eval_true(const struct expr *expr, struct eval_state *state);
 bool eval_false(const struct expr *expr, struct eval_state *state);
 
 bool eval_access(const struct expr *expr, struct eval_state *state);
+bool eval_capable(const struct expr *expr, struct eval_state *state);
 bool eval_perm(const struct expr *expr, struct eval_state *state);
 
 bool eval_newer(const struct expr *expr, struct eval_state *state);
