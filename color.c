@@ -327,6 +327,8 @@ static const char *file_color(const struct colors *colors, const char *filename,
 			color = colors->setuid;
 		} else if (sb->mode & S_ISGID) {
 			color = colors->setgid;
+		} else if (bfs_check_capabilities(ftwbuf)) {
+			color = colors->capable;
 		} else if (sb->mode & 0111) {
 			color = colors->exec;
 		}

@@ -53,7 +53,7 @@ LOCAL_LDLIBS :=
 
 ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
-LOCAL_LDLIBS += -lrt
+LOCAL_LDLIBS += -lcap -lrt
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)

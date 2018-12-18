@@ -33,10 +33,18 @@
 #	define BFS_HAS_INCLUDE(header, fallback) fallback
 #endif
 
-#define BFS_HAS_MNTENT        BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
-#define BFS_HAS_SYS_MKDEV     BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
-#define BFS_HAS_SYS_PARAM     BFS_HAS_INCLUDE(<sys/param.h>, true)
-#define BFS_HAS_SYS_SYSMACROS BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
+#define BFS_HAS_MNTENT         BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
+#define BFS_HAS_SYS_CAPABILITY BFS_HAS_INCLUDE(<sys/capability.h>, __linux__)
+#define BFS_HAS_SYS_MKDEV      BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
+#define BFS_HAS_SYS_PARAM      BFS_HAS_INCLUDE(<sys/param.h>, true)
+#define BFS_HAS_SYS_SYSMACROS  BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
+
+#if BFS_HAS_SYS_CAPABILITY
+#	include <sys/capability.h>
+#	ifdef CAP_CHOWN
+#		define BFS_HAS_POSIX1E_CAPABILITIES true
+#	endif
+#endif
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
@@ -186,5 +194,12 @@ int bfs_major(dev_t dev);
  * Portable version of minor().
  */
 int bfs_minor(dev_t dev);
+
+struct BFTW;
+
+/**
+ * Check if a file has a non-trvial capability set.
+ */
+bool bfs_check_capabilities(const struct BFTW *ftwbuf);
 
 #endif // BFS_UTIL_H
