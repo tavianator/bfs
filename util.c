@@ -459,7 +459,8 @@ static bool bfs_check_acl_type(const char *path, acl_type_t type) {
 			break;
 		}
 #else
-		return true;
+		ret = true;
+		break;
 #endif
 	}
 
