@@ -449,6 +449,7 @@ static bool bfs_check_acl_type(const char *path, acl_type_t type) {
 	for (int status = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
 	     status > 0;
 	     status = acl_get_entry(acl, ACL_NEXT_ENTRY, &entry)) {
+#if defined(ACL_USER_OBJ) && defined(ACL_GROUP_OBJ) && defined(ACL_OTHER)
 		acl_tag_t tag;
 		if (acl_get_tag_type(entry, &tag) != 0) {
 			continue;
@@ -457,6 +458,9 @@ static bool bfs_check_acl_type(const char *path, acl_type_t type) {
 			ret = true;
 			break;
 		}
+#else
+		return true;
+#endif
 	}
 
 	acl_free(acl);
