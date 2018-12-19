@@ -2,6 +2,12 @@ language: c
 
 script: make check
 
+addons:
+  apt:
+    packages:
+      - acl-dev
+      - libcap-dev
+
 matrix:
   include:
     - os: linux
@@ -19,6 +25,8 @@ matrix:
         apt:
           packages:
             - gcc-multilib
+            - acl-dev:i386
+            - libcap-dev:i386
 
     - os: linux
       dist: trusty
