@@ -2174,38 +2174,41 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 
 	const char *c = expr->sdata;
 	while (true) {
+		enum bftw_typeflag type;
+		double type_prob;
+
 		switch (*c) {
 		case 'b':
-			types |= BFTW_BLK;
-			probability += 0.00000721183;
+			type = BFTW_BLK;
+			type_prob = 0.00000721183;
 			break;
 		case 'c':
-			types |= BFTW_CHR;
-			probability += 0.0000499855;
+			type = BFTW_CHR;
+			type_prob = 0.0000499855;
 			break;
 		case 'd':
-			types |= BFTW_DIR;
-			probability += 0.114475;
+			type = BFTW_DIR;
+			type_prob = 0.114475;
 			break;
 		case 'D':
-			types |= BFTW_DOOR;
-			probability += 0.000001;
+			type = BFTW_DOOR;
+			type_prob = 0.000001;
 			break;
 		case 'p':
-			types |= BFTW_FIFO;
-			probability += 0.00000248684;
+			type = BFTW_FIFO;
+			type_prob = 0.00000248684;
 			break;
 		case 'f':
-			types |= BFTW_REG;
-			probability += 0.859772;
+			type = BFTW_REG;
+			type_prob = 0.859772;
 			break;
 		case 'l':
-			types |= BFTW_LNK;
-			probability += 0.0256816;
+			type = BFTW_LNK;
+			type_prob = 0.0256816;
 			break;
 		case 's':
-			types |= BFTW_SOCK;
-			probability += 0.0000116881;
+			type = BFTW_SOCK;
+			type_prob = 0.0000116881;
 			break;
 
 		case '\0':
@@ -2219,6 +2222,11 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			         "%{er}error: %s %s: Unknown type flag '%c' (expected one of [bcdpflsD]).%{rs}\n",
 			         expr->argv[0], expr->argv[1], *c);
 			goto fail;
+		}
+
+		if (!(types & type)) {
+			types |= type;
+			probability += type_prob;
 		}
 
 		++c;
