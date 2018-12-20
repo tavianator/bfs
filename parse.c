@@ -929,7 +929,9 @@ static struct expr *parse_acl(struct parser_state *state, int flag, int arg2) {
 #if BFS_HAS_SYS_ACL
 	struct expr *expr = parse_nullary_test(state, eval_acl);
 	if (expr) {
-		expr->cost = 2*STAT_COST;
+		expr->cost = STAT_COST;
+		expr->probability = 0.00002;
+		expr->ephemeral_fds = 1;
 	}
 	return expr;
 #else
@@ -985,7 +987,9 @@ static struct expr *parse_capable(struct parser_state *state, int flag, int arg2
 #if BFS_HAS_POSIX1E_CAPABILITIES
 	struct expr *expr = parse_nullary_test(state, eval_capable);
 	if (expr) {
-		expr->cost = 2*STAT_COST;
+		expr->cost = STAT_COST;
+		expr->probability = 0.000002;
+		expr->ephemeral_fds = 1;
 	}
 	return expr;
 #else
