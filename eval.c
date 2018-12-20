@@ -213,20 +213,33 @@ bool eval_capable(const struct expr *expr, struct eval_state *state) {
 /**
  * Get the given timespec field out of a stat buffer.
  */
-static const struct timespec *eval_stat_time(const struct expr *expr, struct eval_state *state) {
-	const struct bfs_stat *statbuf = eval_stat(state);
-	if (!statbuf) {
-		return NULL;
-	}
+static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, const struct eval_state *state) {
+	if (!(statbuf->mask & field)) {
+		const char *kind = "";
+		switch (field) {
+		case BFS_STAT_ATIME:
+			kind = "access";
+			break;
+		case BFS_STAT_BTIME:
+			kind = "birth";
+			break;
+		case BFS_STAT_CTIME:
+			kind = "change";
+			break;
+		case BFS_STAT_MTIME:
+			kind = "modification";
+			break;
+		default:
+			assert(false);
+			break;
+		}
 
-	if (!(statbuf->mask & expr->stat_field)) {
-		assert(expr->stat_field == BFS_STAT_BTIME);
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file birth time.%{rs}\n", state->ftwbuf->path);
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file %s time.%{rs}\n", state->ftwbuf->path, kind);
 		*state->ret = EXIT_FAILURE;
 		return NULL;
 	}
 
-	switch (expr->stat_field) {
+	switch (field) {
 	case BFS_STAT_ATIME:
 		return &statbuf->atime;
 	case BFS_STAT_BTIME:
@@ -245,7 +258,12 @@ static const struct timespec *eval_stat_time(const struct expr *expr, struct eva
  * -[aBcm]?newer tests.
  */
 bool eval_newer(const struct expr *expr, struct eval_state *state) {
-	const struct timespec *time = eval_stat_time(expr, state);
+	const struct bfs_stat *statbuf = eval_stat(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	const struct timespec *time = eval_stat_time(statbuf, expr->stat_field, state);
 	if (!time) {
 		return false;
 	}
@@ -258,7 +276,12 @@ bool eval_newer(const struct expr *expr, struct eval_state *state) {
  * -[aBcm]{min,time} tests.
  */
 bool eval_time(const struct expr *expr, struct eval_state *state) {
-	const struct timespec *time = eval_stat_time(expr, state);
+	const struct bfs_stat *statbuf = eval_stat(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	const struct timespec *time = eval_stat_time(statbuf, expr->stat_field, state);
 	if (!time) {
 		return false;
 	}
@@ -285,7 +308,13 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	time_t diff = timespec_diff(&statbuf->atime, &statbuf->ctime);
+	const struct timespec *atime = eval_stat_time(statbuf, BFS_STAT_ATIME, state);
+	const struct timespec *ctime = eval_stat_time(statbuf, BFS_STAT_CTIME, state);
+	if (!atime || !ctime) {
+		return false;
+	}
+
+	time_t diff = timespec_diff(atime, ctime);
 	diff /= 60*60*24;
 	return expr_cmp(expr, diff);
 }

@@ -148,8 +148,9 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 		return ret;
 	}
 
-	if ((xbuf.stx_mask & STATX_BASIC_STATS) != STATX_BASIC_STATS) {
-		// Callers shouldn't have to check anything except BFS_STAT_BTIME
+	// Callers shouldn't have to check anything except the times
+	const int guaranteed = STATX_BASIC_STATS ^ (STATX_ATIME | STATX_CTIME | STATX_MTIME);
+	if ((xbuf.stx_mask & guaranteed) != guaranteed) {
 		errno = EINVAL;
 		return -1;
 	}
