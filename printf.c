@@ -76,37 +76,13 @@ static int bfs_printf_flush(FILE *file, const struct bfs_printf_directive *direc
 	assert(ret >= 0 && ret < sizeof(buf));				\
 	(void)ret
 
-/**
- * Get a particular time field from a struct bfs_stat.
- */
-static const struct timespec *get_time_field(const struct bfs_stat *statbuf, enum bfs_stat_field stat_field) {
-	if (!(statbuf->mask & stat_field)) {
-		errno = ENOTSUP;
-		return NULL;
-	}
-
-	switch (stat_field) {
-	case BFS_STAT_ATIME:
-		return &statbuf->atime;
-	case BFS_STAT_BTIME:
-		return &statbuf->btime;
-	case BFS_STAT_CTIME:
-		return &statbuf->ctime;
-	case BFS_STAT_MTIME:
-		return &statbuf->mtime;
-	default:
-		assert(false);
-		return NULL;
-	}
-}
-
 /** %a, %c, %t: ctime() */
 static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
 	// Not using ctime() itself because GNU find adds nanoseconds
 	static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 	static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->stat_field);
+	const struct timespec *ts = bfs_stat_time(ftwbuf->statbuf, directive->stat_field);
 	if (!ts) {
 		return -1;
 	}
@@ -131,7 +107,7 @@ static int bfs_printf_ctime(FILE *file, const struct bfs_printf_directive *direc
 
 /** %A, %B/%W, %C, %T: strftime() */
 static int bfs_printf_strftime(FILE *file, const struct bfs_printf_directive *directive, const struct BFTW *ftwbuf) {
-	const struct timespec *ts = get_time_field(ftwbuf->statbuf, directive->stat_field);
+	const struct timespec *ts = bfs_stat_time(ftwbuf->statbuf, directive->stat_field);
 	if (!ts) {
 		return -1;
 	}

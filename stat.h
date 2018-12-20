@@ -108,4 +108,9 @@ int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag fl
  */
 int bfs_fstat(int fd, struct bfs_stat *buf);
 
+/**
+ * Get a particular time field from a bfs_stat() buffer.
+ */
+const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_field field);
+
 #endif // BFS_STAT_H

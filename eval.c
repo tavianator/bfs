@@ -214,8 +214,10 @@ bool eval_capable(const struct expr *expr, struct eval_state *state) {
  * Get the given timespec field out of a stat buffer.
  */
 static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, const struct eval_state *state) {
-	if (!(statbuf->mask & field)) {
-		const char *kind = "";
+	const struct timespec *ret = bfs_stat_time(statbuf, field);
+
+	if (!ret) {
+		const char *kind;
 		switch (field) {
 		case BFS_STAT_ATIME:
 			kind = "access";
@@ -231,27 +233,15 @@ static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enu
 			break;
 		default:
 			assert(false);
+			kind = "???";
 			break;
 		}
 
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file %s time.%{rs}\n", state->ftwbuf->path, kind);
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file %s time: %s%{rs}\n", state->ftwbuf->path, kind, strerror(errno));
 		*state->ret = EXIT_FAILURE;
-		return NULL;
 	}
 
-	switch (field) {
-	case BFS_STAT_ATIME:
-		return &statbuf->atime;
-	case BFS_STAT_BTIME:
-		return &statbuf->btime;
-	case BFS_STAT_CTIME:
-		return &statbuf->ctime;
-	case BFS_STAT_MTIME:
-		return &statbuf->mtime;
-	default:
-		assert(false);
-		return NULL;
-	}
+	return ret;
 }
 
 /**

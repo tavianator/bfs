@@ -16,6 +16,7 @@
 
 #include "stat.h"
 #include "util.h"
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -151,7 +152,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 	// Callers shouldn't have to check anything except the times
 	const int guaranteed = STATX_BASIC_STATS ^ (STATX_ATIME | STATX_CTIME | STATX_MTIME);
 	if ((xbuf.stx_mask & guaranteed) != guaranteed) {
-		errno = EINVAL;
+		errno = ENODATA;
 		return -1;
 	}
 
@@ -267,4 +268,26 @@ int bfs_fstat(int fd, struct bfs_stat *buf) {
 		bfs_stat_convert(&statbuf, buf);
 	}
 	return ret;
+}
+
+const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_field field) {
+	if (!(buf->mask & field)) {
+		errno = ENODATA;
+		return NULL;
+	}
+
+	switch (field) {
+	case BFS_STAT_ATIME:
+		return &buf->atime;
+	case BFS_STAT_BTIME:
+		return &buf->btime;
+	case BFS_STAT_CTIME:
+		return &buf->ctime;
+	case BFS_STAT_MTIME:
+		return &buf->mtime;
+	default:
+		assert(false);
+		errno = EINVAL;
+		return NULL;
+	}
 }
