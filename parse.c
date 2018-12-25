@@ -3108,6 +3108,12 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->open_files = NULL;
 	cmdline->nopen_files = 0;
 
+	static char* default_argv[] = {"bfs", NULL};
+	if (argc < 1) {
+		argc = 1;
+		argv = default_argv;
+	}
+
 	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));
 	if (!cmdline->argv) {
 		perror("malloc()");
