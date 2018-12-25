@@ -117,7 +117,7 @@ static const struct color_name color_names[] = {
 	{0},
 };
 
-static const char **look_up_color(const struct colors *colors, const char *name) {
+static const char **get_color(const struct colors *colors, const char *name) {
 	for (const struct color_name *entry = color_names; entry->name; ++entry) {
 		if (strcmp(name, entry->name) == 0) {
 			return (const char **)((char *)colors + entry->offset);
@@ -127,17 +127,8 @@ static const char **look_up_color(const struct colors *colors, const char *name)
 	return NULL;
 }
 
-static const char *get_color(const struct colors *colors, const char *name) {
-	const char **color = look_up_color(colors, name);
-	if (color) {
-		return *color;
-	} else {
-		return NULL;
-	}
-}
-
 static void set_color(struct colors *colors, const char *name, const char *value) {
-	const char **color = look_up_color(colors, name);
+	const char **color = get_color(colors, name);
 	if (color) {
 		*color = value;
 	}
@@ -581,12 +572,14 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 			memcpy(name, i, len);
 			name[len] = '\0';
 
-			const char *esc = get_color(colors, name);
+			const char **esc = get_color(colors, name);
 			if (!esc) {
 				goto invalid;
 			}
-			if (print_esc(esc, file) != 0) {
-				goto done;
+			if (*esc) {
+				if (print_esc(*esc, file) != 0) {
+					goto done;
+				}
 			}
 
 			i = end;
