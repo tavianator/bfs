@@ -18,6 +18,7 @@
 #define BFS_COLOR_H
 
 #include "bftw.h"
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -107,5 +108,10 @@ int cfclose(CFILE *cfile);
  * @return 0 on success, -1 on failure.
  */
 int cfprintf(CFILE *cfile, const char *format, ...);
+
+/**
+ * cfprintf() variant that takes a va_list.
+ */
+int cvfprintf(CFILE *cfile, const char *format, va_list args);
 
 #endif // BFS_COLOR_H

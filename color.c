@@ -473,58 +473,61 @@ done:
 }
 
 int cfprintf(CFILE *cfile, const char *format, ...) {
-	const struct colors *colors = cfile->colors;
-	FILE *file = cfile->file;
-
-	int ret = -1;
-	int error = errno;
-
 	va_list args;
 	va_start(args, format);
+	int ret = cvfprintf(cfile, format, args);
+	va_end(args);
+	return ret;
+}
+
+int cvfprintf(CFILE *cfile, const char *format, va_list args) {
+	const struct colors *colors = cfile->colors;
+	FILE *file = cfile->file;
+	int error = errno;
 
 	for (const char *i = format; *i; ++i) {
 		const char *percent = strchr(i, '%');
 		if (!percent) {
 			if (fputs(i, file) == EOF) {
-				goto done;
+				return -1;
 			}
 			break;
 		}
 
 		size_t len = percent - i;
 		if (fwrite(i, 1, len, file) != len) {
-			goto done;
+			return -1;
 		}
 
 		i = percent + 1;
 		switch (*i) {
 		case '%':
 			if (fputc('%', file) == EOF) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 'c':
 			if (fputc(va_arg(args, int), file) == EOF) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 'd':
 			if (fprintf(file, "%d", va_arg(args, int)) < 0) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 'g':
 			if (fprintf(file, "%g", va_arg(args, double)) < 0) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 's':
 			if (fputs(va_arg(args, const char *), file) == EOF) {
-				goto done;
+				return -1;
 			}
 			break;
 
@@ -534,25 +537,25 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 				goto invalid;
 			}
 			if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 'm':
 			if (fputs(strerror(error), file) == EOF) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 'P':
 			if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
-				goto done;
+				return -1;
 			}
 			break;
 
 		case 'L':
 			if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
-				goto done;
+				return -1;
 			}
 			break;
 
@@ -578,7 +581,7 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 			}
 			if (*esc) {
 				if (print_esc(*esc, file) != 0) {
-					goto done;
+					return -1;
 				}
 			}
 
@@ -590,13 +593,9 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 		invalid:
 			assert(false);
 			errno = EINVAL;
-			goto done;
+			return -1;
 		}
 	}
 
-	ret = 0;
-
-done:
-	va_end(args);
-	return ret;
+	return 0;
 }

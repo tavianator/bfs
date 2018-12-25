@@ -18,6 +18,7 @@
 #include "bftw.h"
 #include "cmdline.h"
 #include "color.h"
+#include "diag.h"
 #include "dstring.h"
 #include "exec.h"
 #include "mtab.h"
@@ -31,6 +32,7 @@
 #include <fnmatch.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,6 +60,22 @@ struct eval_state {
 };
 
 /**
+ * Print an error message.
+ */
+static void eval_error(const struct eval_state *state, const char *format, ...) {
+	int error = errno;
+	const struct cmdline *cmdline = state->cmdline;
+
+	bfs_error(cmdline, "%P: ", state->ftwbuf);
+
+	va_list args;
+	va_start(args, format);
+	errno = error;
+	cvfprintf(cmdline->cerr, format, args);
+	va_end(args);
+}
+
+/**
  * Check if an error should be ignored.
  */
 static bool eval_should_ignore(const struct eval_state *state, int error) {
@@ -69,9 +87,9 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
 /**
  * Report an error that occurs during evaluation.
  */
-static void eval_error(struct eval_state *state) {
+static void eval_report_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': %m%{rs}\n", state->ftwbuf->path);
+		eval_error(state, "%m.\n");
 		*state->ret = EXIT_FAILURE;
 	}
 }
@@ -128,7 +146,7 @@ static const struct bfs_stat *eval_stat(struct eval_state *state) {
 		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->statbuf) == 0) {
 			ftwbuf->statbuf = &state->statbuf;
 		} else {
-			eval_error(state);
+			eval_report_error(state);
 		}
 	}
 	return ftwbuf->statbuf;
@@ -216,8 +234,7 @@ bool eval_capable(const struct expr *expr, struct eval_state *state) {
 static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, const struct eval_state *state) {
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
 	if (!ret) {
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file %s time: %m%{rs}\n",
-		         state->ftwbuf->path, bfs_stat_field_name(field));
+		eval_error(state, "Couldn't get file %s: %m.\n", bfs_stat_field_name(field));
 		*state->ret = EXIT_FAILURE;
 	}
 	return ret;
@@ -360,13 +377,13 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 				flag |= AT_REMOVEDIR;
 			}
 		} else {
-			eval_error(state);
+			eval_report_error(state);
 			return false;
 		}
 	}
 
 	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {
-		eval_error(state);
+		eval_report_error(state);
 		return false;
 	}
 
@@ -378,7 +395,7 @@ static int eval_exec_finish(const struct expr *expr, const struct cmdline *cmdli
 	int ret = 0;
 	if (expr->execbuf && bfs_exec_finish(expr->execbuf) != 0) {
 		if (errno != 0) {
-			cfprintf(cmdline->cerr, "%{er}error: %s %s: %m%{rs}\n", expr->argv[0], expr->argv[1]);
+			bfs_error(cmdline, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
 		}
 		ret = -1;
 	}
@@ -397,7 +414,7 @@ static int eval_exec_finish(const struct expr *expr, const struct cmdline *cmdli
 bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	bool ret = bfs_exec(expr->execbuf, state->ftwbuf) == 0;
 	if (errno != 0) {
-		cfprintf(state->cmdline->cerr, "%{er}error: %s %s: %m%{rs}\n", expr->argv[0], expr->argv[1]);
+		eval_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
 		*state->ret = EXIT_FAILURE;
 	}
 	return ret;
@@ -430,13 +447,13 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	if (ftwbuf->typeflag == BFTW_DIR) {
 		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
 		if (dfd < 0) {
-			eval_error(state);
+			eval_report_error(state);
 			goto done;
 		}
 
 		DIR *dir = fdopendir(dfd);
 		if (!dir) {
-			eval_error(state);
+			eval_report_error(state);
 			close(dfd);
 			goto done;
 		}
@@ -446,7 +463,7 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 		while (true) {
 			struct dirent *de;
 			if (xreaddir(dir, &de) != 0) {
-				eval_error(state);
+				eval_report_error(state);
 				goto done_dir;
 			}
 			if (!de) {
@@ -548,7 +565,7 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 
 	name = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->size);
 	if (!name) {
-		eval_error(state);
+		eval_report_error(state);
 		goto done;
 	}
 
@@ -574,7 +591,7 @@ bool eval_name(const struct expr *expr, struct eval_state *state) {
 		if (slash && slash > name) {
 			copy = strndup(name, slash - name);
 			if (!copy) {
-				eval_error(state);
+				eval_report_error(state);
 				return false;
 			}
 			name = copy;
@@ -722,7 +739,7 @@ done:
 	return true;
 
 error:
-	eval_error(state);
+	eval_report_error(state);
 	return true;
 }
 
@@ -736,7 +753,7 @@ bool eval_fprint(const struct expr *expr, struct eval_state *state) {
 	}
 
 	if (cfprintf(cfile, "%P\n", state->ftwbuf) < 0) {
-		eval_error(state);
+		eval_report_error(state);
 	}
 
 	return true;
@@ -749,7 +766,7 @@ bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
 	size_t length = strlen(path) + 1;
 	if (fwrite(path, 1, length, expr->cfile->file) != length) {
-		eval_error(state);
+		eval_report_error(state);
 	}
 	return true;
 }
@@ -765,7 +782,7 @@ bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
 	}
 
 	if (bfs_printf(expr->cfile->file, expr->printf, state->ftwbuf) != 0) {
-		eval_error(state);
+		eval_report_error(state);
 	}
 
 done:
@@ -806,7 +823,7 @@ bool eval_fprintx(const struct expr *expr, struct eval_state *state) {
 	return true;
 
 error:
-	eval_error(state);
+	eval_report_error(state);
 	return true;
 }
 
@@ -848,7 +865,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	} else if (err != REG_NOMATCH) {
 		char *str = xregerror(err, expr->regex);
 		if (str) {
-			cfprintf(state->cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", path, str);
+			eval_error(state, "%s.\n", str);
 			free(str);
 		} else {
 			perror("xregerror()");
@@ -936,7 +953,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		// Broken symlink
 		return eval_type(expr, state);
 	} else {
-		eval_error(state);
+		eval_report_error(state);
 		return false;
 	}
 }
@@ -1152,7 +1169,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = EXIT_FAILURE;
-			cfprintf(cmdline->cerr, "%{er}error: '%s': %s%{rs}\n", ftwbuf->path, strerror(ftwbuf->error));
+			eval_error(&state, "%s.\n", strerror(ftwbuf->error));
 		}
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
@@ -1160,7 +1177,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 
 	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
 		args->ret = EXIT_FAILURE;
-		cfprintf(cmdline->cerr, "%{er}error: '%s': Path is not safe for xargs.%{rs}\n", ftwbuf->path);
+		eval_error(&state, "Path is not safe for xargs.\n");
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
 	}

@@ -18,6 +18,7 @@
 #include "bftw.h"
 #include "cmdline.h"
 #include "color.h"
+#include "diag.h"
 #include "dstring.h"
 #include "spawn.h"
 #include "util.h"
@@ -114,8 +115,6 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 }
 
 struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct cmdline *cmdline) {
-	CFILE *cerr = cmdline->cerr;
-
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
 		perror("malloc()");
@@ -142,9 +141,9 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 		const char *arg = argv[i];
 		if (!arg) {
 			if (execbuf->flags & BFS_EXEC_CONFIRM) {
-				cfprintf(cerr, "%{er}error: %s: Expected '... ;'.%{rs}\n", argv[0]);
+				bfs_error(cmdline, "%s: Expected '... ;'.\n", argv[0]);
 			} else {
-				cfprintf(cerr, "%{er}error: %s: Expected '... ;' or '... {} +'.%{rs}\n", argv[0]);
+				bfs_error(cmdline, "%s: Expected '... ;' or '... {} +'.\n", argv[0]);
 			}
 			goto fail;
 		} else if (strcmp(arg, ";") == 0) {
@@ -161,7 +160,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	execbuf->tmpl_argc = i - 1;
 
 	if (execbuf->tmpl_argc == 0) {
-		cfprintf(cerr, "%{er}error: %s: Missing command.%{rs}\n", argv[0]);
+		bfs_error(cmdline, "%s: Missing command.\n", argv[0]);
 		goto fail;
 	}
 
@@ -176,7 +175,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 		for (i = 0; i < execbuf->tmpl_argc - 1; ++i) {
 			char *arg = execbuf->tmpl_argv[i];
 			if (strstr(arg, "{}")) {
-				cfprintf(cerr, "%{er}error: %s ... +: Only one '{}' is supported.%{rs}\n", argv[0]);
+				bfs_error(cmdline, "%s ... +: Only one '{}' is supported.\n", argv[0]);
 				goto fail;
 			}
 			execbuf->argv[i] = arg;

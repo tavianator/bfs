@@ -17,6 +17,7 @@
 #include "printf.h"
 #include "cmdline.h"
 #include "color.h"
+#include "diag.h"
 #include "dstring.h"
 #include "expr.h"
 #include "mtab.h"
@@ -476,8 +477,6 @@ static int append_literal(struct bfs_printf_directive ***tail, struct bfs_printf
 }
 
 struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline) {
-	CFILE *cerr = cmdline->cerr;
-
 	struct bfs_printf *command = malloc(sizeof(*command));
 	if (!command) {
 		perror("malloc()");
@@ -532,11 +531,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				goto done;
 
 			case '\0':
-				cfprintf(cerr, "%{er}error: '%s': Incomplete escape sequence '\\'.%{rs}\n", format);
+				bfs_error(cmdline, "'%s': Incomplete escape sequence '\\'.\n", format);
 				goto error;
 
 			default:
-				cfprintf(cerr, "%{er}error: '%s': Unrecognized escape sequence '\\%c'.%{rs}\n", format, c);
+				bfs_error(cmdline, "'%s': Unrecognized escape sequence '\\%c'.\n", format, c);
 				goto error;
 			}
 		} else if (c == '%') {
@@ -570,7 +569,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				case ' ':
 				case '-':
 					if (strchr(directive->str, c)) {
-						cfprintf(cerr, "%{er}error: '%s': Duplicate flag '%c'.%{rs}\n", format, c);
+						bfs_error(cmdline, "'%s': Duplicate flag '%c'.\n", format, c);
 						goto directive_error;
 					}
 					if (dstrapp(&directive->str, c) != 0) {
@@ -633,7 +632,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				if (!cmdline->mtab) {
 					cmdline->mtab = parse_bfs_mtab();
 					if (!cmdline->mtab) {
-						cfprintf(cmdline->cerr, "%{er}error: Couldn't parse the mount table: %m%{rs}\n");
+						bfs_error(cmdline, "Couldn't parse the mount table: %m.\n");
 						goto directive_error;
 					}
 				}
@@ -738,32 +737,27 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				command->needs_stat = true;
 				c = *++i;
 				if (!c) {
-					cfprintf(cerr, "%{er}error: '%s': Incomplete time specifier '%s%c'.%{rs}\n",
-					         format, directive->str, i[-1]);
+					bfs_error(cmdline, "'%s': Incomplete time specifier '%s%c'.\n", format, directive->str, i[-1]);
 					goto directive_error;
 				} else if (strchr("%+@aAbBcCdDeFgGhHIjklmMnprRsStTuUVwWxXyYzZ", c)) {
 					directive->c = c;
 				} else {
-					cfprintf(cerr, "%{er}error: '%s': Unrecognized time specifier '%%%c%c'.%{rs}\n",
-					         format, i[-1], c);
+					bfs_error(cmdline, "'%s': Unrecognized time specifier '%%%c%c'.\n", format, i[-1], c);
 					goto directive_error;
 				}
 				break;
 
 			case '\0':
-				cfprintf(cerr, "%{er}error: '%s': Incomplete format specifier '%s'.%{rs}\n",
-				         format, directive->str);
+				bfs_error(cmdline, "'%s': Incomplete format specifier '%s'.\n", format, directive->str);
 				goto directive_error;
 
 			default:
-				cfprintf(cerr, "%{er}error: '%s': Unrecognized format specifier '%%%c'.%{rs}\n",
-				         format, c);
+				bfs_error(cmdline, "'%s': Unrecognized format specifier '%%%c'.\n", format, c);
 				goto directive_error;
 			}
 
 			if (must_be_numeric && strcmp(specifier, "s") == 0) {
-				cfprintf(cerr, "%{er}error: '%s': Invalid flags '%s' for string format '%%%c'.%{rs}\n",
-				         format, directive->str + 1, c);
+				bfs_error(cmdline, "'%s': Invalid flags '%s' for string format '%%%c'.\n", format, directive->str + 1, c);
 				goto directive_error;
 			}
 
