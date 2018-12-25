@@ -1771,7 +1771,7 @@ function test_exit() {
         return 1
     fi
 
-    bfs_diff basic -name bar -exit -o -print
+    bfs_diff basic/g -print -name g -exit
 }
 
 function test_printx() {
