@@ -215,32 +215,11 @@ bool eval_capable(const struct expr *expr, struct eval_state *state) {
  */
 static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, const struct eval_state *state) {
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
-
 	if (!ret) {
-		const char *kind;
-		switch (field) {
-		case BFS_STAT_ATIME:
-			kind = "access";
-			break;
-		case BFS_STAT_BTIME:
-			kind = "birth";
-			break;
-		case BFS_STAT_CTIME:
-			kind = "change";
-			break;
-		case BFS_STAT_MTIME:
-			kind = "modification";
-			break;
-		default:
-			assert(false);
-			kind = "???";
-			break;
-		}
-
-		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file %s time: %s%{rs}\n", state->ftwbuf->path, kind, strerror(errno));
+		cfprintf(state->cmdline->cerr, "%{er}error: '%s': Couldn't get file %s time: %m%{rs}\n",
+		         state->ftwbuf->path, bfs_stat_field_name(field));
 		*state->ret = EXIT_FAILURE;
 	}
-
 	return ret;
 }
 

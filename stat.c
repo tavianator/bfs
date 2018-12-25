@@ -42,6 +42,42 @@
 #	define st_birthtim st_birthtimespec
 #endif
 
+const char *bfs_stat_field_name(enum bfs_stat_field field) {
+	switch (field) {
+	case BFS_STAT_DEV:
+		return "device number";
+	case BFS_STAT_INO:
+		return "inode nunmber";
+	case BFS_STAT_TYPE:
+		return "type";
+	case BFS_STAT_MODE:
+		return "mode";
+	case BFS_STAT_NLINK:
+		return "link count";
+	case BFS_STAT_GID:
+		return "group ID";
+	case BFS_STAT_UID:
+		return "user ID";
+	case BFS_STAT_SIZE:
+		return "size";
+	case BFS_STAT_BLOCKS:
+		return "block count";
+	case BFS_STAT_RDEV:
+		return "underlying device";
+	case BFS_STAT_ATIME:
+		return "access time";
+	case BFS_STAT_BTIME:
+		return "birth time";
+	case BFS_STAT_CTIME:
+		return "change time";
+	case BFS_STAT_MTIME:
+		return "modification time";
+	}
+
+	assert(false);
+	return "???";
+}
+
 /**
  * Check if we should retry a failed stat() due to a potentially broken link.
  */

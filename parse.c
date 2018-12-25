@@ -1518,6 +1518,22 @@ static struct expr *parse_lname(struct parser_state *state, int casefold, int ar
 	return parse_fnmatch(state, expr, casefold);
 }
 
+/** Get the bfs_stat_field for X/Y in -newerXY */
+static enum bfs_stat_field parse_newerxy_field(char c) {
+	switch (c) {
+	case 'a':
+		return BFS_STAT_ATIME;
+	case 'B':
+		return BFS_STAT_BTIME;
+	case 'c':
+		return BFS_STAT_CTIME;
+	case 'm':
+		return BFS_STAT_MTIME;
+	default:
+		return 0;
+	}
+}
+
 /**
  * Parse -newerXY.
  */
@@ -1535,21 +1551,8 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 		goto fail;
 	}
 
-	switch (arg[6]) {
-	case 'a':
-		expr->stat_field = BFS_STAT_ATIME;
-		break;
-	case 'c':
-		expr->stat_field = BFS_STAT_CTIME;
-		break;
-	case 'm':
-		expr->stat_field = BFS_STAT_MTIME;
-		break;
-	case 'B':
-		expr->stat_field = BFS_STAT_BTIME;
-		break;
-
-	default:
+	expr->stat_field = parse_newerxy_field(arg[6]);
+	if (!expr->stat_field) {
 		cfprintf(cerr, "%{er}error: %s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.%{rs}\n", arg);
 		goto fail;
 	}
@@ -1558,35 +1561,25 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 		cfprintf(cerr, "%{er}error: %s: Explicit reference times ('t') are not supported.%{rs}\n", arg);
 		goto fail;
 	} else {
+		enum bfs_stat_field field = parse_newerxy_field(arg[7]);
+		if (!field) {
+			cfprintf(cerr, "%{er}error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.%{rs}\n", arg);
+			goto fail;
+		}
+
 		struct bfs_stat sb;
 		if (stat_arg(state, expr, &sb) != 0) {
 			goto fail;
 		}
 
-		switch (arg[7]) {
-		case 'a':
-			expr->reftime = sb.atime;
-			break;
-		case 'c':
-			expr->reftime = sb.ctime;
-			break;
-		case 'm':
-			expr->reftime = sb.mtime;
-			break;
-
-		case 'B':
-			if (sb.mask & BFS_STAT_BTIME) {
-				expr->reftime = sb.btime;
-			} else {
-				cfprintf(cerr, "%{er}error: '%s': Couldn't get file birth time.%{rs}\n", expr->sdata);
-				goto fail;
-			}
-			break;
-
-		default:
-			cfprintf(cerr, "%{er}error: %s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.%{rs}\n", arg);
+		const struct timespec *reftime = bfs_stat_time(&sb, field);
+		if (!reftime) {
+			cfprintf(cerr, "%{er}error: '%s': Couldn't get file %s: %m.%{rs}\n",
+			         expr->sdata, bfs_stat_field_name(field));
 			goto fail;
 		}
+
+		expr->reftime = *reftime;
 	}
 
 	return expr;

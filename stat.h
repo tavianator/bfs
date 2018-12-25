@@ -47,6 +47,11 @@ enum bfs_stat_field {
 };
 
 /**
+ * Get the human-readable name of a bfs_stat field.
+ */
+const char *bfs_stat_field_name(enum bfs_stat_field field);
+
+/**
  * bfs_stat() flags.
  */
 enum bfs_stat_flag {
