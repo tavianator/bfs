@@ -2,6 +2,27 @@
 ===
 
 
+1.3
+---
+
+**Unreleased**
+
+New features:
+
+- `-acl` finds files with non-trivial Access Control Lists (from FreeBSD)
+- `-capable` finds files with capabilities set
+- `-D all` turns on all debugging flags at once
+
+Fixes:
+
+- Extension colors from `LS_COLORS` are now case-insensitive like GNU `ls`
+- `-ls`/`-fls` now prints the major/minor numbers for device nodes
+- `-exec ;` is rejected rather than segfaulting
+- `bfs` now builds on old Linux versions that require `-lrt` for POSIX timers
+- For files whose access/change/modification times can't be read, `bfs` no longer fails unless those times are needed for tests
+- The testsuite is now more correct and portable
+
+
 1.2.4
 -----
 
