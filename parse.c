@@ -2408,6 +2408,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find files last accessed %{bld}N%{rs} days after they were changed\n");
 	cfprintf(cout, "  %{blu}-wholename%{rs} %{bld}GLOB%{rs}\n");
 	cfprintf(cout, "      Find files whose entire path matches the %{bld}GLOB%{rs} (same as %{blu}-path%{rs})\n");
+#ifdef FNM_CASEFOLD
 	cfprintf(cout, "  %{blu}-ilname%{rs} %{bld}GLOB%{rs}\n");
 	cfprintf(cout, "  %{blu}-iname%{rs}  %{bld}GLOB%{rs}\n");
 	cfprintf(cout, "  %{blu}-ipath%{rs}  %{bld}GLOB%{rs}\n");
@@ -2415,6 +2416,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{blu}-iwholename%{rs} %{bld}GLOB%{rs}\n");
 	cfprintf(cout, "      Case-insensitive versions of %{blu}-lname%{rs}/%{blu}-name%{rs}/%{blu}-path%{rs}"
 	               "/%{blu}-regex%{rs}/%{blu}-wholename%{rs}\n");
+#endif
 	cfprintf(cout, "  %{blu}-xtype%{rs} %{bld}[bcdlpfsD]%{rs}\n");
 	cfprintf(cout, "      Find files of the given type, following links when %{blu}-type%{rs} would not, and\n");
 	cfprintf(cout, "      vice versa\n\n");
@@ -2459,8 +2461,10 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  %{cyn}-f%{rs} %{mag}PATH%{rs}\n");
 	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if begins with a dash)\n\n");
 
+#if BFS_HAS_SYS_ACL
 	cfprintf(cout, "  %{blu}-acl%{rs}\n");
 	cfprintf(cout, "      Find files with non-trivial Access Control Lists\n");
+#endif
 	cfprintf(cout, "  %{blu}-Bmin%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "  %{blu}-Btime%{rs} %{bld}[-+]N%{rs}\n");
 	cfprintf(cout, "      Find files Birthed %{bld}N%{rs} minutes/days ago\n");
@@ -2503,8 +2507,10 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Turn colors on or off (default: %{blu}-color%{rs} if outputting to a terminal,\n");
 	cfprintf(cout, "      %{blu}-nocolor%{rs} otherwise)\n\n");
 
+#if BFS_HAS_POSIX1E_CAPABILITIES
 	cfprintf(cout, "  %{blu}-capable%{rs}\n");
 	cfprintf(cout, "      Match files with POSIX.1e capabilities set\n\n");
+#endif
 
 	cfprintf(cout, "  %{blu}-hidden%{rs}\n");
 	cfprintf(cout, "  %{blu}-nohidden%{rs}\n");
