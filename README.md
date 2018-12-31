@@ -13,7 +13,7 @@ It is otherwise intended to be compatible with many versions of `find`, includin
 - [POSIX `find`](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)
 - [GNU `find`](https://www.gnu.org/software/findutils/)
 - {[Free](https://www.freebsd.org/cgi/man.cgi?find(1)),[Open](https://man.openbsd.org/find.1),[Net](http://netbsd.gw.com/cgi-bin/man-cgi?find+1+NetBSD-current)}BSD `find`
-- [macOS `find`](https://developer.apple.com/legacy/library/documentation/Darwin/Reference/ManPages/man1/find.1.html)
+- [macOS `find`](https://ss64.com/osx/find.html)
 
 If you're not familiar with `find`, the [GNU find manual](https://www.gnu.org/software/findutils/manual/html_mono/find.html) provides a good introduction.
 
