@@ -108,7 +108,7 @@ static void debug_opt(const struct opt_state *state, const char *format, ...) {
 				break;
 
 			case 'g':
-				cfprintf(cerr, "%{ylw}%g%{rs}", va_arg(args, double));
+				cfprintf(cerr, "${ylw}%g${rs}", va_arg(args, double));
 				break;
 			}
 		} else {

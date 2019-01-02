@@ -18,16 +18,19 @@
 #define BFS_DIAG_H
 
 #include "cmdline.h"
+#include "util.h"
 #include <stdarg.h>
 
 /**
  * Shorthand for printing error messages.
  */
+BFS_FORMATTER(2, 3)
 void bfs_error(const struct cmdline *cmdline, const char *format, ...);
 
 /**
  * Shorthand for printing warning messages.
  */
+BFS_FORMATTER(2, 3)
 void bfs_warning(const struct cmdline *cmdline, const char *format, ...);
 
 /**

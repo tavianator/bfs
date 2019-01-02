@@ -68,6 +68,15 @@
 #endif
 
 /**
+ * Adds compiler warnings for bad printf()-style function calls, if supported.
+ */
+#if __GNUC__
+#	define BFS_FORMATTER(fmt, args) __attribute__((format(printf, fmt, args)))
+#else
+#	define BFS_FORMATTER(fmt, args)
+#endif
+
+/**
  * readdir() wrapper that makes error handling cleaner.
  */
 int xreaddir(DIR *dir, struct dirent **de);

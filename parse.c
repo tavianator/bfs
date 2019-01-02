@@ -199,13 +199,13 @@ void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 	fputs("(", cfile->file);
 
 	if (expr->lhs || expr->rhs) {
-		cfprintf(cfile, "%{red}%s%{rs}", expr->argv[0]);
+		cfprintf(cfile, "${red}%s${rs}", expr->argv[0]);
 	} else {
-		cfprintf(cfile, "%{blu}%s%{rs}", expr->argv[0]);
+		cfprintf(cfile, "${blu}%s${rs}", expr->argv[0]);
 	}
 
 	for (size_t i = 1; i < expr->argc; ++i) {
-		cfprintf(cfile, " %{bld}%s%{rs}", expr->argv[i]);
+		cfprintf(cfile, " ${bld}%s${rs}", expr->argv[i]);
 	}
 
 	if (verbose) {
@@ -214,7 +214,7 @@ void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 			rate = 100.0*expr->successes/expr->evaluations;
 			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
 		}
-		cfprintf(cfile, " [%{ylw}%zu%{rs}/%{ylw}%zu%{rs}=%{ylw}%g%%%{rs}; %{ylw}%gns%{rs}]", expr->successes, expr->evaluations, rate, time);
+		cfprintf(cfile, " [${ylw}%zu${rs}/${ylw}%zu${rs}=${ylw}%g%%${rs}; ${ylw}%gns${rs}]", expr->successes, expr->evaluations, rate, time);
 	}
 
 	if (expr->lhs) {
@@ -373,6 +373,7 @@ enum token_type {
 /**
  * Print an error message during parsing.
  */
+BFS_FORMATTER(2, 3)
 static void parse_error(const struct parser_state *state, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
@@ -383,6 +384,7 @@ static void parse_error(const struct parser_state *state, const char *format, ..
 /**
  * Print a warning message during parsing.
  */
+BFS_FORMATTER(2, 3)
 static void parse_warning(const struct parser_state *state, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
@@ -837,15 +839,15 @@ static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
 static void debug_help(CFILE *cfile) {
 	cfprintf(cfile, "Supported debug flags:\n\n");
 
-	cfprintf(cfile, "  %{bld}help%{rs}:   This message.\n");
-	cfprintf(cfile, "  %{bld}cost%{rs}:   Show cost estimates.\n");
-	cfprintf(cfile, "  %{bld}exec%{rs}:   Print executed command details.\n");
-	cfprintf(cfile, "  %{bld}opt%{rs}:    Print optimization details.\n");
-	cfprintf(cfile, "  %{bld}rates%{rs}:  Print predicate success rates.\n");
-	cfprintf(cfile, "  %{bld}search%{rs}: Trace the filesystem traversal.\n");
-	cfprintf(cfile, "  %{bld}stat%{rs}:   Trace all stat() calls.\n");
-	cfprintf(cfile, "  %{bld}tree%{rs}:   Print the parse tree.\n");
-	cfprintf(cfile, "  %{bld}all%{rs}:    All debug flags at once.\n");
+	cfprintf(cfile, "  ${bld}help${rs}:   This message.\n");
+	cfprintf(cfile, "  ${bld}cost${rs}:   Show cost estimates.\n");
+	cfprintf(cfile, "  ${bld}exec${rs}:   Print executed command details.\n");
+	cfprintf(cfile, "  ${bld}opt${rs}:    Print optimization details.\n");
+	cfprintf(cfile, "  ${bld}rates${rs}:  Print predicate success rates.\n");
+	cfprintf(cfile, "  ${bld}search${rs}: Trace the filesystem traversal.\n");
+	cfprintf(cfile, "  ${bld}stat${rs}:   Trace all stat() calls.\n");
+	cfprintf(cfile, "  ${bld}tree${rs}:   Print the parse tree.\n");
+	cfprintf(cfile, "  ${bld}all${rs}:    All debug flags at once.\n");
 }
 
 /**
@@ -2277,259 +2279,259 @@ static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
  */
 static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	CFILE *cout = state->cmdline->cout;
-	cfprintf(cout, "Usage: %{ex}%s%{rs} [%{cyn}flags%{rs}...] [%{mag}paths%{rs}...] [%{blu}expression%{rs}...]\n\n",
+	cfprintf(cout, "Usage: ${ex}%s${rs} [${cyn}flags${rs}...] [${mag}paths${rs}...] [${blu}expression${rs}...]\n\n",
 		 state->command);
 
-	cfprintf(cout, "%{ex}bfs%{rs} is compatible with %{ex}find%{rs}; see %{ex}find%{rs} %{blu}-help%{rs} or"
-	               " %{ex}man%{rs} %{bld}find%{rs} for help with %{ex}find%{rs}-\n"
+	cfprintf(cout, "${ex}bfs${rs} is compatible with ${ex}find${rs}; see ${ex}find${rs} ${blu}-help${rs} or"
+	               " ${ex}man${rs} ${bld}find${rs} for help with ${ex}find${rs}-\n"
 	               "compatible options :)\n\n");
 
-	cfprintf(cout, "%{cyn}flags%{rs} (%{cyn}-H%{rs}/%{cyn}-L%{rs}/%{cyn}-P%{rs} etc.), %{mag}paths%{rs}, and"
-	               " %{blu}expressions%{rs} may be freely mixed in any order.\n\n");
+	cfprintf(cout, "${cyn}flags${rs} (${cyn}-H${rs}/${cyn}-L${rs}/${cyn}-P${rs} etc.), ${mag}paths${rs}, and"
+	               " ${blu}expressions${rs} may be freely mixed in any order.\n\n");
 
-	cfprintf(cout, "%{bld}POSIX find features:%{rs}\n\n");
+	cfprintf(cout, "${bld}POSIX find features:${rs}\n\n");
 
-	cfprintf(cout, "  %{red}(%{rs} %{blu}expression%{rs} %{red})%{rs}\n");
-	cfprintf(cout, "  %{red}!%{rs} %{blu}expression%{rs}\n");
-	cfprintf(cout, "  %{blu}expression%{rs} [%{red}-a%{rs}] %{blu}expression%{rs}\n");
-	cfprintf(cout, "  %{blu}expression%{rs} %{red}-o%{rs} %{blu}expression%{rs}\n\n");
+	cfprintf(cout, "  ${red}(${rs} ${blu}expression${rs} ${red})${rs}\n");
+	cfprintf(cout, "  ${red}!${rs} ${blu}expression${rs}\n");
+	cfprintf(cout, "  ${blu}expression${rs} [${red}-a${rs}] ${blu}expression${rs}\n");
+	cfprintf(cout, "  ${blu}expression${rs} ${red}-o${rs} ${blu}expression${rs}\n\n");
 
-	cfprintf(cout, "  %{cyn}-H%{rs}\n");
+	cfprintf(cout, "  ${cyn}-H${rs}\n");
 	cfprintf(cout, "      Follow symbolic links on the command line, but not while searching\n");
-	cfprintf(cout, "  %{cyn}-L%{rs}\n");
+	cfprintf(cout, "  ${cyn}-L${rs}\n");
 	cfprintf(cout, "      Follow all symbolic links\n\n");
 
-	cfprintf(cout, "  %{blu}-depth%{rs}\n");
+	cfprintf(cout, "  ${blu}-depth${rs}\n");
 	cfprintf(cout, "      Search in post-order (descendents first)\n");
-	cfprintf(cout, "  %{blu}-xdev%{rs}\n");
+	cfprintf(cout, "  ${blu}-xdev${rs}\n");
 	cfprintf(cout, "      Don't descend into other mount points\n\n");
 
-	cfprintf(cout, "  %{blu}-atime%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "  %{blu}-ctime%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "  %{blu}-mtime%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files accessed/changed/modified %{bld}N%{rs} days ago\n");
-	cfprintf(cout, "  %{blu}-group%{rs} %{bld}NAME%{rs}\n");
-	cfprintf(cout, "  %{blu}-user%{rs}  %{bld}NAME%{rs}\n");
-	cfprintf(cout, "      Find files owned by the group/user %{bld}NAME%{rs}\n");
-	cfprintf(cout, "  %{blu}-links%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files with %{bld}N%{rs} hard links\n");
-	cfprintf(cout, "  %{blu}-name%{rs} %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "      Find files whose name matches the %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "  %{blu}-path%{rs} %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "      Find files whose entire path matches the %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "  %{blu}-newer%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Find files newer than %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-perm%{rs} %{bld}[-]MODE%{rs}\n");
+	cfprintf(cout, "  ${blu}-atime${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "  ${blu}-ctime${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "  ${blu}-mtime${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files accessed/changed/modified ${bld}N${rs} days ago\n");
+	cfprintf(cout, "  ${blu}-group${rs} ${bld}NAME${rs}\n");
+	cfprintf(cout, "  ${blu}-user${rs}  ${bld}NAME${rs}\n");
+	cfprintf(cout, "      Find files owned by the group/user ${bld}NAME${rs}\n");
+	cfprintf(cout, "  ${blu}-links${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files with ${bld}N${rs} hard links\n");
+	cfprintf(cout, "  ${blu}-name${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "      Find files whose name matches the ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-path${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "      Find files whose entire path matches the ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-newer${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      Find files newer than ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-perm${rs} ${bld}[-]MODE${rs}\n");
 	cfprintf(cout, "      Find files with a matching mode\n");
-	cfprintf(cout, "  %{blu}-type%{rs} %{bld}[bcdlpfs]%{rs}\n");
+	cfprintf(cout, "  ${blu}-type${rs} ${bld}[bcdlpfs]${rs}\n");
 	cfprintf(cout, "      Find files of the given type\n");
-	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[c]%{rs}\n");
+	cfprintf(cout, "  ${blu}-size${rs} ${bld}[-+]N[c]${rs}\n");
 	cfprintf(cout, "      Find files with the given size\n\n");
 
-	cfprintf(cout, "  %{blu}-prune%{rs}\n");
+	cfprintf(cout, "  ${blu}-prune${rs}\n");
 	cfprintf(cout, "      Don't descend into this directory\n");
-	cfprintf(cout, "  %{blu}-exec%{rs} %{bld}command ... {} ;%{rs}\n");
+	cfprintf(cout, "  ${blu}-exec${rs} ${bld}command ... {} ;${rs}\n");
 	cfprintf(cout, "      Execute a command\n");
-	cfprintf(cout, "  %{blu}-exec%{rs} %{bld}command ... {} +%{rs}\n");
+	cfprintf(cout, "  ${blu}-exec${rs} ${bld}command ... {} +${rs}\n");
 	cfprintf(cout, "      Execute a command with multiple files at once\n");
-	cfprintf(cout, "  %{blu}-ok%{rs} %{bld}command ... {} ;%{rs}\n");
+	cfprintf(cout, "  ${blu}-ok${rs} ${bld}command ... {} ;${rs}\n");
 	cfprintf(cout, "      Prompt the user whether to execute a command\n");
-	cfprintf(cout, "  %{blu}-print%{rs}\n");
+	cfprintf(cout, "  ${blu}-print${rs}\n");
 	cfprintf(cout, "      Print the path to the found file\n\n");
 
-	cfprintf(cout, "%{bld}GNU find features:%{rs}\n\n");
+	cfprintf(cout, "${bld}GNU find features:${rs}\n\n");
 
-	cfprintf(cout, "  %{red}-not%{rs} %{blu}expression%{rs}\n");
-	cfprintf(cout, "  %{blu}expression%{rs} %{red}-and%{rs} %{blu}expression%{rs}\n");
-	cfprintf(cout, "  %{blu}expression%{rs} %{red}-or%{rs} %{blu}expression%{rs}\n");
-	cfprintf(cout, "  %{blu}expression%{rs} %{red},%{rs} %{blu}expression%{rs}\n\n");
+	cfprintf(cout, "  ${red}-not${rs} ${blu}expression${rs}\n");
+	cfprintf(cout, "  ${blu}expression${rs} ${red}-and${rs} ${blu}expression${rs}\n");
+	cfprintf(cout, "  ${blu}expression${rs} ${red}-or${rs} ${blu}expression${rs}\n");
+	cfprintf(cout, "  ${blu}expression${rs} ${red},${rs} ${blu}expression${rs}\n\n");
 
-	cfprintf(cout, "  %{cyn}-P%{rs}\n");
+	cfprintf(cout, "  ${cyn}-P${rs}\n");
 	cfprintf(cout, "      Never follow symbolic links (the default)\n");
-	cfprintf(cout, "  %{cyn}-D%{rs} %{bld}FLAG%{rs}\n");
-	cfprintf(cout, "      Turn on a debugging flag (see %{cyn}-D%{rs} %{bld}help%{rs})\n");
-	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}N%{rs}\n");
-	cfprintf(cout, "      Enable optimization level %{bld}N%{rs} (default: 3; interpreted differently than GNU\n");
+	cfprintf(cout, "  ${cyn}-D${rs} ${bld}FLAG${rs}\n");
+	cfprintf(cout, "      Turn on a debugging flag (see ${cyn}-D${rs} ${bld}help${rs})\n");
+	cfprintf(cout, "  ${cyn}-O${rs}${bld}N${rs}\n");
+	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: 3; interpreted differently than GNU\n");
 	cfprintf(cout, "      find -- see below)\n\n");
 
-	cfprintf(cout, "  %{blu}-d%{rs}\n");
-	cfprintf(cout, "      Search in post-order (same as %{blu}-depth%{rs})\n");
-	cfprintf(cout, "  %{blu}-daystart%{rs}\n");
+	cfprintf(cout, "  ${blu}-d${rs}\n");
+	cfprintf(cout, "      Search in post-order (same as ${blu}-depth${rs})\n");
+	cfprintf(cout, "  ${blu}-daystart${rs}\n");
 	cfprintf(cout, "      Measure times relative to the start of today\n");
-	cfprintf(cout, "  %{blu}-follow%{rs}\n");
-	cfprintf(cout, "      Follow all symbolic links (same as %{cyn}-L%{rs})\n");
-	cfprintf(cout, "  %{blu}-ignore_readdir_race%{rs}\n");
-	cfprintf(cout, "  %{blu}-noignore_readdir_race%{rs}\n");
-	cfprintf(cout, "      Whether to report an error if %{ex}bfs%{rs} detects that the file tree is modified\n");
-	cfprintf(cout, "      during the search (default: %{blu}-noignore_readdir_race%{rs})\n");
-	cfprintf(cout, "  %{blu}-maxdepth%{rs} %{bld}N%{rs}\n");
-	cfprintf(cout, "  %{blu}-mindepth%{rs} %{bld}N%{rs}\n");
-	cfprintf(cout, "      Ignore files deeper/shallower than %{bld}N%{rs}\n");
-	cfprintf(cout, "  %{blu}-mount%{rs}\n");
-	cfprintf(cout, "      Don't descend into other mount points (same as %{blu}-xdev%{rs})\n");
-	cfprintf(cout, "  %{blu}-noleaf%{rs}\n");
+	cfprintf(cout, "  ${blu}-follow${rs}\n");
+	cfprintf(cout, "      Follow all symbolic links (same as ${cyn}-L${rs})\n");
+	cfprintf(cout, "  ${blu}-ignore_readdir_race${rs}\n");
+	cfprintf(cout, "  ${blu}-noignore_readdir_race${rs}\n");
+	cfprintf(cout, "      Whether to report an error if ${ex}bfs${rs} detects that the file tree is modified\n");
+	cfprintf(cout, "      during the search (default: ${blu}-noignore_readdir_race${rs})\n");
+	cfprintf(cout, "  ${blu}-maxdepth${rs} ${bld}N${rs}\n");
+	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
+	cfprintf(cout, "      Ignore files deeper/shallower than ${bld}N${rs}\n");
+	cfprintf(cout, "  ${blu}-mount${rs}\n");
+	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs})\n");
+	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
 	cfprintf(cout, "      Ignored; for compatibility with GNU find\n");
-	cfprintf(cout, "  %{blu}-regextype%{rs} %{bld}TYPE%{rs}\n");
-	cfprintf(cout, "      Use %{bld}TYPE%{rs}-flavored regexes (default: %{bld}posix-basic%{rs}; see %{blu}-regextype%{rs}"
-	                " %{bld}help%{rs})\n");
-	cfprintf(cout, "  %{blu}-warn%{rs}\n");
-	cfprintf(cout, "  %{blu}-nowarn%{rs}\n");
+	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
+	cfprintf(cout, "      Use ${bld}TYPE${rs}-flavored regexes (default: ${bld}posix-basic${rs}; see ${blu}-regextype${rs}"
+	                " ${bld}help${rs})\n");
+	cfprintf(cout, "  ${blu}-warn${rs}\n");
+	cfprintf(cout, "  ${blu}-nowarn${rs}\n");
 	cfprintf(cout, "      Turn on or off warnings about the command line\n\n");
 
-	cfprintf(cout, "  %{blu}-amin%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "  %{blu}-cmin%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "  %{blu}-mmin%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files accessed/changed/modified %{bld}N%{rs} minutes ago\n");
-	cfprintf(cout, "  %{blu}-anewer%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-cnewer%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-mnewer%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Find files accessed/changed/modified more recently than %{bld}FILE%{rs} was modified\n");
-	cfprintf(cout, "  %{blu}-empty%{rs}\n");
+	cfprintf(cout, "  ${blu}-amin${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "  ${blu}-cmin${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "  ${blu}-mmin${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files accessed/changed/modified ${bld}N${rs} minutes ago\n");
+	cfprintf(cout, "  ${blu}-anewer${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-cnewer${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-mnewer${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      Find files accessed/changed/modified more recently than ${bld}FILE${rs} was modified\n");
+	cfprintf(cout, "  ${blu}-empty${rs}\n");
 	cfprintf(cout, "      Find empty files/directories\n");
-	cfprintf(cout, "  %{blu}-executable%{rs}\n");
-	cfprintf(cout, "  %{blu}-readable%{rs}\n");
-	cfprintf(cout, "  %{blu}-writable%{rs}\n");
+	cfprintf(cout, "  ${blu}-executable${rs}\n");
+	cfprintf(cout, "  ${blu}-readable${rs}\n");
+	cfprintf(cout, "  ${blu}-writable${rs}\n");
 	cfprintf(cout, "      Find files the current user can execute/read/write\n");
-	cfprintf(cout, "  %{blu}-false%{rs}\n");
-	cfprintf(cout, "  %{blu}-true%{rs}\n");
+	cfprintf(cout, "  ${blu}-false${rs}\n");
+	cfprintf(cout, "  ${blu}-true${rs}\n");
 	cfprintf(cout, "      Always false/true\n");
-	cfprintf(cout, "  %{blu}-fstype%{rs} %{bld}TYPE%{rs}\n");
-	cfprintf(cout, "      Find files on file systems with the given %{bld}TYPE%{rs}\n");
-	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "  %{blu}-uid%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files owned by group/user ID %{bld}N%{rs}\n");
-	cfprintf(cout, "  %{blu}-inum%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files with inode number %{bld}N%{rs}\n");
-	cfprintf(cout, "  %{blu}-lname%{rs} %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "      Find symbolic links whose target matches the %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "  %{blu}-newer%{rs}%{bld}XY%{rs} %{bld}REFERENCE%{rs}\n");
-	cfprintf(cout, "      Find files whose %{bld}X%{rs} time is newer than the %{bld}Y%{rs} time of"
-	               " %{bld}REFERENCE%{rs}.  %{bld}X%{rs} and %{bld}Y%{rs}\n");
+	cfprintf(cout, "  ${blu}-fstype${rs} ${bld}TYPE${rs}\n");
+	cfprintf(cout, "      Find files on file systems with the given ${bld}TYPE${rs}\n");
+	cfprintf(cout, "  ${blu}-gid${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "  ${blu}-uid${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files owned by group/user ID ${bld}N${rs}\n");
+	cfprintf(cout, "  ${blu}-inum${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files with inode number ${bld}N${rs}\n");
+	cfprintf(cout, "  ${blu}-lname${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "      Find symbolic links whose target matches the ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-newer${rs}${bld}XY${rs} ${bld}REFERENCE${rs}\n");
+	cfprintf(cout, "      Find files whose ${bld}X${rs} time is newer than the ${bld}Y${rs} time of"
+	               " ${bld}REFERENCE${rs}.  ${bld}X${rs} and ${bld}Y${rs}\n");
 	cfprintf(cout, "      can be any of [aBcm].\n");
-	cfprintf(cout, "  %{blu}-regex%{rs} %{bld}REGEX%{rs}\n");
-	cfprintf(cout, "      Find files whose entire path matches the regular expression %{bld}REGEX%{rs}\n");
-	cfprintf(cout, "  %{blu}-samefile%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Find hard links to %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[cwbkMG]%{rs}\n");
-	cfprintf(cout, "      1-byte %{bld}c%{rs}haracters, 2-byte %{bld}w%{rs}ords, 512-byte %{bld}b%{rs}locks, and"
-	               " %{bld}k%{rs}iB/%{bld}M%{rs}iB/%{bld}G%{rs}iB\n");
-	cfprintf(cout, "  %{blu}-type%{rs} %{bld}[bcdlpfsD]%{rs}\n");
-	cfprintf(cout, "      The %{bld}D%{rs}oor file type is also supported on platforms that have it (Solaris)\n");
-	cfprintf(cout, "  %{blu}-used%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files last accessed %{bld}N%{rs} days after they were changed\n");
-	cfprintf(cout, "  %{blu}-wholename%{rs} %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "      Find files whose entire path matches the %{bld}GLOB%{rs} (same as %{blu}-path%{rs})\n");
+	cfprintf(cout, "  ${blu}-regex${rs} ${bld}REGEX${rs}\n");
+	cfprintf(cout, "      Find files whose entire path matches the regular expression ${bld}REGEX${rs}\n");
+	cfprintf(cout, "  ${blu}-samefile${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      Find hard links to ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-size${rs} ${bld}[-+]N[cwbkMG]${rs}\n");
+	cfprintf(cout, "      1-byte ${bld}c${rs}haracters, 2-byte ${bld}w${rs}ords, 512-byte ${bld}b${rs}locks, and"
+	               " ${bld}k${rs}iB/${bld}M${rs}iB/${bld}G${rs}iB\n");
+	cfprintf(cout, "  ${blu}-type${rs} ${bld}[bcdlpfsD]${rs}\n");
+	cfprintf(cout, "      The ${bld}D${rs}oor file type is also supported on platforms that have it (Solaris)\n");
+	cfprintf(cout, "  ${blu}-used${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files last accessed ${bld}N${rs} days after they were changed\n");
+	cfprintf(cout, "  ${blu}-wholename${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "      Find files whose entire path matches the ${bld}GLOB${rs} (same as ${blu}-path${rs})\n");
 #ifdef FNM_CASEFOLD
-	cfprintf(cout, "  %{blu}-ilname%{rs} %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "  %{blu}-iname%{rs}  %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "  %{blu}-ipath%{rs}  %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "  %{blu}-iregex%{rs} %{bld}REGEX%{rs}\n");
-	cfprintf(cout, "  %{blu}-iwholename%{rs} %{bld}GLOB%{rs}\n");
-	cfprintf(cout, "      Case-insensitive versions of %{blu}-lname%{rs}/%{blu}-name%{rs}/%{blu}-path%{rs}"
-	               "/%{blu}-regex%{rs}/%{blu}-wholename%{rs}\n");
+	cfprintf(cout, "  ${blu}-ilname${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-iname${rs}  ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-ipath${rs}  ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-iregex${rs} ${bld}REGEX${rs}\n");
+	cfprintf(cout, "  ${blu}-iwholename${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "      Case-insensitive versions of ${blu}-lname${rs}/${blu}-name${rs}/${blu}-path${rs}"
+	               "/${blu}-regex${rs}/${blu}-wholename${rs}\n");
 #endif
-	cfprintf(cout, "  %{blu}-xtype%{rs} %{bld}[bcdlpfsD]%{rs}\n");
-	cfprintf(cout, "      Find files of the given type, following links when %{blu}-type%{rs} would not, and\n");
+	cfprintf(cout, "  ${blu}-xtype${rs} ${bld}[bcdlpfsD]${rs}\n");
+	cfprintf(cout, "      Find files of the given type, following links when ${blu}-type${rs} would not, and\n");
 	cfprintf(cout, "      vice versa\n\n");
 
-	cfprintf(cout, "  %{blu}-delete%{rs}\n");
-	cfprintf(cout, "      Delete any found files (implies %{blu}-depth%{rs})\n");
-	cfprintf(cout, "  %{blu}-execdir%{rs} %{bld}command ... {} ;%{rs}\n");
-	cfprintf(cout, "  %{blu}-execdir%{rs} %{bld}command ... {} +%{rs}\n");
-	cfprintf(cout, "  %{blu}-okdir%{rs}   %{bld}command ... {} ;%{rs}\n");
-	cfprintf(cout, "      Like %{blu}-exec%{rs}/%{blu}-ok%{rs}, but run the command in the same directory as the found\n");
+	cfprintf(cout, "  ${blu}-delete${rs}\n");
+	cfprintf(cout, "      Delete any found files (implies ${blu}-depth${rs})\n");
+	cfprintf(cout, "  ${blu}-execdir${rs} ${bld}command ... {} ;${rs}\n");
+	cfprintf(cout, "  ${blu}-execdir${rs} ${bld}command ... {} +${rs}\n");
+	cfprintf(cout, "  ${blu}-okdir${rs}   ${bld}command ... {} ;${rs}\n");
+	cfprintf(cout, "      Like ${blu}-exec${rs}/${blu}-ok${rs}, but run the command in the same directory as the found\n");
 	cfprintf(cout, "      file(s)\n");
-	cfprintf(cout, "  %{blu}-ls%{rs}\n");
-	cfprintf(cout, "      List files like %{ex}ls%{rs} %{bld}-dils%{rs}\n");
-	cfprintf(cout, "  %{blu}-print0%{rs}\n");
-	cfprintf(cout, "      Like %{blu}-print%{rs}, but use the null character ('\\0') as a separator rather than\n");
+	cfprintf(cout, "  ${blu}-ls${rs}\n");
+	cfprintf(cout, "      List files like ${ex}ls${rs} ${bld}-dils${rs}\n");
+	cfprintf(cout, "  ${blu}-print0${rs}\n");
+	cfprintf(cout, "      Like ${blu}-print${rs}, but use the null character ('\\0') as a separator rather than\n");
 	cfprintf(cout, "      newlines\n");
-	cfprintf(cout, "  %{blu}-printf%{rs} %{bld}FORMAT%{rs}\n");
-	cfprintf(cout, "      Print according to a format string (see %{ex}man%{rs} %{bld}find%{rs})\n");
-	cfprintf(cout, "  %{blu}-fls%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-fprint%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-fprint0%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "  %{blu}-fprintf%{rs} %{bld}FORMAT%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Like %{blu}-ls%{rs}/%{blu}-print%{rs}/%{blu}-print0%{rs}/%{blu}-printf%{rs}, but write to"
-	               " %{bld}FILE%{rs} instead of standard output\n");
-	cfprintf(cout, "  %{blu}-quit%{rs}\n");
+	cfprintf(cout, "  ${blu}-printf${rs} ${bld}FORMAT${rs}\n");
+	cfprintf(cout, "      Print according to a format string (see ${ex}man${rs} ${bld}find${rs})\n");
+	cfprintf(cout, "  ${blu}-fls${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-fprint${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-fprint0${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-fprintf${rs} ${bld}FORMAT${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      Like ${blu}-ls${rs}/${blu}-print${rs}/${blu}-print0${rs}/${blu}-printf${rs}, but write to"
+	               " ${bld}FILE${rs} instead of standard output\n");
+	cfprintf(cout, "  ${blu}-quit${rs}\n");
 	cfprintf(cout, "      Quit immediately\n\n");
 
-	cfprintf(cout, "  %{blu}-version%{rs}\n");
+	cfprintf(cout, "  ${blu}-version${rs}\n");
 	cfprintf(cout, "      Print version information\n");
-	cfprintf(cout, "  %{blu}-help%{rs}\n");
+	cfprintf(cout, "  ${blu}-help${rs}\n");
 	cfprintf(cout, "      Print this help message\n\n");
 
-	cfprintf(cout, "%{bld}BSD find features:%{rs}\n\n");
+	cfprintf(cout, "${bld}BSD find features:${rs}\n\n");
 
-	cfprintf(cout, "  %{cyn}-E%{rs}\n");
-	cfprintf(cout, "      Use extended regular expressions (same as %{blu}-regextype%{rs} %{bld}posix-extended%{rs})\n");
-	cfprintf(cout, "  %{cyn}-X%{rs}\n");
-	cfprintf(cout, "      Filter out files with non-%{ex}xargs%{rs}-safe names\n");
-	cfprintf(cout, "  %{cyn}-x%{rs}\n");
-	cfprintf(cout, "      Don't descend into other mount points (same as %{blu}-xdev%{rs})\n\n");
+	cfprintf(cout, "  ${cyn}-E${rs}\n");
+	cfprintf(cout, "      Use extended regular expressions (same as ${blu}-regextype${rs} ${bld}posix-extended${rs})\n");
+	cfprintf(cout, "  ${cyn}-X${rs}\n");
+	cfprintf(cout, "      Filter out files with non-${ex}xargs${rs}-safe names\n");
+	cfprintf(cout, "  ${cyn}-x${rs}\n");
+	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs})\n\n");
 
-	cfprintf(cout, "  %{cyn}-f%{rs} %{mag}PATH%{rs}\n");
-	cfprintf(cout, "      Treat %{mag}PATH%{rs} as a path to search (useful if begins with a dash)\n\n");
+	cfprintf(cout, "  ${cyn}-f${rs} ${mag}PATH${rs}\n");
+	cfprintf(cout, "      Treat ${mag}PATH${rs} as a path to search (useful if begins with a dash)\n\n");
 
 #if BFS_HAS_SYS_ACL
-	cfprintf(cout, "  %{blu}-acl%{rs}\n");
+	cfprintf(cout, "  ${blu}-acl${rs}\n");
 	cfprintf(cout, "      Find files with non-trivial Access Control Lists\n");
 #endif
-	cfprintf(cout, "  %{blu}-Bmin%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "  %{blu}-Btime%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files Birthed %{bld}N%{rs} minutes/days ago\n");
-	cfprintf(cout, "  %{blu}-Bnewer%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      Find files Birthed more recently than %{bld}FILE%{rs} was modified\n");
-	cfprintf(cout, "  %{blu}-depth%{rs} %{bld}[-+]N%{rs}\n");
-	cfprintf(cout, "      Find files with depth %{bld}N%{rs}\n");
-	cfprintf(cout, "  %{blu}-gid%{rs} %{bld}NAME%{rs}\n");
-	cfprintf(cout, "  %{blu}-uid%{rs} %{bld}NAME%{rs}\n");
+	cfprintf(cout, "  ${blu}-Bmin${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "  ${blu}-Btime${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files Birthed ${bld}N${rs} minutes/days ago\n");
+	cfprintf(cout, "  ${blu}-Bnewer${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      Find files Birthed more recently than ${bld}FILE${rs} was modified\n");
+	cfprintf(cout, "  ${blu}-depth${rs} ${bld}[-+]N${rs}\n");
+	cfprintf(cout, "      Find files with depth ${bld}N${rs}\n");
+	cfprintf(cout, "  ${blu}-gid${rs} ${bld}NAME${rs}\n");
+	cfprintf(cout, "  ${blu}-uid${rs} ${bld}NAME${rs}\n");
 	cfprintf(cout, "      Group/user names are supported in addition to numeric IDs\n");
-	cfprintf(cout, "  %{blu}-size%{rs} %{bld}[-+]N[cwbkMGTP]%{rs}\n");
-	cfprintf(cout, "      Units of %{bld}T%{rs}iB/%{bld}P%{rs}iB are additionally supported\n");
-	cfprintf(cout, "  %{blu}-sparse%{rs}\n");
+	cfprintf(cout, "  ${blu}-size${rs} ${bld}[-+]N[cwbkMGTP]${rs}\n");
+	cfprintf(cout, "      Units of ${bld}T${rs}iB/${bld}P${rs}iB are additionally supported\n");
+	cfprintf(cout, "  ${blu}-sparse${rs}\n");
 	cfprintf(cout, "      Find files that occupy fewer disk blocks than expected\n\n");
 
-	cfprintf(cout, "  %{blu}-exit%{rs} %{bld}[STATUS]%{rs}\n");
+	cfprintf(cout, "  ${blu}-exit${rs} ${bld}[STATUS]${rs}\n");
 	cfprintf(cout, "      Exit immediately with the given status (%d if unspecified)\n", EXIT_SUCCESS);
-	cfprintf(cout, "  %{blu}-printx%{rs}\n");
-	cfprintf(cout, "      Like %{blu}-print%{rs}, but escape whitespace and quotation characters, to make the\n");
-	cfprintf(cout, "      output safe for %{ex}xargs%{rs}.  Consider using %{blu}-print0%{rs} and %{ex}xargs%{rs} %{bld}-0%{rs} instead.\n");
-	cfprintf(cout, "  %{blu}-rm%{rs}\n");
-	cfprintf(cout, "      Delete any found files (same as %{blu}-delete%{rs}; implies %{blu}-depth%{rs})\n\n");
+	cfprintf(cout, "  ${blu}-printx${rs}\n");
+	cfprintf(cout, "      Like ${blu}-print${rs}, but escape whitespace and quotation characters, to make the\n");
+	cfprintf(cout, "      output safe for ${ex}xargs${rs}.  Consider using ${blu}-print0${rs} and ${ex}xargs${rs} ${bld}-0${rs} instead.\n");
+	cfprintf(cout, "  ${blu}-rm${rs}\n");
+	cfprintf(cout, "      Delete any found files (same as ${blu}-delete${rs}; implies ${blu}-depth${rs})\n\n");
 
-	cfprintf(cout, "%{ex}bfs%{rs}%{bld}-specific features:%{rs}\n\n");
+	cfprintf(cout, "${ex}bfs${rs}${bld}-specific features:${rs}\n\n");
 
-	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}0%{rs}\n");
+	cfprintf(cout, "  ${cyn}-O${rs}${bld}0${rs}\n");
 	cfprintf(cout, "      Disable all optimizations\n");
-	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}1%{rs}\n");
+	cfprintf(cout, "  ${cyn}-O${rs}${bld}1${rs}\n");
 	cfprintf(cout, "      Basic logical simplification\n");
-	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}2%{rs}\n");
-	cfprintf(cout, "      All %{cyn}-O%{rs}%{bld}1%{rs} optimizations, plus dead code elimination and data flow analysis\n");
-	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}3%{rs} (default)\n");
-	cfprintf(cout, "      All %{cyn}-O%{rs}%{bld}2%{rs} optimizations, plus re-order expressions to reduce expected cost\n");
-	cfprintf(cout, "  %{cyn}-O%{rs}%{bld}4%{rs}/%{cyn}-O%{rs}%{bld}fast%{rs}\n");
+	cfprintf(cout, "  ${cyn}-O${rs}${bld}2${rs}\n");
+	cfprintf(cout, "      All ${cyn}-O${rs}${bld}1${rs} optimizations, plus dead code elimination and data flow analysis\n");
+	cfprintf(cout, "  ${cyn}-O${rs}${bld}3${rs} (default)\n");
+	cfprintf(cout, "      All ${cyn}-O${rs}${bld}2${rs} optimizations, plus re-order expressions to reduce expected cost\n");
+	cfprintf(cout, "  ${cyn}-O${rs}${bld}4${rs}/${cyn}-O${rs}${bld}fast${rs}\n");
 	cfprintf(cout, "      All optimizations, including aggressive optimizations that may alter the\n");
 	cfprintf(cout, "      observed behavior in corner cases\n\n");
 
-	cfprintf(cout, "  %{blu}-color%{rs}\n");
-	cfprintf(cout, "  %{blu}-nocolor%{rs}\n");
-	cfprintf(cout, "      Turn colors on or off (default: %{blu}-color%{rs} if outputting to a terminal,\n");
-	cfprintf(cout, "      %{blu}-nocolor%{rs} otherwise)\n\n");
+	cfprintf(cout, "  ${blu}-color${rs}\n");
+	cfprintf(cout, "  ${blu}-nocolor${rs}\n");
+	cfprintf(cout, "      Turn colors on or off (default: ${blu}-color${rs} if outputting to a terminal,\n");
+	cfprintf(cout, "      ${blu}-nocolor${rs} otherwise)\n\n");
 
 #if BFS_HAS_POSIX1E_CAPABILITIES
-	cfprintf(cout, "  %{blu}-capable%{rs}\n");
+	cfprintf(cout, "  ${blu}-capable${rs}\n");
 	cfprintf(cout, "      Match files with POSIX.1e capabilities set\n\n");
 #endif
 
-	cfprintf(cout, "  %{blu}-hidden%{rs}\n");
-	cfprintf(cout, "  %{blu}-nohidden%{rs}\n");
+	cfprintf(cout, "  ${blu}-hidden${rs}\n");
+	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
 	cfprintf(cout, "      Match hidden files, or filter them out\n\n");
 
-	cfprintf(cout, "  %{blu}-printf%{rs} %{bld}FORMAT%{rs}\n");
-	cfprintf(cout, "  %{blu}-fprintf%{rs} %{bld}FORMAT%{rs} %{bld}FILE%{rs}\n");
-	cfprintf(cout, "      The additional format directives %%w and %%W%{bld}k%{rs} for printing file birth times\n");
+	cfprintf(cout, "  ${blu}-printf${rs} ${bld}FORMAT${rs}\n");
+	cfprintf(cout, "  ${blu}-fprintf${rs} ${bld}FORMAT${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      The additional format directives %%w and %%W${bld}k${rs} for printing file birth times\n");
 	cfprintf(cout, "      are supported.\n\n");
 
 	cfprintf(cout, "%s\n", BFS_HOMEPAGE);
@@ -2542,7 +2544,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
  * "Parse" -version.
  */
 static struct expr *parse_version(struct parser_state *state, int arg1, int arg2) {
-	cfprintf(state->cmdline->cout, "%{ex}bfs%{rs} %{bld}%s%{rs}\n\n", BFS_VERSION);
+	cfprintf(state->cmdline->cout, "${ex}bfs${rs} ${bld}%s${rs}\n\n", BFS_VERSION);
 
 	printf("%s\n", BFS_HOMEPAGE);
 
@@ -2987,69 +2989,69 @@ fail:
 void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	CFILE *cerr = cmdline->cerr;
 
-	cfprintf(cerr, "%{ex}%s%{rs} ", cmdline->argv[0]);
+	cfprintf(cerr, "${ex}%s${rs} ", cmdline->argv[0]);
 
 	if (cmdline->flags & BFTW_LOGICAL) {
-		cfprintf(cerr, "%{cyn}-L%{rs} ");
+		cfprintf(cerr, "${cyn}-L${rs} ");
 	} else if (cmdline->flags & BFTW_COMFOLLOW) {
-		cfprintf(cerr, "%{cyn}-H%{rs} ");
+		cfprintf(cerr, "${cyn}-H${rs} ");
 	} else {
-		cfprintf(cerr, "%{cyn}-P%{rs} ");
+		cfprintf(cerr, "${cyn}-P${rs} ");
 	}
 
 	if (cmdline->optlevel != 3) {
-		cfprintf(cerr, "%{cyn}-O%d%{rs} ", cmdline->optlevel);
+		cfprintf(cerr, "${cyn}-O%d${rs} ", cmdline->optlevel);
 	}
 
 	if (cmdline->debug & DEBUG_COST) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}cost%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}cost${rs} ");
 	}
 	if (cmdline->debug & DEBUG_EXEC) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}exec%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}exec${rs} ");
 	}
 	if (cmdline->debug & DEBUG_OPT) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}opt%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}opt${rs} ");
 	}
 	if (cmdline->debug & DEBUG_RATES) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}rates%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}rates${rs} ");
 	}
 	if (cmdline->debug & DEBUG_SEARCH) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}search%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}search${rs} ");
 	}
 	if (cmdline->debug & DEBUG_STAT) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}stat%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}stat${rs} ");
 	}
 	if (cmdline->debug & DEBUG_TREE) {
-		cfprintf(cerr, "%{cyn}-D%{rs} %{bld}tree%{rs} ");
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}tree${rs} ");
 	}
 
 	for (struct root *root = cmdline->roots; root; root = root->next) {
 		char c = root->path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
-			cfprintf(cerr, "%{cyn}-f%{rs} ");
+			cfprintf(cerr, "${cyn}-f${rs} ");
 		}
-		cfprintf(cerr, "%{mag}%s%{rs} ", root->path);
+		cfprintf(cerr, "${mag}%s${rs} ", root->path);
 	}
 
 	if (cmdline->cout->colors) {
-		cfprintf(cerr, "%{blu}-color%{rs} ");
+		cfprintf(cerr, "${blu}-color${rs} ");
 	} else {
-		cfprintf(cerr, "%{blu}-nocolor%{rs} ");
+		cfprintf(cerr, "${blu}-nocolor${rs} ");
 	}
 	if (cmdline->flags & BFTW_DEPTH) {
-		cfprintf(cerr, "%{blu}-depth%{rs} ");
+		cfprintf(cerr, "${blu}-depth${rs} ");
 	}
 	if (cmdline->ignore_races) {
-		cfprintf(cerr, "%{blu}-ignore_readdir_race%{rs} ");
+		cfprintf(cerr, "${blu}-ignore_readdir_race${rs} ");
 	}
 	if (cmdline->flags & BFTW_XDEV) {
-		cfprintf(cerr, "%{blu}-mount%{rs} ");
+		cfprintf(cerr, "${blu}-mount${rs} ");
 	}
 	if (cmdline->mindepth != 0) {
-		cfprintf(cerr, "%{blu}-mindepth%{rs} %{bld}%d%{rs} ", cmdline->mindepth);
+		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", cmdline->mindepth);
 	}
 	if (cmdline->maxdepth != INT_MAX) {
-		cfprintf(cerr, "%{blu}-maxdepth%{rs} %{bld}%d%{rs} ", cmdline->maxdepth);
+		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", cmdline->maxdepth);
 	}
 
 	dump_expr(cerr, cmdline->expr, verbose);
@@ -3063,8 +3065,8 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 static void dump_costs(const struct cmdline *cmdline) {
 	CFILE *cerr = cmdline->cerr;
 	const struct expr *expr = cmdline->expr;
-	cfprintf(cerr, "       Cost: ~%{ylw}%g%{rs}\n", expr->cost);
-	cfprintf(cerr, "Probability: ~%{ylw}%g%%%{rs}\n", 100.0*expr->probability);
+	cfprintf(cerr, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
+	cfprintf(cerr, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
 }
 
 /**

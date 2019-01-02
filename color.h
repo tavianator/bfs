@@ -18,6 +18,7 @@
 #define BFS_COLOR_H
 
 #include "bftw.h"
+#include "util.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -95,18 +96,20 @@ int cfclose(CFILE *cfile);
  * @param format
  *         A printf()-style format string, supporting these format specifiers:
  *
- *         %%: A literal '%'
  *         %c: A single character
  *         %d: An integer
  *         %g: A double
  *         %s: A string
  *         %zu: A size_t
  *         %m: strerror(errno)
- *         %P: A colored file path, from a const struct BFTW * argument
- *         %L: A colored link target, from a const struct BFTW * argument
- *         %{cc}: Change the color to 'cc'
+ *         %pP: A colored file path, from a const struct BFTW * argument
+ *         %pL: A colored link target, from a const struct BFTW * argument
+ *         %%: A literal '%'
+ *         ${cc}: Change the color to 'cc'
+ *         $$: A literal '$'
  * @return 0 on success, -1 on failure.
  */
+BFS_FORMATTER(2, 3)
 int cfprintf(CFILE *cfile, const char *format, ...);
 
 /**

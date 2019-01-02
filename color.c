@@ -486,116 +486,139 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 	int error = errno;
 
 	for (const char *i = format; *i; ++i) {
-		const char *percent = strchr(i, '%');
-		if (!percent) {
-			if (fputs(i, file) == EOF) {
-				return -1;
-			}
-			break;
-		}
-
-		size_t len = percent - i;
-		if (fwrite(i, 1, len, file) != len) {
+		size_t verbatim = strcspn(i, "%$");
+		if (fwrite(i, 1, verbatim, file) != verbatim) {
 			return -1;
 		}
 
-		i = percent + 1;
+		i += verbatim;
 		switch (*i) {
 		case '%':
-			if (fputc('%', file) == EOF) {
-				return -1;
-			}
-			break;
+			switch (*++i) {
+			case '%':
+				if (fputc('%', file) == EOF) {
+					return -1;
+				}
+				break;
 
-		case 'c':
-			if (fputc(va_arg(args, int), file) == EOF) {
-				return -1;
-			}
-			break;
+			case 'c':
+				if (fputc(va_arg(args, int), file) == EOF) {
+					return -1;
+				}
+				break;
 
-		case 'd':
-			if (fprintf(file, "%d", va_arg(args, int)) < 0) {
-				return -1;
-			}
-			break;
+			case 'd':
+				if (fprintf(file, "%d", va_arg(args, int)) < 0) {
+					return -1;
+				}
+				break;
 
-		case 'g':
-			if (fprintf(file, "%g", va_arg(args, double)) < 0) {
-				return -1;
-			}
-			break;
+			case 'g':
+				if (fprintf(file, "%g", va_arg(args, double)) < 0) {
+					return -1;
+				}
+				break;
 
-		case 's':
-			if (fputs(va_arg(args, const char *), file) == EOF) {
-				return -1;
-			}
-			break;
+			case 's':
+				if (fputs(va_arg(args, const char *), file) == EOF) {
+					return -1;
+				}
+				break;
 
-		case 'z':
-			++i;
-			if (*i != 'u') {
+			case 'z':
+				++i;
+				if (*i != 'u') {
+					goto invalid;
+				}
+				if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
+					return -1;
+				}
+				break;
+
+			case 'm':
+				if (fputs(strerror(error), file) == EOF) {
+					return -1;
+				}
+				break;
+
+			case 'p':
+				switch (*++i) {
+				case 'P':
+					if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
+						return -1;
+					}
+					break;
+
+				case 'L':
+					if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
+						return -1;
+					}
+					break;
+
+				default:
+					goto invalid;
+				}
+
+				break;
+
+			default:
 				goto invalid;
 			}
-			if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
-				return -1;
-			}
 			break;
 
-		case 'm':
-			if (fputs(strerror(error), file) == EOF) {
-				return -1;
-			}
-			break;
+		case '$':
+			switch (*++i) {
+			case '$':
+				if (fputc('$', file) == EOF) {
+					return -1;
+				}
+				break;
 
-		case 'P':
-			if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
-				return -1;
-			}
-			break;
+			case '{': {
+				++i;
+				const char *end = strchr(i, '}');
+				if (!end) {
+					goto invalid;
+				}
+				if (!colors) {
+					i = end;
+					break;
+				}
 
-		case 'L':
-			if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
-				return -1;
-			}
-			break;
+				size_t len = end - i;
+				char name[len + 1];
+				memcpy(name, i, len);
+				name[len] = '\0';
 
-		case '{': {
-			++i;
-			const char *end = strchr(i, '}');
-			if (!end) {
-				goto invalid;
-			}
-			if (!colors) {
+				const char **esc = get_color(colors, name);
+				if (!esc) {
+					goto invalid;
+				}
+				if (*esc) {
+					if (print_esc(*esc, file) != 0) {
+						return -1;
+					}
+				}
+
 				i = end;
 				break;
 			}
 
-			size_t len = end - i;
-			char name[len + 1];
-			memcpy(name, i, len);
-			name[len] = '\0';
-
-			const char **esc = get_color(colors, name);
-			if (!esc) {
+			default:
 				goto invalid;
 			}
-			if (*esc) {
-				if (print_esc(*esc, file) != 0) {
-					return -1;
-				}
-			}
-
-			i = end;
 			break;
-		}
 
 		default:
-		invalid:
-			assert(false);
-			errno = EINVAL;
-			return -1;
+			return 0;
 		}
+
 	}
 
 	return 0;
+
+invalid:
+	assert(false);
+	errno = EINVAL;
+	return -1;
 }

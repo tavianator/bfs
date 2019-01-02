@@ -62,11 +62,12 @@ struct eval_state {
 /**
  * Print an error message.
  */
+BFS_FORMATTER(2, 3)
 static void eval_error(const struct eval_state *state, const char *format, ...) {
 	int error = errno;
 	const struct cmdline *cmdline = state->cmdline;
 
-	bfs_error(cmdline, "%P: ", state->ftwbuf);
+	bfs_error(cmdline, "%pP: ", state->ftwbuf);
 
 	va_list args;
 	va_start(args, format);
@@ -721,12 +722,12 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		goto error;
 	}
 
-	if (cfprintf(cfile, " %P", ftwbuf) < 0) {
+	if (cfprintf(cfile, " %pP", ftwbuf) < 0) {
 		goto error;
 	}
 
 	if (ftwbuf->typeflag == BFTW_LNK) {
-		if (cfprintf(cfile, " -> %L", ftwbuf) < 0) {
+		if (cfprintf(cfile, " -> %pL", ftwbuf) < 0) {
 			goto error;
 		}
 	}
@@ -752,7 +753,7 @@ bool eval_fprint(const struct expr *expr, struct eval_state *state) {
 		eval_stat(state);
 	}
 
-	if (cfprintf(cfile, "%P\n", state->ftwbuf) < 0) {
+	if (cfprintf(cfile, "%pP\n", state->ftwbuf) < 0) {
 		eval_report_error(state);
 	}
 

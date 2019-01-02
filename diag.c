@@ -56,9 +56,9 @@ void bfs_vwarning(const struct cmdline *cmdline, const char *format, va_list arg
 }
 
 void bfs_error_prefix(const struct cmdline *cmdline) {
-	cfprintf(cmdline->cerr, "%{bld}%s:%{rs} %{er}error:%{rs} ", xbasename(cmdline->argv[0]));
+	cfprintf(cmdline->cerr, "${bld}%s:${rs} ${er}error:${rs} ", xbasename(cmdline->argv[0]));
 }
 
 void bfs_warning_prefix(const struct cmdline *cmdline) {
-	cfprintf(cmdline->cerr, "%{bld}%s:%{rs} %{wr}warning:%{rs} ", xbasename(cmdline->argv[0]));
+	cfprintf(cmdline->cerr, "${bld}%s:${rs} ${wr}warning:${rs} ", xbasename(cmdline->argv[0]));
 }
