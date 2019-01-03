@@ -15,7 +15,12 @@ New features:
 
 Fixes:
 
-- Extension colors from `LS_COLORS` are now case-insensitive like GNU `ls`
+- `LS_COLORS` handling has been improved:
+  - Extension colors are now case-insensitive like GNU `ls`
+  - `or` (orphan) and `mi` (missing) files are now treated differently
+  - Default colors can be unset with `di=00` or similar
+  - Specific colors fall back to more general colors when unspecified in more places
+  - `LS_COLORS` no longer needs a trailing colon
 - `-ls`/`-fls` now prints the major/minor numbers for device nodes
 - `-exec ;` is rejected rather than segfaulting
 - `bfs` now builds on old Linux versions that require `-lrt` for POSIX timers

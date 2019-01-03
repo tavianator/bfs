@@ -184,24 +184,19 @@ struct colors *parse_colors(const char *ls_colors) {
 	}
 
 	char *start = colors->data;
-	char *end;
+	size_t colon;
 	struct ext_color *ext;
-	for (end = strchr(start, ':'); *start && end; start = end + 1, end = strchr(start, ':')) {
+	for (colon = strcspn(start, ":"); *start; start += colon + 1, colon = strcspn(start, ":")) {
+		start[colon] = '\0';
+
 		char *equals = strchr(start, '=');
 		if (!equals) {
 			continue;
 		}
-
 		*equals = '\0';
-		*end = '\0';
 
 		const char *key = start;
 		const char *value = equals + 1;
-
-		// Ignore all-zero values
-		if (strspn(value, "0") == strlen(value)) {
-			continue;
-		}
 
 		if (key[0] == '*') {
 			ext = malloc(sizeof(struct ext_color));
@@ -213,6 +208,11 @@ struct colors *parse_colors(const char *ls_colors) {
 				colors->ext_list = ext;
 			}
 		} else {
+			// All-zero values should be treated like NULL, to fall
+			// back on any other relevant coloring for that file
+			if (strcmp(key, "rs") != 0 && strspn(value, "0") == strlen(value)) {
+				value = NULL;
+			}
 			set_color(colors, key, value);
 		}
 	}
@@ -307,7 +307,11 @@ static const char *ext_color(const struct colors *colors, const char *filename) 
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
 	const struct bfs_stat *sb = ftwbuf->statbuf;
 	if (!sb) {
-		return colors->orphan;
+		if (colors->missing) {
+			return colors->missing;
+		} else {
+			return colors->orphan;
+		}
 	}
 
 	const char *color = NULL;
@@ -318,7 +322,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 			color = colors->setuid;
 		} else if (sb->mode & S_ISGID) {
 			color = colors->setgid;
-		} else if (bfs_check_capabilities(ftwbuf)) {
+		} else if (colors->capable && bfs_check_capabilities(ftwbuf)) {
 			color = colors->capable;
 		} else if (sb->mode & 0111) {
 			color = colors->exec;
@@ -356,9 +360,8 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFLNK:
-		if (xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) == 0) {
-			color = colors->link;
-		} else {
+		color = colors->link;
+		if (colors->orphan && xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0) {
 			color = colors->orphan;
 		}
 		break;

@@ -53,7 +53,9 @@ function installp() {
 
 # Like a mythical touch -p
 function touchp() {
-    installp -m644 /dev/null "$1"
+    for arg; do
+        installp -m644 /dev/null "$arg"
+    done
 }
 
 # Creates a simple file+directory structure for tests
@@ -163,6 +165,29 @@ function make_deep() {
     done
 }
 make_deep "$TMP/deep"
+
+# Creates a directory structure with many different types, and therefore colors
+function make_rainbow() {
+    touchp "$1/file.txt"
+    touchp "$1/file.dat"
+    ln -s file.txt "$1/link.txt"
+    touchp "$1/mh1"
+    ln "$1/mh1" "$1/mh2"
+    mkfifo "$1/pipe"
+    # XXX: block
+    # XXX: chardev
+    ln -s nowhere "$1/broken"
+    # XXX: socket
+    touchp "$1"/s{u,g,ug}id
+    chmod u+s "$1"/su{,g}id
+    chmod g+s "$1"/s{u,}gid
+    mkdir "$1/ow" "$1"/sticky{,_ow}
+    chmod o+w "$1"/*ow
+    chmod +t "$1"/sticky*
+    touchp "$1"/exec.sh
+    chmod +x "$1"/exec.sh
+}
+make_rainbow "$TMP/rainbow"
 
 # Creates a scratch directory that tests can modify
 function make_scratch() {
@@ -582,7 +607,17 @@ bfs_tests=(
 
     # Primaries
 
-    test_colors
+    test_color
+    test_color_mh
+    test_color_mh0
+    test_color_or
+    test_color_mi
+    test_color_or_mi
+    test_color_or0_mi
+    test_color_or_mi0
+    test_color_ext
+    test_color_ext0
+    test_color_missing_colon
 
     test_execdir_plus
 
@@ -1741,8 +1776,48 @@ function test_precedence() {
     bfs_diff basic \( -name foo -type d -o -name bar -a -type f \) -print , \! -empty -type f -print
 }
 
-function test_colors() {
-    LS_COLORS= bfs_diff links -color
+function test_color() {
+    LS_COLORS= bfs_diff rainbow -color
+}
+
+function test_color_mh() {
+    LS_COLORS="mh=01:" bfs_diff rainbow -color
+}
+
+function test_color_mh0() {
+    LS_COLORS="mh=00:" bfs_diff rainbow -color
+}
+
+function test_color_or() {
+    LS_COLORS="or=01:" bfs_diff rainbow -color
+}
+
+function test_color_mi() {
+    LS_COLORS="mi=01:" bfs_diff rainbow -color
+}
+
+function test_color_or_mi() {
+    LS_COLORS="or=01;31:mi=01;33:" bfs_diff rainbow -color
+}
+
+function test_color_or0_mi() {
+    LS_COLORS="or=00:mi=01;33:" bfs_diff rainbow -color
+}
+
+function test_color_or_mi0() {
+    LS_COLORS="or=01;31:mi=00:" bfs_diff rainbow -color
+}
+
+function test_color_ext() {
+    LS_COLORS="*.txt=01:" bfs_diff rainbow -color
+}
+
+function test_color_ext0() {
+    LS_COLORS="*.txt=00:" bfs_diff rainbow -color
+}
+
+function test_color_missing_colon() {
+    LS_COLORS="*.txt=01" bfs_diff rainbow -color
 }
 
 function test_deep() {
