@@ -40,13 +40,6 @@
 #define BFS_HAS_SYS_PARAM      BFS_HAS_INCLUDE(<sys/param.h>, true)
 #define BFS_HAS_SYS_SYSMACROS  BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
 
-#if BFS_HAS_SYS_CAPABILITY
-#	include <sys/capability.h>
-#	ifdef CAP_CHOWN
-#		define BFS_HAS_POSIX1E_CAPABILITIES true
-#	endif
-#endif
-
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
 #endif

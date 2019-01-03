@@ -22,6 +22,7 @@
 #include "exec.h"
 #include "expr.h"
 #include "mtab.h"
+#include "posix1e.h"
 #include "printf.h"
 #include "stat.h"
 #include "typo.h"
