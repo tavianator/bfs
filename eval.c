@@ -22,6 +22,7 @@
 #include "dstring.h"
 #include "exec.h"
 #include "mtab.h"
+#include "posix1e.h"
 #include "printf.h"
 #include "stat.h"
 #include "util.h"

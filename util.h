@@ -205,16 +205,4 @@ int bfs_major(dev_t dev);
  */
 int bfs_minor(dev_t dev);
 
-struct BFTW;
-
-/**
- * Check if a file has a non-trvial Access Control List.
- */
-bool bfs_check_acl(const struct BFTW *ftwbuf);
-
-/**
- * Check if a file has a non-trvial capability set.
- */
-bool bfs_check_capabilities(const struct BFTW *ftwbuf);
-
 #endif // BFS_UTIL_H

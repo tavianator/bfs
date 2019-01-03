@@ -63,7 +63,23 @@ ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 
 all: bfs
 
-bfs: bftw.o color.o diag.o dstring.o eval.o exec.o main.o mtab.o opt.o parse.o printf.o spawn.o stat.o typo.o util.o
+bfs: \
+    bftw.o \
+    color.o \
+    diag.o \
+    dstring.o \
+    eval.o \
+    exec.o \
+    main.o \
+    mtab.o \
+    opt.o \
+    parse.o \
+    posix1e.o \
+    printf.o \
+    spawn.o \
+    stat.o \
+    typo.o \
+    util.o
 	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
 sanitized: CFLAGS := -g $(WFLAGS) -fsanitize=address -fsanitize=undefined

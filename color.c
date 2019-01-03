@@ -16,6 +16,7 @@
 
 #include "color.h"
 #include "bftw.h"
+#include "posix1e.h"
 #include "stat.h"
 #include "util.h"
 #include <assert.h>

@@ -174,10 +174,10 @@ function make_rainbow() {
     touchp "$1/mh1"
     ln "$1/mh1" "$1/mh2"
     mkfifo "$1/pipe"
-    # XXX: block
-    # XXX: chardev
+    # TODO: block
+    # TODO: chardev
     ln -s nowhere "$1/broken"
-    # XXX: socket
+    # TODO: socket
     touchp "$1"/s{u,g,ug}id
     chmod u+s "$1"/su{,g}id
     chmod g+s "$1"/s{u,}gid
