@@ -186,9 +186,9 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 	}
 
 	// Callers shouldn't have to check anything except the times
-	const int guaranteed = STATX_BASIC_STATS ^ (STATX_ATIME | STATX_CTIME | STATX_MTIME);
+	const unsigned int guaranteed = STATX_BASIC_STATS ^ (STATX_ATIME | STATX_CTIME | STATX_MTIME);
 	if ((xbuf.stx_mask & guaranteed) != guaranteed) {
-		errno = ENODATA;
+		errno = ENOTSUP;
 		return -1;
 	}
 
@@ -308,7 +308,7 @@ int bfs_fstat(int fd, struct bfs_stat *buf) {
 
 const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_field field) {
 	if (!(buf->mask & field)) {
-		errno = ENODATA;
+		errno = ENOTSUP;
 		return NULL;
 	}
 
