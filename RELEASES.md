@@ -5,7 +5,7 @@
 1.3
 ---
 
-**Unreleased**
+**January 2, 2019**
 
 New features:
 
