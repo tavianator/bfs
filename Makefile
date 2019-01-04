@@ -1,6 +1,6 @@
 ############################################################################
 # bfs                                                                      #
-# Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        #
+# Copyright (C) 2015-2019 Tavian Barnes <tavianator@tavianator.com>        #
 #                                                                          #
 # Permission to use, copy, modify, and/or distribute this software for any #
 # purpose with or without fee is hereby granted.                           #
@@ -15,7 +15,7 @@
 ############################################################################
 
 ifeq ($(wildcard .git),)
-VERSION := 1.3
+VERSION := 1.3.1
 else
 VERSION := $(shell git describe --always)
 endif

@@ -2,6 +2,14 @@
 ===
 
 
+1.3.1
+-----
+
+**January 3, 2019**
+
+- Fixed some portability problems affecting FreeBSD
+
+
 1.3
 ---
 
