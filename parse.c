@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -851,6 +851,34 @@ static void debug_help(CFILE *cfile) {
 	cfprintf(cfile, "  ${bld}all${rs}:    All debug flags at once.\n");
 }
 
+/** A named debug flag. */
+struct debug_flag {
+	enum debug_flags flag;
+	const char *name;
+};
+
+/** The table of debug flags. */
+struct debug_flag debug_flags[] = {
+	{DEBUG_ALL,    "all"},
+	{DEBUG_COST,   "cost"},
+	{DEBUG_EXEC,   "exec"},
+	{DEBUG_OPT,    "opt"},
+	{DEBUG_RATES,  "rates"},
+	{DEBUG_SEARCH, "search"},
+	{DEBUG_STAT,   "stat"},
+	{DEBUG_TREE,   "tree"},
+	{0},
+};
+
+/** Check if a substring matches a debug flag. */
+static bool parse_debug_flag(const char *flag, size_t len, const char *expected) {
+	if (len == strlen(expected)) {
+		return strncmp(flag, expected, len) == 0;
+	} else {
+		return false;
+	}
+}
+
 /**
  * Parse -D FLAG.
  */
@@ -858,35 +886,47 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 	struct cmdline *cmdline = state->cmdline;
 
 	const char *arg = state->argv[0];
-	const char *flag = state->argv[1];
-	if (!flag) {
-		parse_error(state, " %s needs a flag.\n\n", arg);
+	const char *flags = state->argv[1];
+	if (!flags) {
+		parse_error(state, "%s needs a flag.\n\n", arg);
 		debug_help(cmdline->cerr);
 		return NULL;
 	}
 
-	if (strcmp(flag, "help") == 0) {
-		debug_help(cmdline->cout);
-		state->just_info = true;
-		return NULL;
-	} else if (strcmp(flag, "cost") == 0) {
-		cmdline->debug |= DEBUG_COST;
-	} else if (strcmp(flag, "exec") == 0) {
-		cmdline->debug |= DEBUG_EXEC;
-	} else if (strcmp(flag, "opt") == 0) {
-		cmdline->debug |= DEBUG_OPT;
-	} else if (strcmp(flag, "rates") == 0) {
-		cmdline->debug |= DEBUG_RATES;
-	} else if (strcmp(flag, "search") == 0) {
-		cmdline->debug |= DEBUG_SEARCH;
-	} else if (strcmp(flag, "stat") == 0) {
-		cmdline->debug |= DEBUG_STAT;
-	} else if (strcmp(flag, "tree") == 0) {
-		cmdline->debug |= DEBUG_TREE;
-	} else if (strcmp(flag, "all") == 0) {
-		cmdline->debug |= DEBUG_ALL;
-	} else {
-		parse_warning(state, "Unrecognized debug flag '%s'.\n\n", flag);
+	bool unrecognized = false;
+
+	for (const char *flag = flags, *next; flag; flag = next) {
+		size_t len = strcspn(flag, ",");
+		if (flag[len]) {
+			next = flag + len + 1;
+		} else {
+			next = NULL;
+		}
+
+		if (parse_debug_flag(flag, len, "help")) {
+			debug_help(cmdline->cout);
+			state->just_info = true;
+			return NULL;
+		}
+
+		for (int i = 0; ; ++i) {
+			const char *expected = debug_flags[i].name;
+			if (!expected) {
+				parse_warning(state, "Unrecognized debug flag '");
+				fwrite(flag, 1, len, stderr);
+				fputs("'\n\n", stderr);
+				unrecognized = true;
+				break;
+			}
+
+			if (parse_debug_flag(flag, len, expected)) {
+				cmdline->debug |= debug_flags[i].flag;
+				break;
+			}
+		}
+	}
+
+	if (unrecognized) {
 		debug_help(cmdline->cerr);
 		cfprintf(cmdline->cerr, "\n");
 	}
@@ -3004,26 +3044,21 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		cfprintf(cerr, "${cyn}-O%d${rs} ", cmdline->optlevel);
 	}
 
-	if (cmdline->debug & DEBUG_COST) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}cost${rs} ");
-	}
-	if (cmdline->debug & DEBUG_EXEC) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}exec${rs} ");
-	}
-	if (cmdline->debug & DEBUG_OPT) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}opt${rs} ");
-	}
-	if (cmdline->debug & DEBUG_RATES) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}rates${rs} ");
-	}
-	if (cmdline->debug & DEBUG_SEARCH) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}search${rs} ");
-	}
-	if (cmdline->debug & DEBUG_STAT) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}stat${rs} ");
-	}
-	if (cmdline->debug & DEBUG_TREE) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}tree${rs} ");
+	enum debug_flags debug = cmdline->debug;
+	if (debug) {
+		cfprintf(cerr, "${cyn}-D${rs} ");
+		for (int i = 0; debug; ++i) {
+			enum debug_flags flag = debug_flags[i].flag;
+			const char *name = debug_flags[i].name;
+			if ((debug & flag) == flag) {
+				cfprintf(cerr, "${bld}%s${rs}", name);
+				debug ^= flag;
+				if (debug) {
+					cfprintf(cerr, ",");
+				}
+			}
+		}
+		cfprintf(cerr, " ");
 	}
 
 	for (struct root *root = cmdline->roots; root; root = root->next) {

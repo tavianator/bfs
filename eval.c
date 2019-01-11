@@ -96,14 +96,16 @@ static void eval_report_error(struct eval_state *state) {
 	}
 }
 
-#define DEBUG_FLAG(flags, flag)			\
-	if ((flags & flag) || flags == flag) {	\
-		fputs(#flag, stderr);		\
-		flags ^= flag;			\
-		if (flags) {			\
-			fputs(" | ", stderr);	\
-		}				\
-	}
+#define DEBUG_FLAG(flags, flag)				\
+	do {						\
+		if ((flags & flag) || flags == flag) {	\
+			fputs(#flag, stderr);		\
+			flags ^= flag;			\
+			if (flags) {			\
+				fputs(" | ", stderr);	\
+			}				\
+		}					\
+	} while (0)
 
 /**
  * Debug stat() calls.
