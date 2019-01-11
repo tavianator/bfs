@@ -2,6 +2,15 @@
 ===
 
 
+1.3.2
+-----
+
+**January 11, 2019**
+
+- Fixed an out-of-bounds read if LS_COLORS doesn't end with a `:`
+- Allowed multiple debug flags to be specified like `-D opt,tree`
+
+
 1.3.1
 -----
 
