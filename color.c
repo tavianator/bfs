@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -184,23 +184,23 @@ struct colors *parse_colors(const char *ls_colors) {
 		goto done;
 	}
 
-	char *start = colors->data;
-	size_t colon;
-	struct ext_color *ext;
-	for (colon = strcspn(start, ":"); *start; start += colon + 1, colon = strcspn(start, ":")) {
-		start[colon] = '\0';
+	for (char *chunk = colors->data, *next; chunk; chunk = next) {
+		next = strchr(chunk, ':');
+		if (next) {
+			*next++ = '\0';
+		}
 
-		char *equals = strchr(start, '=');
+		char *equals = strchr(chunk, '=');
 		if (!equals) {
 			continue;
 		}
 		*equals = '\0';
 
-		const char *key = start;
+		const char *key = chunk;
 		const char *value = equals + 1;
 
 		if (key[0] == '*') {
-			ext = malloc(sizeof(struct ext_color));
+			struct ext_color *ext = malloc(sizeof(*ext));
 			if (ext) {
 				ext->ext = key + 1;
 				ext->len = strlen(ext->ext);
