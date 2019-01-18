@@ -134,4 +134,5 @@ Alternatively, `bfs` may already be packaged for your distribution of choice:
 For example:
 
     # apt install bfs                  # Debian/Ubuntu
-    # brew install tavianator/tap/bfs  # macOS Homebrew
+    $ sudo port install bfs            # MacPorts
+    $ brew install tavianator/tap/bfs  # macOS Homebrew
