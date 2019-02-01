@@ -94,7 +94,7 @@ tests/mksock: tests/mksock.o
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-check: all
+check: all tests/mksock
 	./tests.sh
 
 distcheck:
@@ -107,7 +107,7 @@ endif
 	+$(MAKE) -Bs check
 
 clean:
-	$(RM) bfs *.o *.d
+	$(RM) bfs *.[od] tests/mksock tests/*.[od]
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin

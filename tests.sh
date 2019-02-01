@@ -22,6 +22,16 @@ umask 022
 export LC_ALL=C
 export TZ=UTC
 
+function _realpath() {
+    (
+        cd "${1%/*}"
+        echo "$PWD/${1##*/}"
+    )
+}
+
+BFS="$(_realpath ./bfs)"
+TESTS="$(_realpath ./tests)"
+
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
 chown "$(id -u):$(id -g)" "$TMP"
@@ -177,7 +187,7 @@ function make_rainbow() {
     # TODO: block
     # TODO: chardev
     ln -s nowhere "$1/broken"
-    # TODO: socket
+    "$TESTS/mksock" "$1/socket"
     touchp "$1"/s{u,g,ug}id
     chmod u+s "$1"/su{,g}id
     chmod g+s "$1"/s{u,}gid
@@ -194,16 +204,6 @@ function make_scratch() {
     mkdir -p "$1"
 }
 make_scratch "$TMP/scratch"
-
-function _realpath() {
-    (
-        cd "${1%/*}"
-        echo "$PWD/${1##*/}"
-    )
-}
-
-BFS="$(_realpath ./bfs)"
-TESTS="$(_realpath ./tests)"
 
 posix_tests=(
     # General parsing
