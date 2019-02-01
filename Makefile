@@ -54,6 +54,9 @@ LOCAL_LDLIBS :=
 ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
 LOCAL_LDLIBS += -lacl -lcap -lrt
+
+# These libraries are not build with msan, so disable them
+MSAN_CFLAGS := -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
@@ -82,17 +85,26 @@ bfs: \
     util.o
 	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-sanitized: CFLAGS := -g $(WFLAGS) -fsanitize=address -fsanitize=undefined
-sanitized: bfs
-
 release: CFLAGS := -g $(WFLAGS) -O3 -flto -DNDEBUG
 release: bfs
+
+tests/mksock: tests/mksock.o
+	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 check: all
 	./tests.sh
+
+distcheck:
+	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -fsanitize=undefined -fsanitize=address"
+ifneq ($(OS),Darwin)
+	+$(MAKE) -Bs check CC=clang CFLAGS="$(CFLAGS) $(MSAN_CFLAGS) -fsanitize=memory"
+	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -m32"
+endif
+	+$(MAKE) -Bs release check
+	+$(MAKE) -Bs check
 
 clean:
 	$(RM) bfs *.o *.d
@@ -107,6 +119,6 @@ uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 	$(RM) $(DESTDIR)$(PREFIX)/share/man/man1/bfs.1
 
-.PHONY: all release check clean install uninstall
+.PHONY: all release check distcheck clean install uninstall
 
 -include $(wildcard *.d)
