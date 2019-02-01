@@ -787,6 +787,11 @@ function invoke_bfs() {
     $BFS "$@"
 }
 
+# Return value when bfs fails
+EX_BFS=10
+# Return value when a difference is detected
+EX_DIFF=20
+
 function bfs_diff() (
     bfs_verbose "$@"
 
@@ -802,9 +807,16 @@ function bfs_diff() (
     fi
 
     $BFS "$@" | bfs_sort >"$ACTUAL"
+    local STATUS="${PIPESTATUS[0]}"
 
     if [ ! "$UPDATE" ]; then
-        diff -u "$EXPECTED" "$ACTUAL"
+        diff -u "$EXPECTED" "$ACTUAL" || return $EX_DIFF
+    fi
+
+    if [ "$STATUS" -eq 0 ]; then
+        return 0
+    else
+        return $EX_BFS
     fi
 )
 
@@ -890,7 +902,7 @@ function test_depth_error() {
     chmod +r scratch/foo
     rm -rf scratch/*
 
-    return $ret
+    [ $ret -eq $EX_BFS ]
 }
 
 function test_name() {
@@ -1046,10 +1058,12 @@ function test_L_loops() {
 
 function test_L_loops_continue() {
     bfs_diff -L loops 2>/dev/null
+    [ $? -eq $EX_BFS ]
 }
 
 function test_X() {
     bfs_diff -X weirdnames 2>/dev/null
+    [ $? -eq $EX_BFS ]
 }
 
 function test_follow() {
@@ -1708,7 +1722,7 @@ function test_printf_Y_error() {
     chmod +x scratch/foo
     rm -rf scratch/*
 
-    return $ret
+    [ $ret -eq $EX_BFS ]
 }
 
 function test_fstype() {
