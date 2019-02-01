@@ -43,6 +43,7 @@ char *dstralloc(size_t capacity) {
 
 	header->capacity = capacity;
 	header->length = 0;
+	header->data[0] = '\0';
 	return header->data;
 }
 
