@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2017 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -24,16 +24,31 @@
 #include <unistd.h>
 
 /**
- * Ensure that a file descriptor is open.
+ * Make sure the standard streams std{in,out,err} are open.  If they are not,
+ * future open() calls may use those file descriptors, and std{in,out,err} will
+ * use them unintentionally.
  */
-static int ensure_fd_open(int fd, int flags) {
-	if (isopen(fd)) {
-		return 0;
-	} else if (redirect(fd, "/dev/null", flags) >= 0) {
-		return 0;
-	} else {
+static int open_std_streams() {
+#ifdef O_PATH
+	const int inflags = O_PATH, outflags = O_PATH;
+#else
+	// These are intentionally backwards so that bfs >&- still fails with EBADF
+	const int inflags = O_WRONLY, outflags = O_RDONLY;
+#endif
+
+	if (!isopen(STDERR_FILENO) && redirect(STDERR_FILENO, "/dev/null", outflags) < 0) {
 		return -1;
 	}
+	if (!isopen(STDOUT_FILENO) && redirect(STDOUT_FILENO, "/dev/null", outflags) < 0) {
+		perror("redirect()");
+		return -1;
+	}
+	if (!isopen(STDIN_FILENO) && redirect(STDIN_FILENO, "/dev/null", inflags) < 0) {
+		perror("redirect()");
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
@@ -42,13 +57,8 @@ static int ensure_fd_open(int fd, int flags) {
 int main(int argc, char *argv[]) {
 	int ret = EXIT_FAILURE;
 
-	if (ensure_fd_open(STDIN_FILENO, O_RDONLY) != 0) {
-		goto done;
-	}
-	if (ensure_fd_open(STDOUT_FILENO, O_WRONLY) != 0) {
-		goto done;
-	}
-	if (ensure_fd_open(STDERR_FILENO, O_WRONLY) != 0) {
+	// Make sure the standard streams are open
+	if (open_std_streams() != 0) {
 		goto done;
 	}
 

@@ -21,7 +21,7 @@
 #include "util.h"
 #include <stdbool.h>
 
-#if BFS_HAS_SYS_CAPABILITY && !__FreeBSD__
+#if !defined(BFS_HAS_POSIX1E_CAPABILITIES) && BFS_HAS_SYS_CAPABILITY && !__FreeBSD__
 #	include <sys/capability.h>
 #	ifdef CAP_CHOWN
 #		define BFS_HAS_POSIX1E_CAPABILITIES true

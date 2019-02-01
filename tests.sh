@@ -22,6 +22,16 @@ umask 022
 export LC_ALL=C
 export TZ=UTC
 
+function _realpath() {
+    (
+        cd "${1%/*}"
+        echo "$PWD/${1##*/}"
+    )
+}
+
+BFS="$(_realpath ./bfs)"
+TESTS="$(_realpath ./tests)"
+
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
 chown "$(id -u):$(id -g)" "$TMP"
@@ -177,7 +187,7 @@ function make_rainbow() {
     # TODO: block
     # TODO: chardev
     ln -s nowhere "$1/broken"
-    # TODO: socket
+    "$TESTS/mksock" "$1/socket"
     touchp "$1"/s{u,g,ug}id
     chmod u+s "$1"/su{,g}id
     chmod g+s "$1"/s{u,}gid
@@ -194,16 +204,6 @@ function make_scratch() {
     mkdir -p "$1"
 }
 make_scratch "$TMP/scratch"
-
-function _realpath() {
-    (
-        cd "${1%/*}"
-        echo "$PWD/${1##*/}"
-    )
-}
-
-BFS="$(_realpath ./bfs)"
-TESTS="$(_realpath ./tests)"
 
 posix_tests=(
     # General parsing
@@ -289,6 +289,11 @@ posix_tests=(
 
     test_user_name
     test_user_id
+
+    # Closed file descriptors
+    test_closed_stdin
+    test_closed_stdout
+    test_closed_stderr
 
     # PATH_MAX handling
     test_deep
@@ -385,8 +390,10 @@ bsd_tests=(
     test_nouser
 
     test_ok_stdin
+    test_ok_closed_stdin
 
     test_okdir_stdin
+    test_okdir_closed_stdin
 
     test_perm_000_plus
     test_perm_222_plus
@@ -525,8 +532,10 @@ gnu_tests=(
 
     test_nouser
 
+    test_ok_closed_stdin
     test_ok_nothing
 
+    test_okdir_closed_stdin
     test_okdir_plus_semicolon
 
     test_perm_000_slash
@@ -787,6 +796,11 @@ function invoke_bfs() {
     $BFS "$@"
 }
 
+# Return value when bfs fails
+EX_BFS=10
+# Return value when a difference is detected
+EX_DIFF=20
+
 function bfs_diff() (
     bfs_verbose "$@"
 
@@ -802,9 +816,16 @@ function bfs_diff() (
     fi
 
     $BFS "$@" | bfs_sort >"$ACTUAL"
+    local STATUS="${PIPESTATUS[0]}"
 
     if [ ! "$UPDATE" ]; then
-        diff -u "$EXPECTED" "$ACTUAL"
+        diff -u "$EXPECTED" "$ACTUAL" || return $EX_DIFF
+    fi
+
+    if [ "$STATUS" -eq 0 ]; then
+        return 0
+    else
+        return $EX_BFS
     fi
 )
 
@@ -890,7 +911,7 @@ function test_depth_error() {
     chmod +r scratch/foo
     rm -rf scratch/*
 
-    return $ret
+    [ $ret -eq $EX_BFS ]
 }
 
 function test_name() {
@@ -1046,10 +1067,12 @@ function test_L_loops() {
 
 function test_L_loops_continue() {
     bfs_diff -L loops 2>/dev/null
+    [ $? -eq $EX_BFS ]
 }
 
 function test_X() {
     bfs_diff -X weirdnames 2>/dev/null
+    [ $? -eq $EX_BFS ]
 }
 
 function test_follow() {
@@ -1708,7 +1731,7 @@ function test_printf_Y_error() {
     chmod +x scratch/foo
     rm -rf scratch/*
 
-    return $ret
+    [ $ret -eq $EX_BFS ]
 }
 
 function test_fstype() {
@@ -1913,6 +1936,26 @@ function test_fprint_error() {
     if [ -e /dev/full ]; then
         ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/null
     fi
+}
+
+function test_closed_stdin() {
+    bfs_diff basic <&-
+}
+
+function test_ok_closed_stdin() {
+    bfs_diff basic -ok echo \; <&- 2>/dev/null
+}
+
+function test_okdir_closed_stdin() {
+    bfs_diff basic -okdir echo {} \; <&- 2>/dev/null
+}
+
+function test_closed_stdout() {
+    ! invoke_bfs basic >&- 2>/dev/null
+}
+
+function test_closed_stderr() {
+    ! invoke_bfs basic >&- 2>&-
 }
 
 if [ -t 1 -a ! "$VERBOSE" ]; then

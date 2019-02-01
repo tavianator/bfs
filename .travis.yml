@@ -1,37 +1,24 @@
 language: c
 
-script: make check
+script: make distcheck
 
 addons:
   apt:
     packages:
-      - acl-dev
+      - gcc-multilib
+      - libacl1-dev
+      - libacl1:i386
       - libcap-dev
+      - libcap2:i386
 
 matrix:
   include:
     - os: linux
-      dist: trusty
-      sudo: false
-      compiler: gcc
-
-    - os: linux
-      dist: trusty
-      sudo: false
-      compiler: gcc
-      env:
-        - CFLAGS="-m32 -g -Wall"
-      addons:
-        apt:
-          packages:
-            - gcc-multilib
-            - acl-dev:i386
-            - libcap-dev:i386
-
-    - os: linux
-      dist: trusty
-      sudo: false
-      compiler: clang
+      dist: xenial
+      before_script:
+        # Ubuntu doesn't let you install the -dev packages for both amd64 and
+        # i386 at once, so we make our own symlinks to fix -m32 -lacl -lcap
+        - sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
+        - sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
 
     - os: osx
-      compiler: clang

@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -27,33 +27,44 @@
 
 // Some portability concerns
 
+#ifdef __has_feature
+#	define BFS_HAS_FEATURE(feature, fallback) __has_feature(feature)
+#else
+#	define BFS_HAS_FEATURE(feature, fallback) fallback
+#endif
+
 #ifdef __has_include
 #	define BFS_HAS_INCLUDE(header, fallback) __has_include(header)
 #else
 #	define BFS_HAS_INCLUDE(header, fallback) fallback
 #endif
 
-#define BFS_HAS_MNTENT         BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
-#define BFS_HAS_SYS_ACL        BFS_HAS_INCLUDE(<sys/acl.h>, true)
-#define BFS_HAS_SYS_CAPABILITY BFS_HAS_INCLUDE(<sys/capability.h>, __linux__)
-#define BFS_HAS_SYS_MKDEV      BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
-#define BFS_HAS_SYS_PARAM      BFS_HAS_INCLUDE(<sys/param.h>, true)
-#define BFS_HAS_SYS_SYSMACROS  BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
+#ifndef BFS_HAS_MNTENT
+#	define BFS_HAS_MNTENT BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
+#endif
+
+#ifndef BFS_HAS_SYS_ACL
+#	define BFS_HAS_SYS_ACL BFS_HAS_INCLUDE(<sys/acl.h>, true)
+#endif
+
+#ifndef BFS_HAS_SYS_CAPABILITY
+#	define BFS_HAS_SYS_CAPABILITY BFS_HAS_INCLUDE(<sys/capability.h>, __linux__)
+#endif
+
+#ifndef BFS_HAS_SYS_MKDEV
+#	define BFS_HAS_SYS_MKDEV BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
+#endif
+
+#ifndef BFS_HAS_SYS_PARAM
+#	define BFS_HAS_SYS_PARAM BFS_HAS_INCLUDE(<sys/param.h>, true)
+#endif
+
+#ifndef BFS_HAS_SYS_SYSMACROS
+#	define BFS_HAS_SYS_SYSMACROS BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
+#endif
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
-#endif
-
-#ifndef S_ISDOOR
-#	define S_ISDOOR(mode) false
-#endif
-
-#ifndef S_ISPORT
-#	define S_ISPORT(mode) false
-#endif
-
-#ifndef S_ISWHT
-#	define S_ISWHT(mode) false
 #endif
 
 #ifndef O_DIRECTORY

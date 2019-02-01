@@ -60,42 +60,6 @@ struct eval_state {
 	struct bfs_stat xstatbuf;
 };
 
-/**
- * Print an error message.
- */
-BFS_FORMATTER(2, 3)
-static void eval_error(const struct eval_state *state, const char *format, ...) {
-	int error = errno;
-	const struct cmdline *cmdline = state->cmdline;
-
-	bfs_error(cmdline, "%pP: ", state->ftwbuf);
-
-	va_list args;
-	va_start(args, format);
-	errno = error;
-	cvfprintf(cmdline->cerr, format, args);
-	va_end(args);
-}
-
-/**
- * Check if an error should be ignored.
- */
-static bool eval_should_ignore(const struct eval_state *state, int error) {
-	return state->cmdline->ignore_races
-		&& is_nonexistence_error(error)
-		&& state->ftwbuf->depth > 0;
-}
-
-/**
- * Report an error that occurs during evaluation.
- */
-static void eval_report_error(struct eval_state *state) {
-	if (!eval_should_ignore(state, errno)) {
-		eval_error(state, "%m.\n");
-		*state->ret = EXIT_FAILURE;
-	}
-}
-
 #define DEBUG_FLAG(flags, flag)				\
 	do {						\
 		if ((flags & flag) || flags == flag) {	\
@@ -143,17 +107,80 @@ static void debug_stat(const struct eval_state *state, int at_flags, enum bfs_st
 /**
  * Perform a bfs_stat() call if necessary.
  */
-static const struct bfs_stat *eval_stat(struct eval_state *state) {
+static const struct bfs_stat *eval_try_stat(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-	if (!ftwbuf->statbuf) {
-		debug_stat(state, ftwbuf->at_flags, BFS_STAT_BROKEN_OK);
-		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->statbuf) == 0) {
-			ftwbuf->statbuf = &state->statbuf;
-		} else {
-			eval_report_error(state);
-		}
+
+	if (ftwbuf->statbuf) {
+		goto done;
 	}
+
+	if (ftwbuf->error) {
+		errno = ftwbuf->error;
+		goto done;
+	}
+
+	debug_stat(state, ftwbuf->at_flags, BFS_STAT_BROKEN_OK);
+
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->statbuf) == 0) {
+		ftwbuf->statbuf = &state->statbuf;
+	} else {
+		ftwbuf->error = errno;
+	}
+
+done:
 	return ftwbuf->statbuf;
+}
+
+/**
+ * Print an error message.
+ */
+BFS_FORMATTER(2, 3)
+static void eval_error(struct eval_state *state, const char *format, ...) {
+	int error = errno;
+	const struct cmdline *cmdline = state->cmdline;
+	CFILE *cerr = cmdline->cerr;
+
+	if (cerr->colors) {
+		eval_try_stat(state);
+	}
+
+	bfs_error(cmdline, "%pP: ", state->ftwbuf);
+
+	va_list args;
+	va_start(args, format);
+	errno = error;
+	cvfprintf(cerr, format, args);
+	va_end(args);
+}
+
+/**
+ * Check if an error should be ignored.
+ */
+static bool eval_should_ignore(const struct eval_state *state, int error) {
+	return state->cmdline->ignore_races
+		&& is_nonexistence_error(error)
+		&& state->ftwbuf->depth > 0;
+}
+
+/**
+ * Report an error that occurs during evaluation.
+ */
+static void eval_report_error(struct eval_state *state) {
+	if (!eval_should_ignore(state, errno)) {
+		eval_error(state, "%m.\n");
+		*state->ret = EXIT_FAILURE;
+	}
+}
+
+/**
+ * Perform a bfs_stat() call if necessary.
+ */
+static const struct bfs_stat *eval_stat(struct eval_state *state) {
+	const struct bfs_stat *ret = eval_try_stat(state);
+	if (!ret) {
+		eval_report_error(state);
+	}
+	return ret;
 }
 
 /**
@@ -235,7 +262,7 @@ bool eval_capable(const struct expr *expr, struct eval_state *state) {
 /**
  * Get the given timespec field out of a stat buffer.
  */
-static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, const struct eval_state *state) {
+static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, struct eval_state *state) {
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
 	if (!ret) {
 		eval_error(state, "Couldn't get file %s: %m.\n", bfs_stat_field_name(field));

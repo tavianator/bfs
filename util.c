@@ -85,8 +85,6 @@ bool isopen(int fd) {
 }
 
 int redirect(int fd, const char *path, int flags, ...) {
-	close(fd);
-
 	mode_t mode = 0;
 	if (flags & O_CREAT) {
 		va_list args;
@@ -102,11 +100,9 @@ int redirect(int fd, const char *path, int flags, ...) {
 	int ret = open(path, flags, mode);
 
 	if (ret >= 0 && ret != fd) {
-		int other = ret;
-		ret = dup2(other, fd);
-		if (close(other) != 0) {
-			ret = -1;
-		}
+		int orig = ret;
+		ret = dup2(orig, fd);
+		close(orig);
 	}
 
 	return ret;
