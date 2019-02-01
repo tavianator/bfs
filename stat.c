@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -161,6 +162,12 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, enum bfs_
  * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
  */
 static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int mask, struct statx *buf) {
+	// -fsanitize=memory doesn't know about statx(), so tell it the memory
+	// got initialized
+#if BFS_HAS_FEATURE(memory_sanitizer, false)
+	memset(buf, 0, sizeof(*buf));
+#endif
+
 #if HAVE_STATX
 	return statx(at_fd, at_path, at_flags, mask, buf);
 #else

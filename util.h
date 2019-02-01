@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -26,6 +26,12 @@
 #include <time.h>
 
 // Some portability concerns
+
+#ifdef __has_feature
+#	define BFS_HAS_FEATURE(feature, fallback) __has_feature(feature)
+#else
+#	define BFS_HAS_FEATURE(feature, fallback) fallback
+#endif
 
 #ifdef __has_include
 #	define BFS_HAS_INCLUDE(header, fallback) __has_include(header)
