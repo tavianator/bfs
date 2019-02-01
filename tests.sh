@@ -290,6 +290,11 @@ posix_tests=(
     test_user_name
     test_user_id
 
+    # Closed file descriptors
+    test_closed_stdin
+    test_closed_stdout
+    test_closed_stderr
+
     # PATH_MAX handling
     test_deep
 
@@ -385,8 +390,10 @@ bsd_tests=(
     test_nouser
 
     test_ok_stdin
+    test_ok_closed_stdin
 
     test_okdir_stdin
+    test_okdir_closed_stdin
 
     test_perm_000_plus
     test_perm_222_plus
@@ -525,8 +532,10 @@ gnu_tests=(
 
     test_nouser
 
+    test_ok_closed_stdin
     test_ok_nothing
 
+    test_okdir_closed_stdin
     test_okdir_plus_semicolon
 
     test_perm_000_slash
@@ -1927,6 +1936,26 @@ function test_fprint_error() {
     if [ -e /dev/full ]; then
         ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/null
     fi
+}
+
+function test_closed_stdin() {
+    bfs_diff basic <&-
+}
+
+function test_ok_closed_stdin() {
+    bfs_diff basic -ok echo \; <&- 2>/dev/null
+}
+
+function test_okdir_closed_stdin() {
+    bfs_diff basic -okdir echo {} \; <&- 2>/dev/null
+}
+
+function test_closed_stdout() {
+    ! invoke_bfs basic >&- 2>/dev/null
+}
+
+function test_closed_stderr() {
+    ! invoke_bfs basic >&- 2>&-
 }
 
 if [ -t 1 -a ! "$VERBOSE" ]; then
