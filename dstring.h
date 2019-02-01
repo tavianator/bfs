@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * A dynamic string library.
+ */
+
 #ifndef BFS_DSTRING_H
 #define BFS_DSTRING_H
 

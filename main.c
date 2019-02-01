@@ -14,6 +14,37 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * - main(): the entry point for bfs(1), a breadth-first version of find(1)
+ *     - main.c        (this file)
+ *
+ * - parse_cmdline(): parses the command line into an expression tree
+ *     - cmdline.h     (declares the parsed command line structure)
+ *     - expr.h        (declares the expression tree nodes)
+ *     - parse.c       (the parser itself)
+ *     - opt.c         (the expression optimizer)
+ *
+ * - eval_cmdline(): runs the expression on every file it sees
+ *     - eval.[ch]     (the main evaluation functions)
+ *     - exec.[ch]     (implements -exec[dir]/-ok[dir])
+ *     - printf.[ch]   (implements -[f]printf)
+ *
+ * - bftw(): used by eval_cmdline() to walk the directory tree(s)
+ *     - bftw.[ch]     (an extended version of nftw(3))
+ *
+ * - Utilities:
+ *     - bfs.h         (constants about bfs itself)
+ *     - color.[ch]    (for pretty terminal colors)
+ *     - diag.[ch]     (formats diagnostic messages)
+ *     - dstring.[ch]  (a dynamic string library)
+ *     - mtab.[ch]     (parses the system's mount table)
+ *     - posix1e.[ch]  (wraps POSIX.1e functionality, if present)
+ *     - spawn.[ch]    (spawns processes)
+ *     - stat.[ch]     (wraps stat(), or statx() on Linux)
+ *     - typo.[ch]     (fuzzy matching for typos)
+ *     - util.[ch]     (everything else)
+ */
+
 #include "cmdline.h"
 #include "util.h"
 #include <errno.h>

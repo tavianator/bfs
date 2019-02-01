@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Utilities for colored output on ANSI terminals.
+ */
+
 #ifndef BFS_COLOR_H
 #define BFS_COLOR_H
 

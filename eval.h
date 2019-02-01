@@ -14,6 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * The evaluation functions that implement literal expressions like -name,
+ * -print, etc.
+ */
+
 #ifndef BFS_EVAL_H
 #define BFS_EVAL_H
 

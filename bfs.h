@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Constants about the bfs program itself.
+ */
+
 #ifndef BFS_H
 #define BFS_H
 

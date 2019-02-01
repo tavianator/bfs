@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * A file-walking API based on nftw().
+ */
+
 #ifndef BFS_BFTW_H
 #define BFS_BFTW_H
 

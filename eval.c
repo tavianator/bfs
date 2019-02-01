@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Implementation of all the literal expressions.
+ */
+
 #include "eval.h"
 #include "bftw.h"
 #include "cmdline.h"

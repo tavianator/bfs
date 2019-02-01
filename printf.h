@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Implementation of -printf/-fprintf.
+ */
+
 #ifndef BFS_PRINTF_H
 #define BFS_PRINTF_H
 

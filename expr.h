@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * The expression tree representation.
+ */
+
 #ifndef BFS_EXPR_H
 #define BFS_EXPR_H
 

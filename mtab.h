@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * A facade over platform-specific APIs for enumerating mounted filesystems.
+ */
+
 #ifndef BFS_MTAB_H
 #define BFS_MTAB_H
 

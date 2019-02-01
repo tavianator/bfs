@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Representation of the parsed command line.
+ */
+
 #ifndef BFS_CMDLINE_H
 #define BFS_CMDLINE_H
 

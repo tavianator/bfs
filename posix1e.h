@@ -14,6 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * The withdrawn POSIX.1e standard specified a security API for POSIX systems.
+ * Although it was never ratified, many of its interfaces are widely deployed
+ * in Unix-like systems.  These functions wrap the POSIX.1e APIs if present,
+ * to support things like Access Control Lists and Capabilities.
+ */
+
 #ifndef BFS_POSIX1E_H
 #define BFS_POSIX1E_H
 

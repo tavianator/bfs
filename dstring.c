@@ -27,10 +27,12 @@ struct dstring {
 	char data[];
 };
 
+/** Get the string header from the string data pointer. */
 static struct dstring *dstrheader(const char *dstr) {
 	return (struct dstring *)(dstr - offsetof(struct dstring, data));
 }
 
+/** Get the correct size for a dstring with the given capacity. */
 static size_t dstrsize(size_t capacity) {
 	return sizeof(struct dstring) + capacity + 1;
 }
@@ -81,6 +83,7 @@ int dstresize(char **dstr, size_t length) {
 	return 0;
 }
 
+/** Common implementation of dstr{cat,ncat,app}. */
 static int dstrcat_impl(char **dest, const char *src, size_t srclen) {
 	size_t oldlen = dstrlen(*dest);
 	size_t newlen = oldlen + srclen;

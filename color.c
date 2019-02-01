@@ -29,6 +29,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/**
+ * A color for a file extension.
+ */
 struct ext_color {
 	const char *ext;
 	size_t len;
@@ -38,6 +41,9 @@ struct ext_color {
 	struct ext_color *next;
 };
 
+/**
+ * The parsed form of LS_COLORS.
+ */
 struct colors {
 	const char *reset;
 	const char *bold;
@@ -77,6 +83,9 @@ struct colors {
 	char *data;
 };
 
+/**
+ * A named color for parsing and lookup.
+ */
 struct color_name {
 	const char *name;
 	size_t offset;
@@ -84,6 +93,9 @@ struct color_name {
 
 #define COLOR_NAME(name, field) {name, offsetof(struct colors, field)}
 
+/**
+ * All the known color names that can be referenced in LS_COLORS.
+ */
 static const struct color_name color_names[] = {
 	COLOR_NAME("bd", block),
 	COLOR_NAME("bld", bold),
@@ -118,6 +130,7 @@ static const struct color_name color_names[] = {
 	{0},
 };
 
+/** Get a color from the table. */
 static const char **get_color(const struct colors *colors, const char *name) {
 	for (const struct color_name *entry = color_names; entry->name; ++entry) {
 		if (strcmp(name, entry->name) == 0) {
@@ -128,6 +141,7 @@ static const char **get_color(const struct colors *colors, const char *name) {
 	return NULL;
 }
 
+/** Set the value of a color. */
 static void set_color(struct colors *colors, const char *name, const char *value) {
 	const char **color = get_color(colors, name);
 	if (color) {
@@ -288,6 +302,7 @@ int cfclose(CFILE *cfile) {
 	return ret;
 }
 
+/** Get the color for a file by its extension. */
 static const char *ext_color(const struct colors *colors, const char *filename) {
 	size_t namelen = strlen(filename);
 
@@ -305,6 +320,7 @@ static const char *ext_color(const struct colors *colors, const char *filename) 
 	return NULL;
 }
 
+/** Get the color for a file. */
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
 	const struct bfs_stat *sb = ftwbuf->statbuf;
 	if (!sb) {
@@ -394,6 +410,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 	return color;
 }
 
+/** Print an ANSI escape sequence. */
 static int print_esc(const char *esc, FILE *file) {
 	if (fputs("\033[", file) == EOF) {
 		return -1;
@@ -408,6 +425,7 @@ static int print_esc(const char *esc, FILE *file) {
 	return 0;
 }
 
+/** Print a string with an optional color. */
 static int print_colored(const struct colors *colors, const char *esc, const char *str, size_t len, FILE *file) {
 	if (esc) {
 		if (print_esc(esc, file) != 0) {
@@ -426,6 +444,7 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 	return 0;
 }
 
+/** Print the path to a file with the appropriate colors. */
 static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
@@ -450,6 +469,7 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	return 0;
 }
 
+/** Print a link target with the appropriate colors. */
 static int print_link(CFILE *cfile, const struct BFTW *ftwbuf) {
 	int ret = -1;
 

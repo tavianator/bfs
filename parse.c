@@ -14,6 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * The command line parser.  Expressions are parsed by recursive descent, with a
+ * grammar described in the comments of the parse_*() functions.  The parser
+ * also accepts flags and paths at any point in the expression, by treating
+ * flags like always-true options, and skipping over paths wherever they appear.
+ */
+
 #include "bfs.h"
 #include "cmdline.h"
 #include "diag.h"

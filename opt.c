@@ -14,6 +14,31 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * The expression optimizer.  Different optimization levels are supported:
+ *
+ * -O1: basic logical simplifications, like folding (-true -and -foo) to -foo.
+ *
+ * -O2: dead code elimination and data flow analysis.  struct opt_facts is used
+ * to record data flow facts that are true at various points of evaluation.
+ * Specifically, struct opt_facts records the facts that must be true before an
+ * expression is evaluated (state->facts), and those that must be true after the
+ * expression is evaluated, given that it returns true (state->facts_when_true)
+ * or false (state->facts_when_true).  Additionally, state->facts_when_impure
+ * records the possible data flow facts before any expressions with side effects
+ * are evaluated.
+ *
+ * -O3: expression re-ordering to reduce expected cost.  In an expression like
+ * (-foo -and -bar), if both -foo and -bar are pure (no side effects), they can
+ * be re-ordered to (-bar -and -foo).  This is profitable if the expected cost
+ * is lower for the re-ordered expression, for example if -foo is very slow or
+ * -bar is likely to return false.
+ *
+ * -O4/-Ofast: aggressive optimizations that may affect correctness in corner
+ * cases.  The main effect is to use facts_when_impure to determine if any side-
+ * effects are reachable at all, and skipping the traversal if not.
+ */
+
 #include "cmdline.h"
 #include "color.h"
 #include "eval.h"

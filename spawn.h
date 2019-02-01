@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * A process-spawning library inspired by posix_spawn().
+ */
+
 #ifndef BFS_SPAWN_H
 #define BFS_SPAWN_H
 

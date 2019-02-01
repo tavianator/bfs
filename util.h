@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Assorted utilities that don't belong anywhere else.
+ */
+
 #ifndef BFS_UTIL_H
 #define BFS_UTIL_H
 

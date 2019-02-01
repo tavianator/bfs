@@ -14,6 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+/**
+ * Implementation of -exec/-execdir/-ok/-okdir.
+ */
+
 #ifndef BFS_EXEC_H
 #define BFS_EXEC_H
 

@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2018 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -13,6 +13,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
+
+/**
+ * A facade over the stat() API that unifies some details that diverge between
+ * implementations, like the names of the timespec fields and the presence of
+ * file "birth" times.  On new enough Linux kernels, the facade is backed by
+ * statx() instead, and so it exposes a similar interface with a mask for which
+ * fields were successfully returned.
+ */
 
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
