@@ -2323,12 +2323,9 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "Usage: ${ex}%s${rs} [${cyn}flags${rs}...] [${mag}paths${rs}...] [${blu}expression${rs}...]\n\n",
 		 state->command);
 
-	cfprintf(cout, "${ex}bfs${rs} is compatible with ${ex}find${rs}; see ${ex}find${rs} ${blu}-help${rs} or"
-	               " ${ex}man${rs} ${bld}find${rs} for help with ${ex}find${rs}-\n"
-	               "compatible options :)\n\n");
-
-	cfprintf(cout, "${cyn}flags${rs} (${cyn}-H${rs}/${cyn}-L${rs}/${cyn}-P${rs} etc.), ${mag}paths${rs}, and"
-	               " ${blu}expressions${rs} may be freely mixed in any order.\n\n");
+	cfprintf(cout, "${ex}bfs${rs} is compatible with ${ex}find${rs}, with some extensions. "
+		       "${cyn}Flags${rs} (${cyn}-H${rs}/${cyn}-L${rs}/${cyn}-P${rs} etc.), ${mag}paths${rs},\n"
+		       "and ${blu}expressions${rs} may be freely mixed in any order.\n\n");
 
 	cfprintf(cout, "${bld}POSIX find features:${rs}\n\n");
 
