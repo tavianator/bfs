@@ -67,18 +67,6 @@
 #	define FNM_CASEFOLD FNM_IGNORECASE
 #endif
 
-#ifndef S_ISDOOR
-#	define S_ISDOOR(mode) false
-#endif
-
-#ifndef S_ISPORT
-#	define S_ISPORT(mode) false
-#endif
-
-#ifndef S_ISWHT
-#	define S_ISWHT(mode) false
-#endif
-
 #ifndef O_DIRECTORY
 #	define O_DIRECTORY 0
 #endif
