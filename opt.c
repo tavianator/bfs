@@ -619,6 +619,13 @@ static void infer_icmp_facts(struct opt_state *state, const struct expr *expr, e
 	}
 }
 
+/** Infer data flow facts about a -samefile expression. */
+static void infer_samefile_facts(struct opt_state *state, const struct expr *expr) {
+	struct range *range_when_true = state->facts_when_true.ranges + INUM_RANGE;
+	constrain_min(range_when_true, expr->ino);
+	constrain_max(range_when_true, expr->ino);
+}
+
 /** Infer data flow facts about a -type expression. */
 static void infer_type_facts(struct opt_state *state, const struct expr *expr) {
 	state->facts_when_true.types &= expr->idata;
@@ -643,6 +650,8 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		infer_icmp_facts(state, expr, INUM_RANGE);
 	} else if (expr->eval == eval_links) {
 		infer_icmp_facts(state, expr, LINKS_RANGE);
+	} else if (expr->eval == eval_samefile) {
+		infer_samefile_facts(state, expr);
 	} else if (expr->eval == eval_size) {
 		infer_icmp_facts(state, expr, SIZE_RANGE);
 	} else if (expr->eval == eval_type) {
