@@ -2264,6 +2264,10 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			type = BFTW_SOCK;
 			type_prob = 0.0000116881;
 			break;
+		case 'w':
+			type = BFTW_WHT;
+			type_prob = 0.000001;
+			break;
 
 		case '\0':
 			parse_error(state, "%s %s: Expected a type flag.\n", expr->argv[0], expr->argv[1]);
