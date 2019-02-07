@@ -386,8 +386,10 @@ bsd_tests=(
     test_newerma
 
     test_nogroup
+    test_nogroup_ulimit
 
     test_nouser
+    test_nouser_ulimit
 
     test_ok_stdin
     test_ok_closed_stdin
@@ -529,8 +531,10 @@ gnu_tests=(
     test_newerma
 
     test_nogroup
+    test_nogroup_ulimit
 
     test_nouser
+    test_nouser_ulimit
 
     test_ok_closed_stdin
     test_ok_nothing
@@ -1653,8 +1657,20 @@ function test_nogroup() {
     bfs_diff basic -nogroup
 }
 
+function test_nogroup_ulimit() {
+    closefrom 4
+    ulimit -n 16
+    bfs_diff deep -nogroup
+}
+
 function test_nouser() {
     bfs_diff basic -nouser
+}
+
+function test_nouser_ulimit() {
+    closefrom 4
+    ulimit -n 16
+    bfs_diff deep -nouser
 }
 
 function test_printf() {
