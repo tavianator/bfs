@@ -1127,12 +1127,12 @@ static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
- * Parse -d, -depth.
+ * Parse -d.
  */
 static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
 	state->cmdline->flags |= BFTW_DEPTH;
 	state->depth_arg = state->argv[0];
-	return parse_nullary_option(state);
+	return parse_nullary_flag(state);
 }
 
 /**
