@@ -28,7 +28,7 @@
  * future open() calls may use those file descriptors, and std{in,out,err} will
  * use them unintentionally.
  */
-static int open_std_streams() {
+static int open_std_streams(void) {
 #ifdef O_PATH
 	const int inflags = O_PATH, outflags = O_PATH;
 #else

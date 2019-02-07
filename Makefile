@@ -29,7 +29,7 @@ INSTALL ?= install
 MKDIR ?= mkdir -p
 RM ?= rm -f
 
-WFLAGS ?= -Wall -Wmissing-declarations
+WFLAGS ?= -Wall -Wmissing-declarations -Wstrict-prototypes
 CFLAGS ?= -g $(WFLAGS)
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)

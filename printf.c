@@ -420,7 +420,7 @@ static void free_directive(struct bfs_printf_directive *directive) {
 /**
  * Create a new printf directive.
  */
-static struct bfs_printf_directive *new_directive() {
+static struct bfs_printf_directive *new_directive(void) {
 	struct bfs_printf_directive *directive = malloc(sizeof(*directive));
 	if (!directive) {
 		perror("malloc()");

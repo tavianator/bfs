@@ -272,7 +272,7 @@ bool is_nonexistence_error(int error) {
 }
 
 /** Read a line from standard input. */
-static char *xgetline() {
+static char *xgetline(void) {
 	char *line = dstralloc(0);
 	if (!line) {
 		return NULL;
