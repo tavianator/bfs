@@ -369,7 +369,16 @@ bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	return getgrgid(statbuf->gid) == NULL;
+	errno = 0;
+	if (getgrgid(statbuf->gid) == NULL) {
+		if (errno == 0) {
+			return true;
+		} else {
+			eval_report_error(state);
+		}
+	}
+
+	return false;
 }
 
 /**
@@ -381,7 +390,16 @@ bool eval_nouser(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	return getpwuid(statbuf->uid) == NULL;
+	errno = 0;
+	if (getpwuid(statbuf->uid) == NULL) {
+		if (errno == 0) {
+			return true;
+		} else {
+			eval_report_error(state);
+		}
+	}
+
+	return false;
 }
 
 /**

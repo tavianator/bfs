@@ -1658,6 +1658,7 @@ static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2
 	struct expr *expr = parse_nullary_test(state, eval_nogroup);
 	if (expr) {
 		expr->cost = 9000.0;
+		expr->ephemeral_fds = 1;
 	}
 	return expr;
 }
@@ -1688,6 +1689,7 @@ static struct expr *parse_nouser(struct parser_state *state, int arg1, int arg2)
 	struct expr *expr = parse_nullary_test(state, eval_nouser);
 	if (expr) {
 		expr->cost = 9000.0;
+		expr->ephemeral_fds = 1;
 	}
 	return expr;
 }
