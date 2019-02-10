@@ -2,6 +2,20 @@
 ===
 
 
+1.3.3
+-----
+
+**February 10, 2019**
+
+- Fixed unpredictable behaviour for empty responses to `-ok`/`-okdir` caused by an uninitialized string
+- Writing to standard output now causes `bfs` to fail if the descriptor was closed
+- Fixed incomplete file coloring in error messages
+- Added some data flow optimizations
+- Fixed `-nogroup`/`-nouser` in big directory trees
+- Added `-type w` for whiteouts, as supported by FreeBSD `find`
+- Re-wrote the `-help` message and manual page
+
+
 1.3.2
 -----
 
