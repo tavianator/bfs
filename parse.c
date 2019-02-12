@@ -2477,7 +2477,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-nouser${rs}\n");
 	cfprintf(cout, "      Find files owned by nonexistent groups/users\n");
 	cfprintf(cout, "  ${blu}-path${rs} ${bld}GLOB${rs}\n");
-	cfprintf(cout, "  ${blu}-wholename{rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "  ${blu}-wholename${rs} ${bld}GLOB${rs}\n");
 	cfprintf(cout, "      Find files whose entire path matches the ${bld}GLOB${rs}\n");
 	cfprintf(cout, "  ${blu}-perm${rs} ${bld}[-]MODE${rs}\n");
 	cfprintf(cout, "      Find files with a matching mode\n");
