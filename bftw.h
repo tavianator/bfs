@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -125,7 +125,7 @@ enum bftw_action {
  * @return
  *         An action value.
  */
-typedef enum bftw_action bftw_fn(struct BFTW *ftwbuf, void *ptr);
+typedef enum bftw_action bftw_callback(struct BFTW *ftwbuf, void *ptr);
 
 /**
  * Flags that control bftw() behavior.
@@ -148,6 +148,20 @@ enum bftw_flags {
 };
 
 /**
+ * Structure for holding the arguments passed to bftw().
+ */
+struct bftw_args {
+	/** The callback to invoke. */
+	bftw_callback *callback;
+	/** A pointer which is passed to the callback. */
+	void *ptr;
+	/** The maximum number of file descriptors to keep open. */
+	int nopenfd;
+	/** Flags that control bftw() behaviour. */
+	enum bftw_flags flags;
+};
+
+/**
  * Breadth First Tree Walk (or Better File Tree Walk).
  *
  * Like ftw(3) and nftw(3), this function walks a directory tree recursively,
@@ -156,17 +170,11 @@ enum bftw_flags {
  *
  * @param path
  *         The starting path.
- * @param fn
- *         The callback to invoke.
- * @param nopenfd
- *         The maximum number of file descriptors to keep open.
- * @param flags
- *         Flags that control bftw() behavior.
- * @param ptr
- *         A generic pointer which is passed to fn().
+ * @param args
+ *         The arguments that control the walk.
  * @return
  *         0 on success, or -1 on failure.
  */
-int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void *ptr);
+int bftw(const char *path, const struct bftw_args *args);
 
 #endif // BFS_BFTW_H

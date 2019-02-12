@@ -764,11 +764,11 @@ static int bftw_stat(struct BFTW *ftwbuf, struct bfs_stat *sb) {
  */
 struct bftw_state {
 	/** bftw() callback. */
-	bftw_fn *fn;
-	/** bftw() flags. */
-	int flags;
+	bftw_callback *callback;
 	/** bftw() callback data. */
 	void *ptr;
+	/** bftw() flags. */
+	enum bftw_flags flags;
 
 	/** The appropriate errno value, if any. */
 	int error;
@@ -795,21 +795,21 @@ struct bftw_state {
 /**
  * Initialize the bftw() state.
  */
-static int bftw_state_init(struct bftw_state *state, const char *root, bftw_fn *fn, int nopenfd, int flags, void *ptr) {
+static int bftw_state_init(struct bftw_state *state, const char *root, const struct bftw_args *args) {
 	state->root = root;
-	state->fn = fn;
-	state->flags = flags;
-	state->ptr = ptr;
+	state->callback = args->callback;
+	state->ptr = args->ptr;
+	state->flags = args->flags;
 
 	state->error = 0;
 
-	if (nopenfd < 2) {
+	if (args->nopenfd < 2) {
 		errno = EMFILE;
 		goto err;
 	}
 
 	// -1 to account for dup()
-	if (bftw_cache_init(&state->cache, nopenfd - 1) != 0) {
+	if (bftw_cache_init(&state->cache, args->nopenfd - 1) != 0) {
 		goto err;
 	}
 
@@ -972,7 +972,7 @@ static enum bftw_action bftw_visit_path(struct bftw_state *state) {
 	// Defensive copy
 	struct BFTW ftwbuf = state->ftwbuf;
 
-	enum bftw_action action = state->fn(&ftwbuf, state->ptr);
+	enum bftw_action action = state->callback(&ftwbuf, state->ptr);
 	switch (action) {
 	case BFTW_CONTINUE:
 	case BFTW_SKIP_SIBLINGS:
@@ -1113,9 +1113,9 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	}
 }
 
-int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void *ptr) {
+int bftw(const char *path, const struct bftw_args *args) {
 	struct bftw_state state;
-	if (bftw_state_init(&state, path, fn, nopenfd, flags, ptr) != 0) {
+	if (bftw_state_init(&state, path, args) != 0) {
 		return -1;
 	}
 
@@ -1163,7 +1163,7 @@ int bftw(const char *path, bftw_fn *fn, int nopenfd, enum bftw_flags flags, void
 
 			if (state.ftwbuf.typeflag == BFTW_DIR) {
 				const struct bfs_stat *statbuf = state.ftwbuf.statbuf;
-				if ((flags & BFTW_XDEV)
+				if ((args->flags & BFTW_XDEV)
 				    && statbuf
 				    && statbuf->dev != reader->dir->dev) {
 					goto read;

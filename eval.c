@@ -1383,8 +1383,6 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		return EXIT_SUCCESS;
 	}
 
-	int nopenfd = infer_fdlimit(cmdline);
-
 	struct callback_args args = {
 		.cmdline = cmdline,
 		.ret = EXIT_SUCCESS,
@@ -1397,14 +1395,28 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		args.seen = &seen;
 	}
 
+	struct bftw_args bftw_args = {
+		.callback = cmdline_callback,
+		.ptr = &args,
+		.nopenfd = infer_fdlimit(cmdline),
+		.flags = cmdline->flags,
+	};
+
 	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
 		if (cmdline->debug & DEBUG_SEARCH) {
-			fprintf(stderr, "bftw(\"%s\", cmdline_callback, %d, ", root->path, nopenfd);
-			dump_bftw_flags(cmdline->flags);
-			fprintf(stderr, ", &args)\n");
+			fprintf(stderr,
+				"bftw(\"%s\", { "
+				".callback = cmdline_callback, "
+				".ptr = &args, "
+				".nopenfd = %d, "
+				".flags = ",
+				root->path,
+				bftw_args.nopenfd);
+			dump_bftw_flags(bftw_args.flags);
+			fprintf(stderr, " })\n");
 		}
 
-		if (bftw(root->path, cmdline_callback, nopenfd, cmdline->flags, &args) != 0) {
+		if (bftw(root->path, &bftw_args) != 0) {
 			args.ret = EXIT_FAILURE;
 			perror("bftw()");
 		}
