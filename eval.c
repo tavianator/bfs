@@ -1400,19 +1400,26 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		.ptr = &args,
 		.nopenfd = infer_fdlimit(cmdline),
 		.flags = cmdline->flags,
+		.mtab = cmdline->mtab,
 	};
 
 	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
 		if (cmdline->debug & DEBUG_SEARCH) {
 			fprintf(stderr,
-				"bftw(\"%s\", { "
-				".callback = cmdline_callback, "
-				".ptr = &args, "
-				".nopenfd = %d, "
-				".flags = ",
-				root->path,
-				bftw_args.nopenfd);
+			        "bftw(\"%s\", { "
+			        ".callback = cmdline_callback, "
+			        ".ptr = &args, "
+			        ".nopenfd = %d, "
+			        ".flags = ",
+			        root->path,
+			        bftw_args.nopenfd);
 			dump_bftw_flags(bftw_args.flags);
+			fprintf(stderr, ", .mtab = ");
+			if (bftw_args.mtab) {
+				fprintf(stderr, "cmdline->mtab");
+			} else {
+				fprintf(stderr, "NULL");
+			}
 			fprintf(stderr, " })\n");
 		}
 

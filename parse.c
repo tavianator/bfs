@@ -1376,11 +1376,8 @@ fail:
 static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2) {
 	struct cmdline *cmdline = state->cmdline;
 	if (!cmdline->mtab) {
-		cmdline->mtab = parse_bfs_mtab();
-		if (!cmdline->mtab) {
-			parse_error(state, "Couldn't parse the mount table: %m.\n");
-			return NULL;
-		}
+		parse_error(state, "Couldn't parse the mount table: %s.\n", strerror(cmdline->mtab_error));
+		return NULL;
 	}
 
 	struct expr *expr = parse_unary_test(state, eval_fstype);
@@ -3126,6 +3123,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->cout = NULL;
 	cmdline->cerr = NULL;
 	cmdline->mtab = NULL;
+	cmdline->mtab_error = 0;
 	cmdline->mindepth = 0;
 	cmdline->maxdepth = INT_MAX;
 	cmdline->flags = BFTW_RECOVER;
@@ -3160,6 +3158,11 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	if (!cmdline->cout || !cmdline->cerr) {
 		perror("cfdup()");
 		goto fail;
+	}
+
+	cmdline->mtab = parse_bfs_mtab();
+	if (!cmdline->mtab) {
+		cmdline->mtab_error = errno;
 	}
 
 	bool stderr_tty = cmdline->cerr->colors;

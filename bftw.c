@@ -769,6 +769,8 @@ struct bftw_state {
 	void *ptr;
 	/** bftw() flags. */
 	enum bftw_flags flags;
+	/** The mount table. */
+	const struct bfs_mtab *mtab;
 
 	/** The appropriate errno value, if any. */
 	int error;
@@ -800,6 +802,7 @@ static int bftw_state_init(struct bftw_state *state, const char *root, const str
 	state->callback = args->callback;
 	state->ptr = args->ptr;
 	state->flags = args->flags;
+	state->mtab = args->mtab;
 
 	state->error = 0;
 
@@ -863,6 +866,41 @@ static int bftw_update_path(struct bftw_state *state) {
 	return 0;
 }
 
+/** Check if a stat() call is needed for this visit. */
+static bool bftw_need_stat(struct bftw_state *state) {
+	if (state->flags & BFTW_STAT) {
+		return true;
+	}
+
+	struct BFTW *ftwbuf = &state->ftwbuf;
+	if (ftwbuf->typeflag == BFTW_UNKNOWN) {
+		return true;
+	}
+
+	if (ftwbuf->typeflag == BFTW_LNK && !(ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW)) {
+		return true;
+	}
+
+	if (ftwbuf->typeflag == BFTW_DIR) {
+		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_XDEV)) {
+			return true;
+		}
+#if __linux__
+	} else if (state->mtab) {
+		// Linux fills in d_type from the underlying inode, even when
+		// the directory entry is a bind mount point.  In that case, we
+		// need to stat() to get the correct type.  We don't need to
+		// check for directories because they can only be mounted over
+		// by other directories.
+		if (bfs_maybe_mount(state->mtab, ftwbuf->path)) {
+			return true;
+		}
+#endif
+	}
+
+	return false;
+}
+
 /**
  * Initialize the buffers with data about the current path.
  */
@@ -875,8 +913,8 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 	ftwbuf->path = dir ? reader->path : state->root;
 	ftwbuf->root = state->root;
 	ftwbuf->depth = 0;
-	ftwbuf->error = reader->error;
 	ftwbuf->visit = state->visit;
+	ftwbuf->error = reader->error;
 	ftwbuf->statbuf = NULL;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
@@ -922,29 +960,24 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 		ftwbuf->at_flags = 0;
 	}
 
-	bool detect_cycles = (state->flags & BFTW_DETECT_CYCLES) && de;
-
-	bool xdev = state->flags & BFTW_XDEV;
-
-	if ((state->flags & BFTW_STAT)
-	    || ftwbuf->typeflag == BFTW_UNKNOWN
-	    || (ftwbuf->typeflag == BFTW_LNK && follow)
-	    || (ftwbuf->typeflag == BFTW_DIR && (detect_cycles || xdev))) {
+	if (bftw_need_stat(state)) {
 		if (bftw_stat(ftwbuf, &state->statbuf) != 0) {
-			ftwbuf->error = errno;
 			ftwbuf->typeflag = BFTW_ERROR;
+			ftwbuf->error = errno;
 			return;
 		}
+	}
 
-		if (ftwbuf->typeflag == BFTW_DIR && detect_cycles) {
-			dev_t dev = ftwbuf->statbuf->dev;
-			ino_t ino = ftwbuf->statbuf->ino;
-			for (const struct bftw_dir *parent = dir; parent; parent = parent->parent) {
-				if (dev == parent->dev && ino == parent->ino) {
-					ftwbuf->error = ELOOP;
-					ftwbuf->typeflag = BFTW_ERROR;
-					return;
-				}
+	if (ftwbuf->typeflag == BFTW_DIR && (state->flags & BFTW_DETECT_CYCLES)) {
+		const struct bfs_stat *statbuf = ftwbuf->statbuf;
+		for (const struct bftw_dir *parent = dir; parent; parent = parent->parent) {
+			if (parent->depth == ftwbuf->depth) {
+				continue;
+			}
+			if (parent->dev == statbuf->dev && parent->ino == statbuf->ino) {
+				ftwbuf->typeflag = BFTW_ERROR;
+				ftwbuf->error = ELOOP;
+				return;
 			}
 		}
 	}

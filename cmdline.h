@@ -75,6 +75,8 @@ struct cmdline {
 
 	/** Table of mounted file systems. */
 	struct bfs_mtab *mtab;
+	/** The error that occurred parsing the mount table, if any. */
+	int mtab_error;
 
 	/** -mindepth option. */
 	int mindepth;

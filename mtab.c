@@ -19,6 +19,7 @@
 #include "util.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -49,13 +50,20 @@
 #endif
 
 struct bfs_mtab {
+	/** A map from device ID to file system type. */
 	struct trie types;
+	/** The names of all the mount points. */
+	struct trie names;
 };
 
 /**
  * Add an entry to the mount table.
  */
-static int bfs_mtab_add(struct bfs_mtab *mtab, dev_t dev, const char *type) {
+static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, dev_t dev, const char *type) {
+	if (!trie_insert_str(&mtab->names, xbasename(path))) {
+		return -1;
+	}
+
 	struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &dev, sizeof(dev));
 	if (!leaf) {
 		return -1;
@@ -91,6 +99,7 @@ struct bfs_mtab *parse_bfs_mtab() {
 		goto fail_file;
 	}
 	trie_init(&mtab->types);
+	trie_init(&mtab->names);
 
 	struct mntent *mnt;
 	while ((mnt = getmntent(file))) {
@@ -99,7 +108,7 @@ struct bfs_mtab *parse_bfs_mtab() {
 			continue;
 		}
 
-		if (bfs_mtab_add(mtab, sb.dev, mnt->mnt_type) != 0) {
+		if (bfs_mtab_add(mtab, mnt->mnt_dir, sb.dev, mnt->mnt_type) != 0) {
 			goto fail_mtab;
 		}
 	}
@@ -127,6 +136,7 @@ fail:
 		goto fail;
 	}
 	trie_init(&mtab->types);
+	trie_init(&mtab->names);
 
 	for (struct statfs *mnt = mntbuf; mnt < mntbuf + size; ++mnt) {
 		struct bfs_stat sb;
@@ -134,7 +144,7 @@ fail:
 			continue;
 		}
 
-		if (bfs_mtab_add(mtab, sb.dev, mnt->f_fstypename) != 0) {
+		if (bfs_mtab_add(mtab, mnt->f_mntonname, sb.dev, mnt->f_fstypename) != 0) {
 			goto fail_mtab;
 		}
 	}
@@ -158,6 +168,7 @@ fail:
 		goto fail_file;
 	}
 	trie_init(&mtab->types);
+	trie_init(&mtab->names);
 
 	struct mnttab mnt;
 	while (getmntent(file, &mnt) == 0) {
@@ -166,7 +177,7 @@ fail:
 			continue;
 		}
 
-		if (bfs_mtab_add(mtab, sb.dev, mnt.mnt_fstype) != 0) {
+		if (bfs_mtab_add(mtab, mnt.mnt_mountp, sb.dev, mnt.mnt_fstype) != 0) {
 			goto fail_mtab;
 		}
 	}
@@ -197,15 +208,22 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 	}
 }
 
+bool bfs_maybe_mount(const struct bfs_mtab *mtab, const char *path) {
+	const char *name = xbasename(path);
+	return trie_find_str(&mtab->names, name);
+}
+
 void free_bfs_mtab(struct bfs_mtab *mtab) {
 	if (mtab) {
+		trie_destroy(&mtab->names);
+
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&mtab->types))) {
 			free((char *)leaf->value);
 			trie_remove_mem(&mtab->types, leaf->key, leaf->length);
 		}
-
 		trie_destroy(&mtab->types);
+
 		free(mtab);
 	}
 }

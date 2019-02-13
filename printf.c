@@ -630,11 +630,8 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				break;
 			case 'F':
 				if (!cmdline->mtab) {
-					cmdline->mtab = parse_bfs_mtab();
-					if (!cmdline->mtab) {
-						bfs_error(cmdline, "Couldn't parse the mount table: %m.\n");
-						goto directive_error;
-					}
+					bfs_error(cmdline, "Couldn't parse the mount table: %s.\n", strerror(cmdline->mtab_error));
+					goto directive_error;
 				}
 				directive->fn = bfs_printf_F;
 				directive->mtab = cmdline->mtab;

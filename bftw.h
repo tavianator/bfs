@@ -21,6 +21,7 @@
 #ifndef BFS_BFTW_H
 #define BFS_BFTW_H
 
+#include "mtab.h"
 #include "stat.h"
 #include <stddef.h>
 
@@ -159,6 +160,8 @@ struct bftw_args {
 	int nopenfd;
 	/** Flags that control bftw() behaviour. */
 	enum bftw_flags flags;
+	/** The parsed mount table, if available. */
+	const struct bfs_mtab *mtab;
 };
 
 /**
