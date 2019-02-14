@@ -2421,7 +2421,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}min${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified ${bld}N${rs} minutes ago\n");
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}newer${rs} ${bld}FILE${rs}\n");
-	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified more recently than ${bld}FILE${rs} was modified\n");
+	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified more recently than ${bld}FILE${rs} was\n"
+	               "modified\n");
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}time${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified ${bld}N${rs} days ago\n");
 #if BFS_HAS_POSIX1E_CAPABILITIES
@@ -2520,8 +2521,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-fprint${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "  ${blu}-fprint0${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "  ${blu}-fprintf${rs} ${bld}FORMAT${rs} ${bld}FILE${rs}\n");
-	cfprintf(cout, "      Like ${blu}-ls${rs}/${blu}-print${rs}/${blu}-print0${rs}/${blu}-printf${rs}, but write to"
-	               " ${bld}FILE${rs} instead of standard output\n");
+	cfprintf(cout, "      Like ${blu}-ls${rs}/${blu}-print${rs}/${blu}-print0${rs}/${blu}-printf${rs}, but write to ${bld}FILE${rs} instead of standard\n"
+	               "output\n");
 	cfprintf(cout, "  ${blu}-ls${rs}\n");
 	cfprintf(cout, "      List files like ${ex}ls${rs} ${bld}-dils${rs}\n");
 	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
