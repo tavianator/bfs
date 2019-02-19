@@ -185,7 +185,7 @@ function make_rainbow() {
     ln "$1/mh1" "$1/mh2"
     mkfifo "$1/pipe"
     # TODO: block
-    # TODO: chardev
+    ln -s /dev/null "$1/chardev_link"
     ln -s nowhere "$1/broken"
     "$TESTS/mksock" "$1/socket"
     touchp "$1"/s{u,g,ug}id
@@ -621,6 +621,7 @@ bfs_tests=(
     # Primaries
 
     test_color
+    test_color_L
     test_color_mh
     test_color_mh0
     test_color_or
@@ -1817,6 +1818,10 @@ function test_precedence() {
 
 function test_color() {
     LS_COLORS= bfs_diff rainbow -color
+}
+
+function test_color_L() {
+    LS_COLORS= bfs_diff -L rainbow -color
 }
 
 function test_color_mh() {
