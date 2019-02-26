@@ -81,6 +81,7 @@ bfs: \
     printf.o \
     spawn.o \
     stat.o \
+    trie.o \
     typo.o \
     util.o
 	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
