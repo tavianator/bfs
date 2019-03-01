@@ -29,6 +29,7 @@
 #include "posix1e.h"
 #include "printf.h"
 #include "stat.h"
+#include "trie.h"
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
@@ -1134,6 +1135,30 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 	return eval_expr(expr->rhs, state);
 }
 
+/** Check if we've seen a file before. */
+static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
+	const struct bfs_stat *statbuf = eval_stat(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	// Glue the device and inode numbers together as a unique ID
+	unsigned char id[sizeof(statbuf->dev) + sizeof(statbuf->ino)];
+	memcpy(id, &statbuf->dev, sizeof(statbuf->dev));
+	memcpy(id + sizeof(statbuf->dev), &statbuf->ino, sizeof(statbuf->ino));
+
+	int ret = trie_meminsert(seen, id, sizeof(id));
+	if (ret > 0) {
+		state->action = BFTW_SKIP_SUBTREE;
+		return false;
+	} else if (ret < 0) {
+		eval_report_error(state);
+		return false;
+	} else {
+		return true;
+	}
+}
+
 /**
  * Dump the bftw_typeflag for -D search.
  */
@@ -1193,6 +1218,8 @@ static const char *dump_bftw_action(enum bftw_action action) {
 struct callback_args {
 	/** The parsed command line. */
 	const struct cmdline *cmdline;
+	/** The set of seen files. */
+	struct trie *seen;
 	/** Eventual return value from eval_cmdline(). */
 	int ret;
 	/** Whether to quit immediately. */
@@ -1226,6 +1253,12 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		}
 		state.action = BFTW_SKIP_SUBTREE;
 		goto done;
+	}
+
+	if (cmdline->unique) {
+		if (!eval_file_unique(&state, args->seen)) {
+			goto done;
+		}
 	}
 
 	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
@@ -1357,6 +1390,12 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		.quit = false,
 	};
 
+	struct trie seen;
+	if (cmdline->unique) {
+		trie_init(&seen);
+		args.seen = &seen;
+	}
+
 	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
 		if (cmdline->debug & DEBUG_SEARCH) {
 			fprintf(stderr, "bftw(\"%s\", cmdline_callback, %d, ", root->path, nopenfd);
@@ -1376,6 +1415,10 @@ int eval_cmdline(const struct cmdline *cmdline) {
 
 	if (cmdline->debug & DEBUG_RATES) {
 		dump_cmdline(cmdline, true);
+	}
+
+	if (cmdline->unique) {
+		trie_destroy(&seen);
 	}
 
 	return args.ret;

@@ -648,6 +648,10 @@ bfs_tests=(
 
     test_type_multi
 
+    test_unique
+    test_L_unique
+    test_L_unique_loops
+
     test_xtype_multi
     test_xtype_reorder
 
@@ -1977,6 +1981,18 @@ function test_closed_stdout() {
 
 function test_closed_stderr() {
     ! invoke_bfs basic >&- 2>&-
+}
+
+function test_unique() {
+    bfs_diff links/{file,symlink,hardlink} -unique
+}
+
+function test_L_unique() {
+    bfs_diff -L links/{file,symlink,hardlink} -unique
+}
+
+function test_L_unique_loops() {
+    bfs_diff -L loops/deeply/nested -unique
 }
 
 if [ -t 1 -a ! "$VERBOSE" ]; then

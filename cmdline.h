@@ -96,6 +96,8 @@ struct cmdline {
 	bool xargs_safe;
 	/** Whether to ignore deletions that race with bfs. */
 	bool ignore_races;
+	/** Whether to only return unique files. */
+	bool unique;
 
 	/** The command line expression. */
 	struct expr *expr;

@@ -965,7 +965,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
  */
 static struct expr *parse_follow(struct parser_state *state, int flags, int option) {
 	struct cmdline *cmdline = state->cmdline;
-	cmdline->flags &= ~(BFTW_COMFOLLOW | BFTW_LOGICAL | BFTW_DETECT_CYCLES);
+	cmdline->flags &= ~(BFTW_COMFOLLOW | BFTW_LOGICAL);
 	cmdline->flags |= flags;
 	if (option) {
 		return parse_nullary_positional_option(state);
@@ -1425,6 +1425,14 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 fail:
 	free_expr(expr);
 	return NULL;
+}
+
+/**
+ * Parse -unique.
+ */
+static struct expr *parse_unique(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->unique = true;
+	return parse_nullary_option(state);
 }
 
 /**
@@ -2408,6 +2416,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
 	cfprintf(cout, "      Use ${bld}TYPE${rs}-flavored regexes (default: ${bld}posix-basic${rs}; see ${blu}-regextype${rs}"
 	                " ${bld}help${rs})\n");
+	cfprintf(cout, "  ${blu}-unique{rs}\n");
+	cfprintf(cout, "      Skip any files that have already been seen\n");
 	cfprintf(cout, "  ${blu}-warn${rs}\n");
 	cfprintf(cout, "  ${blu}-nowarn${rs}\n");
 	cfprintf(cout, "      Turn on or off warnings about the command line\n\n");
@@ -2590,7 +2600,7 @@ static const struct table_entry parse_table[] = {
 	{"-O", true, parse_optlevel},
 	{"-P", false, parse_follow, 0, false},
 	{"-H", false, parse_follow, BFTW_COMFOLLOW, false},
-	{"-L", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, false},
+	{"-L", false, parse_follow, BFTW_LOGICAL, false},
 	{"-X", false, parse_xargs_safe},
 	{"-a"},
 	{"-acl", false, parse_acl},
@@ -2615,7 +2625,7 @@ static const struct table_entry parse_table[] = {
 	{"-f", false, parse_f},
 	{"-false", false, parse_const, false},
 	{"-fls", false, parse_fls},
-	{"-follow", false, parse_follow, BFTW_LOGICAL | BFTW_DETECT_CYCLES, true},
+	{"-follow", false, parse_follow, BFTW_LOGICAL, true},
 	{"-fprint", false, parse_fprint},
 	{"-fprint0", false, parse_fprint0},
 	{"-fprintf", false, parse_fprintf},
@@ -2673,6 +2683,7 @@ static const struct table_entry parse_table[] = {
 	{"-true", false, parse_const, true},
 	{"-type", false, parse_type, false},
 	{"-uid", false, parse_user},
+	{"-unique", false, parse_unique},
 	{"-used", false, parse_used},
 	{"-user", false, parse_user},
 	{"-version", false, parse_version},
@@ -3061,6 +3072,9 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	if (cmdline->maxdepth != INT_MAX) {
 		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", cmdline->maxdepth);
 	}
+	if (cmdline->unique) {
+		cfprintf(cerr, "${blu}-unique${rs} ");
+	}
 
 	dump_expr(cerr, cmdline->expr, verbose);
 
@@ -3123,6 +3137,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->debug = 0;
 	cmdline->xargs_safe = false;
 	cmdline->ignore_races = false;
+	cmdline->unique = false;
 	cmdline->expr = &expr_true;
 	cmdline->open_files = NULL;
 	cmdline->nopen_files = 0;
@@ -3191,6 +3206,11 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}
+	}
+
+	if ((cmdline->flags & BFTW_LOGICAL) && !cmdline->unique) {
+		// We need bftw() to detect cycles unless -unique does it for us
+		cmdline->flags |= BFTW_DETECT_CYCLES;
 	}
 
 	if (cmdline->debug & DEBUG_TREE) {
