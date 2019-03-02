@@ -1147,14 +1147,17 @@ static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
 	memcpy(id, &statbuf->dev, sizeof(statbuf->dev));
 	memcpy(id + sizeof(statbuf->dev), &statbuf->ino, sizeof(statbuf->ino));
 
-	int ret = trie_meminsert(seen, id, sizeof(id));
-	if (ret > 0) {
-		state->action = BFTW_SKIP_SUBTREE;
-		return false;
-	} else if (ret < 0) {
+	struct trie_leaf *leaf = trie_insert_mem(seen, id, sizeof(id));
+	if (!leaf) {
 		eval_report_error(state);
 		return false;
+	}
+
+	if (leaf->value) {
+		state->action = BFTW_SKIP_SUBTREE;
+		return false;
 	} else {
+		leaf->value = leaf;
 		return true;
 	}
 }

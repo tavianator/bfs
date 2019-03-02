@@ -22,10 +22,30 @@
 #include <stdint.h>
 
 /**
- * A trie that holds a set of fixed- or dynamic-length strings.
+ * A trie that holds a set of fixed- or variable-length strings.
  */
 struct trie {
 	uintptr_t root;
+};
+
+/**
+ * A leaf of a trie.
+ */
+struct trie_leaf {
+	/**
+	 * An arbitrary value associated with this leaf.
+	 */
+	const void *value;
+
+	/**
+	 * The length of the key in bytes.
+	 */
+	size_t length;
+
+	/**
+	 * The key itself, stored inline.
+	 */
+	char key[];
 };
 
 /**
@@ -34,70 +54,56 @@ struct trie {
 void trie_init(struct trie *trie);
 
 /**
- * Check if a NUL-terminated string key exists in a trie.
+ * Find the leaf for a string key.
  *
  * @param trie
  *         The trie to search.
  * @param key
- *         The key to search for.
+ *         The key to look up.
  * @return
- *         Whether the key was found.
+ *         The found leaf, or NULL if the key is not present.
  */
-bool trie_strsearch(const struct trie *trie, const char *key);
+struct trie_leaf *trie_find_str(const struct trie *trie, const char *key);
 
 /**
- * Check if a prefix of a NUL-terminated string key exists in a trie.
+ * Find the leaf for a fixed-size key.
  *
  * @param trie
  *         The trie to search.
  * @param key
- *         The key to search for.
- * @param size
- *         The length of the prefix to consider, in bytes.
- * @return
- *         Whether the key was found.
- */
-bool trie_strnsearch(const struct trie *trie, const char *key, size_t size);
-
-/**
- * Check if a fixed-length key exists in a trie.
- *
- * @param trie
- *         The trie to search.
- * @param key
- *         The key to search for.
- * @param size
+ *         The key to look up.
+ * @param length
  *         The length of the key in bytes.
  * @return
- *         Whether the key was found.
+ *         The found leaf, or NULL if the key is not present.
  */
-bool trie_memsearch(const struct trie *trie, const void *key, size_t size);
+struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t length);
 
 /**
- * Insert a NUL-terminated string key in the trie.
+ * Insert a string key into the trie.
  *
  * @param trie
  *         The trie to modify.
  * @param key
  *         The key to insert.
  * @return
- *         0 on success, 1 if the key was already present, or -1 on error.
+ *         The inserted leaf, or NULL on failure.
  */
-int trie_strinsert(struct trie *trie, const char *key);
+struct trie_leaf *trie_insert_str(struct trie *trie, const char *key);
 
 /**
- * Insert a fixed-length key in the trie.
+ * Insert a fixed-size key into the trie.
  *
  * @param trie
  *         The trie to modify.
  * @param key
  *         The key to insert.
- * @param size
+ * @param length
  *         The length of the key in bytes.
  * @return
- *         0 on success, 1 if the key was already present, or -1 on error.
+ *         The inserted leaf, or NULL on failure.
  */
-int trie_meminsert(struct trie *trie, const void *key, size_t size);
+struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length);
 
 /**
  * Destroy a trie and its contents.
