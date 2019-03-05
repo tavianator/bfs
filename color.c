@@ -18,6 +18,7 @@
 #include "bftw.h"
 #include "posix1e.h"
 #include "stat.h"
+#include "trie.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
@@ -28,18 +29,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-/**
- * A color for a file extension.
- */
-struct ext_color {
-	const char *ext;
-	size_t len;
-
-	const char *color;
-
-	struct ext_color *next;
-};
 
 /**
  * The parsed form of LS_COLORS.
@@ -78,7 +67,7 @@ struct colors {
 	const char *warning;
 	const char *error;
 
-	struct ext_color *ext_list;
+	struct trie ext_colors;
 
 	char *data;
 };
@@ -149,6 +138,81 @@ static void set_color(struct colors *colors, const char *name, const char *value
 	}
 }
 
+/**
+ * Transform a file extension for fast lookups, by reversing and lowercasing it.
+ */
+static char *extxfrm(const char *ext) {
+	size_t len = strlen(ext);
+	char *ret = malloc(len + 1);
+	if (!ret) {
+		return NULL;
+	}
+
+	for (size_t i = 0; i < len; ++i) {
+		char c = ext[len - i - 1];
+
+		// What's internationalization?  Doesn't matter, this is what
+		// GNU ls does.  Luckily, since there's no standard C way to
+		// casefold.  Not using tolower() here since it respects the
+		// current locale.
+		if (c >= 'A' && c <= 'Z') {
+			c += 'a' - 'A';
+		}
+
+		ret[i] = c;
+	}
+
+	ret[len] = '\0';
+	return ret;
+}
+
+/**
+ * Set the color for an extension.
+ */
+static int set_ext_color(struct colors *colors, const char *key, const char *value) {
+	char *xfrm = extxfrm(key);
+	if (!xfrm) {
+		return -1;
+	}
+
+	while (true) {
+		// A later *.x should override any earlier *.x, *.y.x, etc.
+		struct trie_leaf *match = trie_find_postfix(&colors->ext_colors, xfrm);
+		if (!match) {
+			break;
+		}
+
+		trie_remove_mem(&colors->ext_colors, match->key, match->length);
+	}
+
+	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, xfrm);
+	free(xfrm);
+	if (leaf) {
+		leaf->value = value;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+/**
+ * Find a color by an extension.
+ */
+static const char *get_ext_color(const struct colors *colors, const char *filename) {
+	char *xfrm = extxfrm(filename);
+	if (!xfrm) {
+		return NULL;
+	}
+
+	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_colors, xfrm);
+	free(xfrm);
+	if (leaf) {
+		return leaf->value;
+	} else {
+		return NULL;
+	}
+}
+
 struct colors *parse_colors(const char *ls_colors) {
 	struct colors *colors = malloc(sizeof(struct colors));
 	if (!colors) {
@@ -187,8 +251,9 @@ struct colors *parse_colors(const char *ls_colors) {
 	colors->exec       = "01;32";
 	colors->warning    = "40;33;01";
 	colors->error      = "40;31;01";
-	colors->ext_list   = NULL;
 	colors->data       = NULL;
+
+	trie_init(&colors->ext_colors);
 
 	if (ls_colors) {
 		colors->data = strdup(ls_colors);
@@ -214,14 +279,7 @@ struct colors *parse_colors(const char *ls_colors) {
 		const char *value = equals + 1;
 
 		if (key[0] == '*') {
-			struct ext_color *ext = malloc(sizeof(*ext));
-			if (ext) {
-				ext->ext = key + 1;
-				ext->len = strlen(ext->ext);
-				ext->color = value;
-				ext->next = colors->ext_list;
-				colors->ext_list = ext;
-			}
+			set_ext_color(colors, key + 1, value);
 		} else {
 			// All-zero values should be treated like NULL, to fall
 			// back on any other relevant coloring for that file
@@ -238,13 +296,7 @@ done:
 
 void free_colors(struct colors *colors) {
 	if (colors) {
-		struct ext_color *ext = colors->ext_list;
-		while (ext) {
-			struct ext_color *saved = ext;
-			ext = ext->next;
-			free(saved);
-		}
-
+		trie_destroy(&colors->ext_colors);
 		free(colors->data);
 		free(colors);
 	}
@@ -302,24 +354,6 @@ int cfclose(CFILE *cfile) {
 	return ret;
 }
 
-/** Get the color for a file by its extension. */
-static const char *ext_color(const struct colors *colors, const char *filename) {
-	size_t namelen = strlen(filename);
-
-	for (const struct ext_color *ext = colors->ext_list; ext; ext = ext->next) {
-		if (namelen < ext->len) {
-			continue;
-		}
-
-		const char *suffix = filename + namelen - ext->len;
-		if (strcasecmp(suffix, ext->ext) == 0) {
-			return ext->color;
-		}
-	}
-
-	return NULL;
-}
-
 /** Get the color for a file. */
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
 	const struct bfs_stat *sb = ftwbuf->statbuf;
@@ -350,7 +384,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		}
 
 		if (!color) {
-			color = ext_color(colors, filename);
+			color = get_ext_color(colors, filename);
 		}
 
 		if (!color) {
