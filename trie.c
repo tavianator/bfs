@@ -481,6 +481,130 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 	return trie_split(ptr, key, length, rep, offset, mismatch);
 }
 
+/** Free a chain of singleton nodes. */
+static void trie_free_singletons(uintptr_t ptr) {
+	while (!trie_is_leaf(ptr)) {
+		struct trie_node *node = trie_decode_node(ptr);
+
+		// Make sure the bitmap is a power of two, i.e. it has just one child
+		assert((node->bitmap & (node->bitmap - 1)) == 0);
+
+		ptr = node->children[0];
+		free(node);
+	}
+
+	free(trie_decode_leaf(ptr));
+}
+
+/**
+ * Try to collapse a two-child node like:
+ *
+ *     parent child
+ *       |      |
+ *       v      v
+ *       *----->*----->*----->leaf
+ *       |
+ *       +----->other
+ *
+ * into
+ *
+ *     parent
+ *       |
+ *       v
+ *     other
+ */
+static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, unsigned int child_index) {
+	uintptr_t other = parent_node->children[child_index ^ 1];
+	if (!trie_is_leaf(other)) {
+		struct trie_node *other_node = trie_decode_node(other);
+		if (other_node->offset + parent_node->offset <= OFFSET_MAX) {
+			other_node->offset += parent_node->offset;
+		} else {
+			return -1;
+		}
+	}
+
+	*parent = other;
+	free(parent_node);
+	return 0;
+}
+
+bool trie_remove_str(struct trie *trie, const char *key) {
+	return trie_remove_mem(trie, key, strlen(key) + 1);
+}
+
+bool trie_remove_mem(struct trie *trie, const void *key, size_t length) {
+	uintptr_t *child = &trie->root;
+	if (!*child) {
+		return false;
+	}
+
+	uintptr_t *parent = NULL;
+	unsigned int child_bit = 0, child_index = 0;
+	size_t offset = 0;
+	while (!trie_is_leaf(*child)) {
+		struct trie_node *node = trie_decode_node(*child);
+		offset += node->offset;
+		if ((offset >> 1) >= length) {
+			return false;
+		}
+
+		unsigned char nibble = trie_key_nibble(key, offset);
+		unsigned int bit = 1U << nibble;
+		unsigned int bitmap = node->bitmap;
+		if (bitmap & bit) {
+			unsigned int index = trie_popcount(bitmap & (bit - 1));
+
+			// Advance the parent pointer, unless this node had only
+			// one child
+			if (bitmap & (bitmap - 1)) {
+				parent = child;
+				child_bit = bit;
+				child_index = index;
+			}
+
+			child = node->children + index;
+		} else {
+			return false;
+		}
+	}
+
+	const struct trie_leaf *leaf = trie_decode_leaf(*child);
+	if (leaf->length != length || memcmp(leaf->key, key, length) != 0) {
+		return false;
+	}
+
+	if (!parent) {
+		trie_free_singletons(trie->root);
+		trie->root = 0;
+		return true;
+	}
+
+	struct trie_node *node = trie_decode_node(*parent);
+	child = node->children + child_index;
+	trie_free_singletons(*child);
+
+	node->bitmap ^= child_bit;
+	unsigned int parent_size = trie_popcount(node->bitmap);
+	assert(parent_size > 0);
+	if (parent_size == 1 && trie_collapse_node(parent, node, child_index) == 0) {
+		return true;
+	}
+
+	if (child_index < parent_size) {
+		memmove(child, child + 1, (parent_size - child_index)*sizeof(*child));
+	}
+
+	if ((parent_size & (parent_size - 1)) == 0) {
+		node = realloc(node, trie_node_size(parent_size));
+		if (node) {
+			*parent = trie_encode_node(node);
+		}
+	}
+
+	return true;
+}
+
 /** Free an encoded pointer to a node. */
 static void free_trie_ptr(uintptr_t ptr) {
 	if (trie_is_leaf(ptr)) {
