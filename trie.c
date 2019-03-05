@@ -232,6 +232,88 @@ struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t
 	}
 }
 
+struct trie_leaf *trie_find_postfix(const struct trie *trie, const char *key) {
+	size_t length = strlen(key);
+	struct trie_leaf *rep = trie_representative(trie, key, length + 1);
+	if (rep && rep->length >= length && memcmp(rep->key, key, length) == 0) {
+		return rep;
+	} else {
+		return NULL;
+	}
+}
+
+/**
+ * Find a leaf that may end at the current node.
+ */
+static struct trie_leaf *trie_terminal_leaf(const struct trie_node *node) {
+	// Finding a terminating NUL byte may take two nibbles
+	for (int i = 0; i < 2; ++i) {
+		if (!(node->bitmap & 1)) {
+			break;
+		}
+
+		uintptr_t ptr = node->children[0];
+		if (trie_is_leaf(ptr)) {
+			return trie_decode_leaf(ptr);
+		} else {
+			node = trie_decode_node(ptr);
+		}
+	}
+
+	return NULL;
+}
+
+/** Check if a leaf is a prefix of a search key. */
+static bool trie_check_prefix(struct trie_leaf *leaf, size_t skip, const char *key, size_t length) {
+	if (leaf && leaf->length <= length) {
+		return memcmp(key + skip, leaf->key + skip, leaf->length - skip - 1) == 0;
+	} else {
+		return false;
+	}
+}
+
+struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
+	uintptr_t ptr = trie->root;
+	if (!ptr) {
+		return NULL;
+	}
+
+	struct trie_leaf *best = NULL;
+	size_t skip = 0;
+	size_t length = strlen(key) + 1;
+
+	size_t offset = 0;
+	while (!trie_is_leaf(ptr)) {
+		struct trie_node *node = trie_decode_node(ptr);
+		offset += node->offset;
+		if ((offset >> 1) >= length) {
+			return best;
+		}
+
+		struct trie_leaf *leaf = trie_terminal_leaf(node);
+		if (trie_check_prefix(leaf, skip, key, length)) {
+			best = leaf;
+			skip = offset >> 1;
+		}
+
+		unsigned char nibble = trie_key_nibble(key, offset);
+		unsigned int bit = 1U << nibble;
+		if (node->bitmap & bit) {
+			unsigned int index = trie_popcount(node->bitmap & (bit - 1));
+			ptr = node->children[index];
+		} else {
+			return best;
+		}
+	}
+
+	struct trie_leaf *leaf = trie_decode_leaf(ptr);
+	if (trie_check_prefix(leaf, skip, key, length)) {
+		best = leaf;
+	}
+
+	return best;
+}
+
 /** Create a new leaf, holding a copy of the given key. */
 static struct trie_leaf *new_trie_leaf(const void *key, size_t length) {
 	struct trie_leaf *leaf = malloc(sizeof(*leaf) + length);

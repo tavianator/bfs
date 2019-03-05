@@ -80,6 +80,30 @@ struct trie_leaf *trie_find_str(const struct trie *trie, const char *key);
 struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t length);
 
 /**
+ * Find the shortest leaf that starts with a given key.
+ *
+ * @param trie
+ *         The trie to search.
+ * @param key
+ *         The key to look up.
+ * @return
+ *         A leaf that starts with the given key, or NULL.
+ */
+struct trie_leaf *trie_find_postfix(const struct trie *trie, const char *key);
+
+/**
+ * Find the leaf that is the longest prefix of the given key.
+ *
+ * @param trie
+ *         The trie to search.
+ * @param key
+ *         The key to look up.
+ * @return
+ *         The longest prefix match for the given key, or NULL.
+ */
+struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key);
+
+/**
  * Insert a string key into the trie.
  *
  * @param trie
