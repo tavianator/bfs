@@ -204,14 +204,13 @@ static struct trie_leaf *trie_representative(const struct trie *trie, const void
 		struct trie_node *node = trie_decode_node(ptr);
 		offset += node->offset;
 
-		unsigned char nibble = 0;
-		if ((offset >> 1) < length) {
-			nibble = trie_key_nibble(key, offset);
-		}
-		unsigned int bit = 1U << nibble;
 		unsigned int index = 0;
-		if (node->bitmap & bit) {
-			index = trie_popcount(node->bitmap & (bit - 1));
+		if ((offset >> 1) < length) {
+			unsigned char nibble = trie_key_nibble(key, offset);
+			unsigned int bit = 1U << nibble;
+			if (node->bitmap & bit) {
+				index = trie_popcount(node->bitmap & (bit - 1));
+			}
 		}
 		ptr = node->children[index];
 	}
