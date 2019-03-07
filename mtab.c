@@ -55,7 +55,7 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-static int bfs_mtab_push(struct bfs_mtab *mtab, dev_t dev, const char *type) {
+static int bfs_mtab_add(struct bfs_mtab *mtab, dev_t dev, const char *type) {
 	struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &dev, sizeof(dev));
 	if (!leaf) {
 		return -1;
@@ -69,6 +69,7 @@ static int bfs_mtab_push(struct bfs_mtab *mtab, dev_t dev, const char *type) {
 	if (leaf->value) {
 		return 0;
 	} else {
+		trie_remove_mem(&mtab->types, leaf->key, leaf->length);
 		return -1;
 	}
 }
@@ -98,7 +99,7 @@ struct bfs_mtab *parse_bfs_mtab() {
 			continue;
 		}
 
-		if (bfs_mtab_push(mtab, sb.dev, mnt->mnt_type) != 0) {
+		if (bfs_mtab_add(mtab, sb.dev, mnt->mnt_type) != 0) {
 			goto fail_mtab;
 		}
 	}
@@ -125,13 +126,7 @@ fail:
 	if (!mtab) {
 		goto fail;
 	}
-
-	mtab->size = 0;
-	mtab->table = malloc(size*sizeof(*mtab->table));
-	if (!mtab->table) {
-		goto fail_mtab;
-	}
-	mtab->capacity = size;
+	trie_init(&mtab->types);
 
 	for (struct statfs *mnt = mntbuf; mnt < mntbuf + size; ++mnt) {
 		struct bfs_stat sb;
@@ -139,7 +134,7 @@ fail:
 			continue;
 		}
 
-		if (bfs_mtab_push(mtab, sb.dev, mnt->f_fstypename) != 0) {
+		if (bfs_mtab_add(mtab, sb.dev, mnt->f_fstypename) != 0) {
 			goto fail_mtab;
 		}
 	}
@@ -162,9 +157,7 @@ fail:
 	if (!mtab) {
 		goto fail_file;
 	}
-	mtab->table = NULL;
-	mtab->size = 0;
-	mtab->capacity = 0;
+	trie_init(&mtab->types);
 
 	struct mnttab mnt;
 	while (getmntent(file, &mnt) == 0) {
@@ -173,7 +166,7 @@ fail:
 			continue;
 		}
 
-		if (bfs_mtab_push(mtab, sb.dev, mnt.mnt_fstype) != 0) {
+		if (bfs_mtab_add(mtab, sb.dev, mnt.mnt_fstype) != 0) {
 			goto fail_mtab;
 		}
 	}
