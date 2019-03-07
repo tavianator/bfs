@@ -1142,10 +1142,8 @@ static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
 		return false;
 	}
 
-	// Glue the device and inode numbers together as a unique ID
-	unsigned char id[sizeof(statbuf->dev) + sizeof(statbuf->ino)];
-	memcpy(id, &statbuf->dev, sizeof(statbuf->dev));
-	memcpy(id + sizeof(statbuf->dev), &statbuf->ino, sizeof(statbuf->ino));
+	bfs_file_id id;
+	bfs_stat_id(statbuf, &id);
 
 	struct trie_leaf *leaf = trie_insert_mem(seen, id, sizeof(id));
 	if (!leaf) {

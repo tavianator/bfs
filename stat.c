@@ -334,3 +334,8 @@ const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_f
 		return NULL;
 	}
 }
+
+void bfs_stat_id(const struct bfs_stat *buf, bfs_file_id *id) {
+	memcpy(*id, &buf->dev, sizeof(buf->dev));
+	memcpy(*id + sizeof(buf->dev), &buf->ino, sizeof(buf->ino));
+}

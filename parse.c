@@ -246,12 +246,6 @@ struct open_file {
 	CFILE *cfile;
 	/** The path to the file (for diagnostics). */
 	const char *path;
-	/** Device number (for deduplication). */
-	dev_t dev;
-	/** Inode number (for deduplication). */
-	ino_t ino;
-	/** The next open file in the chain. */
-	struct open_file *next;
 };
 
 /**
@@ -268,9 +262,9 @@ int free_cmdline(struct cmdline *cmdline) {
 
 		free_bfs_mtab(cmdline->mtab);
 
-		struct open_file *ofile = cmdline->open_files;
-		while (ofile) {
-			struct open_file *next = ofile->next;
+		struct trie_leaf *leaf;
+		while ((leaf = trie_first_leaf(&cmdline->open_files))) {
+			struct open_file *ofile = (struct open_file *)leaf->value;
 
 			if (cfclose(ofile->cfile) != 0) {
 				if (cerr) {
@@ -280,8 +274,9 @@ int free_cmdline(struct cmdline *cmdline) {
 			}
 
 			free(ofile);
-			ofile = next;
+			trie_remove_mem(&cmdline->open_files, leaf->key, leaf->length);
 		}
+		trie_destroy(&cmdline->open_files);
 
 		if (cout && fflush(cout->file) != 0) {
 			if (cerr) {
@@ -429,26 +424,27 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 		goto out_close;
 	}
 
-	for (struct open_file *ofile = cmdline->open_files; ofile; ofile = ofile->next) {
-		if (ofile->dev == sb.dev && ofile->ino == sb.ino) {
-			expr->cfile = ofile->cfile;
-			ret = 0;
-			goto out_close;
-		}
+	bfs_file_id id;
+	bfs_stat_id(&sb, &id);
+
+	struct trie_leaf *leaf = trie_insert_mem(&cmdline->open_files, id, sizeof(id));
+	if (leaf->value) {
+		struct open_file *ofile = (struct open_file *)leaf->value;
+		expr->cfile = ofile->cfile;
+		ret = 0;
+		goto out_close;
 	}
 
 	struct open_file *ofile = malloc(sizeof(*ofile));
 	if (!ofile) {
 		perror("malloc()");
+		trie_remove_mem(&cmdline->open_files, leaf->key, leaf->length);
 		goto out_close;
 	}
 
 	ofile->cfile = cfile;
 	ofile->path = path;
-	ofile->dev = sb.dev;
-	ofile->ino = sb.ino;
-	ofile->next = cmdline->open_files;
-	cmdline->open_files = ofile;
+	leaf->value = ofile;
 	++cmdline->nopen_files;
 
 	expr->cfile = cfile;
@@ -3139,8 +3135,9 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->ignore_races = false;
 	cmdline->unique = false;
 	cmdline->expr = &expr_true;
-	cmdline->open_files = NULL;
 	cmdline->nopen_files = 0;
+
+	trie_init(&cmdline->open_files);
 
 	static char* default_argv[] = {"bfs", NULL};
 	if (argc < 1) {

@@ -126,4 +126,14 @@ int bfs_fstat(int fd, struct bfs_stat *buf);
  */
 const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_field field);
 
+/**
+ * A unique ID for a file.
+ */
+typedef unsigned char bfs_file_id[sizeof(dev_t) + sizeof(ino_t)];
+
+/**
+ * Compute a unique ID for a file.
+ */
+void bfs_stat_id(const struct bfs_stat *buf, bfs_file_id *id);
+
 #endif // BFS_STAT_H

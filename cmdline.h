@@ -22,6 +22,7 @@
 #define BFS_CMDLINE_H
 
 #include "color.h"
+#include "trie.h"
 
 /**
  * Various debugging flags.
@@ -54,11 +55,6 @@ struct root {
 	/** The next path in the list. */
 	struct root *next;
 };
-
-/**
- * An open file for the command line.
- */
-struct open_file;
 
 /**
  * The parsed command line.
@@ -103,7 +99,7 @@ struct cmdline {
 	struct expr *expr;
 
 	/** All the open files owned by the command line. */
-	struct open_file *open_files;
+	struct trie open_files;
 	/** The number of open files owned by the command line. */
 	int nopen_files;
 };
