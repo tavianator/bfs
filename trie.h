@@ -54,6 +54,16 @@ struct trie_leaf {
 void trie_init(struct trie *trie);
 
 /**
+ * Get the first (lexicographically earliest) leaf in the trie.
+ *
+ * @param trie
+ *         The trie to search.
+ * @return
+ *         The first leaf, or NULL if the trie is empty.
+ */
+struct trie_leaf *trie_first_leaf(const struct trie *trie);
+
+/**
  * Find the leaf for a string key.
  *
  * @param trie

@@ -218,6 +218,10 @@ static struct trie_leaf *trie_representative(const struct trie *trie, const void
 	return trie_decode_leaf(ptr);
 }
 
+struct trie_leaf *trie_first_leaf(const struct trie *trie) {
+	return trie_representative(trie, NULL, 0);
+}
+
 struct trie_leaf *trie_find_str(const struct trie *trie, const char *key) {
 	return trie_find_mem(trie, key, strlen(key) + 1);
 }
