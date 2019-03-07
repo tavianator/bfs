@@ -452,7 +452,7 @@ static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
 	}
 
 	*offset += OFFSET_MAX;
-	node->offset = *offset;
+	node->offset = OFFSET_MAX;
 
 	unsigned char nibble = trie_key_nibble(key, *offset);
 	node->bitmap = 1 << nibble;
