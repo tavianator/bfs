@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "mtab.h"
+#include "trie.h"
 #include "util.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -47,50 +48,29 @@
 #	include <sys/mnttab.h>
 #endif
 
-/**
- * A mount point in the mount table.
- */
-struct bfs_mtab_entry {
-	/** The device number for this mount point. */
-	dev_t dev;
-	/** The file system type of this mount point. */
-	char *type;
-};
-
 struct bfs_mtab {
-	/** The array of mtab entries. */
-	struct bfs_mtab_entry *table;
-	/** The size of the array. */
-	size_t size;
-	/** Capacity of the array. */
-	size_t capacity;
+	struct trie types;
 };
 
 /**
  * Add an entry to the mount table.
  */
 static int bfs_mtab_push(struct bfs_mtab *mtab, dev_t dev, const char *type) {
-	size_t size = mtab->size + 1;
-
-	if (size >= mtab->capacity) {
-		size_t capacity = 2*size;
-		struct bfs_mtab_entry *table = realloc(mtab->table, capacity*sizeof(*table));
-		if (!table) {
-			return -1;
-		}
-		mtab->table = table;
-		mtab->capacity = capacity;
-	}
-
-	struct bfs_mtab_entry *entry = mtab->table + (size - 1);
-	entry->dev = dev;
-	entry->type = strdup(type);
-	if (!entry->type) {
+	struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &dev, sizeof(dev));
+	if (!leaf) {
 		return -1;
 	}
 
-	mtab->size = size;
-	return 0;
+	if (leaf->value) {
+		return 0;
+	}
+
+	leaf->value = strdup(type);
+	if (leaf->value) {
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 struct bfs_mtab *parse_bfs_mtab() {
@@ -109,9 +89,7 @@ struct bfs_mtab *parse_bfs_mtab() {
 	if (!mtab) {
 		goto fail_file;
 	}
-	mtab->table = NULL;
-	mtab->size = 0;
-	mtab->capacity = 0;
+	trie_init(&mtab->types);
 
 	struct mntent *mnt;
 	while ((mnt = getmntent(file))) {
@@ -218,21 +196,23 @@ fail:
 }
 
 const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statbuf) {
-	for (struct bfs_mtab_entry *mnt = mtab->table; mnt < mtab->table + mtab->size; ++mnt) {
-		if (statbuf->dev == mnt->dev) {
-			return mnt->type;
-		}
+	const struct trie_leaf *leaf = trie_find_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));
+	if (leaf) {
+		return leaf->value;
+	} else {
+		return "unknown";
 	}
-
-	return "unknown";
 }
 
 void free_bfs_mtab(struct bfs_mtab *mtab) {
 	if (mtab) {
-		for (struct bfs_mtab_entry *mnt = mtab->table; mnt < mtab->table + mtab->size; ++mnt) {
-			free(mnt->type);
+		struct trie_leaf *leaf;
+		while ((leaf = trie_first_leaf(&mtab->types))) {
+			free((char *)leaf->value);
+			trie_remove_mem(&mtab->types, leaf->key, leaf->length);
 		}
-		free(mtab->table);
+
+		trie_destroy(&mtab->types);
 		free(mtab);
 	}
 }
