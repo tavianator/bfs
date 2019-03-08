@@ -1,6 +1,8 @@
 `bfs`
 =====
 
+<img src="https://tavianator.github.io/bfs/screenshot.svg" alt="Screenshot" align="right" />
+
 [![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/master/COPYING)
 [![LOC](https://tokei.rs/b1/github/tavianator/bfs?category=code)](https://github.com/Aaronepower/tokei)
 [![Build Status](https://api.travis-ci.org/tavianator/bfs.svg?branch=master)](https://travis-ci.org/tavianator/bfs)
@@ -96,17 +98,10 @@ Compare `bfs -nohidden` to
     find -name '.?*' -prune -o -print
 
 
-Pretty
-------
-
-When `bfs` detects that its output is a terminal, it automatically colors its output with the same colors `ls` uses.
-This makes it easier to identify relevant files at a glance.
-
-<img src="https://tavianator.github.io/bfs/screenshot.svg" alt="Screenshot" width="100%" />
-
-
 Try it!
 -------
+
+<a href="https://repology.org/metapackage/bfs"><img src="https://repology.org/badge/vertical-allrepos/bfs.svg" alt="Packaging status" align="right" /></a>
 
 To get `bfs`, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
 Then run
@@ -127,12 +122,29 @@ Finally, if you want to install it globally, run
 
     $ sudo make install
 
-Alternatively, `bfs` may already be packaged for your distribution of choice:
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/bfs.svg)](https://repology.org/metapackage/bfs)
-
+Alternatively, `bfs` may already be packaged for your distribution of choice.
 For example:
 
-    # apt install bfs                  # Debian/Ubuntu
-    $ sudo port install bfs            # MacPorts
-    $ brew install tavianator/tap/bfs  # macOS Homebrew
+### Alpine Linux
+
+    # apk add bfs
+
+### Debian/Ubuntu
+
+    # apt install bfs
+
+### NixOS
+
+    # nix-env -i bfs
+
+### Void Linux
+
+    # xbps-install -S bfs
+
+### MacPorts
+
+    # port install bfs
+
+### Homebrew
+
+    $ brew install tavianator/tap/bfs
