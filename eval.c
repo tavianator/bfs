@@ -1256,7 +1256,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 		goto done;
 	}
 
-	if (cmdline->unique) {
+	if (cmdline->unique && ftwbuf->visit == BFTW_PRE) {
 		if (!eval_file_unique(&state, args->seen)) {
 			goto done;
 		}
