@@ -631,6 +631,8 @@ bfs_tests=(
     test_color_or_mi0
     test_color_ext
     test_color_ext0
+    test_color_ext_override
+    test_color_ext_underride
     test_color_missing_colon
 
     test_execdir_plus
@@ -1864,6 +1866,14 @@ function test_color_ext() {
 
 function test_color_ext0() {
     LS_COLORS="*.txt=00:" bfs_diff rainbow -color
+}
+
+function test_color_ext_override() {
+    LS_COLORS="*.txt=01;31:*t=01;33:" bfs_diff rainbow -color
+}
+
+function test_color_ext_underride() {
+    LS_COLORS="*t=01;33:*.txt=01;31:" bfs_diff rainbow -color
 }
 
 function test_color_missing_colon() {
