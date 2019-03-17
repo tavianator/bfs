@@ -180,6 +180,7 @@ make_deep "$TMP/deep"
 function make_rainbow() {
     touchp "$1/file.txt"
     touchp "$1/file.dat"
+    touchp "$1/star".{gz,tar,tar.gz}
     ln -s file.txt "$1/link.txt"
     touchp "$1/mh1"
     ln "$1/mh1" "$1/mh2"
@@ -1924,11 +1925,11 @@ function test_color_ext0() {
 }
 
 function test_color_ext_override() {
-    LS_COLORS="*.txt=01;31:*t=01;33:" bfs_diff rainbow -color
+    LS_COLORS="*.tar.gz=01;31:*.tar=01;32:*.gz=01;33:" bfs_diff rainbow -color
 }
 
 function test_color_ext_underride() {
-    LS_COLORS="*t=01;33:*.txt=01;31:" bfs_diff rainbow -color
+    LS_COLORS="*.gz=01;33:*.tar=01;32:*.tar.gz=01;31:" bfs_diff rainbow -color
 }
 
 function test_color_missing_colon() {
