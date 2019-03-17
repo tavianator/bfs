@@ -627,8 +627,19 @@ bfs_tests=(
     test_color_or
     test_color_mi
     test_color_or_mi
-    test_color_or0_mi
     test_color_or_mi0
+    test_color_or0_mi
+    test_color_or0_mi0
+    test_color_su_sg0
+    test_color_su0_sg
+    test_color_su0_sg0
+    test_color_st_tw_ow0
+    test_color_st_tw0_ow
+    test_color_st_tw0_ow0
+    test_color_st0_tw_ow
+    test_color_st0_tw_ow0
+    test_color_st0_tw0_ow
+    test_color_st0_tw0_ow0
     test_color_ext
     test_color_ext0
     test_color_ext_override
@@ -1852,12 +1863,56 @@ function test_color_or_mi() {
     LS_COLORS="or=01;31:mi=01;33:" bfs_diff rainbow -color
 }
 
+function test_color_or_mi0() {
+    LS_COLORS="or=01;31:mi=00:" bfs_diff rainbow -color
+}
+
 function test_color_or0_mi() {
     LS_COLORS="or=00:mi=01;33:" bfs_diff rainbow -color
 }
 
-function test_color_or_mi0() {
-    LS_COLORS="or=01;31:mi=00:" bfs_diff rainbow -color
+function test_color_or0_mi0() {
+    LS_COLORS="or=00:mi=00:" bfs_diff rainbow -color
+}
+
+function test_color_su_sg0() {
+    LS_COLORS="su=37;41:sg=00:" bfs_diff rainbow -color
+}
+
+function test_color_su0_sg() {
+    LS_COLORS="su=00:sg=30;43:" bfs_diff rainbow -color
+}
+
+function test_color_su0_sg0() {
+    LS_COLORS="su=00:sg=00:" bfs_diff rainbow -color
+}
+
+function test_color_st_tw_ow0() {
+    LS_COLORS="st=37;44:tw=40;32:ow=00:" bfs_diff rainbow -color
+}
+
+function test_color_st_tw0_ow() {
+    LS_COLORS="st=37;44:tw=00:ow=34;42:" bfs_diff rainbow -color
+}
+
+function test_color_st_tw0_ow0() {
+    LS_COLORS="st=37;44:tw=00:ow=00:" bfs_diff rainbow -color
+}
+
+function test_color_st0_tw_ow() {
+    LS_COLORS="st=00:tw=40;32:ow=34;42:" bfs_diff rainbow -color
+}
+
+function test_color_st0_tw_ow0() {
+    LS_COLORS="st=00:tw=40;32:ow=00:" bfs_diff rainbow -color
+}
+
+function test_color_st0_tw0_ow() {
+    LS_COLORS="st=00:tw=00:ow=34;42:" bfs_diff rainbow -color
+}
+
+function test_color_st0_tw0_ow0() {
+    LS_COLORS="st=00:tw=00:ow=00:" bfs_diff rainbow -color
 }
 
 function test_color_ext() {

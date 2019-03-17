@@ -236,12 +236,13 @@ struct colors *parse_colors(const char *ls_colors) {
 	colors->dir        = "01;34";
 	colors->link       = "01;36";
 	colors->multi_hard = NULL;
-	colors->pipe       = "40;33";
+	colors->pipe       = "33";
 	colors->socket     = "01;35";
 	colors->door       = "01;35";
-	colors->block      = "40;33;01";
-	colors->chardev    = "40;33;01";
-	colors->orphan     = "40;31;01";
+	colors->block      = "01;33";
+	colors->chardev    = "01;33";
+	colors->orphan     = NULL;
+	colors->missing    = NULL;
 	colors->setuid     = "37;41";
 	colors->setgid     = "30;43";
 	colors->capable    = "30;41";
@@ -249,8 +250,8 @@ struct colors *parse_colors(const char *ls_colors) {
 	colors->ow         = "34;42";
 	colors->sticky     = "37;44";
 	colors->exec       = "01;32";
-	colors->warning    = "40;33;01";
-	colors->error      = "40;31;01";
+	colors->warning    = "01;33";
+	colors->error      = "01;31";
 	colors->data       = NULL;
 
 	trie_init(&colors->ext_colors);
@@ -369,17 +370,15 @@ static const char *file_color(const struct colors *colors, const char *filename,
 
 	switch (sb->mode & S_IFMT) {
 	case S_IFREG:
-		if (sb->mode & S_ISUID) {
+		if (colors->setuid && (sb->mode & 04000)) {
 			color = colors->setuid;
-		} else if (sb->mode & S_ISGID) {
+		} else if (colors->setgid && (sb->mode & 02000)) {
 			color = colors->setgid;
 		} else if (colors->capable && bfs_check_capabilities(ftwbuf)) {
 			color = colors->capable;
-		} else if (sb->mode & 0111) {
+		} else if (colors->exec && (sb->mode & 00111)) {
 			color = colors->exec;
-		}
-
-		if (!color && sb->nlink > 1) {
+		} else if (colors->multi_hard && sb->nlink > 1) {
 			color = colors->multi_hard;
 		}
 
@@ -394,26 +393,23 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFDIR:
-		if (sb->mode & S_ISVTX) {
-			if (sb->mode & S_IWOTH) {
-				color = colors->sticky_ow;
-			} else {
-				color = colors->sticky;
-			}
-		} else if (sb->mode & S_IWOTH) {
+		if (colors->sticky_ow && (sb->mode & 01002) == 01002) {
+			color = colors->sticky_ow;
+		} else if (colors->ow && (sb->mode & 00002)) {
 			color = colors->ow;
-		}
-
-		if (!color) {
+		} else if (colors->sticky && (sb->mode & 01000)) {
+			color = colors->sticky;
+		} else {
 			color = colors->dir;
 		}
 
 		break;
 
 	case S_IFLNK:
-		color = colors->link;
 		if (colors->orphan && xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0) {
 			color = colors->orphan;
+		} else {
+			color = colors->link;
 		}
 		break;
 
