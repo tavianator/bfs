@@ -41,6 +41,7 @@
  *     - posix1e.[ch]  (wraps POSIX.1e functionality, if present)
  *     - spawn.[ch]    (spawns processes)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
+ *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
  *     - util.[ch]     (everything else)
  */
