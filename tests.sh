@@ -2078,8 +2078,18 @@ function test_L_unique_depth() {
     bfs_diff -L loops/deeply/nested -unique -depth
 }
 
-if [ -t 1 -a ! "$VERBOSE" ]; then
-    in_place=yes
+EOL='\n'
+if [ -t 1 ]; then
+    RED='\033[01;31m'
+    GRN='\033[01;32m'
+    YLW='\033[01;33m'
+    RST='\033[0m'
+    if [ ! "$VERBOSE" ]; then
+        BOL='\r\033[K'
+        # Put the cursor at the last column, then write a space so the next
+        # character will wrap
+        EOL="\\033[$(tput cols)G "
+    fi
 fi
 
 passed=0
@@ -2088,11 +2098,7 @@ failed=0
 for test in ${!run_*}; do
     test=${test#run_}
 
-    if [ "$in_place" ]; then
-        printf '\r\033[J%s' "$test"
-    else
-        echo "$test"
-    fi
+    printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
 
     ("$test" "$dir")
     status=$?
@@ -2101,22 +2107,14 @@ for test in ${!run_*}; do
         ((++passed))
     else
         ((++failed))
-        if [ "$in_place" ]; then
-            printf '\r\033[J%s\n' "$test failed!"
-        else
-            echo "$test failed!"
-        fi
+        printf "${BOL}${RED}%s failed!${RST}\n" "$test"
     fi
 done
 
-if [ "$in_place" ]; then
-    printf '\r\033[J'
-fi
-
 if [ $passed -gt 0 ]; then
-    echo "tests passed: $passed"
+    printf "${BOL}${GRN}tests passed: %d${RST}\n" "$passed"
 fi
 if [ $failed -gt 0 ]; then
-    echo "tests failed: $failed"
+    printf "${BOL}${RED}tests failed: %s${RST}\n" "$failed"
     exit 1
 fi
