@@ -50,6 +50,7 @@
 
 static char *fake_and_arg = "-a";
 static char *fake_or_arg = "-o";
+static char *fake_not_arg = "!";
 
 /**
  * A contrained integer range.
@@ -433,6 +434,14 @@ static struct expr *optimize_and_expr(const struct opt_state *state, struct expr
 		} else if (lhs->always_false) {
 			debug_opt(state, "-O1: short-circuit: %e <==> %e\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
+		} else if (lhs->always_true && rhs == &expr_false) {
+			debug_opt(state, "-O1: strength reduction: %e <==> ", expr);
+			struct expr *ret = extract_child_expr(expr, &expr->lhs);
+			ret = negate_expr(ret, &fake_not_arg);
+			if (ret) {
+				debug_opt(state, "%e\n", ret);
+			}
+			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_false) {
 			debug_opt(state, "-O2: purity: %e <==> %e\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
@@ -493,6 +502,14 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 		} else if (rhs == &expr_false) {
 			debug_opt(state, "-O1: disjunctive syllogism: %e <==> %e\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
+		} else if (lhs->always_false && rhs == &expr_true) {
+			debug_opt(state, "-O1: strength reduction: %e <==> ", expr);
+			struct expr *ret = extract_child_expr(expr, &expr->lhs);
+			ret = negate_expr(ret, &fake_not_arg);
+			if (ret) {
+				debug_opt(state, "%e\n", ret);
+			}
+			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_true) {
 			debug_opt(state, "-O2: purity: %e <==> %e\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);

@@ -609,6 +609,7 @@ gnu_tests=(
     test_and_purity
     test_not_reachability
     test_comma_reachability
+    test_and_false_or_true
 )
 
 bfs_tests=(
@@ -2001,6 +2002,12 @@ function test_de_morgan_and() {
 
 function test_de_morgan_or() {
     bfs_diff basic \( \! -name 'foo' -o \! -type f \)
+}
+
+function test_and_false_or_true() {
+    # Test (-a lhs(always_true) false) <==> (! lhs),
+    # (-a lhs(always_false) true) <==> (! lhs)
+    bfs_diff basic -prune -false -o -true
 }
 
 function test_data_flow_depth() {
