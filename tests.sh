@@ -2079,6 +2079,13 @@ function test_L_unique_depth() {
 }
 
 EOL='\n'
+
+function update_eol() {
+    # Put the cursor at the last column, then write a space so the next
+    # character will wrap
+    EOL="\\033[${COLUMNS}G "
+}
+
 if [ -t 1 ]; then
     RED='\033[01;31m'
     GRN='\033[01;32m'
@@ -2086,9 +2093,8 @@ if [ -t 1 ]; then
     RST='\033[0m'
     if [ ! "$VERBOSE" ]; then
         BOL='\r\033[K'
-        # Put the cursor at the last column, then write a space so the next
-        # character will wrap
-        EOL="\\033[$(tput cols)G "
+        update_eol
+        trap update_eol WINCH
     fi
 fi
 
