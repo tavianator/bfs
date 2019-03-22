@@ -595,9 +595,11 @@ static struct expr *optimize_comma_expr(const struct opt_state *state, struct ex
 		if (expr_never_returns(lhs)) {
 			debug_opt(state, "-O1: reachability: %e <==> %e\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
-		}
-
-		if (optlevel >= 2 && lhs->pure) {
+		} else if ((lhs->always_true && rhs == &expr_true)
+			   || (lhs->always_false && rhs == &expr_false)) {
+			debug_opt(state, "-O1: redundancy elimination: %e <==> %e\n", expr, lhs);
+			return extract_child_expr(expr, &expr->lhs);
+		} else if (optlevel >= 2 && lhs->pure) {
 			debug_opt(state, "-O2: purity: %e <==> %e\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		}

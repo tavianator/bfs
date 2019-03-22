@@ -610,6 +610,8 @@ gnu_tests=(
     test_not_reachability
     test_comma_reachability
     test_and_false_or_true
+    test_comma_redundant_true
+    test_comma_redundant_false
 )
 
 bfs_tests=(
@@ -2005,9 +2007,19 @@ function test_de_morgan_or() {
 }
 
 function test_and_false_or_true() {
-    # Test (-a lhs(always_true) false) <==> (! lhs),
-    # (-a lhs(always_false) true) <==> (! lhs)
+    # Test (-a lhs(always_true) -false) <==> (! lhs),
+    # (-a lhs(always_false) -true) <==> (! lhs)
     bfs_diff basic -prune -false -o -true
+}
+
+function test_comma_redundant_true() {
+    # Test (, lhs(always_true) -true) <==> lhs,
+    bfs_diff basic -prune , -true
+}
+
+function test_comma_redundant_false() {
+    # Test (, lhs(always_false) -false) <==> lhs,
+    bfs_diff basic -print -not -prune , -false
 }
 
 function test_data_flow_depth() {
