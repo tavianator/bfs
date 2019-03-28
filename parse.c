@@ -264,7 +264,7 @@ int free_cmdline(struct cmdline *cmdline) {
 
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&cmdline->open_files))) {
-			struct open_file *ofile = (struct open_file *)leaf->value;
+			struct open_file *ofile = leaf->value;
 
 			if (cfclose(ofile->cfile) != 0) {
 				if (cerr) {
@@ -429,7 +429,7 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 
 	struct trie_leaf *leaf = trie_insert_mem(&cmdline->open_files, id, sizeof(id));
 	if (leaf->value) {
-		struct open_file *ofile = (struct open_file *)leaf->value;
+		struct open_file *ofile = leaf->value;
 		expr->cfile = ofile->cfile;
 		ret = 0;
 		goto out_close;

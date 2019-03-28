@@ -35,7 +35,7 @@ struct trie_leaf {
 	/**
 	 * An arbitrary value associated with this leaf.
 	 */
-	const void *value;
+	void *value;
 
 	/**
 	 * The length of the key in bytes.

@@ -188,7 +188,7 @@ static int set_ext_color(struct colors *colors, const char *key, const char *val
 	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, xfrm);
 	free(xfrm);
 	if (leaf) {
-		leaf->value = value;
+		leaf->value = (char *)value;
 		return 0;
 	} else {
 		return -1;

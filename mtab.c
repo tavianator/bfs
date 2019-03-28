@@ -219,7 +219,7 @@ void free_bfs_mtab(struct bfs_mtab *mtab) {
 
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&mtab->types))) {
-			free((char *)leaf->value);
+			free(leaf->value);
 			trie_remove_mem(&mtab->types, leaf->key, leaf->length);
 		}
 		trie_destroy(&mtab->types);
