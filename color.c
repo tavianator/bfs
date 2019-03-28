@@ -71,6 +71,7 @@ struct colors {
 	char *link;
 	char *orphan;
 	char *missing;
+	bool link_as_target;
 
 	char *blockdev;
 	char *chardev;
@@ -397,6 +398,7 @@ struct colors *parse_colors(const char *ls_colors) {
 	ret |= init_color(colors, "ln", "01;36", &colors->link);
 	ret |= init_color(colors, "or", NULL,    &colors->orphan);
 	ret |= init_color(colors, "mi", NULL,    &colors->missing);
+	colors->link_as_target = false;
 
 	ret |= init_color(colors, "bd", "01;33", &colors->blockdev);
 	ret |= init_color(colors, "cd", "01;33", &colors->chardev);
@@ -455,6 +457,12 @@ struct colors *parse_colors(const char *ls_colors) {
 			set_color(colors, key, value);
 			free(key);
 		}
+	}
+
+	if (colors->link && strcmp(colors->link, "target") == 0) {
+		colors->link_as_target = true;
+		dstrfree(colors->link);
+		colors->link = NULL;
 	}
 
 	return colors;
@@ -532,6 +540,15 @@ int cfclose(CFILE *cfile) {
 	return ret;
 }
 
+/** Check if a symlink is broken. */
+static bool is_link_broken(const struct BFTW *ftwbuf) {
+	if (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW) {
+		return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0;
+	} else {
+		return true;
+	}
+}
+
 /** Get the color for a file. */
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
 	const struct bfs_stat *sb = ftwbuf->statbuf;
@@ -583,7 +600,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFLNK:
-		if (colors->orphan && xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0) {
+		if (colors->orphan && is_link_broken(ftwbuf)) {
 			color = colors->orphan;
 		} else {
 			color = colors->link;
@@ -674,15 +691,11 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 	return 0;
 }
 
-/** Print the path to a file with the appropriate colors. */
-static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
+/** Print a path with colors. */
+static int print_path_colored(CFILE *cfile, const struct BFTW *ftwbuf) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
 	const char *path = ftwbuf->path;
-
-	if (!colors) {
-		return fputs(path, file) == EOF ? -1 : 0;
-	}
 
 	if (ftwbuf->nameoff > 0) {
 		if (print_colored(colors, colors->directory, path, ftwbuf->nameoff, file) != 0) {
@@ -692,15 +705,38 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 
 	const char *filename = path + ftwbuf->nameoff;
 	const char *color = file_color(colors, filename, ftwbuf);
-	if (print_colored(colors, color, filename, strlen(filename), file) != 0) {
-		return -1;
+	return print_colored(colors, color, filename, strlen(filename), file);
+}
+
+/** Call stat() again to resolve a link target. */
+static void restat(struct BFTW *ftwbuf, struct bfs_stat *statbuf) {
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, 0, statbuf) == 0) {
+		ftwbuf->statbuf = statbuf;
+	}
+}
+
+/** Print the path to a file with the appropriate colors. */
+static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
+	const struct colors *colors = cfile->colors;
+	if (!colors) {
+		return fputs(ftwbuf->path, cfile->file) == EOF ? -1 : 0;
 	}
 
-	return 0;
+	if (colors && colors->link_as_target) {
+		if (ftwbuf->typeflag == BFTW_LNK && (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW)) {
+			struct BFTW altbuf = *ftwbuf;
+			altbuf.at_flags = 0;
+			struct bfs_stat statbuf;
+			restat(&altbuf, &statbuf);
+			return print_path_colored(cfile, &altbuf);
+		}
+	}
+
+	return print_path_colored(cfile, ftwbuf);
 }
 
 /** Print a link target with the appropriate colors. */
-static int print_link(CFILE *cfile, const struct BFTW *ftwbuf) {
+static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	int ret = -1;
 
 	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, 0);
@@ -708,18 +744,21 @@ static int print_link(CFILE *cfile, const struct BFTW *ftwbuf) {
 		goto done;
 	}
 
+	if (!cfile->colors) {
+		ret = fputs(target, cfile->file) == EOF ? -1 : 0;
+		goto done;
+	}
+
 	struct BFTW altbuf = *ftwbuf;
 	altbuf.path = target;
 	altbuf.nameoff = xbasename(target) - target;
+	altbuf.at_flags = 0;
+	altbuf.statbuf = NULL;
 
 	struct bfs_stat statbuf;
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, 0, 0, &statbuf) == 0) {
-		altbuf.statbuf = &statbuf;
-	} else {
-		altbuf.statbuf = NULL;
-	}
+	restat(&altbuf, &statbuf);
 
-	ret = print_path(cfile, &altbuf);
+	ret = print_path_colored(cfile, &altbuf);
 
 done:
 	free(target);
@@ -804,7 +843,7 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 					break;
 
 				case 'L':
-					if (print_link(cfile, va_arg(args, const struct BFTW *)) != 0) {
+					if (print_link_target(cfile, va_arg(args, const struct BFTW *)) != 0) {
 						return -1;
 					}
 					break;

@@ -628,6 +628,7 @@ bfs_tests=(
     test_color_L
     test_color_rs_lc_rc_ec
     test_color_escapes
+    test_color_ln_target
     test_color_mh
     test_color_mh0
     test_color_or
@@ -1855,6 +1856,10 @@ function test_color_rs_lc_rc_ec() {
 
 function test_color_escapes() {
     LS_COLORS="lc=\e[:rc=\x6d\::ec=^[[\x6D\0:" bfs_diff rainbow -color
+}
+
+function test_color_ln_target() {
+    LS_COLORS="ln=target:or=01;31:mi=01;33:" bfs_diff rainbow -color
 }
 
 function test_color_mh() {
