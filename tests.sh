@@ -628,6 +628,7 @@ bfs_tests=(
     test_color_L
     test_color_rs_lc_rc_ec
     test_color_escapes
+    test_color_nul
     test_color_ln_target
     test_color_mh
     test_color_mh0
@@ -1855,7 +1856,22 @@ function test_color_rs_lc_rc_ec() {
 }
 
 function test_color_escapes() {
-    LS_COLORS="lc=\e[:rc=\x6d\::ec=^[[\x6D\0:" bfs_diff rainbow -color
+    LS_COLORS="lc=\e[:rc=\155\::ec=^[\x5B\x6d:" bfs_diff rainbow -color
+}
+
+function test_color_nul() {
+    local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
+    if [ "$UPDATE" ]; then
+        local ACTUAL="$EXPECTED"
+    else
+        local ACTUAL="$TMP/${FUNCNAME[0]}.out"
+    fi
+
+    LS_COLORS="ec=\33[m\0:" invoke_bfs rainbow -color -maxdepth 0 >"$ACTUAL"
+
+    if [ ! "$UPDATE" ]; then
+        diff -u "$EXPECTED" "$ACTUAL"
+    fi
 }
 
 function test_color_ln_target() {
