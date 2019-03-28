@@ -16,6 +16,7 @@
 
 #include "color.h"
 #include "bftw.h"
+#include "dstring.h"
 #include "posix1e.h"
 #include "stat.h"
 #include "trie.h"
@@ -34,106 +35,91 @@
  * The parsed form of LS_COLORS.
  */
 struct colors {
-	const char *reset;
-	const char *bold;
-	const char *gray;
-	const char *red;
-	const char *green;
-	const char *yellow;
-	const char *blue;
-	const char *magenta;
-	const char *cyan;
+	char *reset;
+	char *leftcode;
+	char *rightcode;
+	char *endcode;
+	char *clear_to_eol;
 
-	const char *normal;
-	const char *file;
-	const char *dir;
-	const char *link;
-	const char *multi_hard;
-	const char *pipe;
-	const char *door;
-	const char *block;
-	const char *chardev;
-	const char *orphan;
-	const char *missing;
-	const char *socket;
-	const char *setuid;
-	const char *setgid;
-	const char *capable;
-	const char *sticky_ow;
-	const char *ow;
-	const char *sticky;
-	const char *exec;
+	char *bold;
+	char *gray;
+	char *red;
+	char *green;
+	char *yellow;
+	char *blue;
+	char *magenta;
+	char *cyan;
+	char *white;
 
-	const char *warning;
-	const char *error;
+	char *warning;
+	char *error;
 
+	char *normal;
+
+	char *file;
+	char *multi_hard;
+	char *executable;
+	char *capable;
+	char *setgid;
+	char *setuid;
+
+	char *directory;
+	char *sticky;
+	char *other_writable;
+	char *sticky_other_writable;
+
+	char *link;
+	char *orphan;
+	char *missing;
+
+	char *blockdev;
+	char *chardev;
+	char *door;
+	char *pipe;
+	char *socket;
+
+	/** A mapping from color names (fi, di, ln, etc.) to struct fields. */
+	struct trie names;
+
+	/** A mapping from file extensions to colors. */
 	struct trie ext_colors;
-
-	char *data;
 };
 
-/**
- * A named color for parsing and lookup.
- */
-struct color_name {
-	const char *name;
-	size_t offset;
-};
-
-#define COLOR_NAME(name, field) {name, offsetof(struct colors, field)}
-
-/**
- * All the known color names that can be referenced in LS_COLORS.
- */
-static const struct color_name color_names[] = {
-	COLOR_NAME("bd", block),
-	COLOR_NAME("bld", bold),
-	COLOR_NAME("blu", blue),
-	COLOR_NAME("ca", capable),
-	COLOR_NAME("cd", chardev),
-	COLOR_NAME("cyn", cyan),
-	COLOR_NAME("di", dir),
-	COLOR_NAME("do", door),
-	COLOR_NAME("er", error),
-	COLOR_NAME("ex", exec),
-	COLOR_NAME("fi", file),
-	COLOR_NAME("grn", green),
-	COLOR_NAME("gry", gray),
-	COLOR_NAME("ln", link),
-	COLOR_NAME("mag", magenta),
-	COLOR_NAME("mh", multi_hard),
-	COLOR_NAME("mi", missing),
-	COLOR_NAME("no", normal),
-	COLOR_NAME("or", orphan),
-	COLOR_NAME("ow", ow),
-	COLOR_NAME("pi", pipe),
-	COLOR_NAME("red", red),
-	COLOR_NAME("rs", reset),
-	COLOR_NAME("sg", setgid),
-	COLOR_NAME("so", socket),
-	COLOR_NAME("st", sticky),
-	COLOR_NAME("su", setuid),
-	COLOR_NAME("tw", sticky_ow),
-	COLOR_NAME("wr", warning),
-	COLOR_NAME("ylw", yellow),
-	{0},
-};
-
-/** Get a color from the table. */
-static const char **get_color(const struct colors *colors, const char *name) {
-	for (const struct color_name *entry = color_names; entry->name; ++entry) {
-		if (strcmp(name, entry->name) == 0) {
-			return (const char **)((char *)colors + entry->offset);
+/** Initialize a color in the table. */
+static int init_color(struct colors *colors, const char *name, const char *value, char **field) {
+	if (value) {
+		*field = dstrdup(value);
+		if (!*field) {
+			return -1;
 		}
+	} else {
+		*field = NULL;
 	}
 
-	return NULL;
+	struct trie_leaf *leaf = trie_insert_str(&colors->names, name);
+	if (leaf) {
+		leaf->value = field;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+/** Get a color from the table. */
+static char **get_color(const struct colors *colors, const char *name) {
+	const struct trie_leaf *leaf = trie_find_str(&colors->names, name);
+	if (leaf) {
+		return (char **)leaf->value;
+	} else {
+		return NULL;
+	}
 }
 
 /** Set the value of a color. */
-static void set_color(struct colors *colors, const char *name, const char *value) {
-	const char **color = get_color(colors, name);
+static void set_color(struct colors *colors, const char *name, char *value) {
+	char **color = get_color(colors, name);
 	if (color) {
+		dstrfree(*color);
 		*color = value;
 	}
 }
@@ -141,52 +127,42 @@ static void set_color(struct colors *colors, const char *name, const char *value
 /**
  * Transform a file extension for fast lookups, by reversing and lowercasing it.
  */
-static char *extxfrm(const char *ext) {
+static void extxfrm(char *ext) {
 	size_t len = strlen(ext);
-	char *ret = malloc(len + 1);
-	if (!ret) {
-		return NULL;
-	}
-
-	for (size_t i = 0; i < len; ++i) {
-		char c = ext[len - i - 1];
+	for (size_t i = 0; i < len - i; ++i) {
+		char a = ext[i];
+		char b = ext[len - i - 1];
 
 		// What's internationalization?  Doesn't matter, this is what
 		// GNU ls does.  Luckily, since there's no standard C way to
 		// casefold.  Not using tolower() here since it respects the
-		// current locale.
-		if (c >= 'A' && c <= 'Z') {
-			c += 'a' - 'A';
+		// current locale, which GNU ls doesn't do.
+		if (a >= 'A' && a <= 'Z') {
+			a += 'a' - 'A';
+		}
+		if (b >= 'A' && b <= 'Z') {
+			b += 'a' - 'A';
 		}
 
-		ret[i] = c;
+		ext[i] = b;
+		ext[len - i - 1] = a;
 	}
-
-	ret[len] = '\0';
-	return ret;
 }
 
 /**
  * Set the color for an extension.
  */
-static int set_ext_color(struct colors *colors, const char *key, const char *value) {
-	char *xfrm = extxfrm(key);
-	if (!xfrm) {
-		return -1;
-	}
+static int set_ext_color(struct colors *colors, char *key, const char *value) {
+	extxfrm(key);
 
-	while (true) {
-		// A later *.x should override any earlier *.x, *.y.x, etc.
-		struct trie_leaf *match = trie_find_postfix(&colors->ext_colors, xfrm);
-		if (!match) {
-			break;
-		}
-
+	// A later *.x should override any earlier *.x, *.y.x, etc.
+	struct trie_leaf *match;
+	while ((match = trie_find_postfix(&colors->ext_colors, key))) {
+		dstrfree(match->value);
 		trie_remove_mem(&colors->ext_colors, match->key, match->length);
 	}
 
-	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, xfrm);
-	free(xfrm);
+	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, key);
 	if (leaf) {
 		leaf->value = (char *)value;
 		return 0;
@@ -199,10 +175,11 @@ static int set_ext_color(struct colors *colors, const char *key, const char *val
  * Find a color by an extension.
  */
 static const char *get_ext_color(const struct colors *colors, const char *filename) {
-	char *xfrm = extxfrm(filename);
+	char *xfrm = strdup(filename);
 	if (!xfrm) {
 		return NULL;
 	}
+	extxfrm(xfrm);
 
 	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_colors, xfrm);
 	free(xfrm);
@@ -213,92 +190,292 @@ static const char *get_ext_color(const struct colors *colors, const char *filena
 	}
 }
 
+/**
+ * Parse a chunk of LS_COLORS that may have escape sequences.  The supported
+ * escapes are:
+ *
+ * \a, \b, \f, \n, \r, \t, \v:
+ *     As in C
+ * \e:
+ *     ESC (\033)
+ * \?:
+ *     DEL (\177)
+ * \_:
+ *     ' ' (space)
+ * \NNN:
+ *     Octal
+ * \xNN:
+ *     Hex
+ * ^C:
+ *     Control character.
+ *
+ * See man dir_colors.
+ *
+ * @param value
+ *         The value to parse.
+ * @param end
+ *         The character that marks the end of the chunk.
+ * @param[out] next
+ *         Will be set to the next chunk.
+ * @return
+ *         The parsed chunk as a dstring.
+ */
+static char *unescape(const char *value, char end, const char **next) {
+	char *str = dstralloc(0);
+	if (!str) {
+		goto fail;
+	}
+
+	const char *i;
+	for (i = value; *i && *i != end; ++i) {
+		unsigned char c = 0;
+
+		switch (*i) {
+		case '\\':
+			switch (*++i) {
+			case 'a':
+				c = '\a';
+				break;
+			case 'b':
+				c = '\b';
+				break;
+			case 'e':
+				c = '\033';
+				break;
+			case 'f':
+				c = '\f';
+				break;
+			case 'n':
+				c = '\n';
+				break;
+			case 'r':
+				c = '\r';
+				break;
+			case 't':
+				c = '\t';
+				break;
+			case 'v':
+				c = '\v';
+				break;
+			case '?':
+				c = '\177';
+				break;
+			case '_':
+				c = ' ';
+				break;
+
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+				while (i[1] >= '0' && i[1] <= '7') {
+					c <<= 3;
+					c |= *i++ - '0';
+				}
+				c <<= 3;
+				c |= *i - '0';
+				break;
+
+			case 'X':
+			case 'x':
+				while (true) {
+					if (i[1] >= '0' && i[1] <= '9') {
+						c <<= 4;
+						c |= i[1] - '0';
+					} else if (i[1] >= 'A' && i[1] <= 'F') {
+						c <<= 4;
+						c |= i[1] - 'A' + 0xA;
+					} else if (i[1] >= 'a' && i[1] <= 'f') {
+						c <<= 4;
+						c |= i[1] - 'a' + 0xA;
+					} else {
+						break;
+					}
+					++i;
+				}
+				break;
+
+			case '\0':
+				goto fail;
+
+			default:
+				c = *i;
+				break;
+			}
+			break;
+
+		case '^':
+			switch (*++i) {
+			case '?':
+				c = '\177';
+				break;
+			case '\0':
+				goto fail;
+			default:
+				// CTRL masks bits 6 and 7
+				c = *i & 0x1F;
+				break;
+			}
+			break;
+
+		default:
+			c = *i;
+			break;
+		}
+
+		if (dstrapp(&str, c) != 0) {
+			goto fail;
+		}
+	}
+
+	if (*i) {
+		*next = i + 1;
+	} else {
+		*next = NULL;
+	}
+
+	return str;
+
+fail:
+	dstrfree(str);
+	*next = NULL;
+	return NULL;
+}
+
 struct colors *parse_colors(const char *ls_colors) {
 	struct colors *colors = malloc(sizeof(struct colors));
 	if (!colors) {
-		goto done;
+		return NULL;
 	}
 
-	// From man console_codes
-	colors->reset   = "0";
-	colors->bold    = "01";
-	colors->gray    = "01;30";
-	colors->red     = "01;31";
-	colors->green   = "01;32";
-	colors->yellow  = "01;33";
-	colors->blue    = "01;34";
-	colors->magenta = "01;35";
-	colors->cyan    = "01;36";
-
-	// Defaults generated by dircolors --print-database
-	colors->normal     = NULL;
-	colors->file       = NULL;
-	colors->dir        = "01;34";
-	colors->link       = "01;36";
-	colors->multi_hard = NULL;
-	colors->pipe       = "33";
-	colors->socket     = "01;35";
-	colors->door       = "01;35";
-	colors->block      = "01;33";
-	colors->chardev    = "01;33";
-	colors->orphan     = NULL;
-	colors->missing    = NULL;
-	colors->setuid     = "37;41";
-	colors->setgid     = "30;43";
-	colors->capable    = "30;41";
-	colors->sticky_ow  = "30;42";
-	colors->ow         = "34;42";
-	colors->sticky     = "37;44";
-	colors->exec       = "01;32";
-	colors->warning    = "01;33";
-	colors->error      = "01;31";
-	colors->data       = NULL;
-
+	trie_init(&colors->names);
 	trie_init(&colors->ext_colors);
 
-	if (ls_colors) {
-		colors->data = strdup(ls_colors);
+	int ret = 0;
+
+	// From man console_codes
+
+	ret |= init_color(colors, "rs", "0",      &colors->reset);
+	ret |= init_color(colors, "lc", "\033[",  &colors->leftcode);
+	ret |= init_color(colors, "rc", "m",      &colors->rightcode);
+	ret |= init_color(colors, "ec", NULL,     &colors->endcode);
+	ret |= init_color(colors, "cl", "\033[K", &colors->clear_to_eol);
+
+	ret |= init_color(colors, "bld", "01",    &colors->bold);
+	ret |= init_color(colors, "gry", "01;30", &colors->gray);
+	ret |= init_color(colors, "red", "01;31", &colors->red);
+	ret |= init_color(colors, "grn", "01;32", &colors->green);
+	ret |= init_color(colors, "ylw", "01;33", &colors->yellow);
+	ret |= init_color(colors, "blu", "01;34", &colors->blue);
+	ret |= init_color(colors, "mag", "01;35", &colors->magenta);
+	ret |= init_color(colors, "cyn", "01;36", &colors->cyan);
+	ret |= init_color(colors, "wht", "01;37", &colors->white);
+
+	ret |= init_color(colors, "wr", "01;33", &colors->warning);
+	ret |= init_color(colors, "er", "01;31", &colors->error);
+
+	// Defaults from man dir_colors
+
+	ret |= init_color(colors, "no", NULL, &colors->normal);
+
+	ret |= init_color(colors, "fi", NULL,    &colors->file);
+	ret |= init_color(colors, "mh", NULL,    &colors->multi_hard);
+	ret |= init_color(colors, "ex", "01;32", &colors->executable);
+	ret |= init_color(colors, "ca", "30;41", &colors->capable);
+	ret |= init_color(colors, "sg", "30;43", &colors->setgid);
+	ret |= init_color(colors, "su", "37;41", &colors->setuid);
+
+	ret |= init_color(colors, "di", "01;34", &colors->directory);
+	ret |= init_color(colors, "st", "37;44", &colors->sticky);
+	ret |= init_color(colors, "ow", "34;42", &colors->other_writable);
+	ret |= init_color(colors, "tw", "30;42", &colors->sticky_other_writable);
+
+	ret |= init_color(colors, "ln", "01;36", &colors->link);
+	ret |= init_color(colors, "or", NULL,    &colors->orphan);
+	ret |= init_color(colors, "mi", NULL,    &colors->missing);
+
+	ret |= init_color(colors, "bd", "01;33", &colors->blockdev);
+	ret |= init_color(colors, "cd", "01;33", &colors->chardev);
+	ret |= init_color(colors, "do", "01;35", &colors->door);
+	ret |= init_color(colors, "pi", "33",    &colors->pipe);
+	ret |= init_color(colors, "so", "01;35", &colors->socket);
+
+	if (ret) {
+		free_colors(colors);
+		return NULL;
 	}
 
-	if (!colors->data) {
-		goto done;
-	}
+	for (const char *chunk = ls_colors, *next; chunk; chunk = next) {
+		if (chunk[0] == '*') {
+			char *key = unescape(chunk + 1, '=', &next);
+			if (!key) {
+				continue;
+			}
 
-	for (char *chunk = colors->data, *next; chunk; chunk = next) {
-		next = strchr(chunk, ':');
-		if (next) {
-			*next++ = '\0';
-		}
+			char *value = unescape(next, ':', &next);
+			if (value) {
+				if (set_ext_color(colors, key, value) != 0) {
+					dstrfree(value);
+				}
+			}
 
-		char *equals = strchr(chunk, '=');
-		if (!equals) {
-			continue;
-		}
-		*equals = '\0';
-
-		const char *key = chunk;
-		const char *value = equals + 1;
-
-		if (key[0] == '*') {
-			set_ext_color(colors, key + 1, value);
+			dstrfree(key);
 		} else {
+			const char *equals = strchr(chunk, '=');
+			if (!equals) {
+				break;
+			}
+
+			char *key = strndup(chunk, equals - chunk);
+			if (!key) {
+				continue;
+			}
+
+			char *value = unescape(equals + 1, ':', &next);
+			if (!value) {
+				free(key);
+				continue;
+			}
+
 			// All-zero values should be treated like NULL, to fall
 			// back on any other relevant coloring for that file
-			if (strcmp(key, "rs") != 0 && strspn(value, "0") == strlen(value)) {
+			if (strspn(value, "0") == strlen(value)
+			    && strcmp(key, "rs") != 0
+			    && strcmp(key, "lc") != 0
+			    && strcmp(key, "rc") != 0
+			    && strcmp(key, "ec") != 0) {
+				dstrfree(value);
 				value = NULL;
 			}
+
 			set_color(colors, key, value);
+			free(key);
 		}
 	}
 
-done:
 	return colors;
 }
 
 void free_colors(struct colors *colors) {
 	if (colors) {
+		struct trie_leaf *leaf;
+		while ((leaf = trie_first_leaf(&colors->ext_colors))) {
+			dstrfree(leaf->value);
+			trie_remove_mem(&colors->ext_colors, leaf->key, leaf->length);
+		}
 		trie_destroy(&colors->ext_colors);
-		free(colors->data);
+
+		while ((leaf = trie_first_leaf(&colors->names))) {
+			char **field = leaf->value;
+			dstrfree(*field);
+			trie_remove_mem(&colors->names, leaf->key, leaf->length);
+		}
+		trie_destroy(&colors->names);
+
 		free(colors);
 	}
 }
@@ -376,8 +553,8 @@ static const char *file_color(const struct colors *colors, const char *filename,
 			color = colors->setgid;
 		} else if (colors->capable && bfs_check_capabilities(ftwbuf)) {
 			color = colors->capable;
-		} else if (colors->exec && (sb->mode & 00111)) {
-			color = colors->exec;
+		} else if (colors->executable && (sb->mode & 00111)) {
+			color = colors->executable;
 		} else if (colors->multi_hard && sb->nlink > 1) {
 			color = colors->multi_hard;
 		}
@@ -393,14 +570,14 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFDIR:
-		if (colors->sticky_ow && (sb->mode & 01002) == 01002) {
-			color = colors->sticky_ow;
-		} else if (colors->ow && (sb->mode & 00002)) {
-			color = colors->ow;
+		if (colors->sticky_other_writable && (sb->mode & 01002) == 01002) {
+			color = colors->sticky_other_writable;
+		} else if (colors->other_writable && (sb->mode & 00002)) {
+			color = colors->other_writable;
 		} else if (colors->sticky && (sb->mode & 01000)) {
 			color = colors->sticky;
 		} else {
-			color = colors->dir;
+			color = colors->directory;
 		}
 
 		break;
@@ -414,7 +591,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 
 	case S_IFBLK:
-		color = colors->block;
+		color = colors->blockdev;
 		break;
 	case S_IFCHR:
 		color = colors->chardev;
@@ -440,33 +617,56 @@ static const char *file_color(const struct colors *colors, const char *filename,
 	return color;
 }
 
+/** Print a fixed-length string. */
+static int print_strn(const char *str, size_t len, FILE *file) {
+	if (fwrite(str, 1, len, file) == len) {
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+/** Print a dstring. */
+static int print_dstr(const char *str, FILE *file) {
+	return print_strn(str, dstrlen(str), file);
+}
+
 /** Print an ANSI escape sequence. */
-static int print_esc(const char *esc, FILE *file) {
-	if (fputs("\033[", file) == EOF) {
+static int print_esc(const struct colors *colors, const char *esc, FILE *file) {
+	if (print_dstr(colors->leftcode, file) != 0) {
 		return -1;
 	}
-	if (fputs(esc, file) == EOF) {
+	if (print_dstr(esc, file) != 0) {
 		return -1;
 	}
-	if (fputs("m", file) == EOF) {
+	if (print_dstr(colors->rightcode, file) != 0) {
 		return -1;
 	}
 
 	return 0;
 }
 
+/** Reset after an ANSI escape sequence. */
+static int print_reset(const struct colors *colors, FILE *file) {
+	if (colors->endcode) {
+		return print_dstr(colors->endcode, file);
+	} else {
+		return print_esc(colors, colors->reset, file);
+	}
+}
+
 /** Print a string with an optional color. */
 static int print_colored(const struct colors *colors, const char *esc, const char *str, size_t len, FILE *file) {
 	if (esc) {
-		if (print_esc(esc, file) != 0) {
+		if (print_esc(colors, esc, file) != 0) {
 			return -1;
 		}
 	}
-	if (fwrite(str, 1, len, file) != len) {
+	if (print_strn(str, len, file) != 0) {
 		return -1;
 	}
 	if (esc) {
-		if (print_esc(colors->reset, file) != 0) {
+		if (print_reset(colors, file) != 0) {
 			return -1;
 		}
 	}
@@ -485,7 +685,7 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	}
 
 	if (ftwbuf->nameoff > 0) {
-		if (print_colored(colors, colors->dir, path, ftwbuf->nameoff, file) != 0) {
+		if (print_colored(colors, colors->directory, path, ftwbuf->nameoff, file) != 0) {
 			return -1;
 		}
 	}
@@ -644,12 +844,12 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 				memcpy(name, i, len);
 				name[len] = '\0';
 
-				const char **esc = get_color(colors, name);
+				char **esc = get_color(colors, name);
 				if (!esc) {
 					goto invalid;
 				}
 				if (*esc) {
-					if (print_esc(*esc, file) != 0) {
+					if (print_esc(colors, *esc, file) != 0) {
 						return -1;
 					}
 				}

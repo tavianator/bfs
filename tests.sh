@@ -626,6 +626,8 @@ bfs_tests=(
 
     test_color
     test_color_L
+    test_color_rs_lc_rc_ec
+    test_color_escapes
     test_color_mh
     test_color_mh0
     test_color_or
@@ -1845,6 +1847,14 @@ function test_color() {
 
 function test_color_L() {
     LS_COLORS= bfs_diff -L rainbow -color
+}
+
+function test_color_rs_lc_rc_ec() {
+    LS_COLORS="rs=RS:lc=LC:rc=RC:ec=EC:" bfs_diff rainbow -color
+}
+
+function test_color_escapes() {
+    LS_COLORS="lc=\e[:rc=\x6d\::ec=^[[\x6D\0:" bfs_diff rainbow -color
 }
 
 function test_color_mh() {
