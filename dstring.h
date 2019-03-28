@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2017 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -30,6 +30,14 @@
  *         The initial capacity of the string.
  */
 char *dstralloc(size_t capacity);
+
+/**
+ * Create a dynamic copy of a string.
+ *
+ * @param str
+ *         The NUL-terminated string to copy.
+ */
+char *dstrdup(const char *str);
 
 /**
  * Get a dynamic string's length.
