@@ -47,24 +47,16 @@ enum debug_flags {
 };
 
 /**
- * A root path to explore.
- */
-struct root {
-	/** The root path itself. */
-	const char *path;
-	/** The next path in the list. */
-	struct root *next;
-};
-
-/**
  * The parsed command line.
  */
 struct cmdline {
 	/** The unparsed command line arguments. */
 	char **argv;
 
-	/** The list of root paths. */
-	struct root *roots;
+	/** The root paths. */
+	const char **paths;
+	/** The number of root paths. */
+	size_t npaths;
 
 	/** Color data. */
 	struct colors *colors;

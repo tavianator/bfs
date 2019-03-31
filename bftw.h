@@ -193,6 +193,10 @@ enum bftw_flags {
  * Structure for holding the arguments passed to bftw().
  */
 struct bftw_args {
+	/** The path(s) to start from. */
+	const char **paths;
+	/** The number of starting paths. */
+	size_t npaths;
 	/** The callback to invoke. */
 	bftw_callback *callback;
 	/** A pointer which is passed to the callback. */
@@ -212,13 +216,11 @@ struct bftw_args {
  * and invokes a callback for each path it encounters.  However, bftw() operates
  * breadth-first.
  *
- * @param path
- *         The starting path.
  * @param args
  *         The arguments that control the walk.
  * @return
  *         0 on success, or -1 on failure.
  */
-int bftw(const char *path, const struct bftw_args *args);
+int bftw(const struct bftw_args *args);
 
 #endif // BFS_BFTW_H

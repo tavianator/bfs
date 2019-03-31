@@ -289,14 +289,7 @@ int free_cmdline(struct cmdline *cmdline) {
 		cfclose(cerr);
 
 		free_colors(cmdline->colors);
-
-		struct root *root = cmdline->roots;
-		while (root) {
-			struct root *next = root->next;
-			free(root);
-			root = next;
-		}
-
+		free(cmdline->paths);
 		free(cmdline->argv);
 		free(cmdline);
 	}
@@ -323,8 +316,6 @@ struct parser_state {
 	char **argv;
 	/** The name of this program. */
 	const char *command;
-	/** The current tail of the root path list. */
-	struct root **roots_tail;
 
 	/** The current regex flags to use. */
 	int regex_flags;
@@ -504,16 +495,18 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
  * Parse a root path.
  */
 static int parse_root(struct parser_state *state, const char *path) {
-	struct root *root = malloc(sizeof(struct root));
-	if (!root) {
-		perror("malloc()");
-		return -1;
+	struct cmdline *cmdline = state->cmdline;
+	size_t i = cmdline->npaths;
+	if ((i & (i + 1)) == 0) {
+		const char **paths = realloc(cmdline->paths, 2*(i + 1)*sizeof(*paths));
+		if (!paths) {
+			return -1;
+		}
+		cmdline->paths = paths;
 	}
 
-	root->path = path;
-	root->next = NULL;
-	*state->roots_tail = root;
-	state->roots_tail = &root->next;
+	cmdline->paths[i] = path;
+	cmdline->npaths = i + 1;
 	return 0;
 }
 
@@ -3067,12 +3060,13 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		cfprintf(cerr, " ");
 	}
 
-	for (struct root *root = cmdline->roots; root; root = root->next) {
-		char c = root->path[0];
+	for (size_t i = 0; i < cmdline->npaths; ++i) {
+		const char *path = cmdline->paths[i];
+		char c = path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
 			cfprintf(cerr, "${cyn}-f${rs} ");
 		}
-		cfprintf(cerr, "${mag}%s${rs} ", root->path);
+		cfprintf(cerr, "${mag}%s${rs} ", path);
 	}
 
 	if (cmdline->cout->colors) {
@@ -3148,7 +3142,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	cmdline->argv = NULL;
-	cmdline->roots = NULL;
+	cmdline->paths = NULL;
+	cmdline->npaths = 0;
 	cmdline->colors = NULL;
 	cmdline->cout = NULL;
 	cmdline->cerr = NULL;
@@ -3208,7 +3203,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.cmdline = cmdline,
 		.argv = cmdline->argv + 1,
 		.command = cmdline->argv[0],
-		.roots_tail = &cmdline->roots,
 		.regex_flags = 0,
 		.interactive = stderr_tty && stdin_tty,
 		.use_color = use_color,
@@ -3238,7 +3232,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	if (!cmdline->roots) {
+	if (cmdline->npaths == 0) {
 		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}

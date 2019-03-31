@@ -1245,20 +1245,14 @@ done:
 	}
 
 	if (cmdline->debug & DEBUG_SEARCH) {
-		fprintf(stderr,
-		        "cmdline_callback({ "
-		        ".path = \"%s\", "
-		        ".depth = %zu, "
-		        ".visit = %s, "
-		        ".typeflag = %s, "
-		        ".error = %d "
-		        "}) == %s\n",
-		        ftwbuf->path,
-		        ftwbuf->depth,
-		        dump_bftw_visit(ftwbuf->visit),
-			dump_bftw_typeflag(ftwbuf->typeflag),
-			ftwbuf->error,
-		        dump_bftw_action(state.action));
+		fprintf(stderr, "cmdline_callback({\n");
+		fprintf(stderr, "\t.path = \"%s\",\n", ftwbuf->path);
+		fprintf(stderr, "\t.root = \"%s\",\n", ftwbuf->root);
+		fprintf(stderr, "\t.depth = %zu,\n", ftwbuf->depth);
+		fprintf(stderr, "\t.visit = %s,\n", dump_bftw_visit(ftwbuf->visit));
+		fprintf(stderr, "\t.typeflag = %s,\n", dump_bftw_typeflag(ftwbuf->typeflag));
+		fprintf(stderr, "\t.error = %d,\n", ftwbuf->error);
+		fprintf(stderr, "}) == %s\n", dump_bftw_action(state.action));
 	}
 
 	return state.action;
@@ -1352,6 +1346,8 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	}
 
 	struct bftw_args bftw_args = {
+		.paths = cmdline->paths,
+		.npaths = cmdline->npaths,
 		.callback = cmdline_callback,
 		.ptr = &args,
 		.nopenfd = infer_fdlimit(cmdline),
@@ -1359,30 +1355,31 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		.mtab = cmdline->mtab,
 	};
 
-	for (struct root *root = cmdline->roots; root && !args.quit; root = root->next) {
-		if (cmdline->debug & DEBUG_SEARCH) {
-			fprintf(stderr,
-			        "bftw(\"%s\", { "
-			        ".callback = cmdline_callback, "
-			        ".ptr = &args, "
-			        ".nopenfd = %d, "
-			        ".flags = ",
-			        root->path,
-			        bftw_args.nopenfd);
-			dump_bftw_flags(bftw_args.flags);
-			fprintf(stderr, ", .mtab = ");
-			if (bftw_args.mtab) {
-				fprintf(stderr, "cmdline->mtab");
-			} else {
-				fprintf(stderr, "NULL");
-			}
-			fprintf(stderr, " })\n");
+	if (cmdline->debug & DEBUG_SEARCH) {
+		fprintf(stderr, "bftw({\n");
+		fprintf(stderr, "\t.paths = {\n");
+		for (size_t i = 0; i < bftw_args.npaths; ++i) {
+			fprintf(stderr, "\t\t\"%s\",\n", bftw_args.paths[i]);
 		}
+		fprintf(stderr, "\t},\n");
+		fprintf(stderr, "\t.npaths = %zu,\n", bftw_args.npaths);
+		fprintf(stderr, "\t.callback = cmdline_callback,\n");
+		fprintf(stderr, "\t.ptr = &args,\n");
+		fprintf(stderr, "\t.nopenfd = %d,\n", bftw_args.nopenfd);
+		fprintf(stderr, "\t.flags = ");
+		dump_bftw_flags(bftw_args.flags);
+		fprintf(stderr, ",\n\t.mtab = ");
+		if (bftw_args.mtab) {
+			fprintf(stderr, "cmdline->mtab");
+		} else {
+			fprintf(stderr, "NULL");
+		}
+		fprintf(stderr, ",\n})\n");
+	}
 
-		if (bftw(root->path, &bftw_args) != 0) {
-			args.ret = EXIT_FAILURE;
-			perror("bftw()");
-		}
+	if (bftw(&bftw_args) != 0) {
+		args.ret = EXIT_FAILURE;
+		perror("bftw()");
 	}
 
 	if (eval_exec_finish(cmdline->expr, cmdline) != 0) {

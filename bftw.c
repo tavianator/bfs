@@ -59,6 +59,8 @@ struct bftw_dir {
 	struct bftw_dir *parent;
 	/** This directory's depth in the walk. */
 	size_t depth;
+	/** The root path this directory was found from. */
+	const char *root;
 
 	/** The next directory in the queue, if any. */
 	struct bftw_dir *next;
@@ -305,10 +307,12 @@ static struct bftw_dir *bftw_dir_new(struct bftw_cache *cache, struct bftw_dir *
 
 	if (parent) {
 		dir->depth = parent->depth + 1;
+		dir->root = parent->root;
 		dir->nameoff = parent->nameoff + parent->namelen;
 		bftw_dir_incref(cache, parent);
 	} else {
 		dir->depth = 0;
+		dir->root = name;
 		dir->nameoff = 0;
 	}
 
@@ -641,8 +645,6 @@ static int bftw_reader_close(struct bftw_reader *reader) {
  * Holds the current state of the bftw() traversal.
  */
 struct bftw_state {
-	/** The root path of the walk. */
-	const char *root;
 	/** bftw() callback. */
 	bftw_callback *callback;
 	/** bftw() callback data. */
@@ -672,8 +674,7 @@ struct bftw_state {
 /**
  * Initialize the bftw() state.
  */
-static int bftw_state_init(struct bftw_state *state, const char *root, const struct bftw_args *args) {
-	state->root = root;
+static int bftw_state_init(struct bftw_state *state, const struct bftw_args *args) {
 	state->callback = args->callback;
 	state->ptr = args->ptr;
 	state->flags = args->flags;
@@ -868,7 +869,7 @@ static int bftw_update_path(struct bftw_state *state, const struct bftw_dir *dir
 		length = dir->nameoff + dir->namelen;
 	} else if (dir->depth == 0) {
 		// Use exactly the string passed to bftw(), including any trailing slashes
-		length = strlen(state->root);
+		length = strlen(dir->root);
 	} else {
 		// -1 to trim the trailing slash
 		length = dir->nameoff + dir->namelen - 1;
@@ -936,7 +937,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, struct bftw_dir *dir, enu
 
 	struct BFTW *ftwbuf = &state->ftwbuf;
 	ftwbuf->path = state->path;
-	ftwbuf->root = state->root;
+	ftwbuf->root = dir ? dir->root : ftwbuf->path;
 	ftwbuf->depth = 0;
 	ftwbuf->visit = visit;
 	ftwbuf->error = reader->error;
@@ -1180,27 +1181,32 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	return state->error ? -1 : 0;
 }
 
-int bftw(const char *path, const struct bftw_args *args) {
+int bftw(const struct bftw_args *args) {
 	struct bftw_state state;
-	if (bftw_state_init(&state, path, args) != 0) {
+	if (bftw_state_init(&state, args) != 0) {
 		return -1;
 	}
 
-	// Handle 'path' itself first
-	switch (bftw_visit(&state, NULL, path, BFTW_PRE)) {
-	case BFTW_CONTINUE:
-	case BFTW_SKIP_SIBLINGS:
-		break;
-	default:
-		goto done;
+	for (size_t i = 0; i < args->npaths; ++i) {
+		const char *path = args->paths[i];
+
+		switch (bftw_visit(&state, NULL, path, BFTW_PRE)) {
+		case BFTW_CONTINUE:
+			break;
+		case BFTW_SKIP_SIBLINGS:
+			goto start;
+		case BFTW_SKIP_SUBTREE:
+			continue;
+		case BFTW_STOP:
+			goto done;
+		}
+
+		if (bftw_push(&state, path) != 0) {
+			goto done;
+		}
 	}
 
-	// Now start the breadth-first search
-
-	if (bftw_push(&state, path) != 0) {
-		goto done;
-	}
-
+start:
 	while (state.queue.head) {
 		struct bftw_reader *reader = bftw_pop(&state);
 		if (!reader) {
