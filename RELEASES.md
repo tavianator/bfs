@@ -2,6 +2,20 @@
 ===
 
 
+1.4
+---
+
+**April 15, 2019**
+
+- New `-unique` option that filters out duplicate files (https://github.com/tavianator/bfs/issues/40)
+- Optimized the file coloring implementation
+- Fixed the coloring implementation to match GNU ls more closely in many corner cases
+  - Implemented escape sequence parsing for `LS_COLORS`
+  - Implemented `ln=target` for coloring links like their targets
+  - Fixed the order of fallbacks used when some color keys are unset
+- Add a workaround for incorrect file types for bind-mounted files on Linux (https://github.com/tavianator/bfs/issues/37)
+
+
 1.3.3
 -----
 
