@@ -22,189 +22,107 @@ umask 022
 export LC_ALL=C
 export TZ=UTC
 
-function _realpath() {
-    (
-        cd "${1%/*}"
-        echo "$PWD/${1##*/}"
-    )
+if [ "$EUID" -eq 0 ]; then
+    cat >&2 <<EOF
+error: These tests expect filesystem permissions to be enforced, and therefore
+will not work when run as $(id -un).
+EOF
+    exit 1
+fi
+
+function usage() {
+    local pad=$(printf "%*s" ${#0} "")
+    cat <<EOF
+Usage: $0 [--bfs=path/to/bfs] [--posix|--bsd|--gnu|--all]
+       $pad [--noclean] [--update] [--verbose] [--help]
+       $pad [test_* [test_* ...]]
+
+  --bfs=path/to/bfs
+      Set the path to the bfs executable to test (default: ./bfs)
+
+  --posix|--bsd|--gnu|--all
+      Restrict the set of test cases to run
+
+  --noclean
+      Keep the test directories around after the run
+
+  --update
+      Update the expected outputs for the test cases
+
+  --verbose
+      Log the commands that get executed
+
+  --help
+      This message
+
+  test_*
+      Select individual test cases to run
+EOF
 }
 
-BFS="$(_realpath ./bfs)"
-TESTS="$(_realpath ./tests)"
-
-# The temporary directory that will hold our test data
-TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
-chown "$(id -u):$(id -g)" "$TMP"
-
-# Clean up temporary directories on exit
+BSD=yes
+GNU=yes
+ALL=yes
 CLEAN=yes
-function cleanup() {
-    if [ ! "$CLEAN" ]; then
-        return
-    fi
+UPDATE=
+VERBOSE=
+EXPLICIT=
 
-    # Don't force rm to deal with long paths
-    for dir in "$TMP"/deep/*/*; do
-        if [ -d "$dir" ]; then
-            (cd "$dir" && rm -rf *)
-        fi
-    done
-
-    rm -rf "$TMP"
-}
-trap cleanup EXIT
-
-# Install a file, creating any parent directories
-function installp() {
-    local target="${@: -1}"
-    mkdir -p "${target%/*}"
-    install "$@"
-}
-
-# Like a mythical touch -p
-function touchp() {
-    for arg; do
-        installp -m644 /dev/null "$arg"
+function enable_tests() {
+    for test; do
+        eval run_$test=yes
     done
 }
 
-# Creates a simple file+directory structure for tests
-function make_basic() {
-    touchp "$1/a"
-    touchp "$1/b"
-    touchp "$1/c/d"
-    touchp "$1/e/f"
-    mkdir -p "$1/g/h"
-    mkdir -p "$1/i"
-    touchp "$1/j/foo"
-    touchp "$1/k/foo/bar"
-    touchp "$1/l/foo/bar/baz"
-    echo baz >"$1/l/foo/bar/baz"
-}
-make_basic "$TMP/basic"
-
-# Creates a file+directory structure with various permissions for tests
-function make_perms() {
-    installp -m000 /dev/null "$1/0"
-    installp -m444 /dev/null "$1/r"
-    installp -m222 /dev/null "$1/w"
-    installp -m644 /dev/null "$1/rw"
-    installp -m555 /dev/null "$1/rx"
-    installp -m311 /dev/null "$1/wx"
-    installp -m755 /dev/null "$1/rwx"
-}
-make_perms "$TMP/perms"
-
-# Creates a file+directory structure with various symbolic and hard links
-function make_links() {
-    touchp "$1/file"
-    ln -s file "$1/symlink"
-    ln "$1/file" "$1/hardlink"
-    ln -s nowhere "$1/broken"
-    ln -s symlink/file "$1/notdir"
-    mkdir -p "$1/deeply/nested/dir"
-    touchp "$1/deeply/nested/file"
-    ln -s file "$1/deeply/nested/link"
-    ln -s deeply/nested "$1/skip"
-}
-make_links "$TMP/links"
-
-# Creates a file+directory structure with symbolic link loops
-function make_loops() {
-    touchp "$1/file"
-    ln -s file "$1/symlink"
-    ln -s nowhere "$1/broken"
-    ln -s symlink/file "$1/notdir"
-    ln -s loop "$1/loop"
-    mkdir -p "$1/deeply/nested/dir"
-    ln -s ../../deeply "$1/deeply/nested/loop"
-    ln -s deeply/nested/loop/nested "$1/skip"
-}
-make_loops "$TMP/loops"
-
-# Creates a file+directory structure with varying timestamps
-function make_times() {
-    mkdir -p "$1"
-    touch -t 199112140000 "$1/a"
-    touch -t 199112140001 "$1/b"
-    touch -t 199112140002 "$1/c"
-    ln -s a "$1/l"
-    touch -h -t 199112140003 "$1/l"
-    touch -t 199112140004 "$1"
-}
-make_times "$TMP/times"
-
-# Creates a file+directory structure with various weird file/directory names
-function make_weirdnames() {
-    touchp "$1/-/a"
-    touchp "$1/(/b"
-    touchp "$1/(-/c"
-    touchp "$1/!/d"
-    touchp "$1/!-/e"
-    touchp "$1/,/f"
-    touchp "$1/)/g"
-    touchp "$1/.../h"
-    touchp "$1/\\/i"
-    touchp "$1/ /j"
-}
-make_weirdnames "$TMP/weirdnames"
-
-# Creates a very deep directory structure for testing PATH_MAX handling
-function make_deep() {
-    mkdir -p "$1"
-
-    # $name will be 255 characters, aka _XOPEN_NAME_MAX
-    local name="0123456789ABCDEF"
-    name="${name}${name}${name}${name}"
-    name="${name}${name}${name}${name}"
-    name="${name:0:255}"
-
-    for i in {0..9} A B C D E F; do
-        (
-            mkdir "$1/$i"
-            cd "$1/$i"
-
-            # 16 * 256 == 4096 == PATH_MAX
-            for j in {1..16}; do
-                mkdir "$name"
-                cd "$name" 2>/dev/null
-            done
-
-            touch "$name"
-        )
-    done
-}
-make_deep "$TMP/deep"
-
-# Creates a directory structure with many different types, and therefore colors
-function make_rainbow() {
-    touchp "$1/file.txt"
-    touchp "$1/file.dat"
-    touchp "$1/star".{gz,tar,tar.gz}
-    ln -s file.txt "$1/link.txt"
-    touchp "$1/mh1"
-    ln "$1/mh1" "$1/mh2"
-    mkfifo "$1/pipe"
-    # TODO: block
-    ln -s /dev/null "$1/chardev_link"
-    ln -s nowhere "$1/broken"
-    "$TESTS/mksock" "$1/socket"
-    touchp "$1"/s{u,g,ug}id
-    chmod u+s "$1"/su{,g}id
-    chmod g+s "$1"/s{u,}gid
-    mkdir "$1/ow" "$1"/sticky{,_ow}
-    chmod o+w "$1"/*ow
-    chmod +t "$1"/sticky*
-    touchp "$1"/exec.sh
-    chmod +x "$1"/exec.sh
-}
-make_rainbow "$TMP/rainbow"
-
-# Creates a scratch directory that tests can modify
-function make_scratch() {
-    mkdir -p "$1"
-}
-make_scratch "$TMP/scratch"
+for arg; do
+    case "$arg" in
+        --bfs=*)
+            BFS="${arg#*=}"
+            ;;
+        --posix)
+            BSD=
+            GNU=
+            ALL=
+            ;;
+        --bsd)
+            BSD=yes
+            GNU=
+            ALL=
+            ;;
+        --gnu)
+            BSD=
+            GNU=yes
+            ALL=
+            ;;
+        --all)
+            BSD=yes
+            GNU=yes
+            ALL=yes
+            ;;
+        --noclean)
+            CLEAN=
+            ;;
+        --update)
+            UPDATE=yes
+            ;;
+        --verbose)
+            VERBOSE=yes
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        test_*)
+            EXPLICIT=yes
+            enable_tests "$arg"
+            ;;
+        *)
+            printf "Unrecognized option '%s'.\n\n" "$arg" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
 
 posix_tests=(
     # General parsing
@@ -682,100 +600,6 @@ bfs_tests=(
     test_deep_strict
 )
 
-function usage() {
-    local pad=$(printf "%*s" ${#0} "")
-    cat <<EOF
-Usage: $0 [--bfs=path/to/bfs] [--posix|--bsd|--gnu|--all]
-       $pad [--noclean] [--update] [--verbose] [--help]
-       $pad [test_* [test_* ...]]
-
-  --bfs=path/to/bfs
-      Set the path to the bfs executable to test (default: ./bfs)
-
-  --posix|--bsd|--gnu|--all
-      Restrict the set of test cases to run
-
-  --noclean
-      Keep the test directories around after the run
-
-  --update
-      Update the expected outputs for the test cases
-
-  --verbose
-      Log the commands that get executed
-
-  --help
-      This message
-
-  test_*
-      Select individual test cases to run
-EOF
-}
-
-BSD=yes
-GNU=yes
-ALL=yes
-
-function enable_tests() {
-    for test; do
-        eval run_$test=yes
-    done
-}
-
-for arg; do
-    case "$arg" in
-        --bfs=*)
-            BFS="${arg#*=}"
-            ;;
-        --posix)
-            BSD=
-            GNU=
-            ALL=
-            ;;
-        --bsd)
-            BSD=yes
-            GNU=
-            ALL=
-            ;;
-        --gnu)
-            BSD=
-            GNU=yes
-            ALL=
-            ;;
-        --all)
-            BSD=yes
-            GNU=yes
-            ALL=yes
-            ;;
-        --noclean)
-            CLEAN=
-            ;;
-        --update)
-            UPDATE=yes
-            ;;
-        --verbose)
-            VERBOSE=yes
-            ;;
-        --help)
-            usage
-            exit 0
-            ;;
-        test_*)
-            EXPLICIT=yes
-            enable_tests "$arg"
-            ;;
-        *)
-            printf "Unrecognized option '%s'.\n\n" "$arg" >&2
-            usage >&2
-            exit 1
-            ;;
-    esac
-done
-
-if [ ! "$CLEAN" ]; then
-    echo "Test files saved to $TMP"
-fi
-
 if [ ! "$EXPLICIT" ]; then
     enable_tests "${posix_tests[@]}"
     [ "$BSD" ] && enable_tests "${bsd_tests[@]}"
@@ -783,10 +607,197 @@ if [ ! "$EXPLICIT" ]; then
     [ "$ALL" ] && enable_tests "${bfs_tests[@]}"
 fi
 
+function _realpath() {
+    (
+        cd "${1%/*}"
+        echo "$PWD/${1##*/}"
+    )
+}
+
+BFS="$(_realpath ./bfs)"
+TESTS="$(_realpath ./tests)"
+
+# The temporary directory that will hold our test data
+TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
+chown "$(id -u):$(id -g)" "$TMP"
+
+# Clean up temporary directories on exit
+function cleanup() {
+    if [ ! "$CLEAN" ]; then
+        return
+    fi
+
+    # Don't force rm to deal with long paths
+    for dir in "$TMP"/deep/*/*; do
+        if [ -d "$dir" ]; then
+            (cd "$dir" && rm -rf *)
+        fi
+    done
+
+    rm -rf "$TMP"
+}
+
+if [ "$CLEAN" ]; then
+    trap cleanup EXIT
+else
+    echo "Test files saved to $TMP"
+fi
+
+# Install a file, creating any parent directories
+function installp() {
+    local target="${@: -1}"
+    mkdir -p "${target%/*}"
+    install "$@"
+}
+
+# Like a mythical touch -p
+function touchp() {
+    for arg; do
+        installp -m644 /dev/null "$arg"
+    done
+}
+
+# Creates a simple file+directory structure for tests
+function make_basic() {
+    touchp "$1/a"
+    touchp "$1/b"
+    touchp "$1/c/d"
+    touchp "$1/e/f"
+    mkdir -p "$1/g/h"
+    mkdir -p "$1/i"
+    touchp "$1/j/foo"
+    touchp "$1/k/foo/bar"
+    touchp "$1/l/foo/bar/baz"
+    echo baz >"$1/l/foo/bar/baz"
+}
+make_basic "$TMP/basic"
+
+# Creates a file+directory structure with various permissions for tests
+function make_perms() {
+    installp -m000 /dev/null "$1/0"
+    installp -m444 /dev/null "$1/r"
+    installp -m222 /dev/null "$1/w"
+    installp -m644 /dev/null "$1/rw"
+    installp -m555 /dev/null "$1/rx"
+    installp -m311 /dev/null "$1/wx"
+    installp -m755 /dev/null "$1/rwx"
+}
+make_perms "$TMP/perms"
+
+# Creates a file+directory structure with various symbolic and hard links
+function make_links() {
+    touchp "$1/file"
+    ln -s file "$1/symlink"
+    ln "$1/file" "$1/hardlink"
+    ln -s nowhere "$1/broken"
+    ln -s symlink/file "$1/notdir"
+    mkdir -p "$1/deeply/nested/dir"
+    touchp "$1/deeply/nested/file"
+    ln -s file "$1/deeply/nested/link"
+    ln -s deeply/nested "$1/skip"
+}
+make_links "$TMP/links"
+
+# Creates a file+directory structure with symbolic link loops
+function make_loops() {
+    touchp "$1/file"
+    ln -s file "$1/symlink"
+    ln -s nowhere "$1/broken"
+    ln -s symlink/file "$1/notdir"
+    ln -s loop "$1/loop"
+    mkdir -p "$1/deeply/nested/dir"
+    ln -s ../../deeply "$1/deeply/nested/loop"
+    ln -s deeply/nested/loop/nested "$1/skip"
+}
+make_loops "$TMP/loops"
+
+# Creates a file+directory structure with varying timestamps
+function make_times() {
+    mkdir -p "$1"
+    touch -t 199112140000 "$1/a"
+    touch -t 199112140001 "$1/b"
+    touch -t 199112140002 "$1/c"
+    ln -s a "$1/l"
+    touch -h -t 199112140003 "$1/l"
+    touch -t 199112140004 "$1"
+}
+make_times "$TMP/times"
+
+# Creates a file+directory structure with various weird file/directory names
+function make_weirdnames() {
+    touchp "$1/-/a"
+    touchp "$1/(/b"
+    touchp "$1/(-/c"
+    touchp "$1/!/d"
+    touchp "$1/!-/e"
+    touchp "$1/,/f"
+    touchp "$1/)/g"
+    touchp "$1/.../h"
+    touchp "$1/\\/i"
+    touchp "$1/ /j"
+}
+make_weirdnames "$TMP/weirdnames"
+
+# Creates a very deep directory structure for testing PATH_MAX handling
+function make_deep() {
+    mkdir -p "$1"
+
+    # $name will be 255 characters, aka _XOPEN_NAME_MAX
+    local name="0123456789ABCDEF"
+    name="${name}${name}${name}${name}"
+    name="${name}${name}${name}${name}"
+    name="${name:0:255}"
+
+    for i in {0..9} A B C D E F; do
+        (
+            mkdir "$1/$i"
+            cd "$1/$i"
+
+            # 16 * 256 == 4096 == PATH_MAX
+            for j in {1..16}; do
+                mkdir "$name"
+                cd "$name" 2>/dev/null
+            done
+
+            touch "$name"
+        )
+    done
+}
+make_deep "$TMP/deep"
+
+# Creates a directory structure with many different types, and therefore colors
+function make_rainbow() {
+    touchp "$1/file.txt"
+    touchp "$1/file.dat"
+    touchp "$1/star".{gz,tar,tar.gz}
+    ln -s file.txt "$1/link.txt"
+    touchp "$1/mh1"
+    ln "$1/mh1" "$1/mh2"
+    mkfifo "$1/pipe"
+    # TODO: block
+    ln -s /dev/null "$1/chardev_link"
+    ln -s nowhere "$1/broken"
+    "$TESTS/mksock" "$1/socket"
+    touchp "$1"/s{u,g,ug}id
+    chmod u+s "$1"/su{,g}id
+    chmod g+s "$1"/s{u,}gid
+    mkdir "$1/ow" "$1"/sticky{,_ow}
+    chmod o+w "$1"/*ow
+    chmod +t "$1"/sticky*
+    touchp "$1"/exec.sh
+    chmod +x "$1"/exec.sh
+}
+make_rainbow "$TMP/rainbow"
+
+# Creates a scratch directory that tests can modify
+function make_scratch() {
+    mkdir -p "$1"
+}
+make_scratch "$TMP/scratch"
+
 function bfs_sort() {
     awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
 }
-
 
 if [ "$VERBOSE" ]; then
     # dup stdout for verbose logging even when redirected
