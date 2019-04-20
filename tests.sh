@@ -1791,7 +1791,7 @@ function test_printf_Y_error() {
 }
 
 function test_printf_H() {
-    bfs_diff basic links -printf '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
+    bfs_diff basic links -printf '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%y(%y)\n'
 }
 
 function test_fstype() {
