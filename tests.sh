@@ -481,6 +481,7 @@ gnu_tests=(
     test_printf_leak
     test_printf_nul
     test_printf_Y_error
+    test_printf_H
 
     test_quit
     test_quit_child
@@ -1787,6 +1788,10 @@ function test_printf_Y_error() {
     rm -rf scratch/*
 
     [ $ret -eq $EX_BFS ]
+}
+
+function test_printf_H() {
+    bfs_diff basic links -printf '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
 }
 
 function test_fstype() {
