@@ -274,7 +274,7 @@ int free_cmdline(struct cmdline *cmdline) {
 			}
 
 			free(ofile);
-			trie_remove_mem(&cmdline->open_files, leaf->key, leaf->length);
+			trie_remove(&cmdline->open_files, leaf);
 		}
 		trie_destroy(&cmdline->open_files);
 
@@ -438,7 +438,7 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 	struct open_file *ofile = malloc(sizeof(*ofile));
 	if (!ofile) {
 		perror("malloc()");
-		trie_remove_mem(&cmdline->open_files, leaf->key, leaf->length);
+		trie_remove(&cmdline->open_files, leaf);
 		goto out_close;
 	}
 

@@ -77,7 +77,7 @@ static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, dev_t dev, cons
 	if (leaf->value) {
 		return 0;
 	} else {
-		trie_remove_mem(&mtab->types, leaf->key, leaf->length);
+		trie_remove(&mtab->types, leaf);
 		return -1;
 	}
 }
@@ -220,7 +220,7 @@ void free_bfs_mtab(struct bfs_mtab *mtab) {
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&mtab->types))) {
 			free(leaf->value);
-			trie_remove_mem(&mtab->types, leaf->key, leaf->length);
+			trie_remove(&mtab->types, leaf);
 		}
 		trie_destroy(&mtab->types);
 

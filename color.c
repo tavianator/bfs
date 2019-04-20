@@ -160,7 +160,7 @@ static int set_ext_color(struct colors *colors, char *key, const char *value) {
 	struct trie_leaf *match;
 	while ((match = trie_find_postfix(&colors->ext_colors, key))) {
 		dstrfree(match->value);
-		trie_remove_mem(&colors->ext_colors, match->key, match->length);
+		trie_remove(&colors->ext_colors, match);
 	}
 
 	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, key);
@@ -473,14 +473,14 @@ void free_colors(struct colors *colors) {
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&colors->ext_colors))) {
 			dstrfree(leaf->value);
-			trie_remove_mem(&colors->ext_colors, leaf->key, leaf->length);
+			trie_remove(&colors->ext_colors, leaf);
 		}
 		trie_destroy(&colors->ext_colors);
 
 		while ((leaf = trie_first_leaf(&colors->names))) {
 			char **field = leaf->value;
 			dstrfree(*field);
-			trie_remove_mem(&colors->names, leaf->key, leaf->length);
+			trie_remove(&colors->names, leaf);
 		}
 		trie_destroy(&colors->names);
 

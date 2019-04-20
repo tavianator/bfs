@@ -614,55 +614,38 @@ static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, 
 	return 0;
 }
 
-bool trie_remove_str(struct trie *trie, const char *key) {
-	return trie_remove_mem(trie, key, strlen(key) + 1);
-}
-
-bool trie_remove_mem(struct trie *trie, const void *key, size_t length) {
+void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 	uintptr_t *child = &trie->root;
-	if (!*child) {
-		return false;
-	}
-
 	uintptr_t *parent = NULL;
 	unsigned int child_bit = 0, child_index = 0;
 	size_t offset = 0;
 	while (!trie_is_leaf(*child)) {
 		struct trie_node *node = trie_decode_node(*child);
 		offset += node->offset;
-		if ((offset >> 1) >= length) {
-			return false;
-		}
+		assert((offset >> 1) < leaf->length);
 
-		unsigned char nibble = trie_key_nibble(key, offset);
+		unsigned char nibble = trie_key_nibble(leaf->key, offset);
 		unsigned int bit = 1U << nibble;
 		unsigned int bitmap = node->bitmap;
-		if (bitmap & bit) {
-			unsigned int index = trie_popcount(bitmap & (bit - 1));
+		assert(bitmap & bit);
+		unsigned int index = trie_popcount(bitmap & (bit - 1));
 
-			// Advance the parent pointer, unless this node had only
-			// one child
-			if (bitmap & (bitmap - 1)) {
-				parent = child;
-				child_bit = bit;
-				child_index = index;
-			}
-
-			child = node->children + index;
-		} else {
-			return false;
+		// Advance the parent pointer, unless this node had only one child
+		if (bitmap & (bitmap - 1)) {
+			parent = child;
+			child_bit = bit;
+			child_index = index;
 		}
+
+		child = node->children + index;
 	}
 
-	const struct trie_leaf *leaf = trie_decode_leaf(*child);
-	if (leaf->length != length || memcmp(leaf->key, key, length) != 0) {
-		return false;
-	}
+	assert(trie_decode_leaf(*child) == leaf);
 
 	if (!parent) {
 		trie_free_singletons(trie->root);
 		trie->root = 0;
-		return true;
+		return;
 	}
 
 	struct trie_node *node = trie_decode_node(*parent);
@@ -673,7 +656,7 @@ bool trie_remove_mem(struct trie *trie, const void *key, size_t length) {
 	unsigned int parent_size = trie_popcount(node->bitmap);
 	assert(parent_size > 0);
 	if (parent_size == 1 && trie_collapse_node(parent, node, child_index) == 0) {
-		return true;
+		return;
 	}
 
 	if (child_index < parent_size) {
@@ -686,8 +669,6 @@ bool trie_remove_mem(struct trie *trie, const void *key, size_t length) {
 			*parent = trie_encode_node(node);
 		}
 	}
-
-	return true;
 }
 
 /** Free an encoded pointer to a node. */

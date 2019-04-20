@@ -140,30 +140,14 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key);
 struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length);
 
 /**
- * Remove a string key from a trie.
+ * Remove a leaf from a trie.
  *
  * @param trie
  *         The trie to modify.
- * @param key
- *         The key to remove.
- * @return
- *         Whether the key was found.
+ * @param leaf
+ *         The leaf to remove.
  */
-bool trie_remove_str(struct trie *trie, const char *key);
-
-/**
- * Remove a fixed-size key from a trie.
- *
- * @param trie
- *         The trie to modify.
- * @param key
- *         The key to remove.
- * @param size
- *         The size of the key in bytes.
- * @return
- *         Whether the key was found.
- */
-bool trie_remove_mem(struct trie *trie, const void *key, size_t size);
+void trie_remove(struct trie *trie, struct trie_leaf *leaf);
 
 /**
  * Destroy a trie and its contents.
