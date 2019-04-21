@@ -428,7 +428,9 @@ gnu_tests=(
 
     test_gid
     test_gid_plus
+    test_gid_plus_plus
     test_gid_minus
+    test_gid_minus_plus
 
     test_ignore_readdir_race
     test_ignore_readdir_race_root
@@ -525,7 +527,9 @@ gnu_tests=(
 
     test_uid
     test_uid_plus
+    test_uid_plus_plus
     test_uid_minus
+    test_uid_minus_plus
 
     test_writable
 
@@ -1018,8 +1022,16 @@ function test_gid_plus() {
     bfs_diff basic -gid +0
 }
 
+function test_gid_plus_plus() {
+    bfs_diff basic -gid +0
+}
+
 function test_gid_minus() {
     bfs_diff basic -gid "-$(($(id -g) + 1))"
+}
+
+function test_gid_minus_plus() {
+    bfs_diff basic -gid "-+$(($(id -g) + 1))"
 }
 
 function test_uid() {
@@ -1030,8 +1042,16 @@ function test_uid_plus() {
     bfs_diff basic -uid +0
 }
 
+function test_uid_plus_plus() {
+    bfs_diff basic -uid ++0
+}
+
 function test_uid_minus() {
     bfs_diff basic -uid "-$(($(id -u) + 1))"
+}
+
+function test_uid_minus_plus() {
+    bfs_diff basic -uid "-+$(($(id -u) + 1))"
 }
 
 function test_newer() {

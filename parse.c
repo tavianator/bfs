@@ -658,10 +658,16 @@ static const char *parse_icmp(const struct parser_state *state, const char *str,
  * Check if a string could be an integer comparison.
  */
 static bool looks_like_icmp(const char *str) {
-	if (str[0] == '-' || str[0] == '+') {
-		++str;
+	int i;
+
+	// One +/- for the comparison flag, one for the sign
+	for (i = 0; i < 2; ++i) {
+		if (str[i] != '-' && str[i] != '+') {
+			break;
+		}
 	}
-	return str[0] >= '0' && str[0] <= '9';
+
+	return str[i] >= '0' && str[i] <= '9';
 }
 
 /**
