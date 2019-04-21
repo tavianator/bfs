@@ -60,6 +60,16 @@ Usage: $0 [--bfs=path/to/bfs] [--posix|--bsd|--gnu|--all]
 EOF
 }
 
+function _realpath() {
+    (
+        cd "${1%/*}"
+        echo "$PWD/${1##*/}"
+    )
+}
+
+BFS="$(_realpath ./bfs)"
+TESTS="$(_realpath ./tests)"
+
 BSD=yes
 GNU=yes
 ALL=yes
@@ -607,16 +617,6 @@ if [ ! "$EXPLICIT" ]; then
     [ "$GNU" ] && enable_tests "${gnu_tests[@]}"
     [ "$ALL" ] && enable_tests "${bfs_tests[@]}"
 fi
-
-function _realpath() {
-    (
-        cd "${1%/*}"
-        echo "$PWD/${1##*/}"
-    )
-}
-
-BFS="$(_realpath ./bfs)"
-TESTS="$(_realpath ./tests)"
 
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
