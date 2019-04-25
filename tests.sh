@@ -22,10 +22,21 @@ umask 022
 export LC_ALL=C
 export TZ=UTC
 
+if [ -t 1 ]; then
+    BLD="$(printf '\033[01m')"
+    RED="$(printf '\033[01;31m')"
+    GRN="$(printf '\033[01;32m')"
+    YLW="$(printf '\033[01;33m')"
+    BLU="$(printf '\033[01;34m')"
+    MAG="$(printf '\033[01;35m')"
+    CYN="$(printf '\033[01;36m')"
+    RST="$(printf '\033[0m')"
+fi
+
 if [ "$EUID" -eq 0 ]; then
     cat >&2 <<EOF
-error: These tests expect filesystem permissions to be enforced, and therefore
-will not work when run as $(id -un).
+${RED}error:${RST} These tests expect filesystem permissions to be enforced, and therefore
+will not work when run as ${BLD}$(id -un)${RST}.
 EOF
     exit 1
 fi
@@ -33,29 +44,29 @@ fi
 function usage() {
     local pad=$(printf "%*s" ${#0} "")
     cat <<EOF
-Usage: $0 [--bfs=path/to/bfs] [--posix|--bsd|--gnu|--all]
-       $pad [--noclean] [--update] [--verbose] [--help]
-       $pad [test_* [test_* ...]]
+Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix${RST}|${BLU}--bsd${RST}|${BLU}--gnu${RST}|${BLU}--all${RST}]
+       $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}] [${BLU}--help${RST}]
+       $pad [${BLD}test_*${RST} [${BLD}test_*${RST} ...]]
 
-  --bfs=path/to/bfs
-      Set the path to the bfs executable to test (default: ./bfs)
+  ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
+      Set the path to the bfs executable to test (default: ${MAG}./bfs${RST})
 
-  --posix|--bsd|--gnu|--all
-      Restrict the set of test cases to run
+  ${BLU}--posix${RST}|${BLU}--bsd${RST}|${BLU}--gnu${RST}|${BLU}--all${RST}
+      Choose which test cases to run (default: ${BLU}--all${RST})
 
-  --noclean
+  ${BLU}--noclean${RST}
       Keep the test directories around after the run
 
-  --update
+  ${BLU}--update${RST}
       Update the expected outputs for the test cases
 
-  --verbose
+  ${BLU}--verbose${RST}
       Log the commands that get executed
 
-  --help
+  ${BLU}--help${RST}
       This message
 
-  test_*
+  ${BLD}test_*${RST}
       Select individual test cases to run
 EOF
 }
@@ -127,7 +138,7 @@ for arg; do
             enable_tests "$arg"
             ;;
         *)
-            printf "Unrecognized option '%s'.\n\n" "$arg" >&2
+            printf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
             usage >&2
             exit 1
             ;;
@@ -812,24 +823,24 @@ fi
 function bfs_verbose() {
     if [ "$VERBOSE" ]; then
         if [ -t 3 ]; then
-            printf '\033[1;32m%q\033[0m ' $BFS >&3
+            printf "${GRN}%q${RST} " $BFS >&3
 
             local expr_started=
             for arg; do
                 if [[ $arg == -[A-Z]* ]]; then
-                    printf '\033[1;36m%q\033[0m ' "$arg" >&3
+                    printf "${CYN}%q${RST} " "$arg" >&3
                 elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
                     expr_started=yes
-                    printf '\033[1;31m%q\033[0m ' "$arg" >&3
+                    printf "${RED}%q${RST} " "$arg" >&3
                 elif [[ $expr_started && $arg == [\),] ]]; then
-                    printf '\033[1;31m%q\033[0m ' "$arg" >&3
+                    printf "${RED}%q${RST} " "$arg" >&3
                 elif [[ $arg == -?* ]]; then
                     expr_started=yes
-                    printf '\033[1;34m%q\033[0m ' "$arg" >&3
+                    printf "${BLU}%q${RST} " "$arg" >&3
                 elif [ "$expr_started" ]; then
-                    printf '\033[1m%q\033[0m ' "$arg" >&3
+                    printf "${BLD}%q${RST} " "$arg" >&3
                 else
-                    printf '\033[1;35m%q\033[0m ' "$arg" >&3
+                    printf "${MAG}%q${RST} " "$arg" >&3
                 fi
             done
         else
@@ -2157,6 +2168,8 @@ function test_L_unique_depth() {
     bfs_diff -L loops/deeply/nested -unique -depth
 }
 
+
+BOL=
 EOL='\n'
 
 function update_eol() {
@@ -2165,16 +2178,10 @@ function update_eol() {
     EOL="\\033[${COLUMNS}G "
 }
 
-if [ -t 1 ]; then
-    RED='\033[01;31m'
-    GRN='\033[01;32m'
-    YLW='\033[01;33m'
-    RST='\033[0m'
-    if [ ! "$VERBOSE" ]; then
-        BOL='\r\033[K'
-        update_eol
-        trap update_eol WINCH
-    fi
+if [ -t 1 -a ! "$VERBOSE" ]; then
+    BOL='\r\033[K'
+    update_eol
+    trap update_eol WINCH
 fi
 
 passed=0
