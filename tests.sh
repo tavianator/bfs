@@ -44,15 +44,18 @@ fi
 function usage() {
     local pad=$(printf "%*s" ${#0} "")
     cat <<EOF
-Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix${RST}|${BLU}--bsd${RST}|${BLU}--gnu${RST}|${BLU}--all${RST}]
+Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLU}--sudo${RST}]
        $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}] [${BLU}--help${RST}]
        $pad [${BLD}test_*${RST} [${BLD}test_*${RST} ...]]
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
       Set the path to the bfs executable to test (default: ${MAG}./bfs${RST})
 
-  ${BLU}--posix${RST}|${BLU}--bsd${RST}|${BLU}--gnu${RST}|${BLU}--all${RST}
+  ${BLU}--posix${RST}, ${BLU}--bsd${RST}, ${BLU}--gnu${RST}, ${BLU}--all${RST}
       Choose which test cases to run (default: ${BLU}--all${RST})
+
+  ${BLU}--sudo${RST}
+      Run tests that require root (not included in ${BLU}--all${RST})
 
   ${BLU}--noclean${RST}
       Keep the test directories around after the run
@@ -81,9 +84,12 @@ function _realpath() {
 BFS="$(_realpath ./bfs)"
 TESTS="$(_realpath ./tests)"
 
-BSD=yes
-GNU=yes
-ALL=yes
+DEFAULT=yes
+POSIX=
+BSD=
+GNU=
+ALL=
+SUDO=
 CLEAN=yes
 UPDATE=
 VERBOSE=
@@ -101,24 +107,29 @@ for arg; do
             BFS="${arg#*=}"
             ;;
         --posix)
-            BSD=
-            GNU=
-            ALL=
+            DEFAULT=
+            POSIX=yes
             ;;
         --bsd)
+            DEFAULT=
+            POSIX=yes
             BSD=yes
-            GNU=
-            ALL=
             ;;
         --gnu)
-            BSD=
+            DEFAULT=
+            POSIX=yes
             GNU=yes
-            ALL=
             ;;
         --all)
+            DEFAULT=
+            POSIX=yes
             BSD=yes
             GNU=yes
             ALL=yes
+            ;;
+        --sudo)
+            DEFAULT=
+            SUDO=yes
             ;;
         --noclean)
             CLEAN=
@@ -626,11 +637,26 @@ bfs_tests=(
     test_deep_strict
 )
 
+sudo_tests=(
+    test_mount
+    test_xdev
+
+    test_type_bind_mount
+)
+
+if [ "$DEFAULT" ]; then
+    POSIX=yes
+    BSD=yes
+    GNU=yes
+    ALL=yes
+fi
+
 if [ ! "$EXPLICIT" ]; then
-    enable_tests "${posix_tests[@]}"
+    [ "$POSIX" ] && enable_tests "${posix_tests[@]}"
     [ "$BSD" ] && enable_tests "${bsd_tests[@]}"
     [ "$GNU" ] && enable_tests "${gnu_tests[@]}"
     [ "$ALL" ] && enable_tests "${bfs_tests[@]}"
+    [ "$SUDO" ] && enable_tests "${sudo_tests[@]}"
 fi
 
 # The temporary directory that will hold our test data
@@ -2169,6 +2195,44 @@ function test_L_unique_loops() {
 
 function test_L_unique_depth() {
     bfs_diff -L loops/deeply/nested -unique -depth
+}
+
+function test_mount() {
+    rm -rf scratch/*
+    mkdir scratch/foo scratch/mnt
+    sudo mount -t tmpfs tmpfs scratch/mnt
+    touch scratch/foo/bar scratch/mnt/baz
+
+    bfs_diff scratch -mount
+    local ret=$?
+
+    sudo umount scratch/mnt
+    return $ret
+}
+
+function test_xdev() {
+    rm -rf scratch/*
+    mkdir scratch/foo scratch/mnt
+    sudo mount -t tmpfs tmpfs scratch/mnt
+    touch scratch/foo/bar scratch/mnt/baz
+
+    bfs_diff scratch -xdev
+    local ret=$?
+
+    sudo umount scratch/mnt
+    return $ret
+}
+
+function test_type_bind_mount() {
+    rm -rf scratch/*
+    touch scratch/file scratch/null
+    sudo mount --bind /dev/null scratch/null
+
+    bfs_diff scratch -type c
+    local ret=$?
+
+    sudo umount scratch/null
+    return $ret
 }
 
 

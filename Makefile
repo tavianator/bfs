@@ -106,6 +106,9 @@ ifneq ($(OS),Darwin)
 endif
 	+$(MAKE) -Bs release check
 	+$(MAKE) -Bs check
+ifeq ($(OS),Linux)
+	./tests.sh --sudo
+endif
 
 clean:
 	$(RM) bfs *.[od] tests/mksock tests/*.[od]
