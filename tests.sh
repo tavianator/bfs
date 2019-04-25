@@ -815,6 +815,9 @@ function bfs_sort() {
     awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
 }
 
+# Close stdin so bfs doesn't think we're interactive
+exec </dev/null
+
 if [ "$VERBOSE" ]; then
     # dup stdout for verbose logging even when redirected
     exec 3>&1
