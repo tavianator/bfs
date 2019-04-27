@@ -3162,9 +3162,15 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		cmdline->argv[i] = argv[i];
 	}
 
+	enum use_color use_color = COLOR_AUTO;
+	if (getenv("NO_COLOR")) {
+		// https://no-color.org/
+		use_color = COLOR_NEVER;
+	}
+
 	cmdline->colors = parse_colors(getenv("LS_COLORS"));
-	cmdline->cout = cfdup(stdout, cmdline->colors);
-	cmdline->cerr = cfdup(stderr, cmdline->colors);
+	cmdline->cout = cfdup(stdout, use_color ? cmdline->colors : NULL);
+	cmdline->cerr = cfdup(stderr, use_color ? cmdline->colors : NULL);
 	if (!cmdline->cout || !cmdline->cerr) {
 		perror("cfdup()");
 		goto fail;
@@ -3175,7 +3181,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		cmdline->mtab_error = errno;
 	}
 
-	bool stderr_tty = cmdline->cerr->colors;
+	bool stderr_tty = isatty(STDERR_FILENO);
 	bool stdin_tty = isatty(STDIN_FILENO);
 
 	struct parser_state state = {
@@ -3185,7 +3191,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.roots_tail = &cmdline->roots,
 		.regex_flags = 0,
 		.interactive = stderr_tty && stdin_tty,
-		.use_color = COLOR_AUTO,
+		.use_color = use_color,
 		.implicit_print = true,
 		.warn = stdin_tty,
 		.non_option_seen = false,
