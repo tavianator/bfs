@@ -82,10 +82,9 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 /**
  * Check if we should retry a failed stat() due to a potentially broken link.
  */
-static bool bfs_stat_retry(int ret, int at_flags, enum bfs_stat_flag flags) {
+static bool bfs_stat_retry(int ret, enum bfs_stat_flag flags) {
 	return ret != 0
-		&& !(at_flags & AT_SYMLINK_NOFOLLOW)
-		&& (flags & BFS_STAT_BROKEN_OK)
+		&& (flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW
 		&& is_nonexistence_error(errno);
 }
 
@@ -144,7 +143,7 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, enum bfs_
 	struct stat statbuf;
 	int ret = fstatat(at_fd, at_path, &statbuf, at_flags);
 
-	if (bfs_stat_retry(ret, at_flags, flags)) {
+	if (bfs_stat_retry(ret, flags)) {
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 		ret = fstatat(at_fd, at_path, &statbuf, at_flags);
 	}
@@ -183,7 +182,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 	struct statx xbuf;
 	int ret = bfs_statx(at_fd, at_path, at_flags, mask, &xbuf);
 
-	if (bfs_stat_retry(ret, at_flags, flags)) {
+	if (bfs_stat_retry(ret, flags)) {
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 		ret = bfs_statx(at_fd, at_path, at_flags, mask, &xbuf);
 	}
@@ -274,7 +273,10 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 
 #endif // HAVE_BFS_STATX
 
-int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag flags, struct bfs_stat *buf) {
+/**
+ * Allows calling stat with custom at_flags.
+ */
+static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag flags, struct bfs_stat *buf) {
 #if HAVE_BFS_STATX
 	static bool has_statx = true;
 
@@ -291,12 +293,20 @@ int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag fl
 	return bfs_stat_impl(at_fd, at_path, at_flags, flags, buf);
 }
 
+int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flag flags, struct bfs_stat *buf) {
+	int at_flags = 0;
+	if (flags & BFS_STAT_NOFOLLOW) {
+		at_flags |= AT_SYMLINK_NOFOLLOW;
+	}
+	return bfs_stat_explicit(at_fd, at_path, at_flags, flags, buf);
+}
+
 int bfs_fstat(int fd, struct bfs_stat *buf) {
 #ifdef AT_EMPTY_PATH
 	static bool has_at_ep = true;
 
 	if (has_at_ep) {
-		int ret = bfs_stat(fd, "", AT_EMPTY_PATH, 0, buf);
+		int ret = bfs_stat_explicit(fd, "", AT_EMPTY_PATH, 0, buf);
 		if (ret != 0 && errno == EINVAL) {
 			has_at_ep = false;
 		} else {

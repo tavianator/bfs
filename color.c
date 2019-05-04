@@ -542,7 +542,7 @@ int cfclose(CFILE *cfile) {
 
 /** Check if a symlink is broken. */
 static bool is_link_broken(const struct BFTW *ftwbuf) {
-	if (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW) {
+	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
 		return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0;
 	} else {
 		return true;
@@ -710,7 +710,7 @@ static int print_path_colored(CFILE *cfile, const struct BFTW *ftwbuf) {
 
 /** Call stat() again to resolve a link target. */
 static void restat(struct BFTW *ftwbuf, struct bfs_stat *statbuf) {
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, 0, statbuf) == 0) {
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->stat_flags, statbuf) == 0) {
 		ftwbuf->statbuf = statbuf;
 	}
 }
@@ -723,9 +723,9 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	}
 
 	if (colors && colors->link_as_target) {
-		if (ftwbuf->typeflag == BFTW_LNK && (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW)) {
+		if (ftwbuf->typeflag == BFTW_LNK && (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
 			struct BFTW altbuf = *ftwbuf;
-			altbuf.at_flags = 0;
+			altbuf.stat_flags = BFS_STAT_FOLLOW;
 			struct bfs_stat statbuf;
 			restat(&altbuf, &statbuf);
 			return print_path_colored(cfile, &altbuf);
@@ -752,7 +752,7 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	struct BFTW altbuf = *ftwbuf;
 	altbuf.path = target;
 	altbuf.nameoff = xbasename(target) - target;
-	altbuf.at_flags = 0;
+	altbuf.stat_flags = BFS_STAT_FOLLOW;
 	altbuf.statbuf = NULL;
 
 	struct bfs_stat statbuf;

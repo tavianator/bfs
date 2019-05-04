@@ -79,7 +79,7 @@ struct eval_state {
 /**
  * Debug stat() calls.
  */
-static void debug_stat(const struct eval_state *state, int at_flags, enum bfs_stat_flag flags) {
+static void debug_stat(const struct eval_state *state, enum bfs_stat_flag flags) {
 	if (!(state->cmdline->debug & DEBUG_STAT)) {
 		return;
 	}
@@ -98,13 +98,9 @@ static void debug_stat(const struct eval_state *state, int at_flags, enum bfs_st
 
 	fprintf(stderr, ", \"%s\", ", ftwbuf->at_path);
 
-	DEBUG_FLAG(at_flags, 0);
-	DEBUG_FLAG(at_flags, AT_SYMLINK_NOFOLLOW);
-
-	fprintf(stderr, ", ");
-
-	DEBUG_FLAG(flags, 0);
-	DEBUG_FLAG(flags, BFS_STAT_BROKEN_OK);
+	DEBUG_FLAG(flags, BFS_STAT_FOLLOW);
+	DEBUG_FLAG(flags, BFS_STAT_NOFOLLOW);
+	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
 
 	fprintf(stderr, ")\n");
 }
@@ -124,9 +120,9 @@ static const struct bfs_stat *eval_try_stat(struct eval_state *state) {
 		goto done;
 	}
 
-	debug_stat(state, ftwbuf->at_flags, BFS_STAT_BROKEN_OK);
+	debug_stat(state, ftwbuf->stat_flags);
 
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, &state->statbuf) == 0) {
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->stat_flags, &state->statbuf) == 0) {
 		ftwbuf->statbuf = &state->statbuf;
 	} else {
 		ftwbuf->error = errno;
@@ -195,9 +191,9 @@ static const struct bfs_stat *eval_xstat(struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 	struct bfs_stat *statbuf = &state->xstatbuf;
 	if (!statbuf->mask) {
-		int at_flags = ftwbuf->at_flags ^ AT_SYMLINK_NOFOLLOW;
-		debug_stat(state, at_flags, 0);
-		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, at_flags, 0, statbuf) != 0) {
+		enum bfs_stat_flag flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
+		debug_stat(state, flags);
+		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, flags, statbuf) != 0) {
 			return NULL;
 		}
 	}
@@ -419,7 +415,7 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	}
 
 	int flag = 0;
-	if (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW) {
+	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
 		if (ftwbuf->typeflag == BFTW_DIR) {
 			flag |= AT_REMOVEDIR;
 		}
@@ -994,7 +990,7 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
 
-	bool follow = !(ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW);
+	bool follow = !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW);
 	bool is_link = ftwbuf->typeflag == BFTW_LNK;
 	if (follow == is_link) {
 		return eval_type(expr, state);
@@ -1244,7 +1240,7 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	state.xstatbuf.mask = 0;
 
 	if (ftwbuf->statbuf) {
-		debug_stat(&state, ftwbuf->at_flags, BFS_STAT_BROKEN_OK);
+		debug_stat(&state, ftwbuf->stat_flags);
 	}
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {

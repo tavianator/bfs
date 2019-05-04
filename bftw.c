@@ -751,7 +751,7 @@ static enum bftw_typeflag bftw_dirent_typeflag(const struct dirent *de) {
 
 /** Call stat() and use the results. */
 static int bftw_stat(struct BFTW *ftwbuf, struct bfs_stat *sb) {
-	int ret = bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->at_flags, BFS_STAT_BROKEN_OK, sb);
+	int ret = bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->stat_flags, sb);
 	if (ret == 0) {
 		ftwbuf->statbuf = sb;
 		ftwbuf->typeflag = bftw_mode_typeflag(sb->mode);
@@ -877,7 +877,7 @@ static bool bftw_need_stat(struct bftw_state *state) {
 		return true;
 	}
 
-	if (ftwbuf->typeflag == BFTW_LNK && !(ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW)) {
+	if (ftwbuf->typeflag == BFTW_LNK && !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
 		return true;
 	}
 
@@ -918,7 +918,7 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 	ftwbuf->statbuf = NULL;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
-	ftwbuf->at_flags = AT_SYMLINK_NOFOLLOW;
+	ftwbuf->stat_flags = BFS_STAT_NOFOLLOW;
 
 	if (dir) {
 		ftwbuf->nameoff = dir->nameoff;
@@ -957,7 +957,7 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 	}
 	bool follow = state->flags & follow_flags;
 	if (follow) {
-		ftwbuf->at_flags = 0;
+		ftwbuf->stat_flags = BFS_STAT_TRYFOLLOW;
 	}
 
 	if (bftw_need_stat(state)) {

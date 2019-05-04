@@ -381,7 +381,7 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf_directive *directive
 	const char *type = "U";
 
 	struct bfs_stat sb;
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, 0, 0, &sb) == 0) {
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, BFS_STAT_FOLLOW, &sb) == 0) {
 		type = bfs_printf_type(bftw_mode_typeflag(sb.mode));
 	} else {
 		switch (errno) {

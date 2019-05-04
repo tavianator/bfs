@@ -465,9 +465,9 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 	const struct cmdline *cmdline = state->cmdline;
 
 	bool follow = cmdline->flags & (BFTW_COMFOLLOW | BFTW_LOGICAL);
-	int at_flags = follow ? 0 : AT_SYMLINK_NOFOLLOW;
+	enum bfs_stat_flag flags = follow ? BFS_STAT_TRYFOLLOW : BFS_STAT_NOFOLLOW;
 
-	int ret = bfs_stat(AT_FDCWD, expr->sdata, at_flags, BFS_STAT_BROKEN_OK, sb);
+	int ret = bfs_stat(AT_FDCWD, expr->sdata, flags, sb);
 	if (ret != 0) {
 		parse_error(state, "'%s': %m.\n", expr->sdata);
 	}

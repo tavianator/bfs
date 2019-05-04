@@ -63,8 +63,12 @@ const char *bfs_stat_field_name(enum bfs_stat_field field);
  * bfs_stat() flags.
  */
 enum bfs_stat_flag {
-	/** Fall back to the link itself on broken symlinks. */
-	BFS_STAT_BROKEN_OK = 1 << 0,
+	/** Follow symlinks (the default). */
+	BFS_STAT_FOLLOW = 0,
+	/** Never follow symlinks. */
+	BFS_STAT_NOFOLLOW = 1 << 0,
+	/** Try to follow symlinks, but fall back to the link itself if broken. */
+	BFS_STAT_TRYFOLLOW = 1 << 1,
 };
 
 #ifdef DEV_BSIZE
@@ -113,8 +117,19 @@ struct bfs_stat {
 
 /**
  * Facade over fstatat().
+ *
+ * @param at_fd
+ *         The base file descriptor for the lookup.
+ * @param at_path
+ *         The path to stat, relative to at_fd.
+ * @param flags
+ *         Flags that affect the lookup.
+ * @param[out] buf
+ *         A place to store the stat buffer, if successful.
+ * @return
+ *         0 on success, -1 on error.
  */
-int bfs_stat(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flag flags, struct bfs_stat *buf);
+int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flag flags, struct bfs_stat *buf);
 
 /**
  * Facade over fstat().

@@ -96,10 +96,10 @@ struct BFTW {
 
 	/** A parent file descriptor for the *at() family of calls. */
 	int at_fd;
-	/** The path relative to atfd for the *at() family of calls. */
+	/** The path relative to at_fd for the *at() family of calls. */
 	const char *at_path;
-	/** Appropriate flags (such as AT_SYMLINK_NOFOLLOW) for the *at() family of calls. */
-	int at_flags;
+	/** Flags for bfs_stat(). */
+	enum bfs_stat_flag stat_flags;
 };
 
 /**

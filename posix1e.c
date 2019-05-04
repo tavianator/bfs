@@ -44,7 +44,7 @@ static const char *open_path(const struct BFTW *ftwbuf, int *fd) {
 	// /proc/self/fd/<fd> to cap_get_path().  Inspired by
 	// https://android.googlesource.com/platform/bionic/+/2825f10b7f61558c264231a536cf3affc0d84204
 	int flags = O_PATH;
-	if (ftwbuf->at_flags & AT_SYMLINK_NOFOLLOW) {
+	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
 		flags |= O_NOFOLLOW;
 	}
 

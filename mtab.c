@@ -104,7 +104,7 @@ struct bfs_mtab *parse_bfs_mtab() {
 	struct mntent *mnt;
 	while ((mnt = getmntent(file))) {
 		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, mnt->mnt_dir, 0, 0, &sb) != 0) {
+		if (bfs_stat(AT_FDCWD, mnt->mnt_dir, BFS_STAT_NOFOLLOW, &sb) != 0) {
 			continue;
 		}
 
@@ -140,7 +140,7 @@ fail:
 
 	for (struct statfs *mnt = mntbuf; mnt < mntbuf + size; ++mnt) {
 		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, mnt->f_mntonname, 0, 0, &sb) != 0) {
+		if (bfs_stat(AT_FDCWD, mnt->f_mntonname, BFS_STAT_NOFOLLOW, &sb) != 0) {
 			continue;
 		}
 
@@ -173,7 +173,7 @@ fail:
 	struct mnttab mnt;
 	while (getmntent(file, &mnt) == 0) {
 		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, mnt.mnt_mountp, 0, 0, &sb) != 0) {
+		if (bfs_stat(AT_FDCWD, mnt.mnt_mountp, BFS_STAT_NOFOLLOW, &sb) != 0) {
 			continue;
 		}
 
