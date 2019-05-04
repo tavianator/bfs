@@ -419,7 +419,7 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 	}
 
 	struct bfs_stat sb;
-	if (bfs_fstat(fileno(cfile->file), &sb) != 0) {
+	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
 		parse_error(state, "'%s': %m.\n", path);
 		goto out_close;
 	}

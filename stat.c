@@ -298,15 +298,16 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flag flags, struct bf
 	if (flags & BFS_STAT_NOFOLLOW) {
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 	}
-	return bfs_stat_explicit(at_fd, at_path, at_flags, flags, buf);
-}
 
-int bfs_fstat(int fd, struct bfs_stat *buf) {
+	if (at_path) {
+		return bfs_stat_explicit(at_fd, at_path, at_flags, flags, buf);
+	}
+
 #ifdef AT_EMPTY_PATH
 	static bool has_at_ep = true;
-
 	if (has_at_ep) {
-		int ret = bfs_stat_explicit(fd, "", AT_EMPTY_PATH, 0, buf);
+		at_flags |= AT_EMPTY_PATH;
+		int ret = bfs_stat_explicit(at_fd, "", at_flags, flags, buf);
 		if (ret != 0 && errno == EINVAL) {
 			has_at_ep = false;
 		} else {
@@ -316,11 +317,12 @@ int bfs_fstat(int fd, struct bfs_stat *buf) {
 #endif
 
 	struct stat statbuf;
-	int ret = fstat(fd, &statbuf);
-	if (ret == 0) {
+	if (fstat(at_fd, &statbuf) == 0) {
 		bfs_stat_convert(&statbuf, buf);
+		return 0;
+	} else {
+		return -1;
 	}
-	return ret;
 }
 
 const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_field field) {

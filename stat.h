@@ -121,7 +121,8 @@ struct bfs_stat {
  * @param at_fd
  *         The base file descriptor for the lookup.
  * @param at_path
- *         The path to stat, relative to at_fd.
+ *         The path to stat, relative to at_fd.  Pass NULL to fstat() at_fd
+ *         itself.
  * @param flags
  *         Flags that affect the lookup.
  * @param[out] buf
@@ -130,11 +131,6 @@ struct bfs_stat {
  *         0 on success, -1 on error.
  */
 int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flag flags, struct bfs_stat *buf);
-
-/**
- * Facade over fstat().
- */
-int bfs_fstat(int fd, struct bfs_stat *buf);
 
 /**
  * Get a particular time field from a bfs_stat() buffer.
