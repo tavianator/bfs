@@ -59,78 +59,7 @@ struct eval_state {
 	int *ret;
 	/** Whether to quit immediately. */
 	bool *quit;
-	/** A bfs_stat() buffer, if necessary. */
-	struct bfs_stat statbuf;
-	/** A bfs_stat() buffer for -xtype style tests. */
-	struct bfs_stat xstatbuf;
 };
-
-#define DEBUG_FLAG(flags, flag)				\
-	do {						\
-		if ((flags & flag) || flags == flag) {	\
-			fputs(#flag, stderr);		\
-			flags ^= flag;			\
-			if (flags) {			\
-				fputs(" | ", stderr);	\
-			}				\
-		}					\
-	} while (0)
-
-/**
- * Debug stat() calls.
- */
-static void debug_stat(const struct eval_state *state, enum bfs_stat_flag flags) {
-	if (!(state->cmdline->debug & DEBUG_STAT)) {
-		return;
-	}
-
-	struct BFTW *ftwbuf = state->ftwbuf;
-
-	fprintf(stderr, "bfs_stat(");
-	if (ftwbuf->at_fd == AT_FDCWD) {
-		fprintf(stderr, "AT_FDCWD");
-	} else {
-		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);
-		fprintf(stderr, "\"");
-		fwrite(ftwbuf->path, 1, baselen, stderr);
-		fprintf(stderr, "\"");
-	}
-
-	fprintf(stderr, ", \"%s\", ", ftwbuf->at_path);
-
-	DEBUG_FLAG(flags, BFS_STAT_FOLLOW);
-	DEBUG_FLAG(flags, BFS_STAT_NOFOLLOW);
-	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
-
-	fprintf(stderr, ")\n");
-}
-
-/**
- * Perform a bfs_stat() call if necessary.
- */
-static const struct bfs_stat *eval_try_stat(struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
-
-	if (ftwbuf->statbuf) {
-		goto done;
-	}
-
-	if (ftwbuf->error) {
-		errno = ftwbuf->error;
-		goto done;
-	}
-
-	debug_stat(state, ftwbuf->stat_flags);
-
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->stat_flags, &state->statbuf) == 0) {
-		ftwbuf->statbuf = &state->statbuf;
-	} else {
-		ftwbuf->error = errno;
-	}
-
-done:
-	return ftwbuf->statbuf;
-}
 
 /**
  * Print an error message.
@@ -140,10 +69,6 @@ static void eval_error(struct eval_state *state, const char *format, ...) {
 	int error = errno;
 	const struct cmdline *cmdline = state->cmdline;
 	CFILE *cerr = cmdline->cerr;
-
-	if (cerr->colors) {
-		eval_try_stat(state);
-	}
 
 	bfs_error(cmdline, "%pP: ", state->ftwbuf);
 
@@ -177,27 +102,12 @@ static void eval_report_error(struct eval_state *state) {
  * Perform a bfs_stat() call if necessary.
  */
 static const struct bfs_stat *eval_stat(struct eval_state *state) {
-	const struct bfs_stat *ret = eval_try_stat(state);
+	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct bfs_stat *ret = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 	if (!ret) {
 		eval_report_error(state);
 	}
 	return ret;
-}
-
-/**
- * Perform a bfs_stat() call for tests that flip the follow flag, like -xtype.
- */
-static const struct bfs_stat *eval_xstat(struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
-	struct bfs_stat *statbuf = &state->xstatbuf;
-	if (!statbuf->mask) {
-		enum bfs_stat_flag flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
-		debug_stat(state, flags);
-		if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, flags, statbuf) != 0) {
-			return NULL;
-		}
-	}
-	return statbuf;
 }
 
 /**
@@ -415,21 +325,14 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	}
 
 	int flag = 0;
-	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
-		if (ftwbuf->typeflag == BFTW_DIR) {
-			flag |= AT_REMOVEDIR;
-		}
-	} else if (ftwbuf->typeflag != BFTW_LNK) {
-		// We need to know the actual type of the path, not what it points to
-		const struct bfs_stat *statbuf = eval_xstat(state);
-		if (statbuf) {
-			if (S_ISDIR(statbuf->mode)) {
-				flag |= AT_REMOVEDIR;
-			}
-		} else {
-			eval_report_error(state);
-			return false;
-		}
+
+	// We need to know the actual type of the path, not what it points to
+	enum bftw_typeflag type = bftw_typeflag(ftwbuf, BFS_STAT_NOFOLLOW);
+	if (type == BFTW_DIR) {
+		flag |= AT_REMOVEDIR;
+	} else if (type == BFTW_ERROR) {
+		eval_report_error(state);
+		return false;
 	}
 
 	if (unlinkat(ftwbuf->at_fd, ftwbuf->at_path, flag) != 0) {
@@ -698,7 +601,7 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
-	const struct BFTW *ftwbuf = state->ftwbuf;
+	struct BFTW *ftwbuf = state->ftwbuf;
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		goto done;
@@ -825,17 +728,10 @@ bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
  * -f?printf action.
  */
 bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
-	if (expr->printf->needs_stat) {
-		if (!eval_stat(state)) {
-			goto done;
-		}
-	}
-
 	if (bfs_printf(expr->cfile->file, expr->printf, state->ftwbuf) != 0) {
 		eval_report_error(state);
 	}
 
-done:
 	return true;
 }
 
@@ -989,22 +885,13 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	struct BFTW *ftwbuf = state->ftwbuf;
-
-	bool follow = !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW);
-	bool is_link = ftwbuf->typeflag == BFTW_LNK;
-	if (follow == is_link) {
-		return eval_type(expr, state);
-	}
-
-	const struct bfs_stat *statbuf = eval_xstat(state);
-	if (statbuf) {
-		return bftw_mode_typeflag(statbuf->mode) & expr->idata;
-	} else if (!follow && is_nonexistence_error(errno)) {
-		// Broken symlink
-		return eval_type(expr, state);
-	} else {
+	enum bfs_stat_flag flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
+	enum bftw_typeflag type = bftw_typeflag(ftwbuf, flags);
+	if (type == BFTW_ERROR) {
 		eval_report_error(state);
 		return false;
+	} else {
+		return type & expr->idata;
 	}
 }
 
@@ -1156,6 +1043,61 @@ static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
 	}
 }
 
+#define DEBUG_FLAG(flags, flag)				\
+	do {						\
+		if ((flags & flag) || flags == flag) {	\
+			fputs(#flag, stderr);		\
+			flags ^= flag;			\
+			if (flags) {			\
+				fputs(" | ", stderr);	\
+			}				\
+		}					\
+	} while (0)
+
+/**
+ * Log a stat() call.
+ */
+static void debug_stat(const struct BFTW *ftwbuf, const struct bftw_stat *cache, enum bfs_stat_flag flags) {
+	fprintf(stderr, "bfs_stat(");
+	if (ftwbuf->at_fd == AT_FDCWD) {
+		fprintf(stderr, "AT_FDCWD");
+	} else {
+		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);
+		fprintf(stderr, "\"");
+		fwrite(ftwbuf->path, 1, baselen, stderr);
+		fprintf(stderr, "\"");
+	}
+
+	fprintf(stderr, ", \"%s\", ", ftwbuf->at_path);
+
+	DEBUG_FLAG(flags, BFS_STAT_FOLLOW);
+	DEBUG_FLAG(flags, BFS_STAT_NOFOLLOW);
+	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
+
+	fprintf(stderr, ") == %d", cache->buf ? 0 : -1);
+
+	if (cache->error) {
+		fprintf(stderr, " [%d]", cache->error);
+	}
+
+	fprintf(stderr, "\n");
+}
+
+/**
+ * Log any stat() calls that happened.
+ */
+static void debug_stats(const struct BFTW *ftwbuf) {
+	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
+	if (statbuf || ftwbuf->stat_cache.error) {
+		debug_stat(ftwbuf, &ftwbuf->stat_cache, BFS_STAT_FOLLOW);
+	}
+
+	const struct bfs_stat *lstatbuf = ftwbuf->lstat_cache.buf;
+	if ((lstatbuf && lstatbuf != statbuf) || ftwbuf->lstat_cache.error) {
+		debug_stat(ftwbuf, &ftwbuf->lstat_cache, BFS_STAT_NOFOLLOW);
+	}
+}
+
 /**
  * Dump the bftw_typeflag for -D search.
  */
@@ -1237,11 +1179,6 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
 	state.quit = &args->quit;
-	state.xstatbuf.mask = 0;
-
-	if (ftwbuf->statbuf) {
-		debug_stat(&state, ftwbuf->stat_flags);
-	}
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
@@ -1284,6 +1221,10 @@ static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
 	}
 
 done:
+	if (cmdline->debug & DEBUG_STAT) {
+		debug_stats(ftwbuf);
+	}
+
 	if (cmdline->debug & DEBUG_SEARCH) {
 		fprintf(stderr,
 		        "cmdline_callback({ "

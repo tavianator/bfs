@@ -550,8 +550,8 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 }
 
 /** Get the color for a file. */
-static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf) {
-	const struct bfs_stat *sb = ftwbuf->statbuf;
+static const char *file_color(const struct colors *colors, const char *filename, struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+	const struct bfs_stat *sb = bftw_stat(ftwbuf, flags);
 	if (!sb) {
 		if (colors->missing) {
 			return colors->missing;
@@ -692,54 +692,54 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 }
 
 /** Print a path with colors. */
-static int print_path_colored(CFILE *cfile, const struct BFTW *ftwbuf) {
+static int print_path_colored(CFILE *cfile, const char *path, struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
-	const char *path = ftwbuf->path;
 
-	if (ftwbuf->nameoff > 0) {
-		if (print_colored(colors, colors->directory, path, ftwbuf->nameoff, file) != 0) {
+	size_t nameoff;
+	if (path == ftwbuf->path) {
+		nameoff = ftwbuf->nameoff;
+	} else {
+		nameoff = xbasename(path) - path;
+	}
+
+	if (nameoff > 0) {
+		if (print_colored(colors, colors->directory, path, nameoff, file) != 0) {
 			return -1;
 		}
 	}
 
-	const char *filename = path + ftwbuf->nameoff;
-	const char *color = file_color(colors, filename, ftwbuf);
+	const char *filename = path + nameoff;
+	const char *color = file_color(colors, filename, ftwbuf, flags);
 	return print_colored(colors, color, filename, strlen(filename), file);
 }
 
-/** Call stat() again to resolve a link target. */
-static void restat(struct BFTW *ftwbuf, struct bfs_stat *statbuf) {
-	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, ftwbuf->stat_flags, statbuf) == 0) {
-		ftwbuf->statbuf = statbuf;
-	}
-}
-
 /** Print the path to a file with the appropriate colors. */
-static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
+static int print_path(CFILE *cfile, struct BFTW *ftwbuf) {
 	const struct colors *colors = cfile->colors;
 	if (!colors) {
 		return fputs(ftwbuf->path, cfile->file) == EOF ? -1 : 0;
 	}
 
-	if (colors && colors->link_as_target) {
-		if (ftwbuf->typeflag == BFTW_LNK && (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
-			struct BFTW altbuf = *ftwbuf;
-			altbuf.stat_flags = BFS_STAT_FOLLOW;
-			struct bfs_stat statbuf;
-			restat(&altbuf, &statbuf);
-			return print_path_colored(cfile, &altbuf);
-		}
+	enum bfs_stat_flag flags = ftwbuf->stat_flags;
+	if (colors && colors->link_as_target && ftwbuf->typeflag == BFTW_LNK) {
+		flags = BFS_STAT_TRYFOLLOW;
 	}
 
-	return print_path_colored(cfile, ftwbuf);
+	return print_path_colored(cfile, ftwbuf->path, ftwbuf, flags);
 }
 
 /** Print a link target with the appropriate colors. */
-static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
+static int print_link_target(CFILE *cfile, struct BFTW *ftwbuf) {
 	int ret = -1;
 
-	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, 0);
+	size_t len = 0;
+	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, BFS_STAT_NOFOLLOW);
+	if (statbuf) {
+		len = statbuf->size;
+	}
+
+	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
 	if (!target) {
 		goto done;
 	}
@@ -749,16 +749,7 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 		goto done;
 	}
 
-	struct BFTW altbuf = *ftwbuf;
-	altbuf.path = target;
-	altbuf.nameoff = xbasename(target) - target;
-	altbuf.stat_flags = BFS_STAT_FOLLOW;
-	altbuf.statbuf = NULL;
-
-	struct bfs_stat statbuf;
-	restat(&altbuf, &statbuf);
-
-	ret = print_path_colored(cfile, &altbuf);
+	ret = print_path_colored(cfile, target, ftwbuf, BFS_STAT_FOLLOW);
 
 done:
 	free(target);
@@ -837,13 +828,13 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 			case 'p':
 				switch (*++i) {
 				case 'P':
-					if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
+					if (print_path(cfile, va_arg(args, struct BFTW *)) != 0) {
 						return -1;
 					}
 					break;
 
 				case 'L':
-					if (print_link_target(cfile, va_arg(args, const struct BFTW *)) != 0) {
+					if (print_link_target(cfile, va_arg(args, struct BFTW *)) != 0) {
 						return -1;
 					}
 					break;

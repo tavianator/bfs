@@ -71,6 +71,18 @@ enum bftw_visit {
 };
 
 /**
+ * Cached bfs_stat() info for a file.
+ */
+struct bftw_stat {
+	/** A pointer to the bfs_stat() buffer, if available. */
+	const struct bfs_stat *buf;
+	/** Storage for the bfs_stat() buffer, if needed. */
+	struct bfs_stat storage;
+	/** The cached error code, if any. */
+	int error;
+};
+
+/**
  * Data about the current file for the bftw() callback.
  */
 struct BFTW {
@@ -91,16 +103,45 @@ struct BFTW {
 	/** The errno that occurred, if typeflag == BFTW_ERROR. */
 	int error;
 
-	/** A bfs_stat() buffer; may be NULL if no stat() call was needed. */
-	const struct bfs_stat *statbuf;
-
 	/** A parent file descriptor for the *at() family of calls. */
 	int at_fd;
 	/** The path relative to at_fd for the *at() family of calls. */
 	const char *at_path;
+
 	/** Flags for bfs_stat(). */
 	enum bfs_stat_flag stat_flags;
+	/** Cached bfs_stat() info for BFS_STAT_NOFOLLOW. */
+	struct bftw_stat lstat_cache;
+	/** Cached bfs_stat() info for BFS_STAT_FOLLOW. */
+	struct bftw_stat stat_cache;
 };
+
+/**
+ * Get bfs_stat() info for a file encountered during bftw(), caching the result
+ * whenever possible.
+ *
+ * @param ftwbuf
+ *         bftw() data for the file to stat.
+ * @param flags
+ *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
+ * @return
+ *         A pointer to a bfs_stat() buffer, or NULL if the call failed.
+ */
+const struct bfs_stat *bftw_stat(struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+
+/**
+ * Get the type of a file encountered during bftw(), with flags controlling
+ * whether to follow links.  This function will avoid calling bfs_stat() if
+ * possible.
+ *
+ * @param ftwbuf
+ *         bftw() data for the file to check.
+ * @param flags
+ *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
+ * @return
+ *         The type of the file, or BFTW_ERROR if an error occurred.
+ */
+enum bftw_typeflag bftw_typeflag(struct BFTW *ftwbuf, enum bfs_stat_flag flags);
 
 /**
  * Walk actions returned by the bftw() callback.

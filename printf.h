@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -22,22 +22,14 @@
 #define BFS_PRINTF_H
 
 #include "bftw.h"
-#include "color.h"
+#include "cmdline.h"
 #include <stdbool.h>
 #include <stdio.h>
-
-struct cmdline;
-struct bfs_printf_directive;
 
 /**
  * A printf command, the result of parsing a single format string.
  */
-struct bfs_printf {
-	/** The chain of printf directives. */
-	struct bfs_printf_directive *directives;
-	/** Whether the struct bfs_stat must be filled in. */
-	bool needs_stat;
-};
+struct bfs_printf;
 
 /**
  * Parse a -printf format string.
@@ -62,7 +54,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
  *         must be non-NULL.
  * @return 0 on success, -1 on failure.
  */
-int bfs_printf(FILE *file, const struct bfs_printf *command, const struct BFTW *ftwbuf);
+int bfs_printf(FILE *file, const struct bfs_printf *command, struct BFTW *ftwbuf);
 
 /**
  * Free a parsed format string.

@@ -504,6 +504,7 @@ gnu_tests=(
     test_print_error
 
     test_printf
+    test_printf_empty
     test_printf_slash
     test_printf_slashes
     test_printf_trailing_slash
@@ -585,6 +586,7 @@ bfs_tests=(
     test_color_escapes
     test_color_nul
     test_color_ln_target
+    test_color_L_ln_target
     test_color_mh
     test_color_mh0
     test_color_or
@@ -1777,6 +1779,10 @@ function test_printf() {
     bfs_diff basic -printf '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
 }
 
+function test_printf_empty() {
+    bfs_diff basic -printf ''
+}
+
 function test_printf_slash() {
     bfs_diff / -maxdepth 0 -printf '(%h)/(%f)\n'
 }
@@ -1952,6 +1958,10 @@ function test_color_nul() {
 
 function test_color_ln_target() {
     LS_COLORS="ln=target:or=01;31:mi=01;33:" bfs_diff rainbow -color
+}
+
+function test_color_L_ln_target() {
+    LS_COLORS="ln=target:or=01;31:mi=01;33:" bfs_diff -L rainbow -color
 }
 
 function test_color_mh() {
