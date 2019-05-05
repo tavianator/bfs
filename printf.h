@@ -54,7 +54,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
  *         must be non-NULL.
  * @return 0 on success, -1 on failure.
  */
-int bfs_printf(FILE *file, const struct bfs_printf *command, struct BFTW *ftwbuf);
+int bfs_printf(FILE *file, const struct bfs_printf *command, const struct BFTW *ftwbuf);
 
 /**
  * Free a parsed format string.

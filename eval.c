@@ -50,7 +50,7 @@
 
 struct eval_state {
 	/** Data about the current file. */
-	struct BFTW *ftwbuf;
+	const struct BFTW *ftwbuf;
 	/** The parsed command line. */
 	const struct cmdline *cmdline;
 	/** The bftw() callback return value. */
@@ -102,7 +102,7 @@ static void eval_report_error(struct eval_state *state) {
  * Perform a bfs_stat() call if necessary.
  */
 static const struct bfs_stat *eval_stat(struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	const struct bfs_stat *ret = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 	if (!ret) {
 		eval_report_error(state);
@@ -152,7 +152,7 @@ bool eval_false(const struct expr *expr, struct eval_state *state) {
  * -executable, -readable, -writable tests.
  */
 bool eval_access(const struct expr *expr, struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata) == 0;
 }
 
@@ -317,7 +317,7 @@ bool eval_nouser(const struct expr *expr, struct eval_state *state) {
  * -delete action.
  */
 bool eval_delete(const struct expr *expr, struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	// Don't try to delete the current directory
 	if (strcmp(ftwbuf->path, ".") == 0) {
@@ -395,7 +395,7 @@ bool eval_depth(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	bool ret = false;
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	if (ftwbuf->typeflag == BFTW_DIR) {
 		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
@@ -459,7 +459,7 @@ bool eval_fstype(const struct expr *expr, struct eval_state *state) {
  * -hidden test.
  */
 bool eval_hidden(const struct expr *expr, struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	return ftwbuf->nameoff > 0 && ftwbuf->path[ftwbuf->nameoff] == '.';
 }
 
@@ -506,7 +506,7 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 	bool ret = false;
 	char *name = NULL;
 
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	if (ftwbuf->typeflag != BFTW_LNK) {
 		goto done;
 	}
@@ -533,7 +533,7 @@ done:
  * -i?name test.
  */
 bool eval_name(const struct expr *expr, struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
 	char *copy = NULL;
@@ -560,7 +560,7 @@ bool eval_name(const struct expr *expr, struct eval_state *state) {
  * -i?path test.
  */
 bool eval_path(const struct expr *expr, struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	return fnmatch(expr->sdata, ftwbuf->path, expr->idata) == 0;
 }
 
@@ -601,7 +601,7 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		goto done;
@@ -884,7 +884,7 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
  * -xtype test.
  */
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
-	struct BFTW *ftwbuf = state->ftwbuf;
+	const struct BFTW *ftwbuf = state->ftwbuf;
 	enum bfs_stat_flag flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
 	enum bftw_typeflag type = bftw_typeflag(ftwbuf, flags);
 	if (type == BFTW_ERROR) {
@@ -1168,7 +1168,7 @@ struct callback_args {
 /**
  * bftw() callback.
  */
-static enum bftw_action cmdline_callback(struct BFTW *ftwbuf, void *ptr) {
+static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 	struct callback_args *args = ptr;
 
 	const struct cmdline *cmdline = args->cmdline;

@@ -764,26 +764,27 @@ static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, struct bftw_st
 	return cache->buf;
 }
 
-const struct bfs_stat *bftw_stat(struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+	struct BFTW *mutbuf = (struct BFTW *)ftwbuf;
 	const struct bfs_stat *ret;
 
 	if (flags & BFS_STAT_NOFOLLOW) {
-		ret = bftw_stat_impl(ftwbuf, &ftwbuf->lstat_cache, BFS_STAT_NOFOLLOW);
-		if (ret && !S_ISLNK(ret->mode) && !ftwbuf->stat_cache.buf) {
+		ret = bftw_stat_impl(mutbuf, &mutbuf->lstat_cache, BFS_STAT_NOFOLLOW);
+		if (ret && !S_ISLNK(ret->mode) && !mutbuf->stat_cache.buf) {
 			// Non-link, so share stat info
-			ftwbuf->stat_cache.buf = ret;
+			mutbuf->stat_cache.buf = ret;
 		}
 	} else {
-		ret = bftw_stat_impl(ftwbuf, &ftwbuf->stat_cache, BFS_STAT_FOLLOW);
+		ret = bftw_stat_impl(mutbuf, &mutbuf->stat_cache, BFS_STAT_FOLLOW);
 		if (!ret && (flags & BFS_STAT_TRYFOLLOW) && is_nonexistence_error(errno)) {
-			ret = bftw_stat_impl(ftwbuf, &ftwbuf->lstat_cache, BFS_STAT_NOFOLLOW);
+			ret = bftw_stat_impl(mutbuf, &mutbuf->lstat_cache, BFS_STAT_NOFOLLOW);
 		}
 	}
 
 	return ret;
 }
 
-enum bftw_typeflag bftw_typeflag(struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
 		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->typeflag != BFTW_LNK) {
 			return ftwbuf->typeflag;
@@ -911,7 +912,7 @@ static bool bftw_need_stat(struct bftw_state *state) {
 		return true;
 	}
 
-	struct BFTW *ftwbuf = &state->ftwbuf;
+	const struct BFTW *ftwbuf = &state->ftwbuf;
 	if (ftwbuf->typeflag == BFTW_UNKNOWN) {
 		return true;
 	}
@@ -1036,7 +1037,8 @@ static void bftw_prepare_visit(struct bftw_state *state) {
  * Invoke the callback.
  */
 static enum bftw_action bftw_visit_path(struct bftw_state *state) {
-	if (state->reader.dir) {
+	const struct bftw_dir *dir = state->reader.dir;
+	if (dir) {
 		if (bftw_update_path(state) != 0) {
 			state->error = errno;
 			return BFTW_STOP;
@@ -1045,18 +1047,19 @@ static enum bftw_action bftw_visit_path(struct bftw_state *state) {
 
 	bftw_prepare_visit(state);
 
+	const struct BFTW *ftwbuf = &state->ftwbuf;
+
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
-	if (state->ftwbuf.typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
-		state->error = state->ftwbuf.error;
+	if (ftwbuf->typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
+		state->error = ftwbuf->error;
 		return BFTW_STOP;
 	}
 
-	// Defensive copy
-	struct BFTW ftwbuf = state->ftwbuf;
-
-	enum bftw_action action = state->callback(&ftwbuf, state->ptr);
+	enum bftw_action action = state->callback(ftwbuf, state->ptr);
 	switch (action) {
 	case BFTW_CONTINUE:
+		break;
+
 	case BFTW_SKIP_SIBLINGS:
 	case BFTW_SKIP_SUBTREE:
 	case BFTW_STOP:
@@ -1066,6 +1069,19 @@ static enum bftw_action bftw_visit_path(struct bftw_state *state) {
 		state->error = EINVAL;
 		return BFTW_STOP;
 	}
+
+	if (state->visit != BFTW_PRE || ftwbuf->typeflag != BFTW_DIR) {
+		return BFTW_SKIP_SUBTREE;
+	}
+
+	if (state->flags & BFTW_XDEV) {
+		const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
+		if (statbuf && dir && statbuf->dev != dir->dev) {
+			return BFTW_SKIP_SUBTREE;
+		}
+	}
+
+	return BFTW_CONTINUE;
 }
 
 /**
@@ -1214,10 +1230,6 @@ int bftw(const char *path, const struct bftw_args *args) {
 		break;
 	}
 
-	if (state.ftwbuf.typeflag != BFTW_DIR) {
-		goto done;
-	}
-
 	// Now start the breadth-first search
 
 	if (bftw_push(&state, path) != 0) {
@@ -1245,17 +1257,6 @@ int bftw(const char *path, const struct bftw_args *args) {
 
 			case BFTW_STOP:
 				goto done;
-			}
-
-			if (state.ftwbuf.typeflag != BFTW_DIR) {
-				goto read;
-			}
-
-			if (args->flags & BFTW_XDEV) {
-				const struct bfs_stat *statbuf = bftw_stat(&state.ftwbuf, state.ftwbuf.stat_flags);
-				if (statbuf && statbuf->dev != reader->dir->dev) {
-					goto read;
-				}
 			}
 
 			if (bftw_push(&state, name) != 0) {

@@ -106,8 +106,8 @@ int cfclose(CFILE *cfile);
  *         %s: A string
  *         %zu: A size_t
  *         %m: strerror(errno)
- *         %pP: A colored file path, from a struct BFTW * argument
- *         %pL: A colored link target, from a struct BFTW * argument
+ *         %pP: A colored file path, from a const struct BFTW * argument
+ *         %pL: A colored link target, from a const struct BFTW * argument
  *         %%: A literal '%'
  *         ${cc}: Change the color to 'cc'
  *         $$: A literal '$'

@@ -550,7 +550,7 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 }
 
 /** Get the color for a file. */
-static const char *file_color(const struct colors *colors, const char *filename, struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	const struct bfs_stat *sb = bftw_stat(ftwbuf, flags);
 	if (!sb) {
 		if (colors->missing) {
@@ -692,7 +692,7 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 }
 
 /** Print a path with colors. */
-static int print_path_colored(CFILE *cfile, const char *path, struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
 
@@ -715,7 +715,7 @@ static int print_path_colored(CFILE *cfile, const char *path, struct BFTW *ftwbu
 }
 
 /** Print the path to a file with the appropriate colors. */
-static int print_path(CFILE *cfile, struct BFTW *ftwbuf) {
+static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	const struct colors *colors = cfile->colors;
 	if (!colors) {
 		return fputs(ftwbuf->path, cfile->file) == EOF ? -1 : 0;
@@ -730,7 +730,7 @@ static int print_path(CFILE *cfile, struct BFTW *ftwbuf) {
 }
 
 /** Print a link target with the appropriate colors. */
-static int print_link_target(CFILE *cfile, struct BFTW *ftwbuf) {
+static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	int ret = -1;
 
 	size_t len = 0;
@@ -828,13 +828,13 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 			case 'p':
 				switch (*++i) {
 				case 'P':
-					if (print_path(cfile, va_arg(args, struct BFTW *)) != 0) {
+					if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
 						return -1;
 					}
 					break;
 
 				case 'L':
-					if (print_link_target(cfile, va_arg(args, struct BFTW *)) != 0) {
+					if (print_link_target(cfile, va_arg(args, const struct BFTW *)) != 0) {
 						return -1;
 					}
 					break;

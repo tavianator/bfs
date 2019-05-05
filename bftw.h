@@ -127,7 +127,7 @@ struct BFTW {
  * @return
  *         A pointer to a bfs_stat() buffer, or NULL if the call failed.
  */
-const struct bfs_stat *bftw_stat(struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
 
 /**
  * Get the type of a file encountered during bftw(), with flags controlling
@@ -141,7 +141,7 @@ const struct bfs_stat *bftw_stat(struct BFTW *ftwbuf, enum bfs_stat_flag flags);
  * @return
  *         The type of the file, or BFTW_ERROR if an error occurred.
  */
-enum bftw_typeflag bftw_typeflag(struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
 
 /**
  * Walk actions returned by the bftw() callback.
@@ -167,7 +167,7 @@ enum bftw_action {
  * @return
  *         An action value.
  */
-typedef enum bftw_action bftw_callback(struct BFTW *ftwbuf, void *ptr);
+typedef enum bftw_action bftw_callback(const struct BFTW *ftwbuf, void *ptr);
 
 /**
  * Flags that control bftw() behavior.
