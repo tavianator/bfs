@@ -610,6 +610,8 @@ bfs_tests=(
     test_color_ext_override
     test_color_ext_underride
     test_color_missing_colon
+    test_color_no_stat
+    test_color_L_no_stat
 
     test_execdir_plus
 
@@ -2054,6 +2056,14 @@ function test_color_ext_underride() {
 
 function test_color_missing_colon() {
     LS_COLORS="*.txt=01" bfs_diff rainbow -color
+}
+
+function test_color_no_stat() {
+    LS_COLORS="mh=0:ex=0:sg=0:su=0:st=0:ow=0:tw=0:*.txt=01:" bfs_diff rainbow -color
+}
+
+function test_color_L_no_stat() {
+    LS_COLORS="mh=0:ex=0:sg=0:su=0:st=0:ow=0:tw=0:*.txt=01:" bfs_diff -L rainbow -color
 }
 
 function test_deep() {

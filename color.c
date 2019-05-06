@@ -551,28 +551,32 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 
 /** Get the color for a file. */
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
-	const struct bfs_stat *sb = bftw_stat(ftwbuf, flags);
-	if (!sb) {
-		if (colors->missing) {
-			return colors->missing;
-		} else {
-			return colors->orphan;
-		}
+	enum bftw_typeflag typeflag = bftw_typeflag(ftwbuf, flags);
+	if (typeflag == BFTW_ERROR) {
+		goto error;
 	}
 
+	const struct bfs_stat *statbuf = NULL;
 	const char *color = NULL;
 
-	switch (sb->mode & S_IFMT) {
-	case S_IFREG:
-		if (colors->setuid && (sb->mode & 04000)) {
+	switch (typeflag) {
+	case BFTW_REG:
+		if (colors->setuid || colors->setgid || colors->executable || colors->multi_hard) {
+			statbuf = bftw_stat(ftwbuf, flags);
+			if (!statbuf) {
+				goto error;
+			}
+		}
+
+		if (colors->setuid && (statbuf->mode & 04000)) {
 			color = colors->setuid;
-		} else if (colors->setgid && (sb->mode & 02000)) {
+		} else if (colors->setgid && (statbuf->mode & 02000)) {
 			color = colors->setgid;
 		} else if (colors->capable && bfs_check_capabilities(ftwbuf)) {
 			color = colors->capable;
-		} else if (colors->executable && (sb->mode & 00111)) {
+		} else if (colors->executable && (statbuf->mode & 00111)) {
 			color = colors->executable;
-		} else if (colors->multi_hard && sb->nlink > 1) {
+		} else if (colors->multi_hard && statbuf->nlink > 1) {
 			color = colors->multi_hard;
 		}
 
@@ -586,12 +590,19 @@ static const char *file_color(const struct colors *colors, const char *filename,
 
 		break;
 
-	case S_IFDIR:
-		if (colors->sticky_other_writable && (sb->mode & 01002) == 01002) {
+	case BFTW_DIR:
+		if (colors->sticky_other_writable || colors->other_writable || colors->sticky) {
+			statbuf = bftw_stat(ftwbuf, flags);
+			if (!statbuf) {
+				goto error;
+			}
+		}
+
+		if (colors->sticky_other_writable && (statbuf->mode & 01002) == 01002) {
 			color = colors->sticky_other_writable;
-		} else if (colors->other_writable && (sb->mode & 00002)) {
+		} else if (colors->other_writable && (statbuf->mode & 00002)) {
 			color = colors->other_writable;
-		} else if (colors->sticky && (sb->mode & 01000)) {
+		} else if (colors->sticky && (statbuf->mode & 01000)) {
 			color = colors->sticky;
 		} else {
 			color = colors->directory;
@@ -599,7 +610,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 
 		break;
 
-	case S_IFLNK:
+	case BFTW_LNK:
 		if (colors->orphan && is_link_broken(ftwbuf)) {
 			color = colors->orphan;
 		} else {
@@ -607,24 +618,24 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		}
 		break;
 
-	case S_IFBLK:
+	case BFTW_BLK:
 		color = colors->blockdev;
 		break;
-	case S_IFCHR:
+	case BFTW_CHR:
 		color = colors->chardev;
 		break;
-	case S_IFIFO:
+	case BFTW_FIFO:
 		color = colors->pipe;
 		break;
-	case S_IFSOCK:
+	case BFTW_SOCK:
 		color = colors->socket;
 		break;
-
-#ifdef S_IFDOOR
-	case S_IFDOOR:
+	case BFTW_DOOR:
 		color = colors->door;
 		break;
-#endif
+
+	default:
+		break;
 	}
 
 	if (!color) {
@@ -632,6 +643,13 @@ static const char *file_color(const struct colors *colors, const char *filename,
 	}
 
 	return color;
+
+error:
+	if (colors->missing) {
+		return colors->missing;
+	} else {
+		return colors->orphan;
+	}
 }
 
 /** Print a fixed-length string. */

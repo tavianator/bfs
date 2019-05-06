@@ -700,15 +700,9 @@ error:
  * -f?print action.
  */
 bool eval_fprint(const struct expr *expr, struct eval_state *state) {
-	CFILE *cfile = expr->cfile;
-	if (cfile->colors) {
-		eval_stat(state);
-	}
-
-	if (cfprintf(cfile, "%pP\n", state->ftwbuf) < 0) {
+	if (cfprintf(expr->cfile, "%pP\n", state->ftwbuf) < 0) {
 		eval_report_error(state);
 	}
-
 	return true;
 }
 
