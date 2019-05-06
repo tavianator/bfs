@@ -2,6 +2,17 @@
 ===
 
 
+1.4.1
+-----
+
+**April 5, 2019**
+
+- Added a nicer error message when the tests are run as root
+- Fixed detection of comparison expressions with signs, to match GNU find for things like `-uid ++10`
+- Added support for https://no-color.org/
+- Decreased the number of `stat()` calls necessary in some cases
+
+
 1.4
 ---
 
