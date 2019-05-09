@@ -645,7 +645,10 @@ sudo_tests=(
     test_mount
     test_xdev
 
+    test_inum_mount
+    test_inum_bind_mount
     test_type_bind_mount
+    test_xtype_bind_mount
 )
 
 if [ "$DEFAULT" ]; then
@@ -939,6 +942,11 @@ function closefrom() {
         fi
     done
 }
+
+function inum() {
+    ls -id "$@" | awk '{ print $1 }'
+}
+
 
 cd "$TMP"
 
@@ -1753,8 +1761,7 @@ function test_quit_implicit_print() {
 }
 
 function test_inum() {
-    local inode="$(ls -id basic/k/foo/bar | awk '{ print $1 }')"
-    bfs_diff basic -inum "$inode"
+    bfs_diff basic -inum "$(inum basic/k/foo/bar)"
 }
 
 function test_nogroup() {
@@ -2219,7 +2226,7 @@ function test_L_unique_depth() {
 
 function test_mount() {
     rm -rf scratch/*
-    mkdir scratch/foo scratch/mnt
+    mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
     touch scratch/foo/bar scratch/mnt/baz
 
@@ -2232,7 +2239,7 @@ function test_mount() {
 
 function test_xdev() {
     rm -rf scratch/*
-    mkdir scratch/foo scratch/mnt
+    mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
     touch scratch/foo/bar scratch/mnt/baz
 
@@ -2243,12 +2250,49 @@ function test_xdev() {
     return $ret
 }
 
+function test_inum_mount() {
+    rm -rf scratch/*
+    mkdir scratch/{foo,mnt}
+    sudo mount -t tmpfs tmpfs scratch/mnt
+
+    bfs_diff scratch -inum "$(inum scratch/mnt)"
+    local ret=$?
+
+    sudo umount scratch/mnt
+    return $ret
+}
+
+function test_inum_bind_mount() {
+    rm -rf scratch/*
+    touch scratch/{foo,bar}
+    sudo mount --bind scratch/{foo,bar}
+
+    bfs_diff scratch -inum "$(inum scratch/bar)"
+    local ret=$?
+
+    sudo umount scratch/bar
+    return $ret
+}
+
 function test_type_bind_mount() {
     rm -rf scratch/*
-    touch scratch/file scratch/null
+    touch scratch/{file,null}
     sudo mount --bind /dev/null scratch/null
 
     bfs_diff scratch -type c
+    local ret=$?
+
+    sudo umount scratch/null
+    return $ret
+}
+
+function test_xtype_bind_mount() {
+    rm -rf scratch/*
+    touch scratch/{file,null}
+    sudo mount --bind /dev/null scratch/null
+    ln -s /dev/null scratch/link
+
+    bfs_diff -L scratch -type c
     local ret=$?
 
     sudo umount scratch/null
