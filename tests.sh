@@ -2311,6 +2311,13 @@ function update_eol() {
 
 if [ -t 1 -a ! "$VERBOSE" ]; then
     BOL='\r\033[K'
+
+    # Workaround for bash 4: checkwinsize is off by default.  We can turn it on,
+    # but we also have to explicitly trigger a foreground job to finish so that
+    # it will update the window size before we use $COLUMNS
+    shopt -s checkwinsize
+    (:)
+
     update_eol
     trap update_eol WINCH
 fi
