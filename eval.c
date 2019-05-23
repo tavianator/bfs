@@ -25,8 +25,8 @@
 #include "diag.h"
 #include "dstring.h"
 #include "exec.h"
+#include "fsade.h"
 #include "mtab.h"
-#include "posix1e.h"
 #include "printf.h"
 #include "stat.h"
 #include "trie.h"
@@ -160,14 +160,26 @@ bool eval_access(const struct expr *expr, struct eval_state *state) {
  * -acl test.
  */
 bool eval_acl(const struct expr *expr, struct eval_state *state) {
-	return bfs_check_acl(state->ftwbuf);
+	int ret = bfs_check_acl(state->ftwbuf);
+	if (ret >= 0) {
+		return ret;
+	} else {
+		eval_report_error(state);
+		return false;
+	}
 }
 
 /**
  * -capable test.
  */
 bool eval_capable(const struct expr *expr, struct eval_state *state) {
-	return bfs_check_capabilities(state->ftwbuf);
+	int ret = bfs_check_capabilities(state->ftwbuf);
+	if (ret >= 0) {
+		return ret;
+	} else {
+		eval_report_error(state);
+		return false;
+	}
 }
 
 /**

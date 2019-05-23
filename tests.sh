@@ -279,6 +279,9 @@ bsd_tests=(
 
     # Primaries
 
+    test_acl
+    test_L_acl
+
     test_delete
 
     test_depth_maxdepth_1
@@ -642,6 +645,9 @@ bfs_tests=(
 )
 
 sudo_tests=(
+    test_capable
+    test_L_capable
+
     test_mount
     test_xdev
 
@@ -2297,6 +2303,52 @@ function test_xtype_bind_mount() {
 
     sudo umount scratch/null
     return $ret
+}
+
+function test_acl() {
+    rm -rf scratch/*
+
+    if ! invoke_bfs scratch -acl 2>/dev/null; then
+        return 0
+    fi
+
+    touch scratch/{normal,acl}
+    setfacl -m "u:$(id -un):rw" scratch/acl
+    ln -s acl scratch/link
+
+    bfs_diff scratch -acl
+}
+
+function test_L_acl() {
+    rm -rf scratch/*
+
+    if ! invoke_bfs scratch -acl 2>/dev/null; then
+        return 0
+    fi
+
+    touch scratch/{normal,acl}
+    setfacl -m "u:$(id -un):rw" scratch/acl
+    ln -s acl scratch/link
+
+    bfs_diff -L scratch -acl
+}
+
+function test_capable() {
+    rm -rf scratch/*
+    touch scratch/{normal,capable}
+    sudo setcap all+ep scratch/capable
+    ln -s capable scratch/link
+
+    bfs_diff scratch -capable
+}
+
+function test_L_capable() {
+    rm -rf scratch/*
+    touch scratch/{normal,capable}
+    sudo setcap all+ep scratch/capable
+    ln -s capable scratch/link
+
+    bfs_diff -L scratch -capable
 }
 
 

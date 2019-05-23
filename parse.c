@@ -28,8 +28,8 @@
 #include "eval.h"
 #include "exec.h"
 #include "expr.h"
+#include "fsade.h"
 #include "mtab.h"
-#include "posix1e.h"
 #include "printf.h"
 #include "stat.h"
 #include "typo.h"
@@ -999,12 +999,11 @@ static struct expr *parse_access(struct parser_state *state, int flag, int arg2)
  * Parse -acl.
  */
 static struct expr *parse_acl(struct parser_state *state, int flag, int arg2) {
-#if BFS_HAS_SYS_ACL
+#if BFS_CAN_CHECK_ACL
 	struct expr *expr = parse_nullary_test(state, eval_acl);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.00002;
-		expr->ephemeral_fds = 1;
 	}
 	return expr;
 #else
@@ -1057,12 +1056,11 @@ static struct expr *parse_time(struct parser_state *state, int field, int unit) 
  * Parse -capable.
  */
 static struct expr *parse_capable(struct parser_state *state, int flag, int arg2) {
-#if BFS_HAS_POSIX1E_CAPABILITIES
+#if BFS_CAN_CHECK_CAPABILITIES
 	struct expr *expr = parse_nullary_test(state, eval_capable);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.000002;
-		expr->ephemeral_fds = 1;
 	}
 	return expr;
 #else
@@ -2427,7 +2425,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 
 	cfprintf(cout, "${bld}Tests:${rs}\n\n");
 
-#if BFS_HAS_SYS_ACL
+#if BFS_CAN_CHECK_ACL
 	cfprintf(cout, "  ${blu}-acl${rs}\n");
 	cfprintf(cout, "      Find files with non-trivial Access Control Lists\n");
 #endif
@@ -2438,7 +2436,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	               "modified\n");
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}time${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified ${bld}N${rs} days ago\n");
-#if BFS_HAS_POSIX1E_CAPABILITIES
+#if BFS_CAN_CHECK_CAPABILITIES
 	cfprintf(cout, "  ${blu}-capable${rs}\n");
 	cfprintf(cout, "      Match files with POSIX.1e capabilities set\n");
 #endif

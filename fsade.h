@@ -15,34 +15,44 @@
  ****************************************************************************/
 
 /**
- * The withdrawn POSIX.1e standard specified a security API for POSIX systems.
- * Although it was never ratified, many of its interfaces are widely deployed
- * in Unix-like systems.  These functions wrap the POSIX.1e APIs if present,
- * to support things like Access Control Lists and Capabilities.
+ * A facade over (file)system features that are (un)implemented differently
+ * between platforms.
  */
 
-#ifndef BFS_POSIX1E_H
-#define BFS_POSIX1E_H
+#ifndef BFS_FSADE_H
+#define BFS_FSADE_H
 
 #include "bftw.h"
 #include "util.h"
 #include <stdbool.h>
 
-#if !defined(BFS_HAS_POSIX1E_CAPABILITIES) && BFS_HAS_SYS_CAPABILITY && !__FreeBSD__
+#define BFS_CAN_CHECK_ACL BFS_HAS_SYS_ACL
+
+#if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_HAS_SYS_CAPABILITY && !__FreeBSD__
 #	include <sys/capability.h>
 #	ifdef CAP_CHOWN
-#		define BFS_HAS_POSIX1E_CAPABILITIES true
+#		define BFS_CAN_CHECK_CAPABILITIES true
 #	endif
 #endif
 
 /**
  * Check if a file has a non-trvial Access Control List.
+ *
+ * @param ftwbuf
+ *         The file to check.
+ * @return
+ *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
  */
-bool bfs_check_acl(const struct BFTW *ftwbuf);
+int bfs_check_acl(const struct BFTW *ftwbuf);
 
 /**
  * Check if a file has a non-trvial capability set.
+ *
+ * @param ftwbuf
+ *         The file to check.
+ * @return
+ *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
  */
-bool bfs_check_capabilities(const struct BFTW *ftwbuf);
+int bfs_check_capabilities(const struct BFTW *ftwbuf);
 
-#endif // BFS_POSIX1E_H
+#endif // BFS_FSADE_H

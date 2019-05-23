@@ -17,7 +17,7 @@
 #include "color.h"
 #include "bftw.h"
 #include "dstring.h"
-#include "posix1e.h"
+#include "fsade.h"
 #include "stat.h"
 #include "trie.h"
 #include "util.h"
@@ -572,7 +572,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 			color = colors->setuid;
 		} else if (colors->setgid && (statbuf->mode & 02000)) {
 			color = colors->setgid;
-		} else if (colors->capable && bfs_check_capabilities(ftwbuf)) {
+		} else if (colors->capable && bfs_check_capabilities(ftwbuf) > 0) {
 			color = colors->capable;
 		} else if (colors->executable && (statbuf->mode & 00111)) {
 			color = colors->executable;

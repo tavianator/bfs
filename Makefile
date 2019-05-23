@@ -73,11 +73,11 @@ bfs: \
     dstring.o \
     eval.o \
     exec.o \
+    fsade.o \
     main.o \
     mtab.o \
     opt.o \
     parse.o \
-    posix1e.o \
     printf.o \
     spawn.o \
     stat.o \
