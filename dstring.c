@@ -15,6 +15,9 @@
  ****************************************************************************/
 
 #include "dstring.h"
+#include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -115,6 +118,31 @@ int dstrncat(char **dest, const char *src, size_t n) {
 
 int dstrapp(char **str, char c) {
 	return dstrcat_impl(str, &c, 1);
+}
+
+char *dstrprintf(const char *format, ...) {
+	va_list args;
+
+	va_start(args, format);
+	int len = vsnprintf(NULL, 0, format, args);
+	va_end(args);
+
+	assert(len > 0);
+
+	char *str = dstralloc(len);
+	if (!str) {
+		return NULL;
+	}
+
+	va_start(args, format);
+	len = vsnprintf(str, len + 1, format, args);
+	va_end(args);
+
+	struct dstring *header = dstrheader(str);
+	assert(len == header->capacity);
+	header->length = len;
+
+	return str;
 }
 
 void dstrfree(char *dstr) {

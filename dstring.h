@@ -21,6 +21,7 @@
 #ifndef BFS_DSTRING_H
 #define BFS_DSTRING_H
 
+#include "util.h"
 #include <stddef.h>
 
 /**
@@ -104,6 +105,19 @@ int dstrncat(char **dest, const char *src, size_t n);
  * @return 0 on success, -1 on failure.
  */
 int dstrapp(char **str, char c);
+
+/**
+ * Create a dynamic string from a format string.
+ *
+ * @param format
+ *         The format string to fill in.
+ * @param ...
+ *         Any arguments for the format string.
+ * @return
+ *         The created string, or NULL on failure.
+ */
+BFS_FORMATTER(1, 2)
+char *dstrprintf(const char *format, ...);
 
 /**
  * Free a dynamic string.
