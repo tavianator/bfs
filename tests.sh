@@ -1175,7 +1175,7 @@ function test_L_notdir() {
 }
 
 function test_L_loops() {
-    # POSIX says it's okay to either stop of keep going on seeing a filesystem
+    # POSIX says it's okay to either stop or keep going on seeing a filesystem
     # loop, as long as a diagnostic is printed
     local errors="$(invoke_bfs -L loops 2>&1 >/dev/null)"
     [ -n "$errors" ]
