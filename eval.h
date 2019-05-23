@@ -32,6 +32,7 @@ bool eval_access(const struct expr *expr, struct eval_state *state);
 bool eval_acl(const struct expr *expr, struct eval_state *state);
 bool eval_capable(const struct expr *expr, struct eval_state *state);
 bool eval_perm(const struct expr *expr, struct eval_state *state);
+bool eval_xattr(const struct expr *expr, struct eval_state *state);
 
 bool eval_newer(const struct expr *expr, struct eval_state *state);
 bool eval_time(const struct expr *expr, struct eval_state *state);

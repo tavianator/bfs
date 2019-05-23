@@ -53,10 +53,10 @@ LOCAL_LDLIBS :=
 
 ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
-LOCAL_LDLIBS += -lacl -lcap -lrt
+LOCAL_LDLIBS += -lacl -lcap -lattr -lrt
 
-# These libraries are not build with msan, so disable them
-MSAN_CFLAGS := -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0
+# These libraries are not built with msan, so disable them
+MSAN_CFLAGS := -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTRS=0
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)

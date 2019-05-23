@@ -35,6 +35,8 @@
 #	endif
 #endif
 
+#define BFS_CAN_CHECK_XATTRS BFS_HAS_SYS_XATTR
+
 /**
  * Check if a file has a non-trvial Access Control List.
  *
@@ -54,5 +56,15 @@ int bfs_check_acl(const struct BFTW *ftwbuf);
  *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
  */
 int bfs_check_capabilities(const struct BFTW *ftwbuf);
+
+/**
+ * Check if a file has any extended attributes set.
+ *
+ * @param ftwbuf
+ *         The file to check.
+ * @return
+ *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
+ */
+int bfs_check_xattrs(const struct BFTW *ftwbuf);
 
 #endif // BFS_FSADE_H

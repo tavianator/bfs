@@ -648,6 +648,9 @@ sudo_tests=(
     test_capable
     test_L_capable
 
+    test_xattr
+    test_L_xattr
+
     test_mount
     test_xdev
 
@@ -2349,6 +2352,30 @@ function test_L_capable() {
     ln -s capable scratch/link
 
     bfs_diff -L scratch -capable
+}
+
+function test_xattr() {
+    rm -rf scratch/*
+    touch scratch/{normal,xattr}
+    # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
+    # namespace, which is writable by root and readable by others
+    sudo setfattr -n security.bfs_test scratch/xattr
+    ln -s xattr scratch/link
+    ln -s normal scratch/xattr_link
+    sudo setfattr -h -n security.bfs_test scratch/xattr_link
+
+    bfs_diff scratch -xattr
+}
+
+function test_L_xattr() {
+    rm -rf scratch/*
+    touch scratch/{normal,xattr}
+    sudo setfattr -n security.bfs_test scratch/xattr
+    ln -s xattr scratch/link
+    ln -s normal scratch/xattr_link
+    sudo setfattr -h -n security.bfs_test scratch/xattr_link
+
+    bfs_diff -L scratch -xattr
 }
 
 

@@ -887,6 +887,19 @@ bool eval_type(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
+ * -xattr test.
+ */
+bool eval_xattr(const struct expr *expr, struct eval_state *state) {
+	int ret = bfs_check_xattrs(state->ftwbuf);
+	if (ret >= 0) {
+		return ret;
+	} else {
+		eval_report_error(state);
+		return false;
+	}
+}
+
+/**
  * -xtype test.
  */
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {

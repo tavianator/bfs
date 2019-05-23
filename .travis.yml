@@ -6,8 +6,13 @@ addons:
   apt:
     packages:
       - gcc-multilib
+      - acl
       - libacl1-dev
       - libacl1:i386
+      - attr
+      - libattr1-dev
+      - libattr1:i386
+      - libcap2-bin
       - libcap-dev
       - libcap2:i386
 
@@ -19,6 +24,7 @@ matrix:
         # Ubuntu doesn't let you install the -dev packages for both amd64 and
         # i386 at once, so we make our own symlinks to fix -m32 -lacl -lcap
         - sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
+        - sudo ln -s libattr.so.1 /lib/i386-linux-gnu/libattr.so
         - sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
 
     - os: osx

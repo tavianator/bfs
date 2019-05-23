@@ -30,7 +30,11 @@
 #	include <sys/capability.h>
 #endif
 
-#if BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES
+#if BFS_CAN_CHECK_XATTRS
+#	include <sys/xattr.h>
+#endif
+
+#if BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS
 
 /**
  * Many of the APIs used here don't have *at() variants, but we can try to
@@ -103,7 +107,7 @@ static bool is_absence_error(int error) {
 	return false;
 }
 
-#endif // BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES
+#endif // BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS
 
 #if BFS_CAN_CHECK_ACL
 
@@ -225,6 +229,48 @@ out_path:
 #else // !BFS_CAN_CHECK_CAPABILITIES
 
 int bfs_check_capabilities(const struct BFTW *ftwbuf) {
+	errno = ENOTSUP;
+	return -1;
+}
+
+#endif
+
+#if BFS_CAN_CHECK_XATTRS
+
+int bfs_check_xattrs(const struct BFTW *ftwbuf) {
+	const char *path = fake_at(ftwbuf);
+	ssize_t len;
+
+#if __APPLE__
+	int options = ftwbuf->typeflag == BFTW_LNK ? XATTR_NOFOLLOW : 0;
+	len = listxattr(path, NULL, 0, options);
+#else
+	if (ftwbuf->typeflag == BFTW_LNK) {
+		len = llistxattr(path, NULL, 0);
+	} else {
+		len = listxattr(path, NULL, 0);
+	}
+#endif
+
+	int error = errno;
+
+	free_fake_at(ftwbuf, path);
+
+	if (len > 0) {
+		return 1;
+	} else if (len == 0 || is_absence_error(error)) {
+		return 0;
+	} else if (error == E2BIG) {
+		return 1;
+	} else {
+		errno = error;
+		return -1;
+	}
+}
+
+#else // !BFS_CAN_CHECK_XATTRS
+
+int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	errno = ENOTSUP;
 	return -1;
 }

@@ -2338,6 +2338,23 @@ static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
 }
 
 /**
+ * Parse -xattr.
+ */
+static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) {
+#if BFS_CAN_CHECK_XATTRS
+	struct expr *expr = parse_nullary_test(state, eval_xattr);
+	if (expr) {
+		expr->cost = STAT_COST;
+		expr->probability = 0.01;
+	}
+	return expr;
+#else
+	parse_error(state, "%s is missing platform support.\n", state->argv[0]);
+	return NULL;
+#endif
+}
+
+/**
  * "Parse" -help.
  */
 static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
@@ -2692,6 +2709,7 @@ static const struct table_entry parse_table[] = {
 	{"-wholename", false, parse_path, false},
 	{"-writable", false, parse_access, W_OK},
 	{"-x", false, parse_mount},
+	{"-xattr", false, parse_xattr},
 	{"-xdev", false, parse_mount},
 	{"-xtype", false, parse_type, true},
 	{"--"},
