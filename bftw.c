@@ -1097,7 +1097,7 @@ static int bftw_push(struct bftw_state *state, const char *name) {
 
 	const struct BFTW *ftwbuf = &state->ftwbuf;
 	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
-	if (!statbuf) {
+	if (!statbuf || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
 		statbuf = ftwbuf->lstat_cache.buf;
 	}
 	if (statbuf) {
