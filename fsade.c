@@ -104,6 +104,13 @@ static bool is_absence_error(int error) {
 	}
 #endif
 
+#if __APPLE__
+	// On macOS, ENOENT can also signal that a file has no ACLs
+	if (error == ENOENT) {
+		return true;
+	}
+#endif
+
 	return false;
 }
 
@@ -125,7 +132,13 @@ static int bfs_check_acl_type(const char *path, acl_type_t type) {
 	int ret = 0;
 	acl_entry_t entry;
 	for (int status = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
+#if __APPLE__
+	     // POSIX.1e specifies a return value of 1 for success, but macOS
+	     // returns 0 instead
+	     status == 0;
+#else
 	     status > 0;
+#endif
 	     status = acl_get_entry(acl, ACL_NEXT_ENTRY, &entry)) {
 #if defined(ACL_USER_OBJ) && defined(ACL_GROUP_OBJ) && defined(ACL_OTHER)
 		acl_tag_t tag;
@@ -153,22 +166,28 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 
 	const char *path = fake_at(ftwbuf);
 
-	int error = 0;
-	int ret = bfs_check_acl_type(path, ACL_TYPE_ACCESS);
-	if (ret < 0) {
-		error = errno;
-	}
+	int error = ENOTSUP;
+	int ret = -1;
 
-	if (ret <= 0 && ftwbuf->typeflag == BFTW_DIR) {
-		ret = bfs_check_acl_type(path, ACL_TYPE_DEFAULT);
+#if __APPLE__
+	// macOS gives EINVAL for either of the two standard ACL types,
+	// supporting only ACL_TYPE_EXTENDED
+	if (ret <= 0) {
+		ret = bfs_check_acl_type(path, ACL_TYPE_EXTENDED);
+		if (ret < 0) {
+			error = errno;
+		}
+	}
+#else
+	if (ret <= 0) {
+		ret = bfs_check_acl_type(path, ACL_TYPE_ACCESS);
 		if (ret < 0) {
 			error = errno;
 		}
 	}
 
-#ifdef ACL_TYPE_EXTENDED
-	if (ret <= 0) {
-		ret = bfs_check_acl_type(path, ACL_TYPE_EXTENDED);
+	if (ret <= 0 && ftwbuf->typeflag == BFTW_DIR) {
+		ret = bfs_check_acl_type(path, ACL_TYPE_DEFAULT);
 		if (ret < 0) {
 			error = errno;
 		}

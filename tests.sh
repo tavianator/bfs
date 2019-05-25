@@ -2313,12 +2313,18 @@ function test_xtype_bind_mount() {
 function test_acl() {
     rm -rf scratch/*
 
-    if ! invoke_bfs scratch -acl 2>/dev/null; then
+    if ! invoke_bfs scratch -quit -acl 2>/dev/null; then
         return 0
     fi
 
     touch scratch/{normal,acl}
-    setfacl -m "u:$(id -un):rw" scratch/acl
+
+    if [ "$(uname)" = "Darwin" ]; then
+        chmod +a "$(id -un) allow read,write" scratch/acl
+    else
+        setfacl -m "u:$(id -un):rw" scratch/acl
+    fi
+
     ln -s acl scratch/link
 
     bfs_diff scratch -acl
@@ -2327,12 +2333,18 @@ function test_acl() {
 function test_L_acl() {
     rm -rf scratch/*
 
-    if ! invoke_bfs scratch -acl 2>/dev/null; then
+    if ! invoke_bfs scratch -quit -acl 2>/dev/null; then
         return 0
     fi
 
     touch scratch/{normal,acl}
-    setfacl -m "u:$(id -un):rw" scratch/acl
+
+    if [ "$(uname)" = "Darwin" ]; then
+        chmod +a "$(id -un) allow read,write" scratch/acl
+    else
+        setfacl -m "u:$(id -un):rw" scratch/acl
+    fi
+
     ln -s acl scratch/link
 
     bfs_diff -L scratch -acl
@@ -2340,6 +2352,11 @@ function test_L_acl() {
 
 function test_capable() {
     rm -rf scratch/*
+
+    if ! invoke_bfs scratch -quit -capable 2>/dev/null; then
+        return 0
+    fi
+
     touch scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
     ln -s capable scratch/link
@@ -2349,6 +2366,11 @@ function test_capable() {
 
 function test_L_capable() {
     rm -rf scratch/*
+
+    if ! invoke_bfs scratch -quit -capable 2>/dev/null; then
+        return 0
+    fi
+
     touch scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
     ln -s capable scratch/link
@@ -2358,24 +2380,48 @@ function test_L_capable() {
 
 function test_xattr() {
     rm -rf scratch/*
+
+    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+        return 0
+    fi
+
     touch scratch/{normal,xattr}
-    # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
-    # namespace, which is writable by root and readable by others
-    sudo setfattr -n security.bfs_test scratch/xattr
     ln -s xattr scratch/link
     ln -s normal scratch/xattr_link
-    sudo setfattr -h -n security.bfs_test scratch/xattr_link
+
+    if [ "$(uname)" = "Darwin" ]; then
+        xattr -w bfs_test true scratch/xattr
+        xattr -s -w bfs_test true scratch/xattr_link
+    else
+        # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
+        # namespace, which is writable by root and readable by others
+        sudo setfattr -n security.bfs_test scratch/xattr
+        sudo setfattr -h -n security.bfs_test scratch/xattr_link
+    fi
 
     bfs_diff scratch -xattr
 }
 
 function test_L_xattr() {
     rm -rf scratch/*
+
+    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+        return 0
+    fi
+
     touch scratch/{normal,xattr}
-    sudo setfattr -n security.bfs_test scratch/xattr
     ln -s xattr scratch/link
     ln -s normal scratch/xattr_link
-    sudo setfattr -h -n security.bfs_test scratch/xattr_link
+
+    if [ "$(uname)" = "Darwin" ]; then
+        xattr -w bfs_test true scratch/xattr
+        xattr -s -w bfs_test true scratch/xattr_link
+    else
+        # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
+        # namespace, which is writable by root and readable by others
+        sudo setfattr -n security.bfs_test scratch/xattr
+        sudo setfattr -h -n security.bfs_test scratch/xattr_link
+    fi
 
     bfs_diff -L scratch -xattr
 }
