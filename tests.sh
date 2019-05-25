@@ -618,6 +618,8 @@ bfs_tests=(
 
     test_execdir_plus
 
+    test_help
+
     test_hidden
 
     test_nohidden
@@ -2376,6 +2378,10 @@ function test_L_xattr() {
     sudo setfattr -h -n security.bfs_test scratch/xattr_link
 
     bfs_diff -L scratch -xattr
+}
+
+function test_help() {
+    ! invoke_bfs -help | grep -E '\{...?\}'
 }
 
 

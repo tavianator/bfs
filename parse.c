@@ -2434,7 +2434,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
 	cfprintf(cout, "      Use ${bld}TYPE${rs}-flavored regexes (default: ${bld}posix-basic${rs}; see ${blu}-regextype${rs}"
 	                " ${bld}help${rs})\n");
-	cfprintf(cout, "  ${blu}-unique{rs}\n");
+	cfprintf(cout, "  ${blu}-unique${rs}\n");
 	cfprintf(cout, "      Skip any files that have already been seen\n");
 	cfprintf(cout, "  ${blu}-warn${rs}\n");
 	cfprintf(cout, "  ${blu}-nowarn${rs}\n");
@@ -2444,7 +2444,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 
 #if BFS_CAN_CHECK_ACL
 	cfprintf(cout, "  ${blu}-acl${rs}\n");
-	cfprintf(cout, "      Find files with non-trivial Access Control Lists\n");
+	cfprintf(cout, "      Find files with a non-trivial Access Control List\n");
 #endif
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}min${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified ${bld}N${rs} minutes ago\n");
@@ -2455,7 +2455,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified ${bld}N${rs} days ago\n");
 #if BFS_CAN_CHECK_CAPABILITIES
 	cfprintf(cout, "  ${blu}-capable${rs}\n");
-	cfprintf(cout, "      Match files with POSIX.1e capabilities set\n");
+	cfprintf(cout, "      Find files with POSIX.1e capabilities set\n");
 #endif
 	cfprintf(cout, "  ${blu}-depth${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files with depth ${bld}N${rs}\n");
@@ -2478,7 +2478,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find files owned by the group/user ${bld}NAME${rs}\n");
 	cfprintf(cout, "  ${blu}-hidden${rs}\n");
 	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
-	cfprintf(cout, "      Match hidden files, or filter them out\n");
+	cfprintf(cout, "      Find hidden files, or filter them out\n");
 #ifdef FNM_CASEFOLD
 	cfprintf(cout, "  ${blu}-ilname${rs} ${bld}GLOB${rs}\n");
 	cfprintf(cout, "  ${blu}-iname${rs}  ${bld}GLOB${rs}\n");
@@ -2523,6 +2523,10 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find files of the given type\n");
 	cfprintf(cout, "  ${blu}-used${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files last accessed ${bld}N${rs} days after they were changed\n");
+#if BFS_CAN_CHECK_XATTRS
+	cfprintf(cout, "  ${blu}-xattr${rs}\n");
+	cfprintf(cout, "      Find files with extended attributes\n");
+#endif
 	cfprintf(cout, "  ${blu}-xtype${rs} ${bld}[bcdlpfswD]${rs}\n");
 	cfprintf(cout, "      Find files of the given type, following links when ${blu}-type${rs} would not, and\n");
 	cfprintf(cout, "      vice versa\n\n");

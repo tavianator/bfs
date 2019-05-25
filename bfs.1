@@ -270,9 +270,8 @@ Turn on or off warnings about the command line.
 .SH TESTS
 .TP
 .B \-acl
-Find files with non-trivial
-.BR acl (5)
-(Access Control Lists).
+Find files with a non-trivial Access Control List
+.RB ( acl (5)).
 .PP
 \fB\-amin\fR [\fI\-+\fR]\fIN\fR
 .br
@@ -318,7 +317,7 @@ days ago.
 .RE
 .TP
 .B \-capable
-Match files with POSIX.1e
+Find files with POSIX.1e
 .BR capabilities (7)
 set.
 .TP
@@ -366,7 +365,7 @@ Find files owned by the group/user
 .RE
 .TP
 .B \-hidden
-Match hidden files (those beginning with
+Find hidden files (those beginning with
 .IR . ).
 .PP
 \fB\-ilname \fIGLOB\fR
@@ -479,6 +478,10 @@ and
 Find files last accessed
 .I N
 days after they were changed.
+.TP
+.B \-xattr
+Find files with extended attributes
+.RB ( xattr (7)).
 .TP
 \fB\-xtype\fR [\fIbcdlpfswD\fR]
 Find files of the given type, following links when
