@@ -64,7 +64,9 @@ ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 
-all: bfs
+default: bfs
+
+all: bfs tests/mksock
 
 bfs: \
     bftw.o \
@@ -95,7 +97,7 @@ tests/mksock: tests/mksock.o
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-check: all tests/mksock
+check: all
 	./tests.sh
 
 distcheck:
