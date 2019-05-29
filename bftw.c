@@ -29,8 +29,11 @@
  * - struct bftw_queue: The queue of bftw_dir's left to explore.  Implemented as
  *   a simple circular buffer.
  *
+ * - struct bftw_reader: A reader object that simplifies reading directories and
+ *   reporting errors.
+ *
  * - struct bftw_state: Represents the current state of the traversal, allowing
- *   bftw() to be factored into various helper functions.
+ *   various helper functions to take fewer parameters.
  */
 
 #include "bftw.h"
@@ -525,94 +528,6 @@ static void bftw_dir_free(struct bftw_cache *cache, struct bftw_dir *dir) {
 }
 
 /**
- * A directory reader.
- */
-struct bftw_reader {
-	/** The directory object. */
-	struct bftw_dir *dir;
-	/** The path to the directory. */
-	char *path;
-	/** The open handle to the directory. */
-	DIR *handle;
-	/** The current directory entry. */
-	struct dirent *de;
-	/** Any error code that has occurred. */
-	int error;
-};
-
-/** Initialize a reader. */
-static int bftw_reader_init(struct bftw_reader *reader) {
-	reader->path = dstralloc(0);
-	if (!reader->path) {
-		return -1;
-	}
-
-	reader->dir = NULL;
-	reader->handle = NULL;
-	reader->de = NULL;
-	reader->error = 0;
-	return 0;
-}
-
-/** Read a directory entry. */
-static int bftw_reader_read(struct bftw_reader *reader) {
-	if (xreaddir(reader->handle, &reader->de) != 0) {
-		reader->error = errno;
-		return -1;
-	}
-
-	return 0;
-}
-
-/** Open a directory for reading. */
-static int bftw_reader_open(struct bftw_reader *reader, struct bftw_cache *cache, struct bftw_dir *dir) {
-	assert(!reader->handle);
-	assert(!reader->de);
-
-	reader->dir = dir;
-	reader->error = 0;
-
-	if (bftw_dir_path(dir, &reader->path) != 0) {
-		reader->error = errno;
-		dstresize(&reader->path, 0);
-		return -1;
-	}
-
-	reader->handle = bftw_dir_opendir(cache, dir, reader->path);
-	if (!reader->handle) {
-		reader->error = errno;
-		return -1;
-	}
-
-	return bftw_reader_read(reader);
-}
-
-/** Close a directory. */
-static int bftw_reader_close(struct bftw_reader *reader) {
-	assert(reader->handle);
-
-	int ret = 0;
-	if (closedir(reader->handle) != 0) {
-		reader->error = errno;
-		ret = -1;
-	}
-
-	reader->handle = NULL;
-	reader->de = NULL;
-
-	return ret;
-}
-
-/** Destroy a reader. */
-static void bftw_reader_destroy(struct bftw_reader *reader) {
-	if (reader->handle) {
-		bftw_reader_close(reader);
-	}
-
-	dstrfree(reader->path);
-}
-
-/**
  * A queue of bftw_dir's to examine.
  */
 struct bftw_queue {
@@ -650,6 +565,147 @@ static struct bftw_dir *bftw_queue_pop(struct bftw_queue *queue) {
 	}
 	dir->next = NULL;
 	return dir;
+}
+
+/**
+ * A directory reader.
+ */
+struct bftw_reader {
+	/** The directory object. */
+	struct bftw_dir *dir;
+	/** The open handle to the directory. */
+	DIR *handle;
+	/** The current directory entry. */
+	struct dirent *de;
+	/** Any error code that has occurred. */
+	int error;
+};
+
+/** Initialize a reader. */
+static void bftw_reader_init(struct bftw_reader *reader) {
+	reader->dir = NULL;
+	reader->handle = NULL;
+	reader->de = NULL;
+	reader->error = 0;
+}
+
+/** Open a directory for reading. */
+static int bftw_reader_open(struct bftw_reader *reader, struct bftw_cache *cache, struct bftw_dir *dir, const char *path) {
+	assert(!reader->dir);
+	assert(!reader->handle);
+	assert(!reader->de);
+
+	reader->dir = dir;
+	reader->error = 0;
+
+	reader->handle = bftw_dir_opendir(cache, dir, path);
+	if (!reader->handle) {
+		reader->error = errno;
+		return -1;
+	}
+
+	return 0;
+}
+
+/** Read a directory entry. */
+static int bftw_reader_read(struct bftw_reader *reader) {
+	if (!reader->handle) {
+		return -1;
+	}
+
+	if (xreaddir(reader->handle, &reader->de) != 0) {
+		reader->error = errno;
+		return -1;
+	} else if (reader->de) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+/** Close a directory. */
+static int bftw_reader_close(struct bftw_reader *reader) {
+	int ret = 0;
+	if (reader->handle && closedir(reader->handle) != 0) {
+		reader->error = errno;
+		ret = -1;
+	}
+
+	reader->de = NULL;
+	reader->handle = NULL;
+	reader->dir = NULL;
+	return ret;
+}
+
+/**
+ * Holds the current state of the bftw() traversal.
+ */
+struct bftw_state {
+	/** The root path of the walk. */
+	const char *root;
+	/** bftw() callback. */
+	bftw_callback *callback;
+	/** bftw() callback data. */
+	void *ptr;
+	/** bftw() flags. */
+	enum bftw_flags flags;
+	/** The mount table. */
+	const struct bfs_mtab *mtab;
+
+	/** The appropriate errno value, if any. */
+	int error;
+
+	/** The cache of open directories. */
+	struct bftw_cache cache;
+	/** The queue of directories left to explore. */
+	struct bftw_queue queue;
+
+	/** The current path. */
+	char *path;
+	/** The reader for the current directory. */
+	struct bftw_reader reader;
+
+	/** Extra data about the current file. */
+	struct BFTW ftwbuf;
+};
+
+/**
+ * Initialize the bftw() state.
+ */
+static int bftw_state_init(struct bftw_state *state, const char *root, const struct bftw_args *args) {
+	state->root = root;
+	state->callback = args->callback;
+	state->ptr = args->ptr;
+	state->flags = args->flags;
+	state->mtab = args->mtab;
+
+	state->error = 0;
+
+	if (args->nopenfd < 2) {
+		errno = EMFILE;
+		goto err;
+	}
+
+	// Reserve 1 fd for the open DIR *
+	if (bftw_cache_init(&state->cache, args->nopenfd - 1) != 0) {
+		goto err;
+	}
+
+	bftw_queue_init(&state->queue);
+
+	state->path = dstralloc(0);
+	if (!state->path) {
+		goto err_cache;
+	}
+
+	bftw_reader_init(&state->reader);
+
+	return 0;
+
+err_cache:
+	bftw_cache_destroy(&state->cache);
+err:
+	return -1;
 }
 
 enum bftw_typeflag bftw_mode_typeflag(mode_t mode) {
@@ -802,86 +858,13 @@ enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag f
 }
 
 /**
- * Holds the current state of the bftw() traversal.
- */
-struct bftw_state {
-	/** bftw() callback. */
-	bftw_callback *callback;
-	/** bftw() callback data. */
-	void *ptr;
-	/** bftw() flags. */
-	enum bftw_flags flags;
-	/** The mount table. */
-	const struct bfs_mtab *mtab;
-
-	/** The appropriate errno value, if any. */
-	int error;
-
-	/** The cache of open directories. */
-	struct bftw_cache cache;
-	/** The queue of directories left to explore. */
-	struct bftw_queue queue;
-
-	/** The reader for the current directory. */
-	struct bftw_reader reader;
-	/** Whether the current visit is pre- or post-order. */
-	enum bftw_visit visit;
-
-	/** The root path of the walk. */
-	const char *root;
-
-	/** Extra data about the current file. */
-	struct BFTW ftwbuf;
-};
-
-/**
- * Initialize the bftw() state.
- */
-static int bftw_state_init(struct bftw_state *state, const char *root, const struct bftw_args *args) {
-	state->root = root;
-	state->callback = args->callback;
-	state->ptr = args->ptr;
-	state->flags = args->flags;
-	state->mtab = args->mtab;
-
-	state->error = 0;
-
-	if (args->nopenfd < 2) {
-		errno = EMFILE;
-		goto err;
-	}
-
-	// -1 to account for dup()
-	if (bftw_cache_init(&state->cache, args->nopenfd - 1) != 0) {
-		goto err;
-	}
-
-	bftw_queue_init(&state->queue);
-
-	if (bftw_reader_init(&state->reader) != 0) {
-		goto err_cache;
-	}
-
-	state->visit = BFTW_PRE;
-
-	return 0;
-
-err_cache:
-	bftw_cache_destroy(&state->cache);
-err:
-	return -1;
-}
-
-/**
  * Update the path for the current file.
  */
-static int bftw_update_path(struct bftw_state *state) {
-	struct bftw_reader *reader = &state->reader;
-	struct bftw_dir *dir = reader->dir;
-	struct dirent *de = reader->de;
-
+static int bftw_update_path(struct bftw_state *state, const struct bftw_dir *dir, const char *name) {
 	size_t length;
-	if (de) {
+	if (!dir) {
+		length = 0;
+	} else if (name) {
 		length = dir->nameoff + dir->namelen;
 	} else if (dir->depth == 0) {
 		// Use exactly the string passed to bftw(), including any trailing slashes
@@ -891,14 +874,11 @@ static int bftw_update_path(struct bftw_state *state) {
 		length = dir->nameoff + dir->namelen - 1;
 	}
 
-	if (dstrlen(reader->path) < length) {
-		errno = reader->error;
-		return -1;
-	}
-	dstresize(&reader->path, length);
+	assert(dstrlen(state->path) >= length);
+	dstresize(&state->path, length);
 
-	if (de) {
-		if (dstrcat(&reader->path, reader->de->d_name) != 0) {
+	if (name) {
+		if (dstrcat(&state->path, name) != 0) {
 			return -1;
 		}
 	}
@@ -907,7 +887,7 @@ static int bftw_update_path(struct bftw_state *state) {
 }
 
 /** Check if a stat() call is needed for this visit. */
-static bool bftw_need_stat(struct bftw_state *state) {
+static bool bftw_need_stat(const struct bftw_state *state) {
 	if (state->flags & BFTW_STAT) {
 		return true;
 	}
@@ -950,16 +930,15 @@ static void bftw_stat_init(struct bftw_stat *cache) {
 /**
  * Initialize the buffers with data about the current path.
  */
-static void bftw_prepare_visit(struct bftw_state *state) {
-	struct bftw_reader *reader = &state->reader;
-	struct bftw_dir *dir = reader->dir;
-	struct dirent *de = reader->de;
+static void bftw_init_ftwbuf(struct bftw_state *state, struct bftw_dir *dir, enum bftw_visit visit) {
+	const struct bftw_reader *reader = &state->reader;
+	const struct dirent *de = reader->de;
 
 	struct BFTW *ftwbuf = &state->ftwbuf;
-	ftwbuf->path = dir ? reader->path : state->root;
+	ftwbuf->path = state->path;
 	ftwbuf->root = state->root;
 	ftwbuf->depth = 0;
-	ftwbuf->visit = state->visit;
+	ftwbuf->visit = visit;
 	ftwbuf->error = reader->error;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
@@ -1034,20 +1013,16 @@ static void bftw_prepare_visit(struct bftw_state *state) {
 }
 
 /**
- * Invoke the callback.
+ * Visit a path, invoking the callback.
  */
-static enum bftw_action bftw_visit_path(struct bftw_state *state) {
-	const struct bftw_dir *dir = state->reader.dir;
-	if (dir) {
-		if (bftw_update_path(state) != 0) {
-			state->error = errno;
-			return BFTW_STOP;
-		}
+static enum bftw_action bftw_visit(struct bftw_state *state, struct bftw_dir *dir, const char *name, enum bftw_visit visit) {
+	if (bftw_update_path(state, dir, name) != 0) {
+		state->error = errno;
+		return BFTW_STOP;
 	}
 
-	bftw_prepare_visit(state);
-
 	const struct BFTW *ftwbuf = &state->ftwbuf;
+	bftw_init_ftwbuf(state, dir, visit);
 
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
 	if (ftwbuf->typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
@@ -1055,28 +1030,26 @@ static enum bftw_action bftw_visit_path(struct bftw_state *state) {
 		return BFTW_STOP;
 	}
 
-	enum bftw_action action = state->callback(ftwbuf, state->ptr);
-	switch (action) {
+	enum bftw_action ret = state->callback(ftwbuf, state->ptr);
+	switch (ret) {
 	case BFTW_CONTINUE:
 		break;
-
 	case BFTW_SKIP_SIBLINGS:
 	case BFTW_SKIP_SUBTREE:
 	case BFTW_STOP:
-		return action;
-
+		return ret;
 	default:
 		state->error = EINVAL;
 		return BFTW_STOP;
 	}
 
-	if (state->visit != BFTW_PRE || ftwbuf->typeflag != BFTW_DIR) {
+	if (visit != BFTW_PRE || ftwbuf->typeflag != BFTW_DIR) {
 		return BFTW_SKIP_SUBTREE;
 	}
 
-	if (state->flags & BFTW_XDEV) {
+	if ((state->flags & BFTW_XDEV) && dir) {
 		const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
-		if (statbuf && dir && statbuf->dev != dir->dev) {
+		if (statbuf && statbuf->dev != dir->dev) {
 			return BFTW_SKIP_SUBTREE;
 		}
 	}
@@ -1114,8 +1087,14 @@ static int bftw_push(struct bftw_state *state, const char *name) {
  */
 static struct bftw_reader *bftw_pop(struct bftw_state *state) {
 	struct bftw_reader *reader = &state->reader;
-	struct bftw_dir *dir = bftw_queue_pop(&state->queue);
-	bftw_reader_open(reader, &state->cache, dir);
+	struct bftw_dir *dir = state->queue.head;
+	if (bftw_dir_path(dir, &state->path) != 0) {
+		state->error = errno;
+		return NULL;
+	}
+
+	bftw_queue_pop(&state->queue);
+	bftw_reader_open(reader, &state->cache, dir, state->path);
 	return reader;
 }
 
@@ -1129,8 +1108,6 @@ static enum bftw_action bftw_release_dir(struct bftw_state *state, struct bftw_d
 		do_visit = false;
 	}
 
-	state->visit = BFTW_POST;
-
 	while (dir) {
 		bftw_dir_decref(&state->cache, dir);
 		if (dir->refcount > 0) {
@@ -1138,8 +1115,7 @@ static enum bftw_action bftw_release_dir(struct bftw_state *state, struct bftw_d
 		}
 
 		if (do_visit) {
-			state->reader.dir = dir;
-			if (bftw_visit_path(state) == BFTW_STOP) {
+			if (bftw_visit(state, dir, NULL, BFTW_POST) == BFTW_STOP) {
 				ret = BFTW_STOP;
 				do_visit = false;
 			}
@@ -1150,24 +1126,22 @@ static enum bftw_action bftw_release_dir(struct bftw_state *state, struct bftw_d
 		dir = parent;
 	}
 
-	state->visit = BFTW_PRE;
 	return ret;
 }
 
 /**
- * Close and release the reader.
+ * Close and release a reader.
  */
 static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_visit) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
 	struct bftw_reader *reader = &state->reader;
-	if (reader->handle) {
-		bftw_reader_close(reader);
-	}
+	struct bftw_dir *dir = reader->dir;
+	bftw_reader_close(reader);
 
 	if (reader->error != 0) {
 		if (do_visit) {
-			if (bftw_visit_path(state) == BFTW_STOP) {
+			if (bftw_visit(state, dir, NULL, BFTW_PRE) == BFTW_STOP) {
 				ret = BFTW_STOP;
 				do_visit = false;
 			}
@@ -1177,11 +1151,9 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_vi
 		reader->error = 0;
 	}
 
-	if (bftw_release_dir(state, reader->dir, do_visit) == BFTW_STOP) {
+	if (bftw_release_dir(state, dir, do_visit) == BFTW_STOP) {
 		ret = BFTW_STOP;
 	}
-
-	reader->dir = NULL;
 
 	return ret;
 }
@@ -1193,11 +1165,8 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_vi
  *         The bftw() return value.
  */
 static int bftw_state_destroy(struct bftw_state *state) {
-	struct bftw_reader *reader = &state->reader;
-	if (reader->dir) {
-		bftw_release_reader(state, false);
-	}
-	bftw_reader_destroy(reader);
+	bftw_release_reader(state, false);
+	dstrfree(state->path);
 
 	struct bftw_queue *queue = &state->queue;
 	while (queue->head) {
@@ -1208,11 +1177,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	bftw_cache_destroy(&state->cache);
 
 	errno = state->error;
-	if (state->error == 0) {
-		return 0;
-	} else {
-		return -1;
-	}
+	return state->error ? -1 : 0;
 }
 
 int bftw(const char *path, const struct bftw_args *args) {
@@ -1222,12 +1187,12 @@ int bftw(const char *path, const struct bftw_args *args) {
 	}
 
 	// Handle 'path' itself first
-	switch (bftw_visit_path(&state)) {
-	case BFTW_SKIP_SUBTREE:
-	case BFTW_STOP:
-		goto done;
-	default:
+	switch (bftw_visit(&state, NULL, path, BFTW_PRE)) {
+	case BFTW_CONTINUE:
+	case BFTW_SKIP_SIBLINGS:
 		break;
+	default:
+		goto done;
 	}
 
 	// Now start the breadth-first search
@@ -1238,23 +1203,23 @@ int bftw(const char *path, const struct bftw_args *args) {
 
 	while (state.queue.head) {
 		struct bftw_reader *reader = bftw_pop(&state);
+		if (!reader) {
+			goto done;
+		}
 
-		while (reader->de) {
+		while (bftw_reader_read(reader) > 0) {
 			const char *name = reader->de->d_name;
 			if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) {
-				goto read;
+				continue;
 			}
 
-			switch (bftw_visit_path(&state)) {
+			switch (bftw_visit(&state, reader->dir, name, BFTW_PRE)) {
 			case BFTW_CONTINUE:
 				break;
-
 			case BFTW_SKIP_SIBLINGS:
 				goto next;
-
 			case BFTW_SKIP_SUBTREE:
-				goto read;
-
+				continue;
 			case BFTW_STOP:
 				goto done;
 			}
@@ -1262,14 +1227,11 @@ int bftw(const char *path, const struct bftw_args *args) {
 			if (bftw_push(&state, name) != 0) {
 				goto done;
 			}
-
-		read:
-			bftw_reader_read(reader);
 		}
 
 	next:
 		if (bftw_release_reader(&state, true) == BFTW_STOP) {
-			break;
+			goto done;
 		}
 	}
 
