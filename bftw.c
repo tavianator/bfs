@@ -39,6 +39,7 @@
 #include "bftw.h"
 #include "dstring.h"
 #include "stat.h"
+#include "trie.h"
 #include "util.h"
 #include <assert.h>
 #include <dirent.h>
@@ -1336,12 +1337,143 @@ static int bftw_dfs(const struct bftw_args *args) {
 	return ret;
 }
 
+/**
+ * Iterative deepening search state.
+ */
+struct bftw_ids_state {
+	/** The wrapped callback. */
+	bftw_callback *delegate;
+	/** The wrapped callback arguments. */
+	void *ptr;
+	/** Which visit this search corresponds to. */
+	enum bftw_visit visit;
+	/** The current target depth. */
+	size_t depth;
+	/** The set of pruned paths. */
+	struct trie *pruned;
+	/** An error code to report. */
+	int error;
+	/** Whether the bottom has been found. */
+	bool bottom;
+	/** Whether to quit the search. */
+	bool quit;
+};
+
+/** Iterative deepening callback function. */
+static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) {
+	struct bftw_ids_state *state = ptr;
+
+	struct BFTW *mutbuf = (struct BFTW *)ftwbuf;
+	mutbuf->visit = state->visit;
+
+	if (ftwbuf->typeflag == BFTW_ERROR) {
+		if (state->depth - ftwbuf->depth <= 1) {
+			return state->delegate(ftwbuf, state->ptr);
+		} else {
+			return BFTW_SKIP_SUBTREE;
+		}
+	}
+
+	if (ftwbuf->depth < state->depth) {
+		if (trie_find_str(state->pruned, ftwbuf->path)) {
+			return BFTW_SKIP_SUBTREE;
+		} else {
+			return BFTW_CONTINUE;
+		}
+	} else if (state->visit == BFTW_POST) {
+		if (trie_find_str(state->pruned, ftwbuf->path)) {
+			return BFTW_SKIP_SUBTREE;
+		}
+	}
+
+	state->bottom = false;
+
+	enum bftw_action ret = state->delegate(ftwbuf, state->ptr);
+
+	switch (ret) {
+	case BFTW_CONTINUE:
+		ret = BFTW_SKIP_SUBTREE;
+		break;
+	case BFTW_SKIP_SIBLINGS:
+		// Can't be easily supported in this mode
+		state->error = EINVAL;
+		state->quit = true;
+		ret = BFTW_STOP;
+		break;
+	case BFTW_SKIP_SUBTREE:
+		if (ftwbuf->typeflag == BFTW_DIR) {
+			if (!trie_insert_str(state->pruned, ftwbuf->path)) {
+				state->error = errno;
+				state->quit = true;
+				ret = BFTW_STOP;
+			}
+		}
+		break;
+	case BFTW_STOP:
+		state->quit = true;
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * Iterative deepening bftw() wrapper.
+ */
+static int bftw_ids(const struct bftw_args *args) {
+	struct trie pruned;
+	trie_init(&pruned);
+
+	struct bftw_ids_state state = {
+		.delegate = args->callback,
+		.ptr = args->ptr,
+		.visit = BFTW_PRE,
+		.depth = 0,
+		.pruned = &pruned,
+		.bottom = false,
+	};
+
+	struct bftw_args ids_args = *args;
+	ids_args.callback = bftw_ids_callback;
+	ids_args.ptr = &state;
+	ids_args.flags &= ~BFTW_DEPTH;
+	ids_args.strategy = BFTW_DFS;
+
+	int ret = 0;
+
+	while (ret == 0 && !state.quit && !state.bottom) {
+		state.bottom = true;
+		ret = bftw_impl(&ids_args);
+		++state.depth;
+	}
+
+	if (args->flags & BFTW_DEPTH) {
+		state.visit = BFTW_POST;
+
+		while (ret == 0 && !state.quit && state.depth > 0) {
+			--state.depth;
+			ret = bftw_impl(&ids_args);
+		}
+	}
+
+	if (state.error) {
+		ret = -1;
+	} else {
+		state.error = errno;
+	}
+	trie_destroy(&pruned);
+	errno = state.error;
+	return ret;
+}
+
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
 		return bftw_impl(args);
 	case BFTW_DFS:
 		return bftw_dfs(args);
+	case BFTW_IDS:
+		return bftw_ids(args);
 	}
 
 	errno = EINVAL;

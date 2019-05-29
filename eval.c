@@ -1228,7 +1228,7 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 	// In -depth mode, only handle directories on the BFTW_POST visit
 	enum bftw_visit expected_visit = BFTW_PRE;
 	if ((cmdline->flags & BFTW_DEPTH)
-	    && ftwbuf->typeflag == BFTW_DIR
+	    && (cmdline->strategy == BFTW_IDS || ftwbuf->typeflag == BFTW_DIR)
 	    && ftwbuf->depth < cmdline->maxdepth) {
 		expected_visit = BFTW_POST;
 	}
@@ -1332,6 +1332,7 @@ static const char *dump_bftw_strategy(enum bftw_strategy strategy) {
 	static const char *strategies[] = {
 		DUMP_BFTW_MAP(BFTW_BFS),
 		DUMP_BFTW_MAP(BFTW_DFS),
+		DUMP_BFTW_MAP(BFTW_IDS),
 	};
 	return strategies[strategy];
 }

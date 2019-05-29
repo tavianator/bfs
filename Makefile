@@ -100,6 +100,7 @@ tests/mksock: tests/mksock.o
 check: all
 	./tests.sh --bfs="$(realpath bfs)"
 	./tests.sh --bfs="$(realpath bfs) -dfs"
+	./tests.sh --bfs="$(realpath bfs) -ids"
 
 distcheck:
 	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -fsanitize=undefined -fsanitize=address"

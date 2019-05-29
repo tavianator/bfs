@@ -2150,7 +2150,7 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
 }
 
 /**
- * Parse -bfs, -dfs.
+ * Parse -bfs, -dfs, -ids.
  */
 static struct expr *parse_search_strategy(struct parser_state *state, int strategy, int arg2) {
 	struct cmdline *cmdline = state->cmdline;
@@ -2660,6 +2660,7 @@ static const struct table_entry parse_table[] = {
 	{"-group", false, parse_group},
 	{"-help", false, parse_help},
 	{"-hidden", false, parse_hidden},
+	{"-ids", false, parse_search_strategy, BFTW_IDS},
 	{"-ignore_readdir_race", false, parse_ignore_races, true},
 	{"-ilname", false, parse_lname, true},
 	{"-iname", false, parse_name, true},
@@ -3048,6 +3049,9 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		break;
 	case BFTW_DFS:
 		cfprintf(cerr, "${cyn}-dfs${rs} ");
+		break;
+	case BFTW_IDS:
+		cfprintf(cerr, "${cyn}-ids${rs} ");
 		break;
 	}
 
