@@ -31,6 +31,7 @@
 #include "fsade.h"
 #include "mtab.h"
 #include "printf.h"
+#include "spawn.h"
 #include "stat.h"
 #include "typo.h"
 #include "util.h"
@@ -49,6 +50,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -320,7 +322,9 @@ struct parser_state {
 	/** The current regex flags to use. */
 	int regex_flags;
 
-	/** Whether this session is interactive. */
+	/** Whether stdout is a terminal. */
+	bool stdout_tty;
+	/** Whether this session is interactive (stdin and stderr are each a terminal). */
 	bool interactive;
 	/** Whether -color or -nocolor has been passed. */
 	enum use_color use_color;
@@ -2357,10 +2361,121 @@ static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) 
 }
 
 /**
+ * Launch a pager for the help output.
+ */
+static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
+	char *pager = getenv("PAGER");
+	if (!pager) {
+		pager = "more";
+	}
+
+	int pipefd[2];
+	if (pipe(pipefd) != 0) {
+		goto fail;
+	}
+
+	FILE *file = fdopen(pipefd[1], "w");
+	if (!file) {
+		goto fail_pipe;
+	}
+	pipefd[1] = -1;
+
+	CFILE *ret = cfdup(file, NULL);
+	if (!ret) {
+		goto fail_file;
+	}
+	file = NULL;
+	ret->close = true;
+	ret->colors = cout->colors;
+
+	struct bfs_spawn ctx;
+	if (bfs_spawn_init(&ctx) != 0) {
+		goto fail_ret;
+	}
+
+	if (bfs_spawn_setflags(&ctx, BFS_SPAWN_USEPATH) != 0) {
+		goto fail_ctx;
+	}
+
+	if (bfs_spawn_addclose(&ctx, fileno(ret->file)) != 0) {
+		goto fail_ctx;
+	}
+	if (bfs_spawn_adddup2(&ctx, pipefd[0], STDIN_FILENO) != 0) {
+		goto fail_ctx;
+	}
+	if (bfs_spawn_addclose(&ctx, pipefd[0]) != 0) {
+		goto fail_ctx;
+	}
+
+	char *argv[] = {
+		pager,
+		NULL,
+	};
+
+	extern char **environ;
+	char **envp = environ;
+
+	if (!getenv("LESS")) {
+		size_t envc;
+		for (envc = 0; environ[envc]; ++envc);
+		++envc;
+
+		envp = malloc((envc + 1)*sizeof(*envp));
+		if (!envp) {
+			goto fail_ctx;
+		}
+
+		memcpy(envp, environ, (envc - 1)*sizeof(*envp));
+		envp[envc - 1] = "LESS=FKRX";
+		envp[envc] = NULL;
+	}
+
+	*pid = bfs_spawn(pager, &ctx, argv, envp);
+	if (*pid < 0) {
+		goto fail_envp;
+	}
+
+	close(pipefd[0]);
+	if (envp != environ) {
+		free(envp);
+	}
+	bfs_spawn_destroy(&ctx);
+	return ret;
+
+fail_envp:
+	if (envp != environ) {
+		free(envp);
+	}
+fail_ctx:
+	bfs_spawn_destroy(&ctx);
+fail_ret:
+	cfclose(ret);
+fail_file:
+	if (file) {
+		fclose(file);
+	}
+fail_pipe:
+	if (pipefd[1] >= 0) {
+		close(pipefd[1]);
+	}
+	if (pipefd[0] >= 0) {
+		close(pipefd[0]);
+	}
+fail:
+	return cout;
+}
+
+/**
  * "Parse" -help.
  */
 static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	CFILE *cout = state->cmdline->cout;
+
+	pid_t pager = -1;
+	if (state->stdout_tty) {
+		cout = launch_pager(&pager, cout);
+	}
+
 	cfprintf(cout, "Usage: ${ex}%s${rs} [${cyn}flags${rs}...] [${mag}paths${rs}...] [${blu}expression${rs}...]\n\n",
 		 state->command);
 
@@ -2582,6 +2697,11 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Print this help message\n\n");
 
 	cfprintf(cout, "%s\n", BFS_HOMEPAGE);
+
+	if (pager > 0) {
+		cfclose(cout);
+		waitpid(pager, NULL, 0);
+	}
 
 	state->just_info = true;
 	return NULL;
@@ -3221,15 +3341,17 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		cmdline->mtab_error = errno;
 	}
 
-	bool stderr_tty = isatty(STDERR_FILENO);
 	bool stdin_tty = isatty(STDIN_FILENO);
+	bool stdout_tty = isatty(STDOUT_FILENO);
+	bool stderr_tty = isatty(STDERR_FILENO);
 
 	struct parser_state state = {
 		.cmdline = cmdline,
 		.argv = cmdline->argv + 1,
 		.command = cmdline->argv[0],
 		.regex_flags = 0,
-		.interactive = stderr_tty && stdin_tty,
+		.stdout_tty = stdout_tty,
+		.interactive = stdin_tty && stderr_tty,
 		.use_color = use_color,
 		.implicit_print = true,
 		.warn = stdin_tty,
