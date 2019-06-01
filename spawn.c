@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2018 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -28,6 +28,8 @@
  * Types of spawn actions.
  */
 enum bfs_spawn_op {
+	BFS_SPAWN_CLOSE,
+	BFS_SPAWN_DUP2,
 	BFS_SPAWN_FCHDIR,
 };
 
@@ -38,7 +40,8 @@ struct bfs_spawn_action {
 	struct bfs_spawn_action *next;
 
 	enum bfs_spawn_op op;
-	int fd;
+	int in_fd;
+	int out_fd;
 };
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
@@ -69,12 +72,44 @@ static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_sp
 	if (action) {
 		action->next = NULL;
 		action->op = op;
-		action->fd = -1;
+		action->in_fd = -1;
+		action->out_fd = -1;
 
 		*ctx->tail = action;
 		ctx->tail = &action->next;
 	}
 	return action;
+}
+
+int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
+	if (fd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+
+	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_CLOSE);
+	if (action) {
+		action->out_fd = fd;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
+	if (oldfd < 0 || newfd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+
+	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_DUP2);
+	if (action) {
+		action->in_fd = oldfd;
+		action->out_fd = newfd;
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
@@ -85,7 +120,7 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 
 	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_FCHDIR);
 	if (action) {
-		action->fd = fd;
+		action->in_fd = fd;
 		return 0;
 	} else {
 		return -1;
@@ -112,9 +147,29 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 	close(pipefd[0]);
 
 	for (const struct bfs_spawn_action *action = actions; action; action = action->next) {
+		// Move the error-reporting pipe out of the way if necessary
+		if (action->out_fd == pipefd[1]) {
+			int fd = dup(pipefd[1]);
+			if (fd < 0) {
+				goto fail;
+			}
+			close(pipefd[1]);
+			pipefd[1] = fd;
+		}
+
 		switch (action->op) {
+		case BFS_SPAWN_CLOSE:
+			if (close(action->out_fd) != 0) {
+				goto fail;
+			}
+			break;
+		case BFS_SPAWN_DUP2:
+			if (dup2(action->in_fd, action->out_fd) < 0) {
+				goto fail;
+			}
+			break;
 		case BFS_SPAWN_FCHDIR:
-			if (fchdir(action->fd) != 0) {
+			if (fchdir(action->in_fd) != 0) {
 				goto fail;
 			}
 			break;

@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2018 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -62,6 +62,20 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx);
  * @return 0 on success, -1 on failure.
  */
 int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags);
+
+/**
+ * Add a close() action to a bfs_spawn() context.
+ *
+ * @return 0 on success, -1 on failure.
+ */
+int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd);
+
+/**
+ * Add a dup2() action to a bfs_spawn() context.
+ *
+ * @return 0 on success, -1 on failure.
+ */
+int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd);
 
 /**
  * Add an fchdir() action to a bfs_spawn() context.
