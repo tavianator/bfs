@@ -2161,11 +2161,12 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 	const char *flag = state->argv[0];
 	const char *arg = state->argv[1];
 	if (!arg) {
-		parse_error(state, "%s needs an argument.\n\n", flag);
+		parse_error(state, "%s needs an argument.\n", flag);
 		return NULL;
 	}
 
 	struct cmdline *cmdline = state->cmdline;
+	FILE *file = stderr;
 
 	if (strcmp(arg, "bfs") == 0) {
 		cmdline->strategy = BFTW_BFS;
@@ -2173,9 +2174,24 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 		cmdline->strategy = BFTW_DFS;
 	} else if (strcmp(arg, "ids") == 0) {
 		cmdline->strategy = BFTW_IDS;
+	} else if (strcmp(arg, "help") == 0) {
+		state->just_info = true;
+		file = stdout;
+		goto fail_list_strategies;
+	} else {
+		goto fail_bad_strategy;
 	}
 
 	return parse_unary_flag(state);
+
+fail_bad_strategy:
+	parse_error(state, "Unrecognized search strategy '%s'.\n\n", arg);
+fail_list_strategies:
+	fputs("Supported search strategies:\n\n", file);
+	fputs("  bfs: breadth-first search\n", file);
+	fputs("  dfs: depth-first search\n", file);
+	fputs("  ids: iterative deepening search\n", file);
+	return NULL;
 }
 
 /**
