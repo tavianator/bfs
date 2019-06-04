@@ -2506,7 +2506,11 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${cyn}-D${rs} ${bld}FLAG${rs}\n");
 	cfprintf(cout, "      Turn on a debugging flag (see ${cyn}-D${rs} ${bld}help${rs})\n");
 	cfprintf(cout, "  ${cyn}-O${rs}${bld}N${rs}\n");
-	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: 3)\n\n");
+	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: 3)\n");
+	cfprintf(cout, "  ${cyn}-bfs${rs}\n");
+	cfprintf(cout, "  ${cyn}-dfs${rs}\n");
+	cfprintf(cout, "  ${cyn}-ids${rs}\n");
+	cfprintf(cout, "      Use ${cyn}b${rs}readth-${cyn}f${rs}irst/${cyn}d${rs}epth-${cyn}f${rs}irst/${cyn}i${rs}terative ${cyn}d${rs}eepening ${cyn}s${rs}earch (default: ${cyn}-bfs${rs})\n\n");
 
 	cfprintf(cout, "${bld}Operators:${rs}\n\n");
 
