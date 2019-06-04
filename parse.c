@@ -35,6 +35,7 @@
 #include "stat.h"
 #include "typo.h"
 #include "util.h"
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -2154,12 +2155,27 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
 }
 
 /**
- * Parse -bfs, -dfs, -ids.
+ * Parse -S STRATEGY.
  */
-static struct expr *parse_search_strategy(struct parser_state *state, int strategy, int arg2) {
+static struct expr *parse_search_strategy(struct parser_state *state, int arg1, int arg2) {
+	const char *flag = state->argv[0];
+	const char *arg = state->argv[1];
+	if (!arg) {
+		parse_error(state, "%s needs an argument.\n\n", flag);
+		return NULL;
+	}
+
 	struct cmdline *cmdline = state->cmdline;
-	cmdline->strategy = strategy;
-	return parse_nullary_flag(state);
+
+	if (strcmp(arg, "bfs") == 0) {
+		cmdline->strategy = BFTW_BFS;
+	} else if (strcmp(arg, "dfs") == 0) {
+		cmdline->strategy = BFTW_DFS;
+	} else if (strcmp(arg, "ids") == 0) {
+		cmdline->strategy = BFTW_IDS;
+	}
+
+	return parse_unary_flag(state);
 }
 
 /**
@@ -2507,10 +2523,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Turn on a debugging flag (see ${cyn}-D${rs} ${bld}help${rs})\n");
 	cfprintf(cout, "  ${cyn}-O${rs}${bld}N${rs}\n");
 	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: 3)\n");
-	cfprintf(cout, "  ${cyn}-bfs${rs}\n");
-	cfprintf(cout, "  ${cyn}-dfs${rs}\n");
-	cfprintf(cout, "  ${cyn}-ids${rs}\n");
-	cfprintf(cout, "      Use ${cyn}b${rs}readth-${cyn}f${rs}irst/${cyn}d${rs}epth-${cyn}f${rs}irst/${cyn}i${rs}terative ${cyn}d${rs}eepening ${cyn}s${rs}earch (default: ${cyn}-bfs${rs})\n\n");
+	cfprintf(cout, "  ${cyn}-S${rs} ${bld}bfs${rs}|${bld}dfs${rs}|${bld}ids${rs}\n");
+	cfprintf(cout, "      Use ${bld}b${rs}readth-${bld}f${rs}irst/${bld}d${rs}epth-${bld}f${rs}irst/${bld}i${rs}terative ${bld}d${rs}eepening ${bld}s${rs}earch (default: ${cyn}-S${rs} ${bld}bfs${rs})\n\n");
 
 	cfprintf(cout, "${bld}Operators:${rs}\n\n");
 
@@ -2749,6 +2763,7 @@ static const struct table_entry parse_table[] = {
 	{"-P", false, parse_follow, 0, false},
 	{"-H", false, parse_follow, BFTW_COMFOLLOW, false},
 	{"-L", false, parse_follow, BFTW_LOGICAL, false},
+	{"-S", false, parse_search_strategy},
 	{"-X", false, parse_xargs_safe},
 	{"-a"},
 	{"-acl", false, parse_acl},
@@ -2756,7 +2771,6 @@ static const struct table_entry parse_table[] = {
 	{"-and"},
 	{"-anewer", false, parse_newer, BFS_STAT_ATIME},
 	{"-atime", false, parse_time, BFS_STAT_ATIME, DAYS},
-	{"-bfs", false, parse_search_strategy, BFTW_BFS},
 	{"-capable", false, parse_capable},
 	{"-cmin", false, parse_time, BFS_STAT_CTIME, MINUTES},
 	{"-cnewer", false, parse_newer, BFS_STAT_CTIME},
@@ -2766,7 +2780,6 @@ static const struct table_entry parse_table[] = {
 	{"-daystart", false, parse_daystart},
 	{"-delete", false, parse_delete},
 	{"-depth", false, parse_depth_n},
-	{"-dfs", false, parse_search_strategy, BFTW_DFS},
 	{"-empty", false, parse_empty},
 	{"-exec", false, parse_exec, 0},
 	{"-execdir", false, parse_exec, BFS_EXEC_CHDIR},
@@ -2784,7 +2797,6 @@ static const struct table_entry parse_table[] = {
 	{"-group", false, parse_group},
 	{"-help", false, parse_help},
 	{"-hidden", false, parse_hidden},
-	{"-ids", false, parse_search_strategy, BFTW_IDS},
 	{"-ignore_readdir_race", false, parse_ignore_races, true},
 	{"-ilname", false, parse_lname, true},
 	{"-iname", false, parse_name, true},
@@ -3167,17 +3179,20 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 
 	cfprintf(cerr, "${ex}%s${rs} ", cmdline->argv[0]);
 
+	const char *strategy = NULL;
 	switch (cmdline->strategy) {
 	case BFTW_BFS:
-		cfprintf(cerr, "${cyn}-bfs${rs} ");
+		strategy = "bfs";
 		break;
 	case BFTW_DFS:
-		cfprintf(cerr, "${cyn}-dfs${rs} ");
+		strategy = "dfs";
 		break;
 	case BFTW_IDS:
-		cfprintf(cerr, "${cyn}-ids${rs} ");
+		strategy = "ids";
 		break;
 	}
+	assert(strategy);
+	cfprintf(cerr, "${cyn}-S${rs} ${bld}%s${rs} ", strategy);
 
 	if (cmdline->flags & BFTW_LOGICAL) {
 		cfprintf(cerr, "${cyn}-L${rs} ");

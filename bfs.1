@@ -142,19 +142,15 @@ optimizations, plus re-order expressions to reduce expected cost.
 \fB\-O\fI4\fR/\fB\-O\fIfast\fR
 All optimizations, including aggressive optimizations that may alter the observed behavior in corner cases.
 .RE
-.PP
-.B \-bfs
-.br
-.B \-dfs
-.br
-.B \-ids
-.RS
+.TP
+.BR \-S\ bfs | dfs | ids
 Use
 .BR b readth- f irst/ d epth- f irst/ i terative
 .BR d eepening
 .BR s earch
 (default:
-.BR -bfs ).
+.B -S
+.BR bfs ).
 .RE
 .SH OPERATORS
 .TP
