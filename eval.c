@@ -58,7 +58,7 @@ struct eval_state {
 	/** The eval_cmdline() return value. */
 	int *ret;
 	/** Whether to quit immediately. */
-	bool *quit;
+	bool quit;
 };
 
 /**
@@ -391,7 +391,7 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 bool eval_exit(const struct expr *expr, struct eval_state *state) {
 	state->action = BFTW_STOP;
 	*state->ret = expr->idata;
-	*state->quit = true;
+	state->quit = true;
 	return true;
 }
 
@@ -792,7 +792,7 @@ bool eval_prune(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_quit(const struct expr *expr, struct eval_state *state) {
 	state->action = BFTW_STOP;
-	*state->quit = true;
+	state->quit = true;
 	return true;
 }
 
@@ -962,7 +962,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	assert(!*state->quit);
+	assert(!state->quit);
 
 	bool ret = expr->eval(expr, state);
 
@@ -978,8 +978,8 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 	}
 
 	if (expr_never_returns(expr)) {
-		assert(*state->quit);
-	} else if (!*state->quit) {
+		assert(state->quit);
+	} else if (!state->quit) {
 		assert(!expr->always_true || ret);
 		assert(!expr->always_false || !ret);
 	}
@@ -1002,7 +1002,7 @@ bool eval_and(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	if (*state->quit) {
+	if (state->quit) {
 		return false;
 	}
 
@@ -1017,7 +1017,7 @@ bool eval_or(const struct expr *expr, struct eval_state *state) {
 		return true;
 	}
 
-	if (*state->quit) {
+	if (state->quit) {
 		return false;
 	}
 
@@ -1030,7 +1030,7 @@ bool eval_or(const struct expr *expr, struct eval_state *state) {
 bool eval_comma(const struct expr *expr, struct eval_state *state) {
 	eval_expr(expr->lhs, state);
 
-	if (*state->quit) {
+	if (state->quit) {
 		return false;
 	}
 
@@ -1180,8 +1180,6 @@ struct callback_args {
 	struct trie *seen;
 	/** Eventual return value from eval_cmdline(). */
 	int ret;
-	/** Whether to quit immediately. */
-	bool quit;
 };
 
 /**
@@ -1197,7 +1195,7 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 	state.cmdline = cmdline;
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
-	state.quit = &args->quit;
+	state.quit = false;
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
@@ -1348,7 +1346,6 @@ int eval_cmdline(const struct cmdline *cmdline) {
 	struct callback_args args = {
 		.cmdline = cmdline,
 		.ret = EXIT_SUCCESS,
-		.quit = false,
 	};
 
 	struct trie seen;
