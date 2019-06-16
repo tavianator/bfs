@@ -148,7 +148,7 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 
 	for (const struct bfs_spawn_action *action = actions; action; action = action->next) {
 		// Move the error-reporting pipe out of the way if necessary
-		if (action->out_fd == pipefd[1]) {
+		if (action->in_fd == pipefd[1] || action->out_fd == pipefd[1]) {
 			int fd = dup(pipefd[1]);
 			if (fd < 0) {
 				goto fail;
