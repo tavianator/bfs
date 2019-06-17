@@ -2770,15 +2770,18 @@ struct table_entry {
  * The parse table for literals.
  */
 static const struct table_entry parse_table[] = {
+	{"--"},
+	{"--help", false, parse_help},
+	{"--version", false, parse_version},
 	{"-Bmin", false, parse_time, BFS_STAT_BTIME, MINUTES},
 	{"-Bnewer", false, parse_newer, BFS_STAT_BTIME},
 	{"-Btime", false, parse_time, BFS_STAT_BTIME, DAYS},
 	{"-D", false, parse_debug},
 	{"-E", false, parse_regex_extended},
-	{"-O", true, parse_optlevel},
-	{"-P", false, parse_follow, 0, false},
 	{"-H", false, parse_follow, BFTW_COMFOLLOW, false},
 	{"-L", false, parse_follow, BFTW_LOGICAL, false},
+	{"-O", true, parse_optlevel},
+	{"-P", false, parse_follow, 0, false},
 	{"-S", false, parse_search_strategy},
 	{"-X", false, parse_xargs_safe},
 	{"-a"},
@@ -2790,8 +2793,8 @@ static const struct table_entry parse_table[] = {
 	{"-capable", false, parse_capable},
 	{"-cmin", false, parse_time, BFS_STAT_CTIME, MINUTES},
 	{"-cnewer", false, parse_newer, BFS_STAT_CTIME},
-	{"-ctime", false, parse_time, BFS_STAT_CTIME, DAYS},
 	{"-color", false, parse_color, true},
+	{"-ctime", false, parse_time, BFS_STAT_CTIME, DAYS},
 	{"-d", false, parse_depth},
 	{"-daystart", false, parse_daystart},
 	{"-delete", false, parse_delete},
@@ -2873,9 +2876,6 @@ static const struct table_entry parse_table[] = {
 	{"-xattr", false, parse_xattr},
 	{"-xdev", false, parse_mount},
 	{"-xtype", false, parse_type, true},
-	{"--"},
-	{"--help", false, parse_help},
-	{"--version", false, parse_version},
 	{0},
 };
 
