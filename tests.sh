@@ -683,16 +683,15 @@ chown "$(id -u):$(id -g)" "$TMP"
 
 # Clean up temporary directories on exit
 function cleanup() {
-    if [ ! "$CLEAN" ]; then
-        return
-    fi
-
     # Don't force rm to deal with long paths
     for dir in "$TMP"/deep/*/*; do
         if [ -d "$dir" ]; then
             (cd "$dir" && rm -rf *)
         fi
     done
+
+    # In case a test left anything weird in scratch/
+    chmod -R +rX scratch
 
     rm -rf "$TMP"
 }
