@@ -288,16 +288,19 @@ static int bftw_cache_shrink(struct bftw_cache *cache, const struct bftw_dir *sa
 	return ret;
 }
 
+/** Compute the name offset of a child path. */
+static size_t bftw_child_nameoff(const struct bftw_dir *parent) {
+	size_t ret = parent->nameoff + parent->namelen;
+	if (parent->name[parent->namelen - 1] != '/') {
+		++ret;
+	}
+	return ret;
+}
+
 /** Create a new bftw_dir. */
 static struct bftw_dir *bftw_dir_new(struct bftw_cache *cache, struct bftw_dir *parent, const char *name) {
 	size_t namelen = strlen(name);
 	size_t size = sizeof(struct bftw_dir) + namelen + 1;
-
-	bool needs_slash = false;
-	if (namelen == 0 || name[namelen - 1] != '/') {
-		needs_slash = true;
-		++size;
-	}
 
 	struct bftw_dir *dir = malloc(size);
 	if (!dir) {
@@ -309,7 +312,7 @@ static struct bftw_dir *bftw_dir_new(struct bftw_cache *cache, struct bftw_dir *
 	if (parent) {
 		dir->depth = parent->depth + 1;
 		dir->root = parent->root;
-		dir->nameoff = parent->nameoff + parent->namelen;
+		dir->nameoff = bftw_child_nameoff(parent);
 		bftw_dir_incref(cache, parent);
 	} else {
 		dir->depth = 0;
@@ -325,12 +328,8 @@ static struct bftw_dir *bftw_dir_new(struct bftw_cache *cache, struct bftw_dir *
 	dir->dev = -1;
 	dir->ino = -1;
 
-	memcpy(dir->name, name, namelen);
-	if (needs_slash) {
-		dir->name[namelen++] = '/';
-	}
-	dir->name[namelen] = '\0';
 	dir->namelen = namelen;
+	memcpy(dir->name, name, namelen + 1);
 
 	return dir;
 }
@@ -347,6 +346,9 @@ static int bftw_dir_path(const struct bftw_dir *dir, char **path) {
 
 	// Build the path backwards
 	while (dir) {
+		if (dir->nameoff > 0) {
+			dest[dir->nameoff - 1] = '/';
+		}
 		memcpy(dest + dir->nameoff, dir->name, dir->namelen);
 		dir = dir->parent;
 	}
@@ -374,7 +376,7 @@ static struct bftw_dir *bftw_dir_base(struct bftw_dir *dir, int *at_fd, const ch
 
 	if (base) {
 		*at_fd = base->fd;
-		*at_path += base->nameoff + base->namelen;
+		*at_path += bftw_child_nameoff(base);
 	}
 
 	return base;
@@ -884,23 +886,17 @@ enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag f
  * Update the path for the current file.
  */
 static int bftw_update_path(struct bftw_state *state, const struct bftw_dir *dir, const char *name) {
-	size_t length;
-	if (!dir) {
-		length = 0;
-	} else if (name) {
-		length = dir->nameoff + dir->namelen;
-	} else if (dir->depth == 0) {
-		// Use exactly the string passed to bftw(), including any trailing slashes
-		length = strlen(dir->root);
-	} else {
-		// -1 to trim the trailing slash
-		length = dir->nameoff + dir->namelen - 1;
-	}
+	size_t length = dir ? dir->nameoff + dir->namelen : 0;
 
 	assert(dstrlen(state->path) >= length);
 	dstresize(&state->path, length);
 
 	if (name) {
+		if (length > 0 && state->path[length - 1] != '/') {
+			if (dstrapp(&state->path, '/') != 0) {
+				return -1;
+			}
+		}
 		if (dstrcat(&state->path, name) != 0) {
 			return -1;
 		}
@@ -970,16 +966,16 @@ static void bftw_init_ftwbuf(struct bftw_state *state, struct bftw_dir *dir, enu
 	bftw_stat_init(&ftwbuf->stat_cache);
 
 	if (dir) {
-		ftwbuf->nameoff = dir->nameoff;
 		ftwbuf->depth = dir->depth;
 
 		if (de) {
-			ftwbuf->nameoff += dir->namelen;
 			++ftwbuf->depth;
+			ftwbuf->nameoff = bftw_child_nameoff(dir);
 
 			ftwbuf->at_fd = dir->fd;
 			ftwbuf->at_path += ftwbuf->nameoff;
 		} else {
+			ftwbuf->nameoff = dir->nameoff;
 			bftw_dir_base(dir, &ftwbuf->at_fd, &ftwbuf->at_path);
 		}
 	}
