@@ -1259,9 +1259,6 @@ start:
 
 		while (bftw_reader_read(reader) > 0) {
 			const char *name = reader->de->d_name;
-			if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) {
-				continue;
-			}
 
 			switch (bftw_visit(&state, reader->dir, name, BFTW_PRE)) {
 			case BFTW_CONTINUE:

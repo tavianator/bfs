@@ -423,25 +423,13 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 			goto done;
 		}
 
-		ret = true;
-
-		while (true) {
-			struct dirent *de;
-			if (xreaddir(dir, &de) != 0) {
-				eval_report_error(state);
-				goto done_dir;
-			}
-			if (!de) {
-				break;
-			}
-
-			if (strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
-				ret = false;
-				break;
-			}
+		struct dirent *de;
+		if (xreaddir(dir, &de) == 0) {
+			ret = !de;
+		} else {
+			eval_report_error(state);
 		}
 
-	done_dir:
 		closedir(dir);
 	} else {
 		const struct bfs_stat *statbuf = eval_stat(state);
@@ -1282,14 +1270,9 @@ static int infer_fdlimit(const struct cmdline *cmdline) {
 		// Account for 'dir' itself
 		nopen = -1;
 
-		while (true) {
-			struct dirent *de;
-			if (xreaddir(dir, &de) != 0 || !de) {
-				break;
-			}
-			if (strcmp(de->d_name, ".") != 0 && strcmp(de->d_name, "..") != 0) {
-				++nopen;
-			}
+		struct dirent *de;
+		while (xreaddir(dir, &de) == 0 && de) {
+			++nopen;
 		}
 
 		closedir(dir);

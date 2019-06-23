@@ -41,12 +41,20 @@
 #endif
 
 int xreaddir(DIR *dir, struct dirent **de) {
-	errno = 0;
-	*de = readdir(dir);
-	if (!*de && errno != 0) {
-		return -1;
-	} else {
-		return 0;
+	while (true) {
+		errno = 0;
+		*de = readdir(dir);
+
+		if (*de) {
+			const char *name = (*de)->d_name;
+			if (name[0] != '.' || (name[1] != '\0' && (name[1] != '.' || name[2] != '\0'))) {
+				return 0;
+			}
+		} else if (errno != 0) {
+			return -1;
+		} else {
+			return 0;
+		}
 	}
 }
 
