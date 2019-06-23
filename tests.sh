@@ -304,6 +304,7 @@ bsd_tests=(
     test_execdir_slash
     test_execdir_slash_pwd
     test_execdir_slashes
+    test_execdir_ulimit
 
     test_exit
 
@@ -438,6 +439,7 @@ gnu_tests=(
     test_execdir_slash
     test_execdir_slash_pwd
     test_execdir_slashes
+    test_execdir_ulimit
 
     test_executable
 
@@ -1383,7 +1385,9 @@ function test_execdir() {
 }
 
 function test_execdir_plus() {
-    bfs_diff basic -execdir "$TESTS/sort-args.sh" '{}' +
+    if [[ "$BFS" != *"-S dfs"* ]]; then
+        bfs_diff basic -execdir "$TESTS/sort-args.sh" '{}' +
+    fi
 }
 
 function test_execdir_substring() {
@@ -1411,6 +1415,16 @@ function test_execdir_slash_pwd() {
 
 function test_execdir_slashes() {
     bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
+}
+
+function test_execdir_ulimit() {
+    rm -rf scratch/*
+    mkdir -p scratch/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t
+    mkdir -p scratch/a/b/c/d/e/f/g/h/i/j/0/1/2/3/4/5/6/7/8/9
+
+    closefrom 4
+    ulimit -n 10
+    bfs_diff scratch -execdir echo '{}' ';'
 }
 
 function test_weird_names() {

@@ -73,6 +73,8 @@ struct bftw_file {
 	/** An open descriptor to this file, or -1. */
 	int fd;
 
+	/** This file's type, if known. */
+	enum bftw_typeflag typeflag;
 	/** The device number, for cycle detection. */
 	dev_t dev;
 	/** The inode number, for cycle detection. */
@@ -324,6 +326,7 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 	file->refcount = 1;
 	file->fd = -1;
 
+	file->typeflag = BFTW_UNKNOWN;
 	file->dev = -1;
 	file->ino = -1;
 
@@ -944,6 +947,32 @@ static void bftw_stat_init(struct bftw_stat *cache) {
 }
 
 /**
+ * Open a file if necessary.
+ *
+ * @param file
+ *         The file to open.
+ * @param path
+ *         The path to that file or one of its descendants.
+ * @return
+ *         The opened file descriptor, or -1 on error.
+ */
+static int bftw_ensure_open(struct bftw_cache *cache, struct bftw_file *file, const char *path) {
+	int ret = file->fd;
+
+	if (ret < 0) {
+		char *copy = strndup(path, file->nameoff + file->namelen);
+		if (!copy) {
+			return -1;
+		}
+
+		ret = bftw_file_open(cache, file, copy);
+		free(copy);
+	}
+
+	return ret;
+}
+
+/**
  * Initialize the buffers with data about the current path.
  */
 static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
@@ -956,6 +985,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	ftwbuf->root = file ? file->root : ftwbuf->path;
 	ftwbuf->depth = 0;
 	ftwbuf->visit = visit;
+	ftwbuf->typeflag = BFTW_UNKNOWN;
 	ftwbuf->error = reader->error;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
@@ -963,18 +993,26 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	bftw_stat_init(&ftwbuf->lstat_cache);
 	bftw_stat_init(&ftwbuf->stat_cache);
 
-	if (file) {
+	struct bftw_file *parent = NULL;
+	if (de) {
+		parent = file;
+		ftwbuf->depth = file->depth + 1;
+		ftwbuf->typeflag = bftw_dirent_typeflag(de);
+		ftwbuf->nameoff = bftw_child_nameoff(file);
+	} else if (file) {
+		parent = file->parent;
 		ftwbuf->depth = file->depth;
+		ftwbuf->typeflag = file->typeflag;
+		ftwbuf->nameoff = file->nameoff;
+	}
 
-		if (de) {
-			++ftwbuf->depth;
-			ftwbuf->nameoff = bftw_child_nameoff(file);
-
-			ftwbuf->at_fd = file->fd;
+	if (parent) {
+		// Try to ensure the immediate parent is open, to avoid ENAMETOOLONG
+		if (bftw_ensure_open(&state->cache, parent, state->path) >= 0) {
+			ftwbuf->at_fd = parent->fd;
 			ftwbuf->at_path += ftwbuf->nameoff;
 		} else {
-			ftwbuf->nameoff = file->nameoff;
-			bftw_file_base(file, &ftwbuf->at_fd, &ftwbuf->at_path);
+			ftwbuf->error = errno;
 		}
 	}
 
@@ -986,12 +1024,6 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	if (ftwbuf->error != 0) {
 		ftwbuf->typeflag = BFTW_ERROR;
 		return;
-	} else if (de) {
-		ftwbuf->typeflag = bftw_dirent_typeflag(de);
-	} else if (ftwbuf->depth > 0) {
-		ftwbuf->typeflag = BFTW_DIR;
-	} else {
-		ftwbuf->typeflag = BFTW_UNKNOWN;
 	}
 
 	int follow_flags = BFTW_LOGICAL;
@@ -1029,6 +1061,18 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	}
 }
 
+/** Fill file identity information from an ftwbuf. */
+static void bftw_fill_id(struct bftw_file *file, const struct BFTW *ftwbuf) {
+	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
+	if (!statbuf || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
+		statbuf = ftwbuf->lstat_cache.buf;
+	}
+	if (statbuf) {
+		file->dev = statbuf->dev;
+		file->ino = statbuf->ino;
+	}
+}
+
 /**
  * Visit a path, invoking the callback.
  */
@@ -1053,30 +1097,44 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		break;
 	case BFTW_PRUNE:
 	case BFTW_STOP:
-		return ret;
+		goto done;
 	default:
 		state->error = EINVAL;
 		return BFTW_STOP;
 	}
 
 	if (visit != BFTW_PRE || ftwbuf->typeflag != BFTW_DIR) {
-		return BFTW_PRUNE;
+		ret = BFTW_PRUNE;
+		goto done;
 	}
 
-	if ((state->flags & BFTW_XDEV) && state->file) {
-		const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
-		if (statbuf && statbuf->dev != state->file->dev) {
-			return BFTW_PRUNE;
+	if (state->flags & BFTW_XDEV) {
+		const struct bftw_file *parent = state->file;
+		if (parent && !name) {
+			parent = parent->parent;
+		}
+
+		if (parent) {
+			const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
+			if (statbuf && statbuf->dev != parent->dev) {
+				ret = BFTW_PRUNE;
+				goto done;
+			}
 		}
 	}
 
-	return BFTW_CONTINUE;
+done:
+	if (state->file && !name) {
+		bftw_fill_id(state->file, ftwbuf);
+	}
+
+	return ret;
 }
 
 /**
  * Push a new file onto the queue.
  */
-static int bftw_push(struct bftw_state *state, const char *name) {
+static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 	struct bftw_file *parent = state->file;
 	struct bftw_file *file = bftw_file_new(&state->cache, parent, name);
 	if (!file) {
@@ -1084,14 +1142,13 @@ static int bftw_push(struct bftw_state *state, const char *name) {
 		return -1;
 	}
 
-	const struct BFTW *ftwbuf = &state->ftwbuf;
-	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
-	if (!statbuf || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
-		statbuf = ftwbuf->lstat_cache.buf;
+	struct dirent *de = state->reader.de;
+	if (de) {
+		file->typeflag = bftw_dirent_typeflag(de);
 	}
-	if (statbuf) {
-		file->dev = statbuf->dev;
-		file->ino = statbuf->ino;
+
+	if (fill_id) {
+		bftw_fill_id(file, &state->ftwbuf);
 	}
 
 	if (state->strategy == BFTW_DFS) {
@@ -1161,12 +1218,14 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_vi
 /**
  * Finalize and free a file we're done with.
  */
-static enum bftw_action bftw_release_file(struct bftw_state *state, bool do_visit) {
+static enum bftw_action bftw_release_file(struct bftw_state *state, bool visit_file, bool visit_parents) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
 	if (!(state->flags & BFTW_DEPTH)) {
-		do_visit = false;
+		visit_file = false;
+		visit_parents = false;
 	}
+	bool do_visit = visit_file;
 
 	while (state->file) {
 		if (bftw_file_decref(&state->cache, state->file) > 0) {
@@ -1177,9 +1236,10 @@ static enum bftw_action bftw_release_file(struct bftw_state *state, bool do_visi
 		if (do_visit) {
 			if (bftw_visit(state, NULL, BFTW_POST) == BFTW_STOP) {
 				ret = BFTW_STOP;
-				do_visit = false;
+				visit_parents = false;
 			}
 		}
+		do_visit = visit_parents;
 
 		struct bftw_file *parent = state->file->parent;
 		bftw_file_free(&state->cache, state->file);
@@ -1195,7 +1255,7 @@ static enum bftw_action bftw_release_file(struct bftw_state *state, bool do_visi
 static void bftw_drain_queue(struct bftw_state *state, struct bftw_queue *queue) {
 	while (queue->head) {
 		state->file = bftw_queue_pop(queue);
-		bftw_release_file(state, false);
+		bftw_release_file(state, false, false);
 	}
 }
 
@@ -1210,7 +1270,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 
 	bftw_release_reader(state, false);
 
-	bftw_release_file(state, false);
+	bftw_release_file(state, false, false);
 	bftw_drain_queue(state, &state->prequeue);
 	bftw_drain_queue(state, &state->queue);
 
@@ -1221,9 +1281,9 @@ static int bftw_state_destroy(struct bftw_state *state) {
 }
 
 /**
- * bftw() implementation for breadth- and depth-first search.
+ * Breadth-first bftw() implementation.
  */
-static int bftw_impl(const struct bftw_args *args) {
+static int bftw_bfs(const struct bftw_args *args) {
 	struct bftw_state state;
 	if (bftw_state_init(&state, args) != 0) {
 		return -1;
@@ -1241,13 +1301,14 @@ static int bftw_impl(const struct bftw_args *args) {
 			goto done;
 		}
 
-		if (bftw_push(&state, path) != 0) {
+		if (bftw_push(&state, path, true) != 0) {
 			goto done;
 		}
 	}
 
 	while (bftw_pop(&state) > 0) {
 		struct bftw_reader *reader = bftw_open(&state);
+
 		while (bftw_reader_read(reader) > 0) {
 			const char *name = reader->de->d_name;
 
@@ -1260,7 +1321,7 @@ static int bftw_impl(const struct bftw_args *args) {
 				goto done;
 			}
 
-			if (bftw_push(&state, name) != 0) {
+			if (bftw_push(&state, name, true) != 0) {
 				goto done;
 			}
 		}
@@ -1268,7 +1329,7 @@ static int bftw_impl(const struct bftw_args *args) {
 		if (bftw_release_reader(&state, true) == BFTW_STOP) {
 			goto done;
 		}
-		if (bftw_release_file(&state, true) == BFTW_STOP) {
+		if (bftw_release_file(&state, true, true) == BFTW_STOP) {
 			goto done;
 		}
 	}
@@ -1278,51 +1339,53 @@ done:
 }
 
 /**
- * Depth-first search state.
- */
-struct bftw_dfs_state {
-	/** The wrapped callback. */
-	bftw_callback *delegate;
-	/** The wrapped callback arguments. */
-	void *ptr;
-	/** Whether to quit the search. */
-	bool quit;
-};
-
-/** Depth-first callback function. */
-static enum bftw_action bftw_dfs_callback(const struct BFTW *ftwbuf, void *ptr) {
-	struct bftw_dfs_state *state = ptr;
-	enum bftw_action ret = state->delegate(ftwbuf, state->ptr);
-	if (ret == BFTW_STOP || (ret == BFTW_PRUNE && ftwbuf->depth == 0)) {
-		state->quit = true;
-	}
-	return ret;
-}
-
-/**
- * Depth-first bftw() wrapper.
+ * Depth-first bftw() implementation.
  */
 static int bftw_dfs(const struct bftw_args *args) {
-	// bftw_impl() will process all the roots first, but we don't want that
-	// for depth-first searches
-
-	struct bftw_dfs_state state = {
-		.delegate = args->callback,
-		.ptr = args->ptr,
-		.quit = false,
-	};
-
-	struct bftw_args dfs_args = *args;
-	dfs_args.npaths = 1;
-	dfs_args.callback = bftw_dfs_callback;
-	dfs_args.ptr = &state;
-
-	int ret = 0;
-	for (size_t i = 0; i < args->npaths && ret == 0 && !state.quit; ++i) {
-		ret = bftw_impl(&dfs_args);
-		++dfs_args.paths;
+	struct bftw_state state;
+	if (bftw_state_init(&state, args) != 0) {
+		return -1;
 	}
-	return ret;
+
+	for (size_t i = 0; i < args->npaths; ++i) {
+		if (bftw_push(&state, args->paths[i], false) != 0) {
+			goto done;
+		}
+	}
+
+	while (bftw_pop(&state) > 0) {
+		bool visit_post = true;
+
+		switch (bftw_visit(&state, NULL, BFTW_PRE)) {
+		case BFTW_CONTINUE:
+			break;
+		case BFTW_PRUNE:
+			visit_post = false;
+			goto next;
+		case BFTW_STOP:
+			goto done;
+		}
+
+		struct bftw_reader *reader = bftw_open(&state);
+
+		while (bftw_reader_read(reader) > 0) {
+			if (bftw_push(&state, reader->de->d_name, false) != 0) {
+				goto done;
+			}
+		}
+
+		if (bftw_release_reader(&state, true) == BFTW_STOP) {
+			goto done;
+		}
+
+	next:
+		if (bftw_release_file(&state, visit_post, true) == BFTW_STOP) {
+			goto done;
+		}
+	}
+
+done:
+	return bftw_state_destroy(&state);
 }
 
 /**
@@ -1425,7 +1488,15 @@ static int bftw_ids(const struct bftw_args *args) {
 
 	while (ret == 0 && !state.quit && !state.bottom) {
 		state.bottom = true;
-		ret = bftw_impl(&ids_args);
+
+		// bftw_bfs() is more efficient than bftw_dfs() since it visits
+		// directory entries as it reads them.  With args->strategy ==
+		// BFTW_DFS, it gives a hybrid ordering that visits immediate
+		// children first, then deeper descendants depth-first.  This
+		// doesn't matter for iterative deepening since we only visit
+		// one level at a time.
+		ret = bftw_bfs(&ids_args);
+
 		++state.depth;
 	}
 
@@ -1434,7 +1505,7 @@ static int bftw_ids(const struct bftw_args *args) {
 
 		while (ret == 0 && !state.quit && state.depth > 0) {
 			--state.depth;
-			ret = bftw_impl(&ids_args);
+			ret = bftw_bfs(&ids_args);
 		}
 	}
 
@@ -1451,7 +1522,7 @@ static int bftw_ids(const struct bftw_args *args) {
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
-		return bftw_impl(args);
+		return bftw_bfs(args);
 	case BFTW_DFS:
 		return bftw_dfs(args);
 	case BFTW_IDS:
