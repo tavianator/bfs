@@ -691,7 +691,9 @@ function cleanup() {
     done
 
     # In case a test left anything weird in scratch/
-    chmod -R +rX scratch
+    if [ -e "$TMP"/scratch ]; then
+        chmod -R +rX "$TMP"/scratch
+    fi
 
     rm -rf "$TMP"
 }
