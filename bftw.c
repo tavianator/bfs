@@ -337,28 +337,6 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 }
 
 /**
- * Compute the path to a bftw_file.
- */
-static int bftw_file_path(const struct bftw_file *file, char **path) {
-	size_t pathlen = file->nameoff + file->namelen;
-	if (dstresize(path, pathlen) != 0) {
-		return -1;
-	}
-	char *dest = *path;
-
-	// Build the path backwards
-	while (file) {
-		if (file->nameoff > 0) {
-			dest[file->nameoff - 1] = '/';
-		}
-		memcpy(dest + file->nameoff, file->name, file->namelen);
-		file = file->parent;
-	}
-
-	return 0;
-}
-
-/**
  * Get the appropriate (fd, path) pair for the *at() family of functions.
  *
  * @param file
@@ -684,6 +662,8 @@ struct bftw_state {
 	char *path;
 	/** The current file. */
 	struct bftw_file *file;
+	/** The previous file. */
+	struct bftw_file *previous;
 	/** The reader for the current directory. */
 	struct bftw_reader reader;
 
@@ -722,6 +702,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 
 	state->file = NULL;
+	state->previous = NULL;
 	bftw_reader_init(&state->reader);
 
 	return 0;
@@ -1161,6 +1142,41 @@ static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 }
 
 /**
+ * Build the path to the current file.
+ */
+static int bftw_build_path(struct bftw_state *state) {
+	const struct bftw_file *file = state->file;
+
+	size_t pathlen = file->nameoff + file->namelen;
+	if (dstresize(&state->path, pathlen) != 0) {
+		state->error = errno;
+		return -1;
+	}
+
+	// Try to find a common ancestor with the existing path
+	const struct bftw_file *ancestor = state->previous;
+	while (ancestor && ancestor->depth > file->depth) {
+		ancestor = ancestor->parent;
+	}
+
+	// Build the path backwards
+	while (file && file != ancestor) {
+		if (file->nameoff > 0) {
+			state->path[file->nameoff - 1] = '/';
+		}
+		memcpy(state->path + file->nameoff, file->name, file->namelen);
+
+		if (ancestor && ancestor->depth == file->depth) {
+			ancestor = ancestor->parent;
+		}
+		file = file->parent;
+	}
+
+	state->previous = state->file;
+	return 0;
+}
+
+/**
  * Pop the next file from the queue.
  */
 static int bftw_pop(struct bftw_state *state) {
@@ -1174,8 +1190,7 @@ static int bftw_pop(struct bftw_state *state) {
 
 	state->file = bftw_queue_pop(&state->queue);
 
-	if (bftw_file_path(state->file, &state->path) != 0) {
-		state->error = errno;
+	if (bftw_build_path(state) != 0) {
 		return -1;
 	}
 
@@ -1242,6 +1257,9 @@ static enum bftw_action bftw_release_file(struct bftw_state *state, bool visit_f
 		do_visit = visit_parents;
 
 		struct bftw_file *parent = state->file->parent;
+		if (state->previous == state->file) {
+			state->previous = parent;
+		}
 		bftw_file_free(&state->cache, state->file);
 		state->file = parent;
 	}
