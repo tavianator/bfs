@@ -24,6 +24,7 @@
 #include "mtab.h"
 #include "stat.h"
 #include <stddef.h>
+#include <sys/types.h>
 
 /**
  * Possible file types.
