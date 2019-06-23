@@ -771,7 +771,7 @@ error:
  * -prune action.
  */
 bool eval_prune(const struct expr *expr, struct eval_state *state) {
-	state->action = BFTW_SKIP_SUBTREE;
+	state->action = BFTW_PRUNE;
 	return true;
 }
 
@@ -1042,7 +1042,7 @@ static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
 	}
 
 	if (leaf->value) {
-		state->action = BFTW_SKIP_SUBTREE;
+		state->action = BFTW_PRUNE;
 		return false;
 	} else {
 		leaf->value = leaf;
@@ -1151,8 +1151,7 @@ static const char *dump_bftw_visit(enum bftw_visit visit) {
 static const char *dump_bftw_action(enum bftw_action action) {
 	static const char *actions[] = {
 		DUMP_BFTW_MAP(BFTW_CONTINUE),
-		DUMP_BFTW_MAP(BFTW_SKIP_SIBLINGS),
-		DUMP_BFTW_MAP(BFTW_SKIP_SUBTREE),
+		DUMP_BFTW_MAP(BFTW_PRUNE),
 		DUMP_BFTW_MAP(BFTW_STOP),
 	};
 	return actions[action];
@@ -1190,7 +1189,7 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 			args->ret = EXIT_FAILURE;
 			eval_error(&state, "%s.\n", strerror(ftwbuf->error));
 		}
-		state.action = BFTW_SKIP_SUBTREE;
+		state.action = BFTW_PRUNE;
 		goto done;
 	}
 
@@ -1203,12 +1202,12 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
 		args->ret = EXIT_FAILURE;
 		eval_error(&state, "Path is not safe for xargs.\n");
-		state.action = BFTW_SKIP_SUBTREE;
+		state.action = BFTW_PRUNE;
 		goto done;
 	}
 
 	if (cmdline->maxdepth < 0 || ftwbuf->depth >= cmdline->maxdepth) {
-		state.action = BFTW_SKIP_SUBTREE;
+		state.action = BFTW_PRUNE;
 	}
 
 	// In -depth mode, only handle directories on the BFTW_POST visit

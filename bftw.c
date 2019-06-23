@@ -1052,8 +1052,7 @@ static enum bftw_action bftw_visit(struct bftw_state *state, struct bftw_file *f
 	switch (ret) {
 	case BFTW_CONTINUE:
 		break;
-	case BFTW_SKIP_SIBLINGS:
-	case BFTW_SKIP_SUBTREE:
+	case BFTW_PRUNE:
 	case BFTW_STOP:
 		return ret;
 	default:
@@ -1062,13 +1061,13 @@ static enum bftw_action bftw_visit(struct bftw_state *state, struct bftw_file *f
 	}
 
 	if (visit != BFTW_PRE || ftwbuf->typeflag != BFTW_DIR) {
-		return BFTW_SKIP_SUBTREE;
+		return BFTW_PRUNE;
 	}
 
 	if ((state->flags & BFTW_XDEV) && file) {
 		const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 		if (statbuf && statbuf->dev != file->dev) {
-			return BFTW_SKIP_SUBTREE;
+			return BFTW_PRUNE;
 		}
 	}
 
@@ -1232,9 +1231,7 @@ static int bftw_impl(const struct bftw_args *args) {
 		switch (bftw_visit(&state, NULL, path, BFTW_PRE)) {
 		case BFTW_CONTINUE:
 			break;
-		case BFTW_SKIP_SIBLINGS:
-			goto start;
-		case BFTW_SKIP_SUBTREE:
+		case BFTW_PRUNE:
 			continue;
 		case BFTW_STOP:
 			goto done;
@@ -1245,7 +1242,6 @@ static int bftw_impl(const struct bftw_args *args) {
 		}
 	}
 
-start:
 	while (true) {
 		struct bftw_reader *reader = bftw_pop(&state);
 		if (!reader) {
@@ -1258,9 +1254,7 @@ start:
 			switch (bftw_visit(&state, reader->file, name, BFTW_PRE)) {
 			case BFTW_CONTINUE:
 				break;
-			case BFTW_SKIP_SIBLINGS:
-				goto next;
-			case BFTW_SKIP_SUBTREE:
+			case BFTW_PRUNE:
 				continue;
 			case BFTW_STOP:
 				goto done;
@@ -1271,7 +1265,6 @@ start:
 			}
 		}
 
-	next:
 		if (bftw_release_reader(&state, true) == BFTW_STOP) {
 			goto done;
 		}
@@ -1297,7 +1290,7 @@ struct bftw_dfs_state {
 static enum bftw_action bftw_dfs_callback(const struct BFTW *ftwbuf, void *ptr) {
 	struct bftw_dfs_state *state = ptr;
 	enum bftw_action ret = state->delegate(ftwbuf, state->ptr);
-	if (ret == BFTW_STOP || (ret == BFTW_SKIP_SIBLINGS && ftwbuf->depth == 0)) {
+	if (ret == BFTW_STOP || (ret == BFTW_PRUNE && ftwbuf->depth == 0)) {
 		state->quit = true;
 	}
 	return ret;
@@ -1362,19 +1355,19 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 		if (state->depth - ftwbuf->depth <= 1) {
 			return state->delegate(ftwbuf, state->ptr);
 		} else {
-			return BFTW_SKIP_SUBTREE;
+			return BFTW_PRUNE;
 		}
 	}
 
 	if (ftwbuf->depth < state->depth) {
 		if (trie_find_str(state->pruned, ftwbuf->path)) {
-			return BFTW_SKIP_SUBTREE;
+			return BFTW_PRUNE;
 		} else {
 			return BFTW_CONTINUE;
 		}
 	} else if (state->visit == BFTW_POST) {
 		if (trie_find_str(state->pruned, ftwbuf->path)) {
-			return BFTW_SKIP_SUBTREE;
+			return BFTW_PRUNE;
 		}
 	}
 
@@ -1384,15 +1377,9 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 
 	switch (ret) {
 	case BFTW_CONTINUE:
-		ret = BFTW_SKIP_SUBTREE;
+		ret = BFTW_PRUNE;
 		break;
-	case BFTW_SKIP_SIBLINGS:
-		// Can't be easily supported in this mode
-		state->error = EINVAL;
-		state->quit = true;
-		ret = BFTW_STOP;
-		break;
-	case BFTW_SKIP_SUBTREE:
+	case BFTW_PRUNE:
 		if (ftwbuf->typeflag == BFTW_DIR) {
 			if (!trie_insert_str(state->pruned, ftwbuf->path)) {
 				state->error = errno;

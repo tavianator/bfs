@@ -150,10 +150,8 @@ enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag f
 enum bftw_action {
 	/** Keep walking. */
 	BFTW_CONTINUE,
-	/** Skip this path's siblings. */
-	BFTW_SKIP_SIBLINGS,
 	/** Skip this path's children. */
-	BFTW_SKIP_SUBTREE,
+	BFTW_PRUNE,
 	/** Stop walking. */
 	BFTW_STOP,
 };
