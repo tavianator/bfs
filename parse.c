@@ -987,9 +987,25 @@ static struct expr *parse_xargs_safe(struct parser_state *state, int arg1, int a
  */
 static struct expr *parse_access(struct parser_state *state, int flag, int arg2) {
 	struct expr *expr = parse_nullary_test(state, eval_access);
-	if (expr) {
-		expr->idata = flag;
+	if (!expr) {
+		return NULL;
 	}
+
+	expr->idata = flag;
+	expr->cost = STAT_COST;
+
+	switch (flag) {
+	case R_OK:
+		expr->probability = 0.99;
+		break;
+	case W_OK:
+		expr->probability = 0.8;
+		break;
+	case X_OK:
+		expr->probability = 0.2;
+		break;
+	}
+
 	return expr;
 }
 
