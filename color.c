@@ -432,14 +432,14 @@ struct colors *parse_colors(const char *ls_colors) {
 				break;
 			}
 
-			char *key = strndup(chunk, equals - chunk);
-			if (!key) {
+			char *value = unescape(equals + 1, ':', &next);
+			if (!value) {
 				continue;
 			}
 
-			char *value = unescape(equals + 1, ':', &next);
-			if (!value) {
-				free(key);
+			char *key = strndup(chunk, equals - chunk);
+			if (!key) {
+				dstrfree(value);
 				continue;
 			}
 
