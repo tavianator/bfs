@@ -1219,7 +1219,6 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_vi
 		if (do_visit) {
 			if (bftw_visit(state, NULL, BFTW_PRE) == BFTW_STOP) {
 				ret = BFTW_STOP;
-				do_visit = false;
 			}
 		} else {
 			state->error = reader->error;
