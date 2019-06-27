@@ -222,9 +222,13 @@ static const char *get_ext_color(const struct colors *colors, const char *filena
  *         The parsed chunk as a dstring.
  */
 static char *unescape(const char *value, char end, const char **next) {
+	if (!value) {
+		goto fail;
+	}
+
 	char *str = dstralloc(0);
 	if (!str) {
-		goto fail;
+		goto fail_str;
 	}
 
 	const char *i;
@@ -301,7 +305,7 @@ static char *unescape(const char *value, char end, const char **next) {
 				break;
 
 			case '\0':
-				goto fail;
+				goto fail_str;
 
 			default:
 				c = *i;
@@ -315,7 +319,7 @@ static char *unescape(const char *value, char end, const char **next) {
 				c = '\177';
 				break;
 			case '\0':
-				goto fail;
+				goto fail_str;
 			default:
 				// CTRL masks bits 6 and 7
 				c = *i & 0x1F;
@@ -329,7 +333,7 @@ static char *unescape(const char *value, char end, const char **next) {
 		}
 
 		if (dstrapp(&str, c) != 0) {
-			goto fail;
+			goto fail_str;
 		}
 	}
 
@@ -341,8 +345,9 @@ static char *unescape(const char *value, char end, const char **next) {
 
 	return str;
 
-fail:
+fail_str:
 	dstrfree(str);
+fail:
 	*next = NULL;
 	return NULL;
 }

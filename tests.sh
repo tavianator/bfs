@@ -617,6 +617,7 @@ bfs_tests=(
     test_color_missing_colon
     test_color_no_stat
     test_color_L_no_stat
+    test_color_star
 
     test_execdir_plus
 
@@ -2097,6 +2098,11 @@ function test_color_no_stat() {
 
 function test_color_L_no_stat() {
     LS_COLORS="mh=0:ex=0:sg=0:su=0:st=0:ow=0:tw=0:*.txt=01:" bfs_diff -L rainbow -color
+}
+
+function test_color_star() {
+    # Regression test: don't segfault on LS_COLORS="*"
+    LS_COLORS="*" bfs_diff rainbow -color
 }
 
 function test_deep() {
