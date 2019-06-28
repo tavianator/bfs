@@ -36,6 +36,7 @@ DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 
 DESTDIR ?=
 PREFIX ?= /usr
+MANDIR ?= $(PREFIX)/share/man
 
 LOCAL_CPPFLAGS := \
     -D__EXTENSIONS__ \
@@ -120,12 +121,12 @@ clean:
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
-	$(MKDIR) $(DESTDIR)$(PREFIX)/share/man/man1
-	$(INSTALL) -m644 bfs.1 $(DESTDIR)$(PREFIX)/share/man/man1/bfs.1
+	$(MKDIR) $(DESTDIR)$(MANDIR)/man1
+	$(INSTALL) -m644 bfs.1 $(DESTDIR)$(MANDIR)/man1/bfs.1
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
-	$(RM) $(DESTDIR)$(PREFIX)/share/man/man1/bfs.1
+	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 
 .PHONY: all release check distcheck clean install uninstall
 
