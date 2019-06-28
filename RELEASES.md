@@ -2,6 +2,18 @@
 ===
 
 
+1.5
+---
+
+**June 27, 2019**
+
+- New `-xattr` predicate to find files with extended attributes
+- Fixed the `-acl` implementation on macOS
+- Implemented depth-first (`-S dfs`) and iterative deepening search (`-S ids`)
+- Piped `-help` output into `$PAGER` by default
+- Fixed crashes on some invalid `LS_COLORS` values
+
+
 1.4.1
 -----
 
