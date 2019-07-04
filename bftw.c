@@ -57,14 +57,13 @@
 struct bftw_file {
 	/** The parent directory, if any. */
 	struct bftw_file *parent;
-	/** This file's depth in the walk. */
-	size_t depth;
-	/** The root path this file was found from. */
-	const char *root;
-
+	/** The root under which this file was found. */
+	struct bftw_file *root;
 	/** The next file in the queue, if any. */
 	struct bftw_file *next;
 
+	/** This file's depth in the walk. */
+	size_t depth;
 	/** Reference count. */
 	size_t refcount;
 	/** Index in the bftw_cache priority queue. */
@@ -311,13 +310,13 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 	file->parent = parent;
 
 	if (parent) {
-		file->depth = parent->depth + 1;
 		file->root = parent->root;
+		file->depth = parent->depth + 1;
 		file->nameoff = bftw_child_nameoff(parent);
 		bftw_file_incref(cache, parent);
 	} else {
+		file->root = file;
 		file->depth = 0;
-		file->root = name;
 		file->nameoff = 0;
 	}
 
@@ -963,7 +962,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 
 	struct BFTW *ftwbuf = &state->ftwbuf;
 	ftwbuf->path = state->path;
-	ftwbuf->root = file ? file->root : ftwbuf->path;
+	ftwbuf->root = file ? file->root->name : ftwbuf->path;
 	ftwbuf->depth = 0;
 	ftwbuf->visit = visit;
 	ftwbuf->typeflag = BFTW_UNKNOWN;
