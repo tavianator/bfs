@@ -99,9 +99,9 @@ tests/mksock: tests/mksock.o
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 check: all
-	./tests.sh --bfs="$(realpath bfs)"
-	./tests.sh --bfs="$(realpath bfs) -S dfs"
-	./tests.sh --bfs="$(realpath bfs) -S ids"
+	./tests.sh --bfs="$(CURDIR)/bfs"
+	./tests.sh --bfs="$(CURDIR)/bfs -S dfs"
+	./tests.sh --bfs="$(CURDIR)/bfs -S ids"
 
 distcheck:
 	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -fsanitize=undefined -fsanitize=address"
@@ -112,9 +112,9 @@ endif
 	+$(MAKE) -Bs release check
 	+$(MAKE) -Bs check
 ifeq ($(OS),Linux)
-	./tests.sh --sudo --bfs="$(realpath bfs)"
-	./tests.sh --sudo --bfs="$(realpath bfs) -S dfs"
-	./tests.sh --sudo --bfs="$(realpath bfs) -S ids"
+	./tests.sh --sudo --bfs="$(CURDIR)/bfs"
+	./tests.sh --sudo --bfs="$(CURDIR)/bfs -S dfs"
+	./tests.sh --sudo --bfs="$(CURDIR)/bfs -S ids"
 endif
 
 clean:
