@@ -112,7 +112,9 @@ endif
 	+$(MAKE) -Bs release check
 	+$(MAKE) -Bs check
 ifeq ($(OS),Linux)
-	./tests.sh --sudo
+	./tests.sh --sudo --bfs="$(realpath bfs)"
+	./tests.sh --sudo --bfs="$(realpath bfs) -S dfs"
+	./tests.sh --sudo --bfs="$(realpath bfs) -S ids"
 endif
 
 clean:
