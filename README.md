@@ -125,26 +125,22 @@ Finally, if you want to install it globally, run
 Alternatively, `bfs` may already be packaged for your distribution of choice.
 For example:
 
-### Alpine Linux
+<pre>
+<strong>Alpine Linux</strong>
+# apk add bfs
 
-    # apk add bfs
+<strong>Debian/Ubuntu</strong>
+# apt install bfs
 
-### Debian/Ubuntu
+<strong>NixOS</strong>
+# nix-env -i bfs
 
-    # apt install bfs
+<strong>Void Linux</strong>
+# xbps-install -S bfs
 
-### NixOS
+<strong>MacPorts</strong>
+# port install bfs
 
-    # nix-env -i bfs
-
-### Void Linux
-
-    # xbps-install -S bfs
-
-### MacPorts
-
-    # port install bfs
-
-### Homebrew
-
-    $ brew install tavianator/tap/bfs
+<strong>Homebrew</strong>
+$ brew install tavianator/tap/bfs
+</pre>
