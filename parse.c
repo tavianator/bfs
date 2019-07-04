@@ -346,6 +346,10 @@ struct parser_state {
 	const char *depth_arg;
 	/** A "-prune"-type argument if any. */
 	const char *prune_arg;
+	/** A "-mount"-type argument if any. */
+	const char *mount_arg;
+	/** An "-xdev"-type argument if any. */
+	const char *xdev_arg;
 
 	/** The current time. */
 	struct timespec now;
@@ -1546,10 +1550,11 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
 }
 
 /**
- * Parse -mount, -xdev.
+ * Parse -mount.
  */
 static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_XDEV;
+	state->cmdline->flags |= BFTW_MOUNT;
+	state->mount_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
 
@@ -2409,6 +2414,15 @@ static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) 
 }
 
 /**
+ * Parse -xdev.
+ */
+static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->flags |= BFTW_XDEV;
+	state->xdev_arg = state->argv[0];
+	return parse_nullary_option(state);
+}
+
+/**
  * Launch a pager for the help output.
  */
 static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
@@ -2594,6 +2608,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
 	cfprintf(cout, "      Ignore files deeper/shallower than ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
+	cfprintf(cout, "      Skip mount points entirely\n");
 	cfprintf(cout, "  ${blu}-xdev${rs}\n");
 	cfprintf(cout, "      Don't descend into other mount points\n");
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
@@ -2888,9 +2903,9 @@ static const struct table_entry parse_table[] = {
 	{"-warn", parse_warn, true},
 	{"-wholename", parse_path, false},
 	{"-writable", parse_access, W_OK},
-	{"-x", parse_mount},
+	{"-x", parse_xdev},
 	{"-xattr", parse_xattr},
-	{"-xdev", parse_mount},
+	{"-xdev", parse_xdev},
 	{"-xtype", parse_type, true},
 	{0},
 };
@@ -3183,17 +3198,23 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 		}
 	}
 
-	if (state->warn && state->depth_arg && state->prune_arg) {
-		parse_warning(state, "%s does not work in the presence of %s.\n", state->prune_arg, state->depth_arg);
-
-		if (state->interactive) {
-			fprintf(stderr, "Do you want to continue? ");
-			if (ynprompt() == 0) {
-				goto fail;
-			}
+	if (state->warn) {
+		if (state->mount_arg && state->xdev_arg) {
+			parse_warning(state, "%s is redundant in the presence of %s.\n\n", state->xdev_arg, state->mount_arg);
 		}
 
-		fprintf(stderr, "\n");
+		if (state->depth_arg && state->prune_arg) {
+			parse_warning(state, "%s does not work in the presence of %s.\n", state->prune_arg, state->depth_arg);
+
+			if (state->interactive) {
+				fprintf(stderr, "Do you want to continue? ");
+				if (ynprompt() == 0) {
+					goto fail;
+				}
+			}
+
+			fprintf(stderr, "\n");
+		}
 	}
 
 	return expr;
@@ -3275,8 +3296,10 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	if (cmdline->ignore_races) {
 		cfprintf(cerr, "${blu}-ignore_readdir_race${rs} ");
 	}
-	if (cmdline->flags & BFTW_XDEV) {
+	if (cmdline->flags & BFTW_MOUNT) {
 		cfprintf(cerr, "${blu}-mount${rs} ");
+	} else if (cmdline->flags & BFTW_XDEV) {
+		cfprintf(cerr, "${blu}-xdev{rs} ");
 	}
 	if (cmdline->mindepth != 0) {
 		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", cmdline->mindepth);
@@ -3411,6 +3434,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.last_arg = NULL,
 		.depth_arg = NULL,
 		.prune_arg = NULL,
+		.mount_arg = NULL,
+		.xdev_arg = NULL,
 	};
 
 	if (strcmp(xbasename(state.command), "find") == 0) {

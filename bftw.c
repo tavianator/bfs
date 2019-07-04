@@ -901,7 +901,7 @@ static bool bftw_need_stat(const struct bftw_state *state) {
 	}
 
 	if (ftwbuf->typeflag == BFTW_DIR) {
-		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_XDEV)) {
+		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_MOUNT | BFTW_XDEV)) {
 			return true;
 		}
 #if __linux__
@@ -1041,6 +1041,23 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	}
 }
 
+/** Check if the current file is a mount point. */
+static bool bftw_is_mount(struct bftw_state *state, const char *name) {
+	const struct bftw_file *file = state->file;
+	if (!file) {
+		return false;
+	}
+
+	const struct bftw_file *parent = name ? file : file->parent;
+	if (!parent) {
+		return false;
+	}
+
+	const struct BFTW *ftwbuf = &state->ftwbuf;
+	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
+	return statbuf && statbuf->dev != parent->dev;
+}
+
 /** Fill file identity information from an ftwbuf. */
 static void bftw_fill_id(struct bftw_file *file, const struct BFTW *ftwbuf) {
 	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
@@ -1071,6 +1088,10 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		return BFTW_STOP;
 	}
 
+	if ((state->flags & BFTW_MOUNT) && bftw_is_mount(state, name)) {
+		return BFTW_PRUNE;
+	}
+
 	enum bftw_action ret = state->callback(ftwbuf, state->ptr);
 	switch (ret) {
 	case BFTW_CONTINUE:
@@ -1088,19 +1109,9 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		goto done;
 	}
 
-	if (state->flags & BFTW_XDEV) {
-		const struct bftw_file *parent = state->file;
-		if (parent && !name) {
-			parent = parent->parent;
-		}
-
-		if (parent) {
-			const struct bfs_stat *statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
-			if (statbuf && statbuf->dev != parent->dev) {
-				ret = BFTW_PRUNE;
-				goto done;
-			}
-		}
+	if ((state->flags & BFTW_XDEV) && bftw_is_mount(state, name)) {
+		ret = BFTW_PRUNE;
+		goto done;
 	}
 
 done:

@@ -184,8 +184,10 @@ enum bftw_flags {
 	BFTW_LOGICAL       = 1 << 4,
 	/** Detect directory cycles. */
 	BFTW_DETECT_CYCLES = 1 << 5,
-	/** Stay on the same filesystem. */
-	BFTW_XDEV          = 1 << 6,
+	/** Skip mount points and their descendents. */
+	BFTW_MOUNT         = 1 << 6,
+	/** Skip the descendents of mount points. */
+	BFTW_XDEV          = 1 << 7,
 };
 
 /**
