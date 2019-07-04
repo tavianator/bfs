@@ -1207,19 +1207,31 @@ static struct bftw_reader *bftw_open(struct bftw_state *state) {
 }
 
 /**
+ * Flags controlling which files get visited when releasing a reader/file.
+ */
+enum bftw_release_flags {
+	/** Don't visit anything. */
+	BFTW_VISIT_NONE = 0,
+	/** Visit the file itself. */
+	BFTW_VISIT_FILE = 1 << 0,
+	/** Visit the file's ancestors. */
+	BFTW_VISIT_PARENTS = 1 << 1,
+	/** Visit both the file and its ancestors. */
+	BFTW_VISIT_ALL = BFTW_VISIT_FILE | BFTW_VISIT_PARENTS,
+};
+
+/**
  * Close and release the reader.
  */
-static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_visit) {
+static enum bftw_action bftw_release_reader(struct bftw_state *state, enum bftw_release_flags flags) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
 	struct bftw_reader *reader = &state->reader;
 	bftw_reader_close(reader);
 
 	if (reader->error != 0) {
-		if (do_visit) {
-			if (bftw_visit(state, NULL, BFTW_PRE) == BFTW_STOP) {
-				ret = BFTW_STOP;
-			}
+		if (flags & BFTW_VISIT_FILE) {
+			ret = bftw_visit(state, NULL, BFTW_PRE);
 		} else {
 			state->error = reader->error;
 		}
@@ -1232,14 +1244,13 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, bool do_vi
 /**
  * Finalize and free a file we're done with.
  */
-static enum bftw_action bftw_release_file(struct bftw_state *state, bool visit_file, bool visit_parents) {
+static enum bftw_action bftw_release_file(struct bftw_state *state, enum bftw_release_flags flags) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
 	if (!(state->flags & BFTW_DEPTH)) {
-		visit_file = false;
-		visit_parents = false;
+		flags = 0;
 	}
-	bool do_visit = visit_file;
+	bool visit = flags & BFTW_VISIT_FILE;
 
 	while (state->file) {
 		if (bftw_file_decref(&state->cache, state->file) > 0) {
@@ -1247,13 +1258,11 @@ static enum bftw_action bftw_release_file(struct bftw_state *state, bool visit_f
 			break;
 		}
 
-		if (do_visit) {
-			if (bftw_visit(state, NULL, BFTW_POST) == BFTW_STOP) {
-				ret = BFTW_STOP;
-				visit_parents = false;
-			}
+		if (visit && bftw_visit(state, NULL, BFTW_POST) == BFTW_STOP) {
+			ret = BFTW_STOP;
+			flags &= ~BFTW_VISIT_PARENTS;
 		}
-		do_visit = visit_parents;
+		visit = flags & BFTW_VISIT_PARENTS;
 
 		struct bftw_file *parent = state->file->parent;
 		if (state->previous == state->file) {
@@ -1272,7 +1281,7 @@ static enum bftw_action bftw_release_file(struct bftw_state *state, bool visit_f
 static void bftw_drain_queue(struct bftw_state *state, struct bftw_queue *queue) {
 	while (queue->head) {
 		state->file = bftw_queue_pop(queue);
-		bftw_release_file(state, false, false);
+		bftw_release_file(state, BFTW_VISIT_NONE);
 	}
 }
 
@@ -1285,9 +1294,9 @@ static void bftw_drain_queue(struct bftw_state *state, struct bftw_queue *queue)
 static int bftw_state_destroy(struct bftw_state *state) {
 	dstrfree(state->path);
 
-	bftw_release_reader(state, false);
+	bftw_release_reader(state, BFTW_VISIT_NONE);
 
-	bftw_release_file(state, false, false);
+	bftw_release_file(state, BFTW_VISIT_NONE);
 	bftw_drain_queue(state, &state->prequeue);
 	bftw_drain_queue(state, &state->queue);
 
@@ -1343,10 +1352,10 @@ static int bftw_bfs(const struct bftw_args *args) {
 			}
 		}
 
-		if (bftw_release_reader(&state, true) == BFTW_STOP) {
+		if (bftw_release_reader(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
 			goto done;
 		}
-		if (bftw_release_file(&state, true, true) == BFTW_STOP) {
+		if (bftw_release_file(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
 			goto done;
 		}
 	}
@@ -1371,13 +1380,13 @@ static int bftw_dfs(const struct bftw_args *args) {
 	}
 
 	while (bftw_pop(&state) > 0) {
-		bool visit_post = true;
+		enum bftw_release_flags relflags = BFTW_VISIT_ALL;
 
 		switch (bftw_visit(&state, NULL, BFTW_PRE)) {
 		case BFTW_CONTINUE:
 			break;
 		case BFTW_PRUNE:
-			visit_post = false;
+			relflags &= ~BFTW_VISIT_FILE;
 			goto next;
 		case BFTW_STOP:
 			goto done;
@@ -1391,12 +1400,12 @@ static int bftw_dfs(const struct bftw_args *args) {
 			}
 		}
 
-		if (bftw_release_reader(&state, true) == BFTW_STOP) {
+		if (bftw_release_reader(&state, relflags) == BFTW_STOP) {
 			goto done;
 		}
 
 	next:
-		if (bftw_release_file(&state, visit_post, true) == BFTW_STOP) {
+		if (bftw_release_file(&state, relflags) == BFTW_STOP) {
 			goto done;
 		}
 	}
