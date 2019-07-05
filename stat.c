@@ -282,7 +282,9 @@ static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, enum 
 
 	if (has_statx) {
 		int ret = bfs_statx_impl(at_fd, at_path, at_flags, flags, buf);
-		if (ret != 0 && errno == ENOSYS) {
+		// EPERM is commonly returned in a seccomp() sandbox that does
+		// not allow statx()
+		if (ret != 0 && (errno == ENOSYS || errno == EPERM)) {
 			has_statx = false;
 		} else {
 			return ret;
