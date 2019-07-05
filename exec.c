@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 /** Print some debugging info. */
+BFS_FORMATTER(2, 3)
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
 	if (!(execbuf->flags & BFS_EXEC_DEBUG)) {
 		return;
