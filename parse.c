@@ -2609,8 +2609,6 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Ignore files deeper/shallower than ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
 	cfprintf(cout, "      Skip mount points entirely\n");
-	cfprintf(cout, "  ${blu}-xdev${rs}\n");
-	cfprintf(cout, "      Don't descend into other mount points\n");
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
 	cfprintf(cout, "      Ignored; for compatibility with GNU find\n");
 	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
@@ -2620,7 +2618,9 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Skip any files that have already been seen\n");
 	cfprintf(cout, "  ${blu}-warn${rs}\n");
 	cfprintf(cout, "  ${blu}-nowarn${rs}\n");
-	cfprintf(cout, "      Turn on or off warnings about the command line\n\n");
+	cfprintf(cout, "      Turn on or off warnings about the command line\n");
+	cfprintf(cout, "  ${blu}-xdev${rs}\n");
+	cfprintf(cout, "      Don't descend into other mount points\n\n");
 
 	cfprintf(cout, "${bld}Tests:${rs}\n\n");
 
