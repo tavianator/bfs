@@ -2334,16 +2334,14 @@ function test_xtype_bind_mount() {
 function test_acl() {
     rm -rf scratch/*
 
-    if ! invoke_bfs scratch -quit -acl 2>/dev/null; then
-        return 0
-    fi
+    invoke_bfs scratch -quit -acl 2>/dev/null || return 0
 
     touch scratch/{normal,acl}
 
     if [ "$(uname)" = "Darwin" ]; then
-        chmod +a "$(id -un) allow read,write" scratch/acl
+        chmod +a "$(id -un) allow read,write" scratch/acl || return 0
     else
-        setfacl -m "u:$(id -un):rw" scratch/acl
+        setfacl -m "u:$(id -un):rw" scratch/acl || return 0
     fi
 
     ln -s acl scratch/link
@@ -2354,16 +2352,14 @@ function test_acl() {
 function test_L_acl() {
     rm -rf scratch/*
 
-    if ! invoke_bfs scratch -quit -acl 2>/dev/null; then
-        return 0
-    fi
+    invoke_bfs scratch -quit -acl 2>/dev/null || return 0
 
     touch scratch/{normal,acl}
 
     if [ "$(uname)" = "Darwin" ]; then
-        chmod +a "$(id -un) allow read,write" scratch/acl
+        chmod +a "$(id -un) allow read,write" scratch/acl || return 0
     else
-        setfacl -m "u:$(id -un):rw" scratch/acl
+        setfacl -m "u:$(id -un):rw" scratch/acl || return 0
     fi
 
     ln -s acl scratch/link
