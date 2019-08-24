@@ -714,6 +714,79 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 	return 0;
 }
 
+/** Find the offset of the first broken path component. */
+static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags, size_t max) {
+	if (bftw_typeflag(ftwbuf, flags) != BFTW_ERROR) {
+		return max;
+	}
+
+	int at_fd;
+	if (path != ftwbuf->path) {
+		// We're in print_link_target(), so resolve relative to the parent directory
+		at_fd = ftwbuf->at_fd;
+	} else if (ftwbuf->depth == 0) {
+		at_fd = AT_FDCWD;
+	} else {
+		// The parent must have existed to get here
+		return max;
+	}
+
+	char *copy = dstralloc(max);
+	if (!copy) {
+		return 0;
+	}
+
+	size_t i = 0;
+	while (i < max) {
+		size_t j = i;
+		while (path[j] != '/') {
+			++j;
+		}
+		while (path[j] == '/') {
+			++j;
+		}
+
+		if (dstrncat(&copy, path + i, j - i) != 0) {
+			break;
+		}
+
+		if (xfaccessat(at_fd, copy, F_OK) != 0) {
+			break;
+		}
+
+		i = j;
+	}
+
+	dstrfree(copy);
+	return i;
+}
+
+/** Print the directories leading up to a file. */
+static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags, size_t nameoff) {
+	const struct colors *colors = cfile->colors;
+	FILE *file = cfile->file;
+
+	size_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
+
+	if (broken > 0) {
+		if (print_colored(colors, colors->directory, path, broken, file) != 0) {
+			return -1;
+		}
+	}
+
+	if (broken < nameoff) {
+		const char *color = colors->missing;
+		if (!color) {
+			color = colors->orphan;
+		}
+		if (print_colored(colors, color, path + broken, nameoff - broken, file) != 0) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 /** Print a path with colors. */
 static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	const struct colors *colors = cfile->colors;
@@ -726,11 +799,7 @@ static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW 
 		nameoff = xbasename(path) - path;
 	}
 
-	if (nameoff > 0) {
-		if (print_colored(colors, colors->directory, path, nameoff, file) != 0) {
-			return -1;
-		}
-	}
+	print_dirs_colored(cfile, path, ftwbuf, flags, nameoff);
 
 	const char *filename = path + nameoff;
 	const char *color = file_color(colors, filename, ftwbuf, flags);
