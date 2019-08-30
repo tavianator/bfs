@@ -60,7 +60,7 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
  * @return
  *         Whether the named file could be a mount point.
  */
-bool bfs_maybe_mount(const struct bfs_mtab *mtab, const char *path);
+bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path);
 
 /**
  * Free a mount table.
