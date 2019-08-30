@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "mtab.h"
+#include "darray.h"
 #include "trie.h"
 #include "util.h"
 #include <errno.h>
@@ -49,42 +50,56 @@
 #	include <sys/mnttab.h>
 #endif
 
+/**
+ * A mount point in the table.
+ */
+struct bfs_mtab_entry {
+	/** The path to the mount point. */
+	char *path;
+	/** The filesystem type. */
+	char *type;
+};
+
 struct bfs_mtab {
-	/** A map from device ID to file system type. */
-	struct trie types;
-	/** The names of all the mount points. */
+	/** The list of mount points. */
+	struct bfs_mtab_entry *entries;
+	/** The basenames of every mount point. */
 	struct trie names;
+
+	/** A map from device ID to fstype (populated lazily). */
+	struct trie types;
+	/** Whether the types map has been populated. */
+	bool types_filled;
 };
 
 /**
  * Add an entry to the mount table.
  */
 static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
+	struct bfs_mtab_entry entry = {
+		.path = strdup(path),
+		.type = strdup(type),
+	};
+
+	if (!entry.path || !entry.type) {
+		goto fail_entry;
+	}
+
+	if (DARRAY_PUSH(&mtab->entries, &entry) != 0) {
+		goto fail_entry;
+	}
+
 	if (!trie_insert_str(&mtab->names, xbasename(path))) {
-		return -1;
+		goto fail;
 	}
 
-	struct bfs_stat sb;
-	if (bfs_stat(AT_FDCWD, path, BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC, &sb) != 0) {
-		return 0;
-	}
+	return 0;
 
-	struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
-	if (!leaf) {
-		return -1;
-	}
-
-	if (leaf->value) {
-		return 0;
-	}
-
-	leaf->value = strdup(type);
-	if (leaf->value) {
-		return 0;
-	} else {
-		trie_remove(&mtab->types, leaf);
-		return -1;
-	}
+fail_entry:
+	free(entry.type);
+	free(entry.path);
+fail:
+	return -1;
 }
 
 struct bfs_mtab *parse_bfs_mtab() {
@@ -93,8 +108,10 @@ struct bfs_mtab *parse_bfs_mtab() {
 		return NULL;
 	}
 
-	trie_init(&mtab->types);
+	mtab->entries = NULL;
 	trie_init(&mtab->names);
+	trie_init(&mtab->types);
+	mtab->types_filled = false;
 
 	int error = 0;
 
@@ -171,7 +188,29 @@ fail:
 	return NULL;
 }
 
+static void bfs_mtab_fill_types(struct bfs_mtab *mtab) {
+	for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
+		struct bfs_mtab_entry *entry = mtab->entries + i;
+
+		struct bfs_stat sb;
+		if (bfs_stat(AT_FDCWD, entry->path, BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC, &sb) != 0) {
+			continue;
+		}
+
+		struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
+		if (leaf) {
+			leaf->value = entry->type;
+		}
+	}
+
+	mtab->types_filled = true;
+}
+
 const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statbuf) {
+	if (!mtab->types_filled) {
+		bfs_mtab_fill_types((struct bfs_mtab *)mtab);
+	}
+
 	const struct trie_leaf *leaf = trie_find_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));
 	if (leaf) {
 		return leaf->value;
@@ -187,14 +226,14 @@ bool bfs_maybe_mount(const struct bfs_mtab *mtab, const char *path) {
 
 void free_bfs_mtab(struct bfs_mtab *mtab) {
 	if (mtab) {
+		trie_destroy(&mtab->types);
 		trie_destroy(&mtab->names);
 
-		struct trie_leaf *leaf;
-		while ((leaf = trie_first_leaf(&mtab->types))) {
-			free(leaf->value);
-			trie_remove(&mtab->types, leaf);
+		for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
+			free(mtab->entries[i].type);
+			free(mtab->entries[i].path);
 		}
-		trie_destroy(&mtab->types);
+		darray_free(mtab->entries);
 
 		free(mtab);
 	}
