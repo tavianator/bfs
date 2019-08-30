@@ -22,6 +22,7 @@
 #include "bftw.h"
 #include "cmdline.h"
 #include "color.h"
+#include "darray.h"
 #include "diag.h"
 #include "dstring.h"
 #include "exec.h"
@@ -1339,7 +1340,7 @@ int eval_cmdline(const struct cmdline *cmdline) {
 
 	struct bftw_args bftw_args = {
 		.paths = cmdline->paths,
-		.npaths = cmdline->npaths,
+		.npaths = darray_length(cmdline->paths),
 		.callback = cmdline_callback,
 		.ptr = &args,
 		.nopenfd = infer_fdlimit(cmdline),

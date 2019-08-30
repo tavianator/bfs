@@ -23,6 +23,7 @@
 
 #include "bfs.h"
 #include "cmdline.h"
+#include "darray.h"
 #include "diag.h"
 #include "dstring.h"
 #include "eval.h"
@@ -292,7 +293,7 @@ int free_cmdline(struct cmdline *cmdline) {
 		cfclose(cerr);
 
 		free_colors(cmdline->colors);
-		free(cmdline->paths);
+		darray_free(cmdline->paths);
 		free(cmdline->argv);
 		free(cmdline);
 	}
@@ -505,18 +506,7 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
  */
 static int parse_root(struct parser_state *state, const char *path) {
 	struct cmdline *cmdline = state->cmdline;
-	size_t i = cmdline->npaths;
-	if ((i & (i + 1)) == 0) {
-		const char **paths = realloc(cmdline->paths, 2*(i + 1)*sizeof(*paths));
-		if (!paths) {
-			return -1;
-		}
-		cmdline->paths = paths;
-	}
-
-	cmdline->paths[i] = path;
-	cmdline->npaths = i + 1;
-	return 0;
+	return DARRAY_PUSH(&cmdline->paths, &path);
 }
 
 /**
@@ -3276,7 +3266,7 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		cfprintf(cerr, " ");
 	}
 
-	for (size_t i = 0; i < cmdline->npaths; ++i) {
+	for (size_t i = 0; i < darray_length(cmdline->paths); ++i) {
 		const char *path = cmdline->paths[i];
 		char c = path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
@@ -3361,7 +3351,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	cmdline->argv = NULL;
 	cmdline->paths = NULL;
-	cmdline->npaths = 0;
 	cmdline->colors = NULL;
 	cmdline->cout = NULL;
 	cmdline->cerr = NULL;
@@ -3460,7 +3449,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	if (cmdline->npaths == 0) {
+	if (darray_length(cmdline->paths) == 0) {
 		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}

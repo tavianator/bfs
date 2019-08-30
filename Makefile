@@ -72,6 +72,7 @@ all: bfs tests/mksock
 bfs: \
     bftw.o \
     color.o \
+    darray.o \
     diag.o \
     dstring.o \
     eval.o \

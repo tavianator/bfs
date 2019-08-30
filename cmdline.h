@@ -55,8 +55,6 @@ struct cmdline {
 
 	/** The root paths. */
 	const char **paths;
-	/** The number of root paths. */
-	size_t npaths;
 
 	/** Color data. */
 	struct colors *colors;
