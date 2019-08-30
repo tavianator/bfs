@@ -59,12 +59,17 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, dev_t dev, const char *type) {
+static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
 	if (!trie_insert_str(&mtab->names, xbasename(path))) {
 		return -1;
 	}
 
-	struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &dev, sizeof(dev));
+	struct bfs_stat sb;
+	if (bfs_stat(AT_FDCWD, path, BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC, &sb) != 0) {
+		return 0;
+	}
+
+	struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
 	if (!leaf) {
 		return -1;
 	}
@@ -83,120 +88,87 @@ static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, dev_t dev, cons
 }
 
 struct bfs_mtab *parse_bfs_mtab() {
+	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
+	if (!mtab) {
+		return NULL;
+	}
+
+	trie_init(&mtab->types);
+	trie_init(&mtab->names);
+
+	int error = 0;
+
 #if BFS_MNTENT
 
 	FILE *file = setmntent(_PATH_MOUNTED, "r");
 	if (!file) {
 		// In case we're in a chroot or something with /proc but no /etc/mtab
+		error = errno;
 		file = setmntent("/proc/mounts", "r");
 	}
 	if (!file) {
 		goto fail;
 	}
 
-	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
-	if (!mtab) {
-		goto fail_file;
-	}
-	trie_init(&mtab->types);
-	trie_init(&mtab->names);
-
 	struct mntent *mnt;
 	while ((mnt = getmntent(file))) {
-		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, mnt->mnt_dir, BFS_STAT_NOFOLLOW, &sb) != 0) {
-			continue;
-		}
-
-		if (bfs_mtab_add(mtab, mnt->mnt_dir, sb.dev, mnt->mnt_type) != 0) {
-			goto fail_mtab;
+		if (bfs_mtab_add(mtab, mnt->mnt_dir, mnt->mnt_type) != 0) {
+			error = errno;
+			endmntent(file);
+			goto fail;
 		}
 	}
 
 	endmntent(file);
-	return mtab;
-
-fail_mtab:
-	free_bfs_mtab(mtab);
-fail_file:
-	endmntent(file);
-fail:
-	return NULL;
 
 #elif BFS_MNTINFO
 
 	struct statfs *mntbuf;
 	int size = getmntinfo(&mntbuf, MNT_WAIT);
 	if (size < 0) {
-		return NULL;
-	}
-
-	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
-	if (!mtab) {
+		error = errno;
 		goto fail;
 	}
-	trie_init(&mtab->types);
-	trie_init(&mtab->names);
 
 	for (struct statfs *mnt = mntbuf; mnt < mntbuf + size; ++mnt) {
-		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, mnt->f_mntonname, BFS_STAT_NOFOLLOW, &sb) != 0) {
-			continue;
-		}
-
-		if (bfs_mtab_add(mtab, mnt->f_mntonname, sb.dev, mnt->f_fstypename) != 0) {
-			goto fail_mtab;
+		if (bfs_mtab_add(mtab, mnt->f_mntonname, mnt->f_fstypename) != 0) {
+			error = errno;
+			goto fail;
 		}
 	}
-
-	return mtab;
-
-fail_mtab:
-	free_bfs_mtab(mtab);
-fail:
-	return NULL;
 
 #elif BFS_MNTTAB
 
 	FILE *file = fopen(MNTTAB, "r");
 	if (!file) {
+		error = errno;
 		goto fail;
 	}
 
-	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
-	if (!mtab) {
-		goto fail_file;
-	}
-	trie_init(&mtab->types);
-	trie_init(&mtab->names);
-
 	struct mnttab mnt;
 	while (getmntent(file, &mnt) == 0) {
-		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, mnt.mnt_mountp, BFS_STAT_NOFOLLOW, &sb) != 0) {
-			continue;
-		}
-
-		if (bfs_mtab_add(mtab, mnt.mnt_mountp, sb.dev, mnt.mnt_fstype) != 0) {
-			goto fail_mtab;
+		if (bfs_mtab_add(mtab, mnt.mnt_mountp, mnt.mnt_fstype) != 0) {
+			error = errno;
+			fclose(file);
+			goto fail;
 		}
 	}
 
 	fclose(file);
-	return mtab;
-
-fail_mtab:
-	free_bfs_mtab(mtab);
-fail_file:
-	fclose(file);
-fail:
-	return NULL;
 
 #else
 
-	errno = ENOTSUP;
-	return NULL;
+	error = ENOTSUP;
+	goto fail;
+
 #endif
+
+	return mtab;
+
+fail:
+	free_bfs_mtab(mtab);
+	errno = error;
+	return NULL;
 }
 
 const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statbuf) {
