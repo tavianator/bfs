@@ -300,6 +300,9 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flag flags, struct bf
 	if (flags & BFS_STAT_NOFOLLOW) {
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 	}
+	if (flags & BFS_STAT_NOSYNC) {
+		at_flags |= AT_STATX_DONT_SYNC;
+	}
 
 	if (at_path) {
 		return bfs_stat_explicit(at_fd, at_path, at_flags, flags, buf);

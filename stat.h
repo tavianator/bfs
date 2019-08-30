@@ -69,6 +69,8 @@ enum bfs_stat_flag {
 	BFS_STAT_NOFOLLOW = 1 << 0,
 	/** Try to follow symlinks, but fall back to the link itself if broken. */
 	BFS_STAT_TRYFOLLOW = 1 << 1,
+	/** Try to use cached values without synchronizing remote filesystems. */
+	BFS_STAT_NOSYNC = 1 << 2,
 };
 
 #ifdef DEV_BSIZE
