@@ -17,27 +17,30 @@
 /**
  * A dynamic array library.
  *
- *     int ret = 0;
- *     int *array = NULL;
+ * darrays are represented by a simple pointer to the array element type, like
+ * any other array.  Behind the scenes, the capacity and current length of the
+ * array are stored along with it.  NULL is a valid way to initialize an empty
+ * darray:
  *
- *     int e = 1;
- *     if (DARRAY_PUSH(&array, &e) != 0) {
- *             goto fail;
+ *     int *darray = NULL;
+ *
+ * To append an element to a darray, use the DARRAY_PUSH macro:
+ *
+ *     int e = 42;
+ *     if (DARRAY_PUSH(&darray, &e) != 0) {
+ *             // Report the error...
  *     }
  *
- *     e = 2;
- *     if (DARRAY_PUSH(&array, &e) != 0) {
- *             goto fail;
+ * The length can be retrieved by darray_length().  Iterating over the array
+ * works like normal arrays:
+ *
+ *     for (size_t i = 0; i < darray_length(darray); ++i) {
+ *             printf("%d\n", darray[i]);
  *     }
  *
- *     for (size_t i = 0; i < darray_length(array); ++i) {
- *             assert(array[i] == i + 1);
- *     }
+ * To free a darray, use darray_free():
  *
- *     ret = 0;
- *     fail:
- *     darray_free(array);
- *     return ret;
+ *     darray_free(darray);
  */
 
 #ifndef BFS_DARRAY_H

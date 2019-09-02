@@ -22,8 +22,15 @@
  * The darray header.
  */
 struct darray {
+	/** The current capacity of the array, as a count of elements. */
 	size_t capacity;
+	/** The current length of the array. */
 	size_t length;
+
+	// The array elements are stored after this header in memory.  Not using
+	// a flexible array member to avoid worrying about strict aliasing.  We
+	// assume that 2*sizeof(size_t) keeps any memory allocation suitably
+	// aligned for the element type.
 };
 
 /** Get the header for a darray. */
@@ -83,6 +90,7 @@ int darray_check(void *da) {
 	if (header->length <= header->capacity) {
 		return 0;
 	} else {
+		// realloc() failed in darray_push(), so reset the length and report the failure
 		header->length = header->capacity;
 		return -1;
 	}
