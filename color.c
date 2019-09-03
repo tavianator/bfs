@@ -778,7 +778,7 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
 
-	size_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
+	ssize_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
 	if (broken < 0) {
 		return -1;
 	}
