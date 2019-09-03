@@ -41,6 +41,16 @@ char *dstralloc(size_t capacity);
 char *dstrdup(const char *str);
 
 /**
+ * Create a length-limited dynamic copy of a string.
+ *
+ * @param str
+ *         The string to copy.
+ * @param n
+ *         The maximum number of characters to copy from str.
+ */
+char *dstrndup(const char *str, size_t n);
+
+/**
  * Get a dynamic string's length.
  *
  * @param dstr

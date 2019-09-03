@@ -49,7 +49,10 @@ static char *dstralloc_impl(size_t capacity, size_t length, const char *data) {
 
 	header->capacity = capacity;
 	header->length = length;
-	return memcpy(header->data, data, length + 1);
+
+	memcpy(header->data, data, length);
+	header->data[length] = '\0';
+	return header->data;
 }
 
 char *dstralloc(size_t capacity) {
@@ -58,6 +61,11 @@ char *dstralloc(size_t capacity) {
 
 char *dstrdup(const char *str) {
 	size_t len = strlen(str);
+	return dstralloc_impl(len, len, str);
+}
+
+char *dstrndup(const char *str, size_t n) {
+	size_t len = strnlen(str, n);
 	return dstralloc_impl(len, len, str);
 }
 
