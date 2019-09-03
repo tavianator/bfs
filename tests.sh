@@ -618,6 +618,7 @@ bfs_tests=(
     test_color_no_stat
     test_color_L_no_stat
     test_color_star
+    test_color_ls
 
     test_execdir_plus
 
@@ -2103,6 +2104,30 @@ function test_color_L_no_stat() {
 function test_color_star() {
     # Regression test: don't segfault on LS_COLORS="*"
     LS_COLORS="*" bfs_diff rainbow -color
+}
+
+function test_color_ls() {
+    rm -rf scratch/*
+    touchp scratch/foo/bar/baz
+    ln -s foo/bar/baz scratch/link
+    ln -s foo/bar/nowhere scratch/broken
+    ln -s foo/bar/nowhere/nothing scratch/nested
+    ln -s foo/bar/baz/qux scratch/notdir
+    ln -s scratch/foo/bar scratch/relative
+    ln -s /__bfs__/nowhere scratch/absolute
+
+    local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
+    if [ "$UPDATE" ]; then
+        local ACTUAL="$EXPECTED"
+    else
+        local ACTUAL="$TMP/${FUNCNAME[0]}.out"
+    fi
+
+    LS_COLORS="or=01;31:" invoke_bfs scratch/{link,broken,nested,notdir,relative,absolute} -color -ls | sed 's/.* -> //' >"$ACTUAL"
+
+    if [ ! "$UPDATE" ]; then
+        diff -u "$EXPECTED" "$ACTUAL"
+    fi
 }
 
 function test_deep() {

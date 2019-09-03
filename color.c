@@ -716,49 +716,61 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 
 /** Find the offset of the first broken path component. */
 static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags, size_t max) {
+	ssize_t ret = max;
+
 	if (bftw_typeflag(ftwbuf, flags) != BFTW_ERROR) {
-		return max;
+		goto out;
 	}
 
+	char *at_path;
 	int at_fd;
-	if (path != ftwbuf->path) {
-		// We're in print_link_target(), so resolve relative to the parent directory
-		at_fd = ftwbuf->at_fd;
-	} else if (ftwbuf->depth == 0) {
-		at_fd = AT_FDCWD;
+	if (path == ftwbuf->path) {
+		if (ftwbuf->depth == 0) {
+			at_fd = AT_FDCWD;
+			at_path = dstrndup(path, max);
+		} else {
+			// The parent must have existed to get here
+			goto out;
+		}
 	} else {
-		// The parent must have existed to get here
-		return max;
+		// We're in print_link_target(), so resolve relative to the link's parent directory
+		at_fd = AT_FDCWD;
+		if (at_fd == AT_FDCWD && path[0] != '/') {
+			at_path = dstrndup(ftwbuf->path, ftwbuf->nameoff);
+			if (at_path && dstrncat(&at_path, path, max) != 0) {
+				ret = -1;
+				goto out_path;
+			}
+		} else {
+			at_path = dstrndup(path, max);
+		}
 	}
 
-	char *copy = dstralloc(max);
-	if (!copy) {
-		return 0;
+	if (!at_path) {
+		ret = -1;
+		goto out;
 	}
 
-	size_t i = 0;
-	while (i < max) {
-		size_t j = i;
-		while (path[j] != '/') {
-			++j;
-		}
-		while (path[j] == '/') {
-			++j;
-		}
-
-		if (dstrncat(&copy, path + i, j - i) != 0) {
+	while (ret > 0) {
+		if (xfaccessat(at_fd, at_path, F_OK) == 0) {
 			break;
 		}
 
-		if (xfaccessat(at_fd, copy, F_OK) != 0) {
-			break;
+		size_t len = dstrlen(at_path);
+		while (ret && at_path[len - 1] == '/') {
+			--len, --ret;
+		}
+		while (ret && at_path[len - 1] != '/') {
+			--len, --ret;
 		}
 
-		i = j;
+		dstresize(&at_path, len);
 	}
 
-	dstrfree(copy);
-	return i;
+out_path:
+	dstrfree(at_path);
+out:
+	return ret;
 }
 
 /** Print the directories leading up to a file. */
@@ -767,6 +779,9 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 	FILE *file = cfile->file;
 
 	size_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
+	if (broken < 0) {
+		return -1;
+	}
 
 	if (broken > 0) {
 		if (print_colored(colors, colors->directory, path, broken, file) != 0) {
