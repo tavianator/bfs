@@ -2114,6 +2114,7 @@ function test_color_ls() {
     ln -s foo/bar/nowhere/nothing scratch/nested
     ln -s foo/bar/baz/qux scratch/notdir
     ln -s scratch/foo/bar scratch/relative
+    mkdir scratch/__bfs__
     ln -s /__bfs__/nowhere scratch/absolute
 
     local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
