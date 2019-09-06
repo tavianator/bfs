@@ -2124,7 +2124,9 @@ function test_color_ls() {
         local ACTUAL="$TMP/${FUNCNAME[0]}.out"
     fi
 
-    LS_COLORS="or=01;31:" invoke_bfs scratch/{link,broken,nested,notdir,relative,absolute} -color -ls | sed 's/.* -> //' >"$ACTUAL"
+    LS_COLORS="or=01;31:" invoke_bfs scratch/{,link,broken,nested,notdir,relative,absolute} -color -type l -ls \
+        | sed 's/.* -> //' \
+        | sort -o "$ACTUAL"
 
     if [ ! "$UPDATE" ]; then
         diff -u "$EXPECTED" "$ACTUAL"
