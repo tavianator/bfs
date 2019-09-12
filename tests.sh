@@ -95,11 +95,7 @@ UPDATE=
 VERBOSE=
 EXPLICIT=
 
-function enable_tests() {
-    for test; do
-        eval run_$test=yes
-    done
-}
+enabled_tests=()
 
 for arg; do
     case "$arg" in
@@ -146,7 +142,7 @@ for arg; do
             ;;
         test_*)
             EXPLICIT=yes
-            enable_tests "$arg"
+            enabled_tests+=("$arg")
             ;;
         *)
             printf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
@@ -676,12 +672,14 @@ if [ "$DEFAULT" ]; then
 fi
 
 if [ ! "$EXPLICIT" ]; then
-    [ "$POSIX" ] && enable_tests "${posix_tests[@]}"
-    [ "$BSD" ] && enable_tests "${bsd_tests[@]}"
-    [ "$GNU" ] && enable_tests "${gnu_tests[@]}"
-    [ "$ALL" ] && enable_tests "${bfs_tests[@]}"
-    [ "$SUDO" ] && enable_tests "${sudo_tests[@]}"
+    [ "$POSIX" ] && enabled_tests+=("${posix_tests[@]}")
+    [ "$BSD" ] && enabled_tests+=("${bsd_tests[@]}")
+    [ "$GNU" ] && enabled_tests+=("${gnu_tests[@]}")
+    [ "$ALL" ] && enabled_tests+=("${bfs_tests[@]}")
+    [ "$SUDO" ] && enabled_tests+=("${sudo_tests[@]}")
 fi
+
+eval enabled_tests=($(printf '%q\n' "${enabled_tests[@]}" | sort -u))
 
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
@@ -2533,12 +2531,10 @@ fi
 passed=0
 failed=0
 
-for test in ${!run_*}; do
-    test=${test#run_}
-
+for test in "${enabled_tests[@]}"; do
     printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
 
-    ("$test" "$dir")
+    ("$test")
     status=$?
 
     if [ $status -eq 0 ]; then
