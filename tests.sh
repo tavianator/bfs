@@ -658,7 +658,9 @@ sudo_tests=(
     test_L_xattr
 
     test_mount
+    test_L_mount
     test_xdev
+    test_L_xdev
 
     test_inum_mount
     test_inum_bind_mount
@@ -2297,6 +2299,21 @@ function test_mount() {
     return $ret
 }
 
+function test_L_mount() {
+    rm -rf scratch/*
+    mkdir scratch/{foo,mnt}
+    sudo mount -t tmpfs tmpfs scratch/mnt
+    ln -s ../mnt scratch/foo/bar
+    touch scratch/mnt/baz
+    ln -s ../mnt/baz scratch/foo/qux
+
+    bfs_diff -L scratch -mount
+    local ret=$?
+
+    sudo umount scratch/mnt
+    return $ret
+}
+
 function test_xdev() {
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
@@ -2304,6 +2321,21 @@ function test_xdev() {
     touch scratch/foo/bar scratch/mnt/baz
 
     bfs_diff scratch -xdev
+    local ret=$?
+
+    sudo umount scratch/mnt
+    return $ret
+}
+
+function test_L_xdev() {
+    rm -rf scratch/*
+    mkdir scratch/{foo,mnt}
+    sudo mount -t tmpfs tmpfs scratch/mnt
+    ln -s ../mnt scratch/foo/bar
+    touch scratch/mnt/baz
+    ln -s ../mnt/baz scratch/foo/qux
+
+    bfs_diff -L scratch -xdev
     local ret=$?
 
     sudo umount scratch/mnt
