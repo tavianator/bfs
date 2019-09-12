@@ -1543,7 +1543,14 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
  * Parse -mount.
  */
 static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_MOUNT;
+	if (state->warn) {
+		parse_warning(state,
+		              "In the future, %s will skip mount points entirely, unlike\n"
+		              "-xdev, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
+		              state->argv[0]);
+	}
+
+	state->cmdline->flags |= BFTW_XDEV;
 	state->mount_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
