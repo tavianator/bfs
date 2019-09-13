@@ -35,6 +35,7 @@
  * - Utilities:
  *     - bfs.h         (constants about bfs itself)
  *     - color.[ch]    (for pretty terminal colors)
+ *     - darray.[ch]   (a dynamic array library)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
