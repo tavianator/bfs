@@ -4,7 +4,7 @@
 <img src="https://tavianator.github.io/bfs/screenshot.svg" alt="Screenshot" align="right" />
 
 [![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/master/COPYING)
-[![LOC](https://tokei.rs/b1/github/tavianator/bfs?category=code)](https://github.com/Aaronepower/tokei)
+[![Version](https://img.shields.io/github/v/tag/tavianator/bfs?label=version)](https://github.com/tavianator/bfs/releases)
 [![Build Status](https://api.travis-ci.org/tavianator/bfs.svg?branch=master)](https://travis-ci.org/tavianator/bfs)
 
 Breadth-first search for your files.
