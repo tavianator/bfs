@@ -52,12 +52,16 @@ LOCAL_CFLAGS := -std=c99
 LOCAL_LDFLAGS :=
 LOCAL_LDLIBS :=
 
+ASAN_CFLAGS := -fsanitize=address
+MSAN_CFLAGS := -fsanitize=memory
+UBSAN_CFLAGS := -fsanitize=undefined
+
 ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
 LOCAL_LDLIBS += -lacl -lcap -lattr -lrt
 
 # These libraries are not built with msan, so disable them
-MSAN_CFLAGS := -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTR=0
+MSAN_CFLAGS += -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTR=0
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
@@ -105,9 +109,9 @@ check: all
 	./tests.sh --bfs="$(CURDIR)/bfs -S ids"
 
 distcheck:
-	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -fsanitize=undefined -fsanitize=address"
+	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) $(ASAN_CFLAGS) $(UBSAN_CFLAGS)"
 ifneq ($(OS),Darwin)
-	+$(MAKE) -Bs check CC=clang CFLAGS="$(CFLAGS) $(MSAN_CFLAGS) -fsanitize=memory"
+	+$(MAKE) -Bs check CC=clang CFLAGS="$(CFLAGS) $(MSAN_CFLAGS)"
 	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -m32"
 endif
 	+$(MAKE) -Bs release check
