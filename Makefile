@@ -103,10 +103,10 @@ tests/mksock: tests/mksock.o
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-check: all
-	./tests.sh --bfs="$(CURDIR)/bfs"
-	./tests.sh --bfs="$(CURDIR)/bfs -S dfs"
-	./tests.sh --bfs="$(CURDIR)/bfs -S ids"
+check: check-bfs check-dfs check-ids
+
+check-%: all
+	./tests.sh --bfs="$(CURDIR)/bfs -S $*"
 
 distcheck:
 	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) $(ASAN_CFLAGS) $(UBSAN_CFLAGS)"
