@@ -246,7 +246,9 @@ Ignore files deeper/shallower than
 .RE
 .TP
 .B \-mount
-Skip mount points entirely.
+Don't descend into other mount points (same as
+.B \-xdev
+for now, but will skip mount points entirely in the future).
 .TP
 .B \-noleaf
 Ignored; for compatibility with GNU find.

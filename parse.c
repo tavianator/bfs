@@ -2605,7 +2605,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
 	cfprintf(cout, "      Ignore files deeper/shallower than ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
-	cfprintf(cout, "      Skip mount points entirely\n");
+	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs} for now, but will\n");
+	cfprintf(cout, "      skip mount points entirely in the future)\n");
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
 	cfprintf(cout, "      Ignored; for compatibility with GNU find\n");
 	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
