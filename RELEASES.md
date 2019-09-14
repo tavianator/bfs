@@ -2,6 +2,17 @@
 ===
 
 
+1.5.1
+-----
+
+**September 14, 2019**
+
+- Added a warning to `-mount`, since it will change behaviour in the next POSIX revision
+- Added a workaround for environments that block `statx()` with `seccomp()`, like older Docker
+- Fixed coloring of nonexistent leading directories
+- Avoided calling `stat()` on all mount points at startup
+
+
 1.5
 ---
 
