@@ -1047,11 +1047,11 @@ function test_name_trailing_slash() {
 }
 
 function test_name_slash() {
-    bfs_diff / -maxdepth 0 -name / 2>/dev/null
+    bfs_diff / -maxdepth 0 -name /
 }
 
 function test_name_slashes() {
-    bfs_diff /// -maxdepth 0 -name / 2>/dev/null
+    bfs_diff /// -maxdepth 0 -name /
 }
 
 function test_path() {
@@ -1299,11 +1299,11 @@ function test_ilname() {
 }
 
 function test_L_lname() {
-    bfs_diff -L links -lname '[aq]' 2>/dev/null
+    bfs_diff -L links -lname '[aq]'
 }
 
 function test_L_ilname() {
-    bfs_diff -L links -ilname '[AQ]' 2>/dev/null
+    bfs_diff -L links -ilname '[AQ]'
 }
 
 function test_user_name() {
