@@ -140,14 +140,20 @@ struct bfs_mtab *parse_bfs_mtab() {
 
 #elif BFS_MNTINFO
 
-	struct statfs *mntbuf;
+#if __NetBSD__
+	typedef struct statvfs bfs_statfs;
+#else
+	typedef struct statfs bfs_statfs;
+#endif
+
+	bfs_statfs *mntbuf;
 	int size = getmntinfo(&mntbuf, MNT_WAIT);
 	if (size < 0) {
 		error = errno;
 		goto fail;
 	}
 
-	for (struct statfs *mnt = mntbuf; mnt < mntbuf + size; ++mnt) {
+	for (bfs_statfs *mnt = mntbuf; mnt < mntbuf + size; ++mnt) {
 		if (bfs_mtab_add(mtab, mnt->f_mntonname, mnt->f_fstypename) != 0) {
 			error = errno;
 			goto fail;
