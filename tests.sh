@@ -16,6 +16,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
 ############################################################################
 
+set -e
 set -o physical
 umask 022
 
@@ -965,6 +966,7 @@ function inum() {
 
 
 cd "$TMP"
+set +e
 
 # Test cases
 
