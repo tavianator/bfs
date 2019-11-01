@@ -1028,11 +1028,8 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	}
 
 	if (ftwbuf->typeflag == BFTW_DIR && (state->flags & BFTW_DETECT_CYCLES)) {
-		for (const struct bftw_file *parent = file; parent; parent = parent->parent) {
-			if (parent->depth == ftwbuf->depth) {
-				continue;
-			}
-			if (parent->dev == statbuf->dev && parent->ino == statbuf->ino) {
+		for (const struct bftw_file *ancestor = parent; ancestor; ancestor = ancestor->parent) {
+			if (ancestor->dev == statbuf->dev && ancestor->ino == statbuf->ino) {
 				ftwbuf->typeflag = BFTW_ERROR;
 				ftwbuf->error = ELOOP;
 				return;
