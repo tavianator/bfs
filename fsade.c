@@ -104,6 +104,12 @@ static bool is_absence_error(int error) {
 	}
 #endif
 
+	// On at least FreeBSD and macOS, EINVAL is returned when the requested
+	// ACL type is not supported for that file
+	if (error == EINVAL) {
+		return true;
+	}
+
 #if __APPLE__
 	// On macOS, ENOENT can also signal that a file has no ACLs
 	if (error == ENOENT) {
