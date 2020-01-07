@@ -2391,19 +2391,31 @@ function test_xtype_bind_mount() {
     return $ret
 }
 
+function set_acl() {
+    uname="$(uname)"
+
+    if [ "$uname" = "Darwin" ]; then
+        chmod +a "$(id -un) allow read,write" "$1"
+    elif [ "$uname" = "FreeBSD" ]; then
+        if [ "$(getconf ACL_EXTENDED "$1")" -gt 0 ]; then
+            setfacl -m "u:$(id -un):rw" "$1"
+        elif [ "$(getconf ACL_NFS4 "$1")" -gt 0 ]; then
+            setfacl -m "u:$(id -un):rw::allow" "$1"
+        else
+            return 1
+        fi
+    else
+        return 1
+    fi
+}
+
 function test_acl() {
     rm -rf scratch/*
 
     invoke_bfs scratch -quit -acl 2>/dev/null || return 0
 
     touch scratch/{normal,acl}
-
-    if [ "$(uname)" = "Darwin" ]; then
-        chmod +a "$(id -un) allow read,write" scratch/acl || return 0
-    else
-        setfacl -m "u:$(id -un):rw" scratch/acl || return 0
-    fi
-
+    set_acl scratch/acl || return 0
     ln -s acl scratch/link
 
     bfs_diff scratch -acl
@@ -2415,13 +2427,7 @@ function test_L_acl() {
     invoke_bfs scratch -quit -acl 2>/dev/null || return 0
 
     touch scratch/{normal,acl}
-
-    if [ "$(uname)" = "Darwin" ]; then
-        chmod +a "$(id -un) allow read,write" scratch/acl || return 0
-    else
-        setfacl -m "u:$(id -un):rw" scratch/acl || return 0
-    fi
-
+    set_acl scratch/acl || return 0
     ln -s acl scratch/link
 
     bfs_diff -L scratch -acl

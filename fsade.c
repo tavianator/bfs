@@ -136,6 +136,17 @@ static int bfs_check_acl_type(const char *path, acl_type_t type) {
 	}
 
 	int ret = 0;
+
+#if __FreeBSD__
+	int trivial;
+	if (acl_is_trivial_np(acl, &trivial) < 0) {
+		ret = -1;
+	} else if (trivial) {
+		ret = 0;
+	} else {
+		ret = 1;
+	}
+#else
 	acl_entry_t entry;
 	for (int status = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
 #if __APPLE__
@@ -160,46 +171,50 @@ static int bfs_check_acl_type(const char *path, acl_type_t type) {
 		break;
 #endif
 	}
+#endif // !__FreeBSD__
 
+	int error = errno;
 	acl_free(acl);
+	errno = error;
 	return ret;
 }
 
 int bfs_check_acl(const struct BFTW *ftwbuf) {
+	static const acl_type_t acl_types[] = {
+#if __APPLE__
+		// macOS gives EINVAL for either of the two standard ACL types,
+		// supporting only ACL_TYPE_EXTENDED
+		ACL_TYPE_EXTENDED,
+#else
+		// The two standard POSIX.1e ACL types
+		ACL_TYPE_ACCESS,
+		ACL_TYPE_DEFAULT,
+#endif
+
+#ifdef ACL_TYPE_NFS4
+		ACL_TYPE_NFS4,
+#endif
+	};
+	static const size_t n_acl_types = sizeof(acl_types)/sizeof(acl_types[0]);
+
 	if (ftwbuf->typeflag == BFTW_LNK) {
 		return 0;
 	}
 
 	const char *path = fake_at(ftwbuf);
 
-	int error = ENOTSUP;
 	int ret = -1;
+	for (size_t i = 0; i < n_acl_types && ret <= 0; ++i) {
+		if (acl_types[i] == ACL_TYPE_DEFAULT && ftwbuf->typeflag != BFTW_DIR) {
+			// ACL_TYPE_DEFAULT is supported only for directories,
+			// otherwise acl_get_file() gives EACCESS
+			continue;
+		}
 
-#if __APPLE__
-	// macOS gives EINVAL for either of the two standard ACL types,
-	// supporting only ACL_TYPE_EXTENDED
-	if (ret <= 0) {
-		ret = bfs_check_acl_type(path, ACL_TYPE_EXTENDED);
-		if (ret < 0) {
-			error = errno;
-		}
-	}
-#else
-	if (ret <= 0) {
-		ret = bfs_check_acl_type(path, ACL_TYPE_ACCESS);
-		if (ret < 0) {
-			error = errno;
-		}
+		ret = bfs_check_acl_type(path, acl_types[i]);
 	}
 
-	if (ret <= 0 && ftwbuf->typeflag == BFTW_DIR) {
-		ret = bfs_check_acl_type(path, ACL_TYPE_DEFAULT);
-		if (ret < 0) {
-			error = errno;
-		}
-	}
-#endif
-
+	int error = errno;
 	free_fake_at(ftwbuf, path);
 	errno = error;
 	return ret;
