@@ -612,8 +612,9 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 1023)/1024;
 	char mode[11];
 	format_mode(statbuf->mode, mode);
+	char acl = bfs_check_acl(ftwbuf) > 0 ? '+' : ' ';
 	uintmax_t nlink = statbuf->nlink;
-	if (fprintf(file, "%9ju %6ju %s %3ju ", ino, blocks, mode, nlink) < 0) {
+	if (fprintf(file, "%9ju %6ju %s%c %2ju ", ino, blocks, mode, acl, nlink) < 0) {
 		goto error;
 	}
 
