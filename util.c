@@ -178,6 +178,8 @@ void format_mode(mode_t mode, char str[11]) {
 	strcpy(str, "----------");
 
 	switch (bftw_mode_typeflag(mode)) {
+	case BFTW_REG:
+		break;
 	case BFTW_BLK:
 		str[0] = 'b';
 		break;
@@ -190,16 +192,24 @@ void format_mode(mode_t mode, char str[11]) {
 	case BFTW_DOOR:
 		str[0] = 'D';
 		break;
+	case BFTW_LNK:
+		str[0] = 'l';
+		break;
 	case BFTW_FIFO:
 		str[0] = 'p';
 		break;
-	case BFTW_LNK:
-		str[0] = 'l';
+	case BFTW_PORT:
+		str[0] = 'P';
 		break;
 	case BFTW_SOCK:
 		str[0] = 's';
 		break;
-	default:
+	case BFTW_WHT:
+		str[0] = 'w';
+		break;
+	case BFTW_UNKNOWN:
+	case BFTW_ERROR:
+		str[0] = '?';
 		break;
 	}
 
