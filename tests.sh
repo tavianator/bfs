@@ -84,6 +84,7 @@ function _realpath() {
 
 BFS="$(_realpath ./bfs)"
 TESTS="$(_realpath ./tests)"
+UNAME="$(uname)"
 
 DEFAULT=yes
 POSIX=
@@ -2392,21 +2393,21 @@ function test_xtype_bind_mount() {
 }
 
 function set_acl() {
-    uname="$(uname)"
-
-    if [ "$uname" = "Darwin" ]; then
-        chmod +a "$(id -un) allow read,write" "$1"
-    elif [ "$uname" = "FreeBSD" ]; then
-        if [ "$(getconf ACL_EXTENDED "$1")" -gt 0 ]; then
+    case "$UNAME" in
+        Darwin)
+            chmod +a "$(id -un) allow read,write" "$1"
+            ;;
+        FreeBSD)
+            if [ "$(getconf ACL_NFS4 "$1")" -gt 0 ]; then
+                setfacl -m "u:$(id -un):rw::allow" "$1"
+            else
+                setfacl -m "u:$(id -un):rw" "$1"
+            fi
+            ;;
+        *)
             setfacl -m "u:$(id -un):rw" "$1"
-        elif [ "$(getconf ACL_NFS4 "$1")" -gt 0 ]; then
-            setfacl -m "u:$(id -un):rw::allow" "$1"
-        else
-            return 1
-        fi
-    else
-        return 1
-    fi
+            ;;
+    esac
 }
 
 function test_acl() {
