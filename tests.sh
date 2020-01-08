@@ -652,9 +652,6 @@ sudo_tests=(
     test_capable
     test_L_capable
 
-    test_xattr
-    test_L_xattr
-
     test_mount
     test_L_mount
     test_xdev
@@ -665,6 +662,18 @@ sudo_tests=(
     test_type_bind_mount
     test_xtype_bind_mount
 )
+
+if [ "$UNAME" = "Linux" ]; then
+    sudo_tests+=(
+        test_xattr
+        test_L_xattr
+    )
+else
+    bsd_tests+=(
+        test_xattr
+        test_L_xattr
+    )
+fi
 
 if [ "$DEFAULT" ]; then
     POSIX=yes
@@ -2462,6 +2471,25 @@ function test_L_capable() {
     bfs_diff -L scratch -capable
 }
 
+function set_xattr() {
+    case "$UNAME" in
+        Darwin)
+            xattr -w bfs_test true "$1"
+            xattr -s -w bfs_test true "$2"
+            ;;
+        FreeBSD)
+            setextattr user bfs_test true "$1"
+            setextattr -h user bfs_test true "$2"
+            ;;
+        *)
+            # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
+            # namespace, which is writable by root and readable by others
+            sudo setfattr -n security.bfs_test "$1"
+            sudo setfattr -h -n security.bfs_test "$2"
+            ;;
+    esac
+}
+
 function test_xattr() {
     rm -rf scratch/*
 
@@ -2472,16 +2500,7 @@ function test_xattr() {
     touch scratch/{normal,xattr}
     ln -s xattr scratch/link
     ln -s normal scratch/xattr_link
-
-    if [ "$(uname)" = "Darwin" ]; then
-        xattr -w bfs_test true scratch/xattr
-        xattr -s -w bfs_test true scratch/xattr_link
-    else
-        # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
-        # namespace, which is writable by root and readable by others
-        sudo setfattr -n security.bfs_test scratch/xattr
-        sudo setfattr -h -n security.bfs_test scratch/xattr_link
-    fi
+    set_xattr scratch/xattr scratch/xattr_link
 
     bfs_diff scratch -xattr
 }
@@ -2496,16 +2515,7 @@ function test_L_xattr() {
     touch scratch/{normal,xattr}
     ln -s xattr scratch/link
     ln -s normal scratch/xattr_link
-
-    if [ "$(uname)" = "Darwin" ]; then
-        xattr -w bfs_test true scratch/xattr
-        xattr -s -w bfs_test true scratch/xattr_link
-    else
-        # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
-        # namespace, which is writable by root and readable by others
-        sudo setfattr -n security.bfs_test scratch/xattr
-        sudo setfattr -h -n security.bfs_test scratch/xattr_link
-    fi
+    set_xattr scratch/xattr scratch/xattr_link
 
     bfs_diff -L scratch -xattr
 }

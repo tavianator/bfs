@@ -30,7 +30,9 @@
 #	include <sys/capability.h>
 #endif
 
-#if BFS_CAN_CHECK_XATTRS
+#if BFS_HAS_SYS_EXTATTR
+#	include <sys/extattr.h>
+#elif BFS_HAS_SYS_XATTR
 #	include <sys/xattr.h>
 #endif
 
@@ -281,7 +283,15 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	const char *path = fake_at(ftwbuf);
 	ssize_t len;
 
-#if __APPLE__
+#if BFS_HAS_SYS_EXTATTR
+	ssize_t (*extattr_list)(const char *, int, void*, size_t) =
+		ftwbuf->typeflag == BFTW_LNK ? extattr_list_link : extattr_list_file;
+
+	len = extattr_list(path, EXTATTR_NAMESPACE_SYSTEM, NULL, 0);
+	if (len <= 0) {
+		len = extattr_list(path, EXTATTR_NAMESPACE_USER, NULL, 0);
+	}
+#elif __APPLE__
 	int options = ftwbuf->typeflag == BFTW_LNK ? XATTR_NOFOLLOW : 0;
 	len = listxattr(path, NULL, 0, options);
 #else

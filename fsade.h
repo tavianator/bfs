@@ -35,7 +35,7 @@
 #	endif
 #endif
 
-#define BFS_CAN_CHECK_XATTRS BFS_HAS_SYS_XATTR
+#define BFS_CAN_CHECK_XATTRS (BFS_HAS_SYS_EXTATTR || BFS_HAS_SYS_XATTR)
 
 /**
  * Check if a file has a non-trvial Access Control List.
