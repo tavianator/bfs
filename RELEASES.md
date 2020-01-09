@@ -2,6 +2,18 @@
 ===
 
 
+1.5.2
+-----
+
+**January 9, 2020**
+
+- Fixed the build on NetBSD
+- Added support for NFSv4 ACLs on FreeBSD
+- Added a `+` after the file mode for files with ACLs in `-ls`
+- Supported more file types (whiteouts, doors) in symbolic modes for `-ls`/`-printf %M`
+- Implemented `-xattr` on FreeBSD
+
+
 1.5.1
 -----
 
