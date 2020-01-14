@@ -663,17 +663,20 @@ sudo_tests=(
     test_xtype_bind_mount
 )
 
-if [ "$UNAME" = "Linux" ]; then
-    sudo_tests+=(
-        test_xattr
-        test_L_xattr
-    )
-else
-    bsd_tests+=(
-        test_xattr
-        test_L_xattr
-    )
-fi
+case "$UNAME" in
+    Darwin|FreeBSD)
+        bsd_tests+=(
+            test_xattr
+            test_L_xattr
+        )
+        ;;
+    *)
+        sudo_tests+=(
+            test_xattr
+            test_L_xattr
+        )
+        ;;
+esac
 
 if [ "$DEFAULT" ]; then
     POSIX=yes
