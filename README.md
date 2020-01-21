@@ -138,6 +138,9 @@ For example:
 <strong>Void Linux</strong>
 # xbps-install -S bfs
 
+<strong>FreeBSD</strong>
+# pkg install bfs
+
 <strong>MacPorts</strong>
 # port install bfs
 
