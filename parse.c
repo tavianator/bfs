@@ -429,6 +429,11 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 	bfs_stat_id(&sb, &id);
 
 	struct trie_leaf *leaf = trie_insert_mem(&cmdline->open_files, id, sizeof(id));
+	if (!leaf) {
+		perror("trie_insert_mem()");
+		goto out_close;
+	}
+
 	if (leaf->value) {
 		struct open_file *ofile = leaf->value;
 		expr->cfile = ofile->cfile;
