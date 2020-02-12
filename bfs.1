@@ -311,6 +311,23 @@ more recently than
 was modified.
 .RE
 .PP
+\fB\-asince \fITIME\fR
+.br
+\fB\-Bsince \fITIME\fR
+.br
+\fB\-csince \fITIME\fR
+.br
+\fB\-msince \fITIME\fR
+.RS
+Find files
+.BR a ccessed/ B irthed/ c hanged/ m odified
+more recently than the ISO 8601-style timestamp
+.IR TIME .
+See
+.BI \-newer XY
+for examples of the timestamp format.
+.RE
+.PP
 \fB\-atime\fR [\fI\-+\fR]\fIN\fR
 .br
 \fB\-Btime\fR [\fI\-+\fR]\fIN\fR
@@ -425,6 +442,22 @@ and
 can be any of
 .RI [ aBcm ]
 .RI ( a ccess/ B irth/ c hange/ m odification).
+.I Y
+may also be
+.I t
+to parse
+.I REFERENCE
+as an ISO 8601-style timestamp.  For example:
+.PP
+.RS
+1991-12-14
+.br
+1991-12-14T03:00
+.br
+1991-12-14T03:00-07:00
+.br
+1991-12-14T10:00Z
+.RE
 .PP
 .B \-nogroup
 .br
@@ -451,6 +484,13 @@ Find files whose entire path matches the regular expression
 \fB\-samefile \fIFILE\fR
 Find hard links to
 .IR FILE .
+.TP
+\fB\-since \fITIME\fR
+Find files modified since the ISO 8601-style timestamp
+.IR TIME .
+See
+.BI \-newer XY
+for examples of the timestamp format.
 .TP
 \fB\-size\fR [\fI\-+\fR]\fIN\fR[\fIcwbkMGTP\fR]
 Find files with the given size, in 1-byte

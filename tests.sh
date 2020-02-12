@@ -280,6 +280,9 @@ bsd_tests=(
     test_acl
     test_L_acl
 
+    test_anewer
+    test_asince
+
     test_delete
 
     test_depth_maxdepth_1
@@ -330,6 +333,8 @@ bsd_tests=(
 
     test_mnewer
     test_H_mnewer
+
+    test_msince
 
     test_name_slash
     test_name_slashes
@@ -1151,6 +1156,10 @@ function test_anewer() {
     bfs_diff times -anewer times/a
 }
 
+function test_asince() {
+    bfs_diff times -asince 1991-12-14T00:01
+}
+
 function test_links() {
     bfs_diff links -type f -links 2
 }
@@ -1775,6 +1784,10 @@ function test_mnewer() {
 
 function test_H_mnewer() {
     bfs_diff -H times -mnewer times/l
+}
+
+function test_msince() {
+    bfs_diff times -msince 1991-12-14T00:01
 }
 
 function test_size_T() {

@@ -1636,7 +1636,7 @@ static enum bfs_stat_field parse_newerxy_field(char c) {
 }
 
 /** Parse some digits from an explicit reference time. */
-static int parse_reftime_part(const struct parser_state *state, const char **str, size_t n, int *result, int delta) {
+static int parse_timestamp_part(const struct parser_state *state, const char **str, size_t n, int *result, int delta) {
 	char buf[n + 1];
 	for (size_t i = 0; i < n; ++i, ++*str) {
 		char c = **str;
@@ -1655,8 +1655,8 @@ static int parse_reftime_part(const struct parser_state *state, const char **str
 	return 0;
 }
 
-/** Parse an explicit reference time. */
-static int parse_reftime(const struct parser_state *state, struct expr *expr) {
+/** Parse an explicit reference timestamp for -newerXt and -*since. */
+static int parse_timestamp(const struct parser_state *state, struct expr *expr) {
 	const char *str = expr->sdata;
 	struct tm tm = {
 		.tm_isdst = -1,
@@ -1668,7 +1668,7 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 	bool local = true;
 
 	// YYYY
-	if (parse_reftime_part(state, &str, 4, &tm.tm_year, -1900) != 0) {
+	if (parse_timestamp_part(state, &str, 4, &tm.tm_year, -1900) != 0) {
 		goto invalid;
 	}
 
@@ -1676,7 +1676,7 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 	if (*str == '-') {
 		++str;
 	}
-	if (parse_reftime_part(state, &str, 2, &tm.tm_mon, -1) != 0) {
+	if (parse_timestamp_part(state, &str, 2, &tm.tm_mon, -1) != 0) {
 		goto invalid;
 	}
 
@@ -1684,7 +1684,7 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 	if (*str == '-') {
 		++str;
 	}
-	if (parse_reftime_part(state, &str, 2, &tm.tm_mday, 0) != 0) {
+	if (parse_timestamp_part(state, &str, 2, &tm.tm_mday, 0) != 0) {
 		goto invalid;
 	}
 
@@ -1694,28 +1694,28 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 		++str;
 	}
 
-	// HH
-	if (parse_reftime_part(state, &str, 2, &tm.tm_hour, 0) != 0) {
+	// hh
+	if (parse_timestamp_part(state, &str, 2, &tm.tm_hour, 0) != 0) {
 		goto invalid;
 	}
 
-	// MM
+	// mm
 	if (!*str) {
 		goto end;
 	} else if (*str == ':') {
 		++str;
 	}
-	if (parse_reftime_part(state, &str, 2, &tm.tm_min, 0) != 0) {
+	if (parse_timestamp_part(state, &str, 2, &tm.tm_min, 0) != 0) {
 		goto invalid;
 	}
 
-	// SS
+	// ss
 	if (!*str) {
 		goto end;
 	} else if (*str == ':') {
 		++str;
 	}
-	if (parse_reftime_part(state, &str, 2, &tm.tm_sec, 0) != 0) {
+	if (parse_timestamp_part(state, &str, 2, &tm.tm_sec, 0) != 0) {
 		goto invalid;
 	}
 
@@ -1729,18 +1729,18 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 		tz_negative = *str == '-';
 		++str;
 
-		// HH
-		if (parse_reftime_part(state, &str, 2, &tz_hour, 0) != 0) {
+		// hh
+		if (parse_timestamp_part(state, &str, 2, &tz_hour, 0) != 0) {
 			goto invalid;
 		}
 
-		// MM
+		// mm
 		if (!*str) {
 			goto end;
 		} else if (*str == ':') {
 			++str;
 		}
-		if (parse_reftime_part(state, &str, 2, &tz_min, 0) != 0) {
+		if (parse_timestamp_part(state, &str, 2, &tz_min, 0) != 0) {
 			goto invalid;
 		}
 	} else {
@@ -1776,8 +1776,8 @@ end:
 	return 0;
 
 invalid:
-	parse_error(state, "%s %s: Invalid date/time.\n\n", expr->argv[0], expr->argv[1]);
-	fprintf(stderr, "Supported date/time formats are ISO 8601-like, e.g.\n\n");
+	parse_error(state, "%s %s: Invalid timestamp.\n\n", expr->argv[0], expr->argv[1]);
+	fprintf(stderr, "Supported timestamp formats are ISO 8601-like, e.g.\n\n");
 
 	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
 		perror("xlocaltime()");
@@ -1833,7 +1833,7 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 	}
 
 	if (arg[7] == 't') {
-		if (parse_reftime(state, expr) != 0) {
+		if (parse_timestamp(state, expr) != 0) {
 			goto fail;
 		}
 	} else {
@@ -2399,6 +2399,28 @@ fail_list_strategies:
 }
 
 /**
+ * Parse -[aBc]?since.
+ */
+static struct expr *parse_since(struct parser_state *state, int field, int arg2) {
+	struct expr *expr = parse_unary_test(state, eval_newer);
+	if (!expr) {
+		return NULL;
+	}
+
+	if (parse_timestamp(state, expr) != 0) {
+		goto fail;
+	}
+
+	expr->cost = STAT_COST;
+	expr->stat_field = field;
+	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
+}
+
+/**
  * Parse -size N[cwbkMGTP]?.
  */
 static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
@@ -2817,6 +2839,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}newer${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified more recently than ${bld}FILE${rs} was\n"
 	               "      modified\n");
+	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}since${rs} ${bld}TIME${rs}\n");
+	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified more recently than ${bld}TIME${rs}\n");
 	cfprintf(cout, "  ${blu}-${rs}[${blu}aBcm${rs}]${blu}time${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files ${blu}a${rs}ccessed/${blu}B${rs}irthed/${blu}c${rs}hanged/${blu}m${rs}odified ${bld}N${rs} days ago\n");
 #if BFS_CAN_CHECK_CAPABILITIES
@@ -2867,7 +2891,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-newer${rs}${bld}XY${rs} ${bld}REFERENCE${rs}\n");
 	cfprintf(cout, "      Find files whose ${bld}X${rs} time is newer than the ${bld}Y${rs} time of"
 	               " ${bld}REFERENCE${rs}.  ${bld}X${rs} and ${bld}Y${rs}\n");
-	cfprintf(cout, "      can be any of [${bld}aBcm${rs}].\n");
+	cfprintf(cout, "      can be any of [${bld}aBcm${rs}].  ${bld}Y${rs} may also be ${bld}t${rs} to parse ${bld}REFERENCE${rs} an explicit\n");
+	cfprintf(cout, "      timestamp.\n");
 	cfprintf(cout, "  ${blu}-nogroup${rs}\n");
 	cfprintf(cout, "  ${blu}-nouser${rs}\n");
 	cfprintf(cout, "      Find files owned by nonexistent groups/users\n");
@@ -2880,6 +2905,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find files whose entire path matches the regular expression ${bld}REGEX${rs}\n");
 	cfprintf(cout, "  ${blu}-samefile${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "      Find hard links to ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-since${rs} ${bld}TIME${rs}\n");
+	cfprintf(cout, "      Find files modified since ${bld}TIME${rs}\n");
 	cfprintf(cout, "  ${blu}-size${rs} ${bld}[-+]N[cwbkMGTP]${rs}\n");
 	cfprintf(cout, "      Find files with the given size, in 1-byte ${bld}c${rs}haracters, 2-byte ${bld}w${rs}ords,\n");
 	cfprintf(cout, "      512-byte ${bld}b${rs}locks (default), or ${bld}k${rs}iB/${bld}M${rs}iB/${bld}G${rs}iB/${bld}T${rs}iB/${bld}P${rs}iB\n");
@@ -2990,6 +3017,7 @@ static const struct table_entry parse_table[] = {
 	{"--version", parse_version},
 	{"-Bmin", parse_time, BFS_STAT_BTIME, MINUTES},
 	{"-Bnewer", parse_newer, BFS_STAT_BTIME},
+	{"-Bsince", parse_since, BFS_STAT_BTIME},
 	{"-Btime", parse_time, BFS_STAT_BTIME, DAYS},
 	{"-D", parse_debug},
 	{"-E", parse_regex_extended},
@@ -3004,11 +3032,13 @@ static const struct table_entry parse_table[] = {
 	{"-amin", parse_time, BFS_STAT_ATIME, MINUTES},
 	{"-and"},
 	{"-anewer", parse_newer, BFS_STAT_ATIME},
+	{"-asince", parse_since, BFS_STAT_ATIME},
 	{"-atime", parse_time, BFS_STAT_ATIME, DAYS},
 	{"-capable", parse_capable},
 	{"-cmin", parse_time, BFS_STAT_CTIME, MINUTES},
 	{"-cnewer", parse_newer, BFS_STAT_CTIME},
 	{"-color", parse_color, true},
+	{"-csince", parse_since, BFS_STAT_CTIME},
 	{"-ctime", parse_time, BFS_STAT_CTIME, DAYS},
 	{"-d", parse_depth},
 	{"-daystart", parse_daystart},
@@ -3046,6 +3076,7 @@ static const struct table_entry parse_table[] = {
 	{"-mmin", parse_time, BFS_STAT_MTIME, MINUTES},
 	{"-mnewer", parse_newer, BFS_STAT_MTIME},
 	{"-mount", parse_mount},
+	{"-msince", parse_since, BFS_STAT_MTIME},
 	{"-mtime", parse_time, BFS_STAT_MTIME, DAYS},
 	{"-name", parse_name, false},
 	{"-newer", parse_newer, BFS_STAT_MTIME},
@@ -3075,6 +3106,7 @@ static const struct table_entry parse_table[] = {
 	{"-regextype", parse_regextype},
 	{"-rm", parse_delete},
 	{"-samefile", parse_samefile},
+	{"-since", parse_since, BFS_STAT_MTIME},
 	{"-size", parse_size},
 	{"-sparse", parse_sparse},
 	{"-true", parse_const, true},
