@@ -174,6 +174,60 @@ int xlocaltime(const time_t *timep, struct tm *result) {
 	}
 }
 
+int xgmtime(const time_t *timep, struct tm *result) {
+	// Should be called before gmtime_r() according to POSIX.1-2004
+	tzset();
+
+	if (gmtime_r(timep, result)) {
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+time_t xtimegm(struct tm *tm) {
+	// Some man pages for timegm() recommend this as a portable approach
+	time_t ret = -1;
+	int error;
+
+	char *old_tz = getenv("TZ");
+	if (old_tz) {
+		old_tz = strdup(old_tz);
+		if (!old_tz) {
+			error = errno;
+			goto fail;
+		}
+	}
+
+	if (setenv("TZ", "UTC0", true) != 0) {
+		error = errno;
+		goto fail;
+	}
+
+	ret = mktime(tm);
+	error = errno;
+
+	if (old_tz) {
+		if (setenv("TZ", old_tz, true) != 0) {
+			ret = -1;
+			error = errno;
+			goto fail;
+		}
+	} else {
+		if (unsetenv("TZ") != 0) {
+			ret = -1;
+			error = errno;
+			goto fail;
+		}
+	}
+
+	tzset();
+fail:
+	free(old_tz);
+	errno = error;
+	return ret;
+}
+
 void format_mode(mode_t mode, char str[11]) {
 	strcpy(str, "----------");
 

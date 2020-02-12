@@ -337,6 +337,7 @@ bsd_tests=(
     test_H_newer
 
     test_newerma
+    test_newermt
 
     test_nogroup
     test_nogroup_ulimit
@@ -485,6 +486,7 @@ gnu_tests=(
     test_H_newer
 
     test_newerma
+    test_newermt
 
     test_nogroup
     test_nogroup_ulimit
@@ -1347,6 +1349,10 @@ function test_daystart_twice() {
 
 function test_newerma() {
     bfs_diff times -newerma times/a
+}
+
+function test_newermt() {
+    bfs_diff times -newermt 1991-12-14T00:01
 }
 
 function test_size() {

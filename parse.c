@@ -619,6 +619,10 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 	case IF_LONG_LONG:
 		*(long long *)result = value;
 		break;
+
+	default:
+		assert(false);
+		break;
 	}
 
 	return endptr;
@@ -1615,7 +1619,7 @@ static struct expr *parse_lname(struct parser_state *state, int casefold, int ar
 	return parse_fnmatch(state, expr, casefold);
 }
 
-/** Get the bfs_stat_field for X/Y in -newerXY */
+/** Get the bfs_stat_field for X/Y in -newerXY. */
 static enum bfs_stat_field parse_newerxy_field(char c) {
 	switch (c) {
 	case 'a':
@@ -1629,6 +1633,175 @@ static enum bfs_stat_field parse_newerxy_field(char c) {
 	default:
 		return 0;
 	}
+}
+
+/** Parse some digits from an explicit reference time. */
+static int parse_reftime_part(const struct parser_state *state, const char **str, size_t n, int *result, int delta) {
+	char buf[n + 1];
+	for (size_t i = 0; i < n; ++i, ++*str) {
+		char c = **str;
+		if (c < '0' || c > '9') {
+			return -1;
+		}
+		buf[i] = c;
+	}
+	buf[n] = '\0';
+
+	if (!parse_int(state, buf, result, IF_INT | IF_QUIET)) {
+		return -1;
+	}
+
+	*result += delta;
+	return 0;
+}
+
+/** Parse an explicit reference time. */
+static int parse_reftime(const struct parser_state *state, struct expr *expr) {
+	const char *str = expr->sdata;
+	struct tm tm = {0};
+
+	int tz_hour = 0;
+	int tz_min = 0;
+	bool tz_negative = false;
+	bool local = true;
+
+	// YYYY
+	if (parse_reftime_part(state, &str, 4, &tm.tm_year, -1900) != 0) {
+		goto invalid;
+	}
+
+	// MM
+	if (*str == '-') {
+		++str;
+	}
+	if (parse_reftime_part(state, &str, 2, &tm.tm_mon, -1) != 0) {
+		goto invalid;
+	}
+
+	// DD
+	if (*str == '-') {
+		++str;
+	}
+	if (parse_reftime_part(state, &str, 2, &tm.tm_mday, 0) != 0) {
+		goto invalid;
+	}
+
+	if (!*str) {
+		goto end;
+	} else if (*str == 'T') {
+		++str;
+	}
+
+	// HH
+	if (parse_reftime_part(state, &str, 2, &tm.tm_hour, 0) != 0) {
+		goto invalid;
+	}
+
+	// MM
+	if (!*str) {
+		goto end;
+	} else if (*str == ':') {
+		++str;
+	}
+	if (parse_reftime_part(state, &str, 2, &tm.tm_min, 0) != 0) {
+		goto invalid;
+	}
+
+	// SS
+	if (!*str) {
+		goto end;
+	} else if (*str == ':') {
+		++str;
+	}
+	if (parse_reftime_part(state, &str, 2, &tm.tm_sec, 0) != 0) {
+		goto invalid;
+	}
+
+	if (!*str) {
+		goto end;
+	} else if (*str == 'Z') {
+		local = false;
+		++str;
+	} else if (*str == '+' || *str == '-') {
+		local = false;
+		tz_negative = *str == '-';
+		++str;
+
+		// HH
+		if (parse_reftime_part(state, &str, 2, &tz_hour, 0) != 0) {
+			goto invalid;
+		}
+
+		// MM
+		if (!*str) {
+			goto end;
+		} else if (*str == ':') {
+			++str;
+		}
+		if (parse_reftime_part(state, &str, 2, &tz_min, 0) != 0) {
+			goto invalid;
+		}
+	} else {
+		goto invalid;
+	}
+
+	if (*str) {
+		goto invalid;
+	}
+
+end:
+	if (local) {
+		expr->reftime.tv_sec = mktime(&tm);
+		if (expr->reftime.tv_sec == -1) {
+			perror("mktime()");
+			return -1;
+		}
+	} else {
+		expr->reftime.tv_sec = xtimegm(&tm);
+		if (expr->reftime.tv_sec == -1) {
+			perror("xtimegm()");
+			return -1;
+		}
+
+		int offset = 60*tz_hour + tz_min;
+		if (tz_negative) {
+			offset = -offset;
+		}
+		expr->reftime.tv_sec += offset;
+	}
+
+	expr->reftime.tv_nsec = 0;
+	return 0;
+
+invalid:
+	parse_error(state, "%s %s: Invalid date/time.\n\n", expr->argv[0], expr->argv[1]);
+	fprintf(stderr, "Supported date/time formats are ISO 8601-like, e.g.\n\n");
+
+	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
+		perror("xlocaltime()");
+		return -1;
+	}
+
+	int year = tm.tm_year + 1900;
+	int month = tm.tm_mon + 1;
+	fprintf(stderr, "  - %04d-%02d-%02d\n", year, month, tm.tm_mday);
+	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	tz_hour = -timezone/3600;
+	tz_min = (labs(timezone)/60)%60;
+	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d%+03d:%02d\n",
+	        year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
+
+	if (xgmtime(&state->now.tv_sec, &tm) != 0) {
+		perror("xgmtime()");
+		return -1;
+	}
+
+	year = tm.tm_year + 1900;
+	month = tm.tm_mon + 1;
+	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02dZ\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	return -1;
 }
 
 /**
@@ -1653,8 +1826,9 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 	}
 
 	if (arg[7] == 't') {
-		parse_error(state, "%s: Explicit reference times ('t') are not supported.\n", arg);
-		goto fail;
+		if (parse_reftime(state, expr) != 0) {
+			goto fail;
+		}
 	} else {
 		enum bfs_stat_field field = parse_newerxy_field(arg[7]);
 		if (!field) {

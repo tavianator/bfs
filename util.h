@@ -171,6 +171,27 @@ char *xregerror(int err, const regex_t *regex);
 int xlocaltime(const time_t *timep, struct tm *result);
 
 /**
+ * gmtime_r() wrapper that calls tzset() first.
+ *
+ * @param timep
+ *         The time_t to convert.
+ * @param result
+ *         Buffer to hold the result.
+ * @return 0 on success, -1 on failure.
+ */
+int xgmtime(const time_t *timep, struct tm *result);
+
+/**
+ * A portable timegm(), the inverse of gmtime().
+ *
+ * @param tm
+ *         The struct tm to convert.
+ * @return
+ *         The converted time on success, or -1 on failure.
+ */
+time_t xtimegm(struct tm *tm);
+
+/**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
  * @param mode
