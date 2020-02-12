@@ -1658,7 +1658,9 @@ static int parse_reftime_part(const struct parser_state *state, const char **str
 /** Parse an explicit reference time. */
 static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 	const char *str = expr->sdata;
-	struct tm tm = {0};
+	struct tm tm = {
+		.tm_isdst = -1,
+	};
 
 	int tz_hour = 0;
 	int tz_min = 0;
