@@ -1787,8 +1787,13 @@ invalid:
 	fprintf(stderr, "  - %04d-%02d-%02d\n", year, month, tm.tm_mday);
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
+#if __FreeBSD__
+	tz_hour = tm.tm_gmtoff/3600;
+	tz_min = (labs(tm.tm_gmtoff)/60)%60;
+#else
 	tz_hour = -timezone/3600;
 	tz_min = (labs(timezone)/60)%60;
+#endif
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d%+03d:%02d\n",
 	        year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
 
