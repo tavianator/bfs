@@ -1129,9 +1129,9 @@ static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg
 	tm.tm_min = 0;
 	tm.tm_sec = 0;
 
-	time_t time = mktime(&tm);
-	if (time == -1) {
-		perror("mktime()");
+	time_t time;
+	if (xmktime(&tm, &time) != 0) {
+		perror("xmktime()");
 		return NULL;
 	}
 
@@ -1753,23 +1753,20 @@ static int parse_timestamp(const struct parser_state *state, struct expr *expr) 
 
 end:
 	if (local) {
-		expr->reftime.tv_sec = mktime(&tm);
-		if (expr->reftime.tv_sec == -1) {
-			perror("mktime()");
-			return -1;
+		if (xmktime(&tm, &expr->reftime.tv_sec) != 0) {
+			goto error;
 		}
 	} else {
-		expr->reftime.tv_sec = xtimegm(&tm);
-		if (expr->reftime.tv_sec == -1) {
-			perror("xtimegm()");
-			return -1;
+		if (xtimegm(&tm, &expr->reftime.tv_sec) != 0) {
+			goto error;
 		}
 
 		int offset = 60*tz_hour + tz_min;
 		if (tz_negative) {
-			offset = -offset;
+			expr->reftime.tv_sec -= offset;
+		} else {
+			expr->reftime.tv_sec += offset;
 		}
-		expr->reftime.tv_sec += offset;
 	}
 
 	expr->reftime.tv_nsec = 0;
@@ -1808,6 +1805,10 @@ invalid:
 	month = tm.tm_mon + 1;
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02dZ\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
+	return -1;
+
+error:
+	parse_error(state, "%s %s: Error parsing timestamp: %m.\n", expr->argv[0], expr->argv[1]);
 	return -1;
 }
 

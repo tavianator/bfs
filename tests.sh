@@ -343,6 +343,7 @@ bsd_tests=(
 
     test_newerma
     test_newermt
+    test_newermt_epoch_minus_one
 
     test_nogroup
     test_nogroup_ulimit
@@ -492,6 +493,7 @@ gnu_tests=(
 
     test_newerma
     test_newermt
+    test_newermt_epoch_minus_one
 
     test_nogroup
     test_nogroup_ulimit
@@ -1362,6 +1364,10 @@ function test_newerma() {
 
 function test_newermt() {
     bfs_diff times -newermt 1991-12-14T00:01
+}
+
+function test_newermt_epoch_minus_one() {
+    bfs_diff times -newermt 1969-12-31T23:59:59Z
 }
 
 function test_size() {

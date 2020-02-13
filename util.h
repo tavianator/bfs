@@ -182,14 +182,28 @@ int xlocaltime(const time_t *timep, struct tm *result);
 int xgmtime(const time_t *timep, struct tm *result);
 
 /**
+ * mktime() wrapper that reports errors more reliably.
+ *
+ * @param[in,out] tm
+ *         The struct tm to convert.
+ * @param[out] timep
+ *         Where to store the result.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int xmktime(struct tm *tm, time_t *timep);
+
+/**
  * A portable timegm(), the inverse of gmtime().
  *
- * @param tm
+ * @param[in,out] tm
  *         The struct tm to convert.
+ * @param[out] timep
+ *         Where to store the result.
  * @return
- *         The converted time on success, or -1 on failure.
+ *         0 on success, -1 on failure.
  */
-time_t xtimegm(struct tm *tm);
+int xtimegm(struct tm *tm, time_t *timep);
 
 /**
  * Format a mode like ls -l (e.g. -rw-r--r--).

@@ -185,9 +185,30 @@ int xgmtime(const time_t *timep, struct tm *result) {
 	}
 }
 
-time_t xtimegm(struct tm *tm) {
+int xmktime(struct tm *tm, time_t *timep) {
+	*timep = mktime(tm);
+
+	if (*timep == -1) {
+		int error = errno;
+
+		struct tm tmp;
+		if (xlocaltime(timep, &tmp) != 0) {
+			return -1;
+		}
+
+		if (tm->tm_year != tmp.tm_year || tm->tm_yday != tmp.tm_yday
+		    || tm->tm_hour != tmp.tm_hour || tm->tm_min != tmp.tm_min || tm->tm_sec != tmp.tm_sec) {
+			errno = error;
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+int xtimegm(struct tm *tm, time_t *timep) {
 	// Some man pages for timegm() recommend this as a portable approach
-	time_t ret = -1;
+	int ret = -1;
 	int error;
 
 	char *old_tz = getenv("TZ");
@@ -204,7 +225,7 @@ time_t xtimegm(struct tm *tm) {
 		goto fail;
 	}
 
-	ret = mktime(tm);
+	ret = xmktime(tm, timep);
 	error = errno;
 
 	if (old_tz) {
