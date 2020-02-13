@@ -16,9 +16,9 @@
 
 #include "time.h"
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 
 int xlocaltime(const time_t *timep, struct tm *result) {
@@ -64,47 +64,114 @@ int xmktime(struct tm *tm, time_t *timep) {
 	return 0;
 }
 
-int xtimegm(struct tm *tm, time_t *timep) {
-	// Some man pages for timegm() recommend this as a portable approach
-	int ret = -1;
-	int error;
-
-	char *old_tz = getenv("TZ");
-	if (old_tz) {
-		old_tz = strdup(old_tz);
-		if (!old_tz) {
-			error = errno;
-			goto fail;
-		}
-	}
-
-	if (setenv("TZ", "UTC0", true) != 0) {
-		error = errno;
-		goto fail;
-	}
-
-	ret = xmktime(tm, timep);
-	error = errno;
-
-	if (old_tz) {
-		if (setenv("TZ", old_tz, true) != 0) {
-			ret = -1;
-			error = errno;
-			goto fail;
+static int safe_add(int *value, int delta) {
+	if (*value >= 0) {
+		if (delta > INT_MAX - *value) {
+			return -1;
 		}
 	} else {
-		if (unsetenv("TZ") != 0) {
-			ret = -1;
-			error = errno;
-			goto fail;
+		if (delta < INT_MIN - *value) {
+			return -1;
 		}
 	}
 
-	tzset();
-fail:
-	free(old_tz);
-	errno = error;
+	*value += delta;
+	return 0;
+}
+
+static int floor_div(int n, int d) {
+	int a = n < 0;
+	return (n + a)/d - a;
+}
+
+static int wrap(int *value, int max, int *next) {
+	int carry = floor_div(*value, max);
+	*value -= carry * max;
+	return safe_add(next, carry);
+}
+
+static int month_length(int year, int month) {
+	static const int month_lengths[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+	int ret = month_lengths[month];
+	if (month == 1 && year%4 == 0 && (year%100 != 0 || (year + 300)%400 == 0)) {
+		++ret;
+	}
 	return ret;
+}
+
+int xtimegm(struct tm *tm, time_t *timep) {
+	tm->tm_isdst = 0;
+
+	if (wrap(&tm->tm_sec, 60, &tm->tm_min) != 0) {
+		goto overflow;
+	}
+	if (wrap(&tm->tm_min, 60, &tm->tm_hour) != 0) {
+		goto overflow;
+	}
+	if (wrap(&tm->tm_hour, 24, &tm->tm_mday) != 0) {
+		goto overflow;
+	}
+
+	// In order to wrap the days of the month, we first need to know what
+	// month it is
+	if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+		goto overflow;
+	}
+
+	if (tm->tm_mday < 1) {
+		do {
+			--tm->tm_mon;
+			if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+				goto overflow;
+			}
+
+			tm->tm_mday += month_length(tm->tm_year, tm->tm_mon);
+		} while (tm->tm_mday < 1);
+	} else {
+		while (true) {
+			int days = month_length(tm->tm_year, tm->tm_mon);
+			if (tm->tm_mday <= days) {
+				break;
+			}
+
+			tm->tm_mday -= days;
+			++tm->tm_mon;
+			if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+				goto overflow;
+			}
+		}
+	}
+
+	tm->tm_yday = 0;
+	for (int i = 0; i < tm->tm_mon; ++i) {
+		tm->tm_yday += month_length(tm->tm_year, i);
+	}
+	tm->tm_yday += tm->tm_mday - 1;
+
+	int leap_days;
+	// Compute floor((year - 69)/4) - floor((year - 1)/100) + floor((year + 299)/400) without overflows
+	if (tm->tm_year >= 0) {
+		leap_days = floor_div(tm->tm_year - 69, 4) - floor_div(tm->tm_year - 1, 100) + floor_div(tm->tm_year - 101, 400) + 1;
+	} else {
+		leap_days = floor_div(tm->tm_year + 3, 4) - floor_div(tm->tm_year + 99, 100) + floor_div(tm->tm_year + 299, 400) - 17;
+	}
+
+	long long epoch_days = 365LL*(tm->tm_year - 70) + leap_days + tm->tm_yday;
+	tm->tm_wday = (epoch_days + 4)%7;
+	if (tm->tm_wday < 0) {
+		tm->tm_wday += 7;
+	}
+
+	long long epoch_time = tm->tm_sec + 60*(tm->tm_min + 60*(tm->tm_hour + 24*epoch_days));
+	*timep = (time_t)epoch_time;
+	if ((long long)*timep != epoch_time) {
+		goto overflow;
+	}
+	return 0;
+
+overflow:
+	errno = EOVERFLOW;
+	return -1;
 }
 
 /** Parse some digits from a timestamp. */
