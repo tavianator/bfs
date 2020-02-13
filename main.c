@@ -42,6 +42,7 @@
  *     - mtab.[ch]     (parses the system's mount table)
  *     - spawn.[ch]    (spawns processes)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
+ *     - time.[ch]     (date/time handling utilities)
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
  *     - util.[ch]     (everything else)

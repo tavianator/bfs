@@ -30,6 +30,7 @@
 #include "mtab.h"
 #include "printf.h"
 #include "stat.h"
+#include "time.h"
 #include "trie.h"
 #include "util.h"
 #include <assert.h>

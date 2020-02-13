@@ -89,6 +89,7 @@ bfs: \
     printf.o \
     spawn.o \
     stat.o \
+    time.o \
     trie.o \
     typo.o \
     util.o

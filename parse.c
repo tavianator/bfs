@@ -34,6 +34,7 @@
 #include "printf.h"
 #include "spawn.h"
 #include "stat.h"
+#include "time.h"
 #include "typo.h"
 #include "util.h"
 #include <assert.h>
@@ -1635,147 +1636,19 @@ static enum bfs_stat_field parse_newerxy_field(char c) {
 	}
 }
 
-/** Parse some digits from an explicit reference time. */
-static int parse_timestamp_part(const struct parser_state *state, const char **str, size_t n, int *result, int delta) {
-	char buf[n + 1];
-	for (size_t i = 0; i < n; ++i, ++*str) {
-		char c = **str;
-		if (c < '0' || c > '9') {
-			return -1;
-		}
-		buf[i] = c;
-	}
-	buf[n] = '\0';
-
-	if (!parse_int(state, buf, result, IF_INT | IF_QUIET)) {
+/** Parse an explicit reference timestamp for -newerXt and -*since. */
+static int parse_reftime(const struct parser_state *state, struct expr *expr) {
+	if (parse_timestamp(expr->sdata, &expr->reftime) == 0) {
+		return 0;
+	} else if (errno != EINVAL) {
+		parse_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
 		return -1;
 	}
 
-	*result += delta;
-	return 0;
-}
-
-/** Parse an explicit reference timestamp for -newerXt and -*since. */
-static int parse_timestamp(const struct parser_state *state, struct expr *expr) {
-	const char *str = expr->sdata;
-	struct tm tm = {
-		.tm_isdst = -1,
-	};
-
-	int tz_hour = 0;
-	int tz_min = 0;
-	bool tz_negative = false;
-	bool local = true;
-
-	// YYYY
-	if (parse_timestamp_part(state, &str, 4, &tm.tm_year, -1900) != 0) {
-		goto invalid;
-	}
-
-	// MM
-	if (*str == '-') {
-		++str;
-	}
-	if (parse_timestamp_part(state, &str, 2, &tm.tm_mon, -1) != 0) {
-		goto invalid;
-	}
-
-	// DD
-	if (*str == '-') {
-		++str;
-	}
-	if (parse_timestamp_part(state, &str, 2, &tm.tm_mday, 0) != 0) {
-		goto invalid;
-	}
-
-	if (!*str) {
-		goto end;
-	} else if (*str == 'T') {
-		++str;
-	}
-
-	// hh
-	if (parse_timestamp_part(state, &str, 2, &tm.tm_hour, 0) != 0) {
-		goto invalid;
-	}
-
-	// mm
-	if (!*str) {
-		goto end;
-	} else if (*str == ':') {
-		++str;
-	}
-	if (parse_timestamp_part(state, &str, 2, &tm.tm_min, 0) != 0) {
-		goto invalid;
-	}
-
-	// ss
-	if (!*str) {
-		goto end;
-	} else if (*str == ':') {
-		++str;
-	}
-	if (parse_timestamp_part(state, &str, 2, &tm.tm_sec, 0) != 0) {
-		goto invalid;
-	}
-
-	if (!*str) {
-		goto end;
-	} else if (*str == 'Z') {
-		local = false;
-		++str;
-	} else if (*str == '+' || *str == '-') {
-		local = false;
-		tz_negative = *str == '-';
-		++str;
-
-		// hh
-		if (parse_timestamp_part(state, &str, 2, &tz_hour, 0) != 0) {
-			goto invalid;
-		}
-
-		// mm
-		if (!*str) {
-			goto end;
-		} else if (*str == ':') {
-			++str;
-		}
-		if (parse_timestamp_part(state, &str, 2, &tz_min, 0) != 0) {
-			goto invalid;
-		}
-	} else {
-		goto invalid;
-	}
-
-	if (*str) {
-		goto invalid;
-	}
-
-end:
-	if (local) {
-		if (xmktime(&tm, &expr->reftime.tv_sec) != 0) {
-			goto error;
-		}
-	} else {
-		if (xtimegm(&tm, &expr->reftime.tv_sec) != 0) {
-			goto error;
-		}
-
-		int offset = 60*tz_hour + tz_min;
-		if (tz_negative) {
-			expr->reftime.tv_sec -= offset;
-		} else {
-			expr->reftime.tv_sec += offset;
-		}
-	}
-
-	expr->reftime.tv_nsec = 0;
-	return 0;
-
-invalid:
 	parse_error(state, "%s %s: Invalid timestamp.\n\n", expr->argv[0], expr->argv[1]);
 	fprintf(stderr, "Supported timestamp formats are ISO 8601-like, e.g.\n\n");
 
+	struct tm tm;
 	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
 		perror("xlocaltime()");
 		return -1;
@@ -1787,12 +1660,12 @@ invalid:
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 #if __FreeBSD__
-	tz_hour = tm.tm_gmtoff/3600;
-	tz_min = (labs(tm.tm_gmtoff)/60)%60;
+	int gmtoff = tm.tm_gmtoff;
 #else
-	tz_hour = -timezone/3600;
-	tz_min = (labs(timezone)/60)%60;
+	int gmtoff = -timezone;
 #endif
+	int tz_hour = gmtoff/3600;
+	int tz_min = (labs(gmtoff)/60)%60;
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d%+03d:%02d\n",
 	        year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
 
@@ -1805,10 +1678,6 @@ invalid:
 	month = tm.tm_mon + 1;
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02dZ\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-	return -1;
-
-error:
-	parse_error(state, "%s %s: Error parsing timestamp: %m.\n", expr->argv[0], expr->argv[1]);
 	return -1;
 }
 
@@ -1834,7 +1703,7 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 	}
 
 	if (arg[7] == 't') {
-		if (parse_timestamp(state, expr) != 0) {
+		if (parse_reftime(state, expr) != 0) {
 			goto fail;
 		}
 	} else {
@@ -2408,7 +2277,7 @@ static struct expr *parse_since(struct parser_state *state, int field, int arg2)
 		return NULL;
 	}
 
-	if (parse_timestamp(state, expr) != 0) {
+	if (parse_reftime(state, expr) != 0) {
 		goto fail;
 	}
 

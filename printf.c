@@ -22,6 +22,7 @@
 #include "expr.h"
 #include "mtab.h"
 #include "stat.h"
+#include "time.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>

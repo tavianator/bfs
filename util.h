@@ -27,7 +27,6 @@
 #include <regex.h>
 #include <stdbool.h>
 #include <sys/types.h>
-#include <time.h>
 
 // Some portability concerns
 
@@ -158,52 +157,6 @@ int pipe_cloexec(int pipefd[2]);
  * @return A human-readable description of the error, allocated with malloc().
  */
 char *xregerror(int err, const regex_t *regex);
-
-/**
- * localtime_r() wrapper that calls tzset() first.
- *
- * @param timep
- *         The time_t to convert.
- * @param result
- *         Buffer to hold the result.
- * @return 0 on success, -1 on failure.
- */
-int xlocaltime(const time_t *timep, struct tm *result);
-
-/**
- * gmtime_r() wrapper that calls tzset() first.
- *
- * @param timep
- *         The time_t to convert.
- * @param result
- *         Buffer to hold the result.
- * @return 0 on success, -1 on failure.
- */
-int xgmtime(const time_t *timep, struct tm *result);
-
-/**
- * mktime() wrapper that reports errors more reliably.
- *
- * @param[in,out] tm
- *         The struct tm to convert.
- * @param[out] timep
- *         Where to store the result.
- * @return
- *         0 on success, -1 on failure.
- */
-int xmktime(struct tm *tm, time_t *timep);
-
-/**
- * A portable timegm(), the inverse of gmtime().
- *
- * @param[in,out] tm
- *         The struct tm to convert.
- * @param[out] timep
- *         Where to store the result.
- * @return
- *         0 on success, -1 on failure.
- */
-int xtimegm(struct tm *tm, time_t *timep);
 
 /**
  * Format a mode like ls -l (e.g. -rw-r--r--).
