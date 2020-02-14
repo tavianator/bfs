@@ -433,7 +433,7 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 		}
 
 		closedir(dir);
-	} else {
+	} else if (ftwbuf->typeflag == BFTW_REG) {
 		const struct bfs_stat *statbuf = eval_stat(state);
 		if (statbuf) {
 			ret = statbuf->size == 0;

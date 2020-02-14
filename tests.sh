@@ -432,7 +432,7 @@ gnu_tests=(
     test_depth_maxdepth_2
 
     test_empty
-
+    test_empty_special
 
     test_exec_nothing
     test_exec_substring
@@ -1104,6 +1104,10 @@ function test_writable() {
 
 function test_empty() {
     bfs_diff basic -empty
+}
+
+function test_empty_special() {
+    bfs_diff rainbow -empty
 }
 
 function test_gid() {
