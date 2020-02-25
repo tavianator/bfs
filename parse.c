@@ -623,7 +623,7 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 
 	default:
 		assert(false);
-		break;
+		goto bad;
 	}
 
 	return endptr;
@@ -2269,7 +2269,7 @@ fail_list_strategies:
 }
 
 /**
- * Parse -[aBc]?since.
+ * Parse -[aBcm]?since.
  */
 static struct expr *parse_since(struct parser_state *state, int field, int arg2) {
 	struct expr *expr = parse_unary_test(state, eval_newer);
