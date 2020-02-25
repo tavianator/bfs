@@ -2,6 +2,15 @@
 ===
 
 
+1.6
+---
+
+**February 25, 2020**
+
+- Implemented `-newerXt` (explicit reference times), `-since`, `-asince`, etc.
+- Fixed `-empty` to skip special files (pipes, devices, sockets, etc.)
+
+
 1.5.2
 -----
 
