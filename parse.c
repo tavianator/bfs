@@ -1299,6 +1299,7 @@ static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
 	if (expr) {
 		expr_set_always_true(expr);
 		expr->cost = PRINT_COST;
+		expr->ephemeral_fds = 1;
 		if (expr_open(state, expr, expr->sdata) != 0) {
 			goto fail;
 		}
@@ -1544,6 +1545,7 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_nullary_action(state, eval_fls);
 	if (expr) {
 		init_print_expr(state, expr);
+		expr->ephemeral_fds = 1;
 		expr->reftime = state->now;
 	}
 	return expr;
