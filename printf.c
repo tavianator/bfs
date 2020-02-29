@@ -21,6 +21,7 @@
 #include "dstring.h"
 #include "expr.h"
 #include "mtab.h"
+#include "passwd.h"
 #include "stat.h"
 #include "time.h"
 #include "util.h"
@@ -45,8 +46,8 @@ struct bfs_printf {
 	enum bfs_stat_field stat_field;
 	/** Character data associated with this directive. */
 	char c;
-	/** The current mount table. */
-	const struct bfs_mtab *mtab;
+	/** Some data used by the directive. */
+	const void *ptr;
 	/** The next printf directive in the chain. */
 	struct bfs_printf *next;
 };
@@ -217,7 +218,7 @@ static int bfs_printf_F(FILE *file, const struct bfs_printf *directive, const st
 		return -1;
 	}
 
-	const char *type = bfs_fstype(directive->mtab, statbuf);
+	const char *type = bfs_fstype(directive->ptr, statbuf);
 	return fprintf(file, directive->str, type);
 }
 
@@ -239,7 +240,8 @@ static int bfs_printf_g(FILE *file, const struct bfs_printf *directive, const st
 		return -1;
 	}
 
-	struct group *grp = getgrgid(statbuf->gid);
+	const struct bfs_groups *groups = directive->ptr;
+	const struct group *grp = groups ? bfs_getgrgid(groups, statbuf->gid) : NULL;
 	if (!grp) {
 		return bfs_printf_G(file, directive, ftwbuf);
 	}
@@ -410,7 +412,8 @@ static int bfs_printf_u(FILE *file, const struct bfs_printf *directive, const st
 		return -1;
 	}
 
-	struct passwd *pwd = getpwuid(statbuf->uid);
+	const struct bfs_users *users = directive->ptr;
+	const struct passwd *pwd = users ? bfs_getpwuid(users, statbuf->uid) : NULL;
 	if (!pwd) {
 		return bfs_printf_U(file, directive, ftwbuf);
 	}
@@ -512,7 +515,7 @@ static struct bfs_printf *new_directive(bfs_printf_fn *fn) {
 	}
 	directive->stat_field = 0;
 	directive->c = 0;
-	directive->mtab = NULL;
+	directive->ptr = NULL;
 	directive->next = NULL;
 	return directive;
 
@@ -686,10 +689,15 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 					bfs_error(cmdline, "Couldn't parse the mount table: %s.\n", strerror(cmdline->mtab_error));
 					goto directive_error;
 				}
+				directive->ptr = cmdline->mtab;
 				directive->fn = bfs_printf_F;
-				directive->mtab = cmdline->mtab;
 				break;
 			case 'g':
+				if (!cmdline->groups) {
+					bfs_error(cmdline, "Couldn't parse the group table: %s.\n", strerror(cmdline->groups_error));
+					goto directive_error;
+				}
+				directive->ptr = cmdline->groups;
 				directive->fn = bfs_printf_g;
 				break;
 			case 'G':
@@ -738,6 +746,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				directive->stat_field = BFS_STAT_MTIME;
 				break;
 			case 'u':
+				if (!cmdline->users) {
+					bfs_error(cmdline, "Couldn't parse the user table: %s.\n", strerror(cmdline->users_error));
+					goto directive_error;
+				}
+				directive->ptr = cmdline->users;
 				directive->fn = bfs_printf_u;
 				break;
 			case 'U':

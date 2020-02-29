@@ -31,6 +31,7 @@
 #include "expr.h"
 #include "fsade.h"
 #include "mtab.h"
+#include "passwd.h"
 #include "printf.h"
 #include "spawn.h"
 #include "stat.h"
@@ -266,6 +267,9 @@ int free_cmdline(struct cmdline *cmdline) {
 		free_expr(cmdline->expr);
 
 		free_bfs_mtab(cmdline->mtab);
+
+		bfs_free_groups(cmdline->groups);
+		bfs_free_users(cmdline->users);
 
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&cmdline->open_files))) {
@@ -1299,7 +1303,6 @@ static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
 	if (expr) {
 		expr_set_always_true(expr);
 		expr->cost = PRINT_COST;
-		expr->ephemeral_fds = 1;
 		if (expr_open(state, expr, expr->sdata) != 0) {
 			goto fail;
 		}
@@ -1414,6 +1417,12 @@ static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2)
  * Parse -gid/-group.
  */
 static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
+	if (!cmdline->groups) {
+		parse_error(state, "Couldn't parse the group table: %s.\n", strerror(cmdline->groups_error));
+		return NULL;
+	}
+
 	const char *arg = state->argv[0];
 
 	struct expr *expr = parse_unary_test(state, eval_gid);
@@ -1421,7 +1430,7 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 		return NULL;
 	}
 
-	struct group *grp = getgrnam(expr->sdata);
+	const struct group *grp = bfs_getgrnam(cmdline->groups, expr->sdata);
 	if (grp) {
 		expr->idata = grp->gr_gid;
 		expr->cmp_flag = CMP_EXACT;
@@ -1466,6 +1475,12 @@ static struct expr *parse_used(struct parser_state *state, int arg1, int arg2) {
  * Parse -uid/-user.
  */
 static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
+	if (!cmdline->users) {
+		parse_error(state, "Couldn't parse the user table: %s.\n", strerror(cmdline->users_error));
+		return NULL;
+	}
+
 	const char *arg = state->argv[0];
 
 	struct expr *expr = parse_unary_test(state, eval_uid);
@@ -1473,7 +1488,7 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 		return NULL;
 	}
 
-	struct passwd *pwd = getpwnam(expr->sdata);
+	const struct passwd *pwd = bfs_getpwnam(cmdline->users, expr->sdata);
 	if (pwd) {
 		expr->idata = pwd->pw_uid;
 		expr->cmp_flag = CMP_EXACT;
@@ -1545,7 +1560,6 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_nullary_action(state, eval_fls);
 	if (expr) {
 		init_print_expr(state, expr);
-		expr->ephemeral_fds = 1;
 		expr->reftime = state->now;
 	}
 	return expr;
@@ -1743,11 +1757,16 @@ fail:
  * Parse -nogroup.
  */
 static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
+	if (!cmdline->groups) {
+		parse_error(state, "Couldn't parse the group table: %s.\n", strerror(cmdline->groups_error));
+		return NULL;
+	}
+
 	struct expr *expr = parse_nullary_test(state, eval_nogroup);
 	if (expr) {
 		expr->cost = 9000.0;
 		expr->probability = 0.01;
-		expr->ephemeral_fds = 1;
 	}
 	return expr;
 }
@@ -1775,11 +1794,16 @@ static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2)
  * Parse -nouser.
  */
 static struct expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
+	if (!cmdline->users) {
+		parse_error(state, "Couldn't parse the user table: %s.\n", strerror(cmdline->users_error));
+		return NULL;
+	}
+
 	struct expr *expr = parse_nullary_test(state, eval_nouser);
 	if (expr) {
 		expr->cost = 9000.0;
 		expr->probability = 0.01;
-		expr->ephemeral_fds = 1;
 	}
 	return expr;
 }
@@ -3452,6 +3476,10 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->colors = NULL;
 	cmdline->cout = NULL;
 	cmdline->cerr = NULL;
+	cmdline->users = NULL;
+	cmdline->users_error = 0;
+	cmdline->groups = NULL;
+	cmdline->groups_error = 0;
 	cmdline->mtab = NULL;
 	cmdline->mtab_error = 0;
 	cmdline->mindepth = 0;
@@ -3495,6 +3523,16 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	if (!cmdline->cout || !cmdline->cerr) {
 		perror("cfdup()");
 		goto fail;
+	}
+
+	cmdline->users = bfs_parse_users();
+	if (!cmdline->users) {
+		cmdline->users_error = errno;
+	}
+
+	cmdline->groups = bfs_parse_groups();
+	if (!cmdline->groups) {
+		cmdline->groups_error = errno;
 	}
 
 	cmdline->mtab = parse_bfs_mtab();

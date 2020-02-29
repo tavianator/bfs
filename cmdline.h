@@ -63,6 +63,15 @@ struct cmdline {
 	/** Colored stderr. */
 	CFILE *cerr;
 
+	/** User table. */
+	struct bfs_users *users;
+	/** The error that occurred parsing the user table, if any. */
+	int users_error;
+	/** Group table. */
+	struct bfs_groups *groups;
+	/** The error that occurred parsing the group table, if any. */
+	int groups_error;
+
 	/** Table of mounted file systems. */
 	struct bfs_mtab *mtab;
 	/** The error that occurred parsing the mount table, if any. */

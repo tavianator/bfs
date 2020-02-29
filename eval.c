@@ -28,6 +28,7 @@
 #include "exec.h"
 #include "fsade.h"
 #include "mtab.h"
+#include "passwd.h"
 #include "printf.h"
 #include "stat.h"
 #include "time.h"
@@ -294,16 +295,7 @@ bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	errno = 0;
-	if (getgrgid(statbuf->gid) == NULL) {
-		if (errno == 0) {
-			return true;
-		} else {
-			eval_report_error(state);
-		}
-	}
-
-	return false;
+	return bfs_getgrgid(state->cmdline->groups, statbuf->gid) == NULL;
 }
 
 /**
@@ -315,16 +307,7 @@ bool eval_nouser(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	errno = 0;
-	if (getpwuid(statbuf->uid) == NULL) {
-		if (errno == 0) {
-			return true;
-		} else {
-			eval_report_error(state);
-		}
-	}
-
-	return false;
+	return bfs_getpwuid(state->cmdline->users, statbuf->uid) == NULL;
 }
 
 /**
@@ -603,6 +586,8 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
+	const struct bfs_users *users = state->cmdline->users;
+	const struct bfs_groups *groups = state->cmdline->groups;
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
@@ -620,7 +605,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	}
 
 	uintmax_t uid = statbuf->uid;
-	struct passwd *pwd = getpwuid(uid);
+	const struct passwd *pwd = users ? bfs_getpwuid(users, uid) : NULL;
 	if (pwd) {
 		if (fprintf(file, " %-8s", pwd->pw_name) < 0) {
 			goto error;
@@ -632,7 +617,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	}
 
 	uintmax_t gid = statbuf->gid;
-	struct group *grp = getgrgid(gid);
+	const struct group *grp = groups ? bfs_getgrgid(groups, gid) : NULL;
 	if (grp) {
 		if (fprintf(file, " %-8s", grp->gr_name) < 0) {
 			goto error;

@@ -40,6 +40,7 @@
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
  *     - mtab.[ch]     (parses the system's mount table)
+ *     - passwd.[ch]   (a cache for the user/group tables)
  *     - spawn.[ch]    (spawns processes)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
  *     - time.[ch]     (date/time handling utilities)

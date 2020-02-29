@@ -86,6 +86,7 @@ bfs: \
     mtab.o \
     opt.o \
     parse.o \
+    passwd.o \
     printf.o \
     spawn.o \
     stat.o \
