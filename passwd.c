@@ -79,7 +79,9 @@ struct bfs_users *bfs_parse_users(void) {
 		struct passwd *entry = users->entries + i;
 		struct trie_leaf *leaf = trie_insert_str(&users->by_name, entry->pw_name);
 		if (leaf) {
-			leaf->value = entry;
+			if (!leaf->value) {
+				leaf->value = entry;
+			}
 		} else {
 			error = errno;
 			goto fail_free;
@@ -87,7 +89,9 @@ struct bfs_users *bfs_parse_users(void) {
 
 		leaf = trie_insert_mem(&users->by_uid, &entry->pw_uid, sizeof(entry->pw_uid));
 		if (leaf) {
-			leaf->value = entry;
+			if (!leaf->value) {
+				leaf->value = entry;
+			}
 		} else {
 			error = errno;
 			goto fail_free;
@@ -209,7 +213,9 @@ struct bfs_groups *bfs_parse_groups(void) {
 		struct group *entry = groups->entries + i;
 		struct trie_leaf *leaf = trie_insert_str(&groups->by_name, entry->gr_name);
 		if (leaf) {
-			leaf->value = entry;
+			if (!leaf->value) {
+				leaf->value = entry;
+			}
 		} else {
 			error = errno;
 			goto fail_free;
@@ -217,7 +223,9 @@ struct bfs_groups *bfs_parse_groups(void) {
 
 		leaf = trie_insert_mem(&groups->by_gid, &entry->gr_gid, sizeof(entry->gr_gid));
 		if (leaf) {
-			leaf->value = entry;
+			if (!leaf->value) {
+				leaf->value = entry;
+			}
 		} else {
 			error = errno;
 			goto fail_free;
