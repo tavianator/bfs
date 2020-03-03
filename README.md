@@ -1,16 +1,16 @@
 `bfs`
 =====
 
-<img src="https://tavianator.github.io/bfs/screenshot.svg" alt="Screenshot" align="right" />
-
 [![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/master/COPYING)
 [![Version](https://img.shields.io/github/v/tag/tavianator/bfs?label=version)](https://github.com/tavianator/bfs/releases)
 [![Build Status](https://api.travis-ci.org/tavianator/bfs.svg?branch=master)](https://travis-ci.org/tavianator/bfs)
 
 Breadth-first search for your files.
 
+<img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot" />
+
 `bfs` is a variant of the UNIX `find` command that operates [breadth-first](https://en.wikipedia.org/wiki/Breadth-first_search) rather than [depth-first](https://en.wikipedia.org/wiki/Depth-first_search).
-It is otherwise intended to be compatible with many versions of `find`, including
+It is otherwise compatible with many versions of `find`, including
 
 - [POSIX `find`](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)
 - [GNU `find`](https://www.gnu.org/software/findutils/)
