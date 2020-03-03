@@ -103,26 +103,7 @@ Try it!
 
 <a href="https://repology.org/metapackage/bfs"><img src="https://repology.org/badge/vertical-allrepos/bfs.svg" alt="Packaging status" align="right" /></a>
 
-To get `bfs`, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
-Then run
-
-    $ make
-
-This will build the `bfs` binary in the current directory.
-You can test it out:
-
-    $ ./bfs -nohidden
-
-If you're interested in speed, you may want to build the release version instead:
-
-    $ make clean
-    $ make release
-
-Finally, if you want to install it globally, run
-
-    $ sudo make install
-
-Alternatively, `bfs` may already be packaged for your distribution of choice.
+`bfs` may already be packaged for your distribution of choice.
 For example:
 
 <pre>
@@ -147,3 +128,22 @@ For example:
 <strong>Homebrew</strong>
 $ brew install tavianator/tap/bfs
 </pre>
+
+To install `bfs` from source, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
+Then run
+
+    $ make
+
+This will build the `bfs` binary in the current directory.
+You can test it out:
+
+    $ ./bfs -nohidden
+
+If you're interested in speed, you may want to build the release version instead:
+
+    $ make clean
+    $ make release
+
+Finally, if you want to install it globally, run
+
+    $ sudo make install
