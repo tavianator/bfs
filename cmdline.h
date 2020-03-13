@@ -87,16 +87,18 @@ struct cmdline {
 	/** bftw() search strategy. */
 	enum bftw_strategy strategy;
 
-	/** Optimization level. */
+	/** Optimization level (-O). */
 	int optlevel;
-	/** Debugging flags. */
+	/** Debugging flags (-D). */
 	enum debug_flags debug;
-	/** Whether to only handle paths with xargs-safe characters. */
-	bool xargs_safe;
-	/** Whether to ignore deletions that race with bfs. */
+	/** Whether to ignore deletions that race with bfs (-ignore_readdir_race). */
 	bool ignore_races;
-	/** Whether to only return unique files. */
+	/** Whether to only return unique files (-unique). */
 	bool unique;
+	/** Whether to print warnings (-warn/-nowarn). */
+	bool warn;
+	/** Whether to only handle paths with xargs-safe characters (-X). */
+	bool xargs_safe;
 
 	/** The command line expression. */
 	struct expr *expr;

@@ -47,12 +47,14 @@ void bfs_verror(const struct cmdline *cmdline, const char *format, va_list args)
 }
 
 void bfs_vwarning(const struct cmdline *cmdline, const char *format, va_list args) {
-	int error = errno;
+	if (cmdline->warn) {
+		int error = errno;
 
-	bfs_warning_prefix(cmdline);
+		bfs_warning_prefix(cmdline);
 
-	errno = error;
-	cvfprintf(cmdline->cerr, format, args);
+		errno = error;
+		cvfprintf(cmdline->cerr, format, args);
+	}
 }
 
 void bfs_error_prefix(const struct cmdline *cmdline) {

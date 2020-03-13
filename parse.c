@@ -337,8 +337,6 @@ struct parser_state {
 	enum use_color use_color;
 	/** Whether a -print action is implied. */
 	bool implicit_print;
-	/** Whether warnings are enabled (see -warn, -nowarn). */
-	bool warn;
 	/** Whether the expression has started. */
 	bool expr_started;
 	/** Whether any non-option arguments have been encountered. */
@@ -704,7 +702,7 @@ static struct expr *parse_unary_flag(struct parser_state *state) {
 static struct expr *parse_option(struct parser_state *state, size_t argc) {
 	const char *arg = *parser_advance(state, T_OPTION, argc);
 
-	if (state->warn && state->non_option_seen) {
+	if (state->non_option_seen) {
 		parse_warning(state,
 		              "The '%s' option applies to the entire command line.  For clarity, place\n"
 		              "it before any non-option arguments.\n\n",
@@ -961,7 +959,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
 		return NULL;
 	}
 
-	if (state->warn && *optlevel > 4) {
+	if (*optlevel > 4) {
 		parse_warning(state, "%s is the same as -O4.\n\n", state->argv[0]);
 	}
 
@@ -1569,12 +1567,10 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
  * Parse -mount.
  */
 static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
-	if (state->warn) {
-		parse_warning(state,
-		              "In the future, %s will skip mount points entirely, unlike\n"
-		              "-xdev, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
-		              state->argv[0]);
-	}
+	parse_warning(state,
+	              "In the future, %s will skip mount points entirely, unlike\n"
+	              "-xdev, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
+	              state->argv[0]);
 
 	state->cmdline->flags |= BFTW_XDEV;
 	state->mount_arg = state->argv[0];
@@ -1783,10 +1779,7 @@ static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg
  * Parse -noleaf.
  */
 static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
-	if (state->warn) {
-		parse_warning(state, "bfs does not apply the optimization that %s inhibits.\n\n", state->argv[0]);
-	}
-
+	parse_warning(state, "bfs does not apply the optimization that %s inhibits.\n\n", state->argv[0]);
 	return parse_nullary_option(state);
 }
 
@@ -2493,7 +2486,7 @@ fail:
  * Parse -(no)?warn.
  */
 static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
-	state->warn = warn;
+	state->cmdline->warn = warn;
 	return parse_nullary_positional_option(state);
 }
 
@@ -3310,23 +3303,21 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 		}
 	}
 
-	if (state->warn) {
-		if (state->mount_arg && state->xdev_arg) {
-			parse_warning(state, "%s is redundant in the presence of %s.\n\n", state->xdev_arg, state->mount_arg);
-		}
+	if (state->mount_arg && state->xdev_arg) {
+		parse_warning(state, "%s is redundant in the presence of %s.\n\n", state->xdev_arg, state->mount_arg);
+	}
 
-		if (state->depth_arg && state->prune_arg) {
-			parse_warning(state, "%s does not work in the presence of %s.\n", state->prune_arg, state->depth_arg);
+	if (state->cmdline->warn && state->depth_arg && state->prune_arg) {
+		parse_warning(state, "%s does not work in the presence of %s.\n", state->prune_arg, state->depth_arg);
 
-			if (state->interactive) {
-				fprintf(stderr, "Do you want to continue? ");
-				if (ynprompt() == 0) {
-					goto fail;
-				}
+		if (state->interactive) {
+			fprintf(stderr, "Do you want to continue? ");
+			if (ynprompt() == 0) {
+				goto fail;
 			}
-
-			fprintf(stderr, "\n");
 		}
+
+		fprintf(stderr, "\n");
 	}
 
 	return expr;
@@ -3488,9 +3479,10 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->strategy = BFTW_BFS;
 	cmdline->optlevel = 3;
 	cmdline->debug = 0;
-	cmdline->xargs_safe = false;
 	cmdline->ignore_races = false;
 	cmdline->unique = false;
+	cmdline->warn = false;
+	cmdline->xargs_safe = false;
 	cmdline->expr = &expr_true;
 	cmdline->nopen_files = 0;
 
@@ -3541,6 +3533,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	bool stdin_tty = isatty(STDIN_FILENO);
+	cmdline->warn = stdin_tty;
+
 	bool stdout_tty = isatty(STDOUT_FILENO);
 	bool stderr_tty = isatty(STDERR_FILENO);
 
@@ -3553,7 +3547,6 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.interactive = stdin_tty && stderr_tty,
 		.use_color = use_color,
 		.implicit_print = true,
-		.warn = stdin_tty,
 		.non_option_seen = false,
 		.just_info = false,
 		.last_arg = NULL,
