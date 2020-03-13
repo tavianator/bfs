@@ -37,7 +37,7 @@
 /** Print some debugging info. */
 BFS_FORMATTER(2, 3)
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
-	if (!(execbuf->flags & BFS_EXEC_DEBUG)) {
+	if (!(execbuf->cmdline->debug & DEBUG_EXEC)) {
 		return;
 	}
 
@@ -123,6 +123,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	}
 
 	execbuf->flags = flags;
+	execbuf->cmdline = cmdline;
 	execbuf->argv = NULL;
 	execbuf->argc = 0;
 	execbuf->argv_cap = 0;
@@ -132,10 +133,6 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	execbuf->wd_path = NULL;
 	execbuf->wd_len = 0;
 	execbuf->ret = 0;
-
-	if (cmdline->debug & DEBUG_EXEC) {
-		execbuf->flags |= BFS_EXEC_DEBUG;
-	}
 
 	size_t i;
 	for (i = 1; ; ++i) {
@@ -391,9 +388,9 @@ fail:
 		}
 	} else if (WIFSIGNALED(wstatus)) {
 		int sig = WTERMSIG(wstatus);
-		bfs_exec_debug(execbuf, "Command '%s' terminated by signal %d\n", execbuf->argv[0], sig);
+		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated by signal %d\n", execbuf->argv[0], sig);
 	} else {
-		bfs_exec_debug(execbuf, "Command '%s' terminated abnormally\n", execbuf->argv[0]);
+		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
 	}
 
 	errno = 0;
