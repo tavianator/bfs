@@ -3533,10 +3533,12 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	}
 
 	bool stdin_tty = isatty(STDIN_FILENO);
-	cmdline->warn = stdin_tty;
-
 	bool stdout_tty = isatty(STDOUT_FILENO);
 	bool stderr_tty = isatty(STDERR_FILENO);
+
+	if (!getenv("POSIXLY_CORRECT")) {
+		cmdline->warn = stdin_tty;
+	}
 
 	struct parser_state state = {
 		.cmdline = cmdline,
