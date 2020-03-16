@@ -126,29 +126,10 @@ static bool is_absence_error(int error) {
 
 #if BFS_CAN_CHECK_ACL
 
-/** Check if any ACLs of the given type are non-trivial. */
-static int bfs_check_acl_type(const char *path, acl_type_t type) {
-	acl_t acl = acl_get_file(path, type);
-	if (!acl) {
-		if (is_absence_error(errno)) {
-			return 0;
-		} else {
-			return -1;
-		}
-	}
-
+/** Check if a POSIX.1e ACL is non-trivial. */
+static int bfs_check_posix1e_acl(acl_t acl, bool ignore_required) {
 	int ret = 0;
 
-#if __FreeBSD__
-	int trivial;
-	if (acl_is_trivial_np(acl, &trivial) < 0) {
-		ret = -1;
-	} else if (trivial) {
-		ret = 0;
-	} else {
-		ret = 1;
-	}
-#else
 	acl_entry_t entry;
 	for (int status = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
 #if __APPLE__
@@ -160,25 +141,44 @@ static int bfs_check_acl_type(const char *path, acl_type_t type) {
 #endif
 	     status = acl_get_entry(acl, ACL_NEXT_ENTRY, &entry)) {
 #if defined(ACL_USER_OBJ) && defined(ACL_GROUP_OBJ) && defined(ACL_OTHER)
-		acl_tag_t tag;
-		if (acl_get_tag_type(entry, &tag) != 0) {
-			continue;
+		if (ignore_required) {
+			acl_tag_t tag;
+			if (acl_get_tag_type(entry, &tag) != 0) {
+				ret = -1;
+				continue;
+			}
+			if (tag == ACL_USER_OBJ || tag == ACL_GROUP_OBJ || tag == ACL_OTHER) {
+				continue;
+			}
 		}
-		if (tag != ACL_USER_OBJ && tag != ACL_GROUP_OBJ && tag != ACL_OTHER) {
-			ret = 1;
-			break;
-		}
-#else
+#endif
+
 		ret = 1;
 		break;
-#endif
 	}
-#endif // !__FreeBSD__
 
-	int error = errno;
-	acl_free(acl);
-	errno = error;
 	return ret;
+}
+
+/** Check if an ACL of the given type is non-trivial. */
+static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
+	if (type == ACL_TYPE_DEFAULT) {
+		// For directory default ACLs, any entries make them non-trivial
+		return bfs_check_posix1e_acl(acl, false);
+	}
+
+#if __FreeBSD__
+	int trivial;
+	if (acl_is_trivial_np(acl, &trivial) < 0) {
+		return -1;
+	} else if (trivial) {
+		return 0;
+	} else {
+		return 1;
+	}
+#endif
+
+	return bfs_check_posix1e_acl(acl, true);
 }
 
 int bfs_check_acl(const struct BFTW *ftwbuf) {
@@ -205,18 +205,30 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 
 	const char *path = fake_at(ftwbuf);
 
-	int ret = -1;
+	int ret = -1, error = 0;
 	for (size_t i = 0; i < n_acl_types && ret <= 0; ++i) {
-		if (acl_types[i] == ACL_TYPE_DEFAULT && ftwbuf->typeflag != BFTW_DIR) {
+		acl_type_t type = acl_types[i];
+
+		if (type == ACL_TYPE_DEFAULT && ftwbuf->typeflag != BFTW_DIR) {
 			// ACL_TYPE_DEFAULT is supported only for directories,
 			// otherwise acl_get_file() gives EACCESS
 			continue;
 		}
 
-		ret = bfs_check_acl_type(path, acl_types[i]);
+		acl_t acl = acl_get_file(path, type);
+		if (!acl) {
+			error = errno;
+			if (is_absence_error(error)) {
+				ret = 0;
+			}
+			continue;
+		}
+
+		ret = bfs_check_acl_type(acl, type);
+		error = errno;
+		acl_free(acl);
 	}
 
-	int error = errno;
 	free_fake_at(ftwbuf, path);
 	errno = error;
 	return ret;
