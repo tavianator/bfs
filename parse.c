@@ -709,7 +709,6 @@ static struct expr *parse_option(struct parser_state *state, size_t argc) {
 		              arg);
 	}
 
-
 	return &expr_true;
 }
 
@@ -745,14 +744,7 @@ static struct expr *parse_nullary_positional_option(struct parser_state *state) 
 /**
  * Parse a positional option that takes a single value.
  */
-static struct expr *parse_unary_positional_option(struct parser_state *state, const char **value) {
-	const char *arg = state->argv[0];
-	*value = state->argv[1];
-	if (!*value) {
-		parse_error(state, "%s needs a value.\n", arg);
-		return NULL;
-	}
-
+static struct expr *parse_unary_positional_option(struct parser_state *state) {
 	return parse_positional_option(state, 2);
 }
 
@@ -2190,13 +2182,15 @@ static struct expr *parse_regex_extended(struct parser_state *state, int arg1, i
  * Parse -regextype TYPE.
  */
 static struct expr *parse_regextype(struct parser_state *state, int arg1, int arg2) {
-	const char *type;
-	struct expr *expr = parse_unary_positional_option(state, &type);
-	if (!expr) {
-		goto fail;
-	}
+	struct cmdline *cmdline = state->cmdline;
+	CFILE *cfile = cmdline->cerr;
 
-	FILE *file = stderr;
+	const char *arg = state->argv[0];
+	const char *type = state->argv[1];
+	if (!type) {
+		parse_error(state, "%s needs a value.\n\n", arg);
+		goto list_types;
+	}
 
 	if (strcmp(type, "posix-basic") == 0) {
 		state->regex_flags = 0;
@@ -2204,22 +2198,19 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 		state->regex_flags = REG_EXTENDED;
 	} else if (strcmp(type, "help") == 0) {
 		state->just_info = true;
-		file = stdout;
-		goto fail_list_types;
+		cfile = cmdline->cout;
+		goto list_types;
 	} else {
-		goto fail_bad_type;
+		parse_error(state, "Unsupported -regextype '%s'.\n\n", type);
+		goto list_types;
 	}
 
-	return expr;
+	return parse_unary_positional_option(state);
 
-fail_bad_type:
-	parse_error(state, "Unsupported -regextype '%s'.\n\n", type);
-fail_list_types:
-	fputs("Supported types are:\n\n", file);
-	fputs("  posix-basic:    POSIX basic regular expressions (BRE)\n", file);
-	fputs("  posix-extended: POSIX extended regular expressions (ERE)\n", file);
-fail:
-	free_expr(expr);
+list_types:
+	cfprintf(cfile, "Supported types are:\n\n");
+	cfprintf(cfile, "  ${bld}posix-basic${rs}:    POSIX basic regular expressions (BRE)\n");
+	cfprintf(cfile, "  ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n");
 	return NULL;
 }
 
@@ -2251,15 +2242,16 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
  * Parse -S STRATEGY.
  */
 static struct expr *parse_search_strategy(struct parser_state *state, int arg1, int arg2) {
+	struct cmdline *cmdline = state->cmdline;
+	CFILE *cfile = cmdline->cerr;
+
 	const char *flag = state->argv[0];
 	const char *arg = state->argv[1];
 	if (!arg) {
-		parse_error(state, "%s needs an argument.\n", flag);
-		return NULL;
+		parse_error(state, "%s needs an argument.\n\n", flag);
+		goto list_strategies;
 	}
 
-	struct cmdline *cmdline = state->cmdline;
-	FILE *file = stderr;
 
 	if (strcmp(arg, "bfs") == 0) {
 		cmdline->strategy = BFTW_BFS;
@@ -2269,21 +2261,20 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 		cmdline->strategy = BFTW_IDS;
 	} else if (strcmp(arg, "help") == 0) {
 		state->just_info = true;
-		file = stdout;
-		goto fail_list_strategies;
+		cfile = cmdline->cout;
+		goto list_strategies;
 	} else {
-		goto fail_bad_strategy;
+		parse_error(state, "Unrecognized search strategy '%s'.\n\n", arg);
+		goto list_strategies;
 	}
 
 	return parse_unary_flag(state);
 
-fail_bad_strategy:
-	parse_error(state, "Unrecognized search strategy '%s'.\n\n", arg);
-fail_list_strategies:
-	fputs("Supported search strategies:\n\n", file);
-	fputs("  bfs: breadth-first search\n", file);
-	fputs("  dfs: depth-first search\n", file);
-	fputs("  ids: iterative deepening search\n", file);
+list_strategies:
+	cfprintf(cfile, "Supported search strategies:\n\n");
+	cfprintf(cfile, "  ${bld}bfs${rs}: breadth-first search\n");
+	cfprintf(cfile, "  ${bld}dfs${rs}: depth-first search\n");
+	cfprintf(cfile, "  ${bld}ids${rs}: iterative deepening search\n");
 	return NULL;
 }
 
