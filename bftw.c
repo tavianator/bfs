@@ -519,52 +519,33 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 struct bftw_queue {
 	/** The head of the queue. */
 	struct bftw_file *head;
-	/** The tail of the queue. */
-	struct bftw_file *tail;
+	/** The insertion target. */
+	struct bftw_file **target;
 };
 
 /** Initialize a bftw_queue. */
 static void bftw_queue_init(struct bftw_queue *queue) {
 	queue->head = NULL;
-	queue->tail = NULL;
+	queue->target = &queue->head;
 }
 
-/** Add a file to the tail of the bftw_queue. */
+/** Add a file to a bftw_queue. */
 static void bftw_queue_push(struct bftw_queue *queue, struct bftw_file *file) {
 	assert(file->next == NULL);
 
-	if (!queue->head) {
-		queue->head = file;
-	}
-	if (queue->tail) {
-		queue->tail->next = file;
-	}
-	queue->tail = file;
-}
-
-/** Prepend a queue to the head of another one. */
-static void bftw_queue_prepend(struct bftw_queue *head, struct bftw_queue *tail) {
-	if (head->tail) {
-		head->tail->next = tail->head;
-	}
-	if (head->head) {
-		tail->head = head->head;
-	}
-	if (!tail->tail) {
-		tail->tail = head->tail;
-	}
-	head->head = NULL;
-	head->tail = NULL;
+	file->next = *queue->target;
+	*queue->target = file;
+	queue->target = &file->next;
 }
 
 /** Pop the next file from the head of the queue. */
 static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 	struct bftw_file *file = queue->head;
 	queue->head = file->next;
-	if (queue->tail == file) {
-		queue->tail = NULL;
-	}
 	file->next = NULL;
+	if (queue->target == &file->next) {
+		queue->target = &queue->head;
+	}
 	return file;
 }
 
@@ -654,8 +635,6 @@ struct bftw_state {
 	struct bftw_cache cache;
 	/** The queue of directories left to explore. */
 	struct bftw_queue queue;
-	/** An intermediate queue used for depth-first searches. */
-	struct bftw_queue prequeue;
 
 	/** The current path. */
 	char *path;
@@ -693,7 +672,6 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 
 	bftw_queue_init(&state->queue);
-	bftw_queue_init(&state->prequeue);
 
 	state->path = dstralloc(0);
 	if (!state->path) {
@@ -1139,11 +1117,7 @@ static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 		bftw_fill_id(file, &state->ftwbuf);
 	}
 
-	if (state->strategy == BFTW_DFS) {
-		bftw_queue_push(&state->prequeue, file);
-	} else {
-		bftw_queue_push(&state->queue, file);
-	}
+	bftw_queue_push(&state->queue, file);
 
 	return 0;
 }
@@ -1187,10 +1161,6 @@ static int bftw_build_path(struct bftw_state *state) {
  * Pop the next file from the queue.
  */
 static int bftw_pop(struct bftw_state *state) {
-	if (state->strategy == BFTW_DFS) {
-		bftw_queue_prepend(&state->prequeue, &state->queue);
-	}
-
 	if (!state->queue.head) {
 		return 0;
 	}
@@ -1304,7 +1274,6 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	bftw_release_reader(state, BFTW_VISIT_NONE);
 
 	bftw_release_file(state, BFTW_VISIT_NONE);
-	bftw_drain_queue(state, &state->prequeue);
 	bftw_drain_queue(state, &state->queue);
 
 	bftw_cache_destroy(&state->cache);
@@ -1314,9 +1283,9 @@ static int bftw_state_destroy(struct bftw_state *state) {
 }
 
 /**
- * Breadth-first bftw() implementation.
+ * Streaming mode: visit files as they are encountered.
  */
-static int bftw_bfs(const struct bftw_args *args) {
+static int bftw_stream(const struct bftw_args *args) {
 	struct bftw_state state;
 	if (bftw_state_init(&state, args) != 0) {
 		return -1;
@@ -1371,15 +1340,23 @@ done:
 	return bftw_state_destroy(&state);
 }
 
+/** Start a batch of files. */
+static void bftw_batch_start(struct bftw_state *state) {
+	if (state->strategy == BFTW_DFS) {
+		state->queue.target = &state->queue.head;
+	}
+}
+
 /**
- * Depth-first bftw() implementation.
+ * Batching mode: queue up all children before visiting them.
  */
-static int bftw_dfs(const struct bftw_args *args) {
+static int bftw_batch(const struct bftw_args *args) {
 	struct bftw_state state;
 	if (bftw_state_init(&state, args) != 0) {
 		return -1;
 	}
 
+	bftw_batch_start(&state);
 	for (size_t i = 0; i < args->npaths; ++i) {
 		if (bftw_push(&state, args->paths[i], false) != 0) {
 			goto done;
@@ -1401,6 +1378,7 @@ static int bftw_dfs(const struct bftw_args *args) {
 
 		struct bftw_reader *reader = bftw_open(&state);
 
+		bftw_batch_start(&state);
 		while (bftw_reader_read(reader) > 0) {
 			if (bftw_push(&state, reader->de->d_name, false) != 0) {
 				goto done;
@@ -1521,15 +1499,7 @@ static int bftw_ids(const struct bftw_args *args) {
 
 	while (ret == 0 && !state.quit && !state.bottom) {
 		state.bottom = true;
-
-		// bftw_bfs() is more efficient than bftw_dfs() since it visits
-		// directory entries as it reads them.  With args->strategy ==
-		// BFTW_DFS, it gives a hybrid ordering that visits immediate
-		// children first, then deeper descendants depth-first.  This
-		// doesn't matter for iterative deepening since we only visit
-		// one level at a time.
-		ret = bftw_bfs(&ids_args);
-
+		ret = bftw_stream(&ids_args);
 		++state.depth;
 	}
 
@@ -1538,7 +1508,7 @@ static int bftw_ids(const struct bftw_args *args) {
 
 		while (ret == 0 && !state.quit && state.depth > 0) {
 			--state.depth;
-			ret = bftw_bfs(&ids_args);
+			ret = bftw_stream(&ids_args);
 		}
 	}
 
@@ -1555,9 +1525,9 @@ static int bftw_ids(const struct bftw_args *args) {
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
-		return bftw_bfs(args);
+		return bftw_stream(args);
 	case BFTW_DFS:
-		return bftw_dfs(args);
+		return bftw_batch(args);
 	case BFTW_IDS:
 		return bftw_ids(args);
 	}
