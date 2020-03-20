@@ -418,13 +418,13 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 
 	CFILE *cfile = cfopen(path, state->use_color ? cmdline->colors : NULL);
 	if (!cfile) {
-		parse_error(state, "'%s': %m.\n", path);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
 		goto out;
 	}
 
 	struct bfs_stat sb;
 	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
-		parse_error(state, "'%s': %m.\n", path);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
 		goto out_close;
 	}
 
@@ -478,7 +478,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 
 	int ret = bfs_stat(AT_FDCWD, expr->sdata, flags, sb);
 	if (ret != 0) {
-		parse_error(state, "'%s': %m.\n", expr->sdata);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], expr->sdata);
 	}
 	return ret;
 }
@@ -632,7 +632,7 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 
 bad:
 	if (!(flags & IF_QUIET)) {
-		parse_error(state, "'%s' is not a valid integer.\n", str);
+		parse_error(state, "${bld}%s${rs} is not a valid integer.\n", str);
 	}
 	return NULL;
 }
@@ -704,7 +704,7 @@ static struct expr *parse_option(struct parser_state *state, size_t argc) {
 
 	if (state->non_option_seen) {
 		parse_warning(state,
-		              "The '%s' option applies to the entire command line.  For clarity, place\n"
+		              "The ${blu}%s${rs} option applies to the entire command line.  For clarity, place\n"
 		              "it before any non-option arguments.\n\n",
 		              arg);
 	}
@@ -774,7 +774,7 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		parse_error(state, "%s needs a value.\n", arg);
+		parse_error(state, "${blu}%s${rs} needs a value.\n", arg);
 		return NULL;
 	}
 
@@ -811,7 +811,7 @@ static struct expr *parse_unary_action(struct parser_state *state, eval_fn *eval
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		parse_error(state, "%s needs a value.\n", arg);
+		parse_error(state, "${blu}%s${rs} needs a value.\n", arg);
 		return NULL;
 	}
 
@@ -893,7 +893,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 	const char *arg = state->argv[0];
 	const char *flags = state->argv[1];
 	if (!flags) {
-		parse_error(state, "%s needs a flag.\n\n", arg);
+		parse_error(state, "${cyn}%s${rs} needs a flag.\n\n", arg);
 		debug_help(cmdline->cerr);
 		return NULL;
 	}
@@ -917,10 +917,12 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		for (int i = 0; ; ++i) {
 			const char *expected = debug_flags[i].name;
 			if (!expected) {
-				parse_warning(state, "Unrecognized debug flag '");
-				fwrite(flag, 1, len, stderr);
-				fputs("'\n\n", stderr);
-				unrecognized = true;
+				if (cmdline->warn) {
+					parse_warning(state, "Unrecognized debug flag ${bld}");
+					fwrite(flag, 1, len, stderr);
+					cfprintf(cmdline->cerr, "${rs}.\n\n");
+					unrecognized = true;
+				}
 				break;
 			}
 
@@ -952,7 +954,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
 	}
 
 	if (*optlevel > 4) {
-		parse_warning(state, "%s is the same as -O4.\n\n", state->argv[0]);
+		parse_warning(state, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", state->argv[0] + 2);
 	}
 
 	return parse_nullary_flag(state);
@@ -1019,7 +1021,7 @@ static struct expr *parse_acl(struct parser_state *state, int flag, int arg2) {
 	}
 	return expr;
 #else
-	parse_error(state, "%s is missing platform support.\n", state->argv[0]);
+	parse_error(state, "${blu}%s${rs} is missing platform support.\n", state->argv[0]);
 	return NULL;
 #endif
 }
@@ -1076,7 +1078,7 @@ static struct expr *parse_capable(struct parser_state *state, int flag, int arg2
 	}
 	return expr;
 #else
-	parse_error(state, "%s is missing platform support.\n", state->argv[0]);
+	parse_error(state, "${blu}%s${rs} is missing platform support.\n", state->argv[0]);
 	return NULL;
 #endif
 }
@@ -1174,7 +1176,7 @@ static struct expr *parse_depth_limit(struct parser_state *state, int is_min, in
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
-		parse_error(state, "%s needs a value.\n", arg);
+		parse_error(state, "${blu}%s${rs} needs a value.\n", arg);
 		return NULL;
 	}
 
@@ -1273,7 +1275,7 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 
 	const char *path = state->argv[0];
 	if (!path) {
-		parse_error(state, "-f requires a path.\n");
+		parse_error(state, "${cyn}-f${rs} requires a path.\n");
 		return NULL;
 	}
 
@@ -1351,13 +1353,13 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 
 	const char *file = state->argv[1];
 	if (!file) {
-		parse_error(state, "%s needs a file.\n", arg);
+		parse_error(state, "${blu}%s${rs} needs a file.\n", arg);
 		return NULL;
 	}
 
 	const char *format = state->argv[2];
 	if (!format) {
-		parse_error(state, "%s needs a format string.\n", arg);
+		parse_error(state, "${blu}%s${rs} needs a format string.\n", arg);
 		return NULL;
 	}
 
@@ -1429,7 +1431,7 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 			goto fail;
 		}
 	} else {
-		parse_error(state, "%s %s: No such group.\n", arg, expr->sdata);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: No such group.\n", arg, expr->sdata);
 		goto fail;
 	}
 
@@ -1487,7 +1489,7 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 			goto fail;
 		}
 	} else {
-		parse_error(state, "%s %s: No such user.\n", arg, expr->sdata);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: No such user.\n", arg, expr->sdata);
 		goto fail;
 	}
 
@@ -1560,8 +1562,8 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
  */
 static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
 	parse_warning(state,
-	              "In the future, %s will skip mount points entirely, unlike\n"
-	              "-xdev, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
+	              "In the future, ${blu}%s${rs} will skip mount points entirely, unlike\n"
+	              "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
 	              state->argv[0]);
 
 	state->cmdline->flags |= BFTW_XDEV;
@@ -1581,7 +1583,7 @@ static struct expr *parse_fnmatch(const struct parser_state *state, struct expr 
 #ifdef FNM_CASEFOLD
 		expr->idata = FNM_CASEFOLD;
 #else
-		parse_error(state, "%s is missing platform support.\n", expr->argv[0]);
+		parse_error(state, "${blu}%s${rs} is missing platform support.\n", expr->argv[0]);
 		free_expr(expr);
 		return NULL;
 #endif
@@ -1645,11 +1647,11 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 	if (parse_timestamp(expr->sdata, &expr->reftime) == 0) {
 		return 0;
 	} else if (errno != EINVAL) {
-		parse_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], expr->argv[1]);
 		return -1;
 	}
 
-	parse_error(state, "%s %s: Invalid timestamp.\n\n", expr->argv[0], expr->argv[1]);
+	parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Invalid timestamp.\n\n", expr->argv[0], expr->argv[1]);
 	fprintf(stderr, "Supported timestamp formats are ISO 8601-like, e.g.\n\n");
 
 	struct tm tm;
@@ -1691,7 +1693,7 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
-		parse_error(state, "Expected -newerXY; found %s.\n", arg);
+		parse_error(state, "Expected ${blu}-newer${bld}XY${rs}; found ${blu}-newer${bld}%s${rs}.\n", arg + 6);
 		return NULL;
 	}
 
@@ -1702,7 +1704,9 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 
 	expr->stat_field = parse_newerxy_field(arg[6]);
 	if (!expr->stat_field) {
-		parse_error(state, "%s: For -newerXY, X should be 'a', 'c', 'm', or 'B'.\n", arg);
+		parse_error(state,
+		            "${blu}%s${rs}: For ${blu}-newer${bld}XY${rs}, ${bld}X${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, or ${bld}B${rs}, not ${er}%c${rs}.\n",
+		            arg, arg[6]);
 		goto fail;
 	}
 
@@ -1713,7 +1717,9 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 	} else {
 		enum bfs_stat_field field = parse_newerxy_field(arg[7]);
 		if (!field) {
-			parse_error(state, "%s: For -newerXY, Y should be 'a', 'c', 'm', 'B', or 't'.\n", arg);
+			parse_error(state,
+			            "${blu}%s${rs}: For ${blu}-newer${bld}XY${rs}, ${bld}Y${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, ${bld}B${rs}, or ${bld}t${rs}, not ${er}%c${rs}.\n",
+			            arg, arg[7]);
 			goto fail;
 		}
 
@@ -1725,7 +1731,7 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 
 		const struct timespec *reftime = bfs_stat_time(&sb, field);
 		if (!reftime) {
-			parse_error(state, "'%s': Couldn't get file %s.\n", expr->sdata, bfs_stat_field_name(field));
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Couldn't get file %s.\n", arg, expr->sdata, bfs_stat_field_name(field));
 			goto fail;
 		}
 
@@ -1771,7 +1777,7 @@ static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg
  * Parse -noleaf.
  */
 static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
-	parse_warning(state, "bfs does not apply the optimization that %s inhibits.\n\n", state->argv[0]);
+	parse_warning(state, "${ex}bfs${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n", state->argv[0]);
 	return parse_nullary_option(state);
 }
 
@@ -2008,7 +2014,7 @@ done:
 	return 0;
 
 fail:
-	parse_error(state, "'%s' is an invalid mode.\n", mode);
+	parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Invalid mode.\n", expr->argv[0], mode);
 	return -1;
 }
 
@@ -2152,7 +2158,7 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 	if (err != 0) {
 		char *str = xregerror(err, expr->regex);
 		if (str) {
-			parse_error(state, "%s %s: %s.\n", expr->argv[0], expr->argv[1], str);
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
 			free(str);
 		} else {
 			perror("xregerror()");
@@ -2188,7 +2194,7 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 	const char *arg = state->argv[0];
 	const char *type = state->argv[1];
 	if (!type) {
-		parse_error(state, "%s needs a value.\n\n", arg);
+		parse_error(state, "${blu}%s${rs} needs a value.\n\n", arg);
 		goto list_types;
 	}
 
@@ -2201,7 +2207,7 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 		cfile = cmdline->cout;
 		goto list_types;
 	} else {
-		parse_error(state, "Unsupported -regextype '%s'.\n\n", type);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Unsupported regex type.\n\n", arg, type);
 		goto list_types;
 	}
 
@@ -2248,7 +2254,7 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 	const char *flag = state->argv[0];
 	const char *arg = state->argv[1];
 	if (!arg) {
-		parse_error(state, "%s needs an argument.\n\n", flag);
+		parse_error(state, "${cyn}%s${rs} needs an argument.\n\n", flag);
 		goto list_strategies;
 	}
 
@@ -2264,7 +2270,7 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 		cfile = cmdline->cout;
 		goto list_strategies;
 	} else {
-		parse_error(state, "Unrecognized search strategy '%s'.\n\n", arg);
+		parse_error(state, "${cyn}%s${rs} ${bld}%s${rs}: Unrecognized search strategy.\n\n", flag, arg);
 		goto list_strategies;
 	}
 
@@ -2355,7 +2361,7 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	return expr;
 
 bad_unit:
-	parse_error(state, "%s %s: Expected a size unit (one of cwbkMGTP); found '%s'.\n",
+	parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Expected a size unit (one of ${bld}cwbkMGTP${rs}); found ${er}%s${rs}.\n",
 	            expr->argv[0], expr->argv[1], unit);
 fail:
 	free_expr(expr);
@@ -2430,11 +2436,11 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			break;
 
 		case '\0':
-			parse_error(state, "%s %s: Expected a type flag.\n", expr->argv[0], expr->argv[1]);
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Expected a type flag.\n", expr->argv[0], expr->argv[1]);
 			goto fail;
 
 		default:
-			parse_error(state, "%s %s: Unknown type flag '%c' (expected one of [bcdpflsD]).\n",
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Unknown type flag ${er}%c${rs} (expected one of [${bld}bcdpflsD${rs}]).\n",
 			            expr->argv[0], expr->argv[1], *c);
 			goto fail;
 		}
@@ -2451,7 +2457,7 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			++c;
 			continue;
 		} else {
-			parse_error(state, "%s %s: Types must be comma-separated.\n", expr->argv[0], expr->argv[1]);
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Types must be comma-separated.\n", expr->argv[0], expr->argv[1]);
 			goto fail;
 		}
 	}
@@ -2493,7 +2499,7 @@ static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) 
 	}
 	return expr;
 #else
-	parse_error(state, "%s is missing platform support.\n", state->argv[0]);
+	parse_error(state, "${blu}%s${rs} is missing platform support.\n", state->argv[0]);
 	return NULL;
 #endif
 }
@@ -2652,7 +2658,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Treat ${mag}PATH${rs} as a path to search (useful if begins with a dash)\n");
 	cfprintf(cout, "  ${cyn}-D${rs} ${bld}FLAG${rs}\n");
 	cfprintf(cout, "      Turn on a debugging flag (see ${cyn}-D${rs} ${bld}help${rs})\n");
-	cfprintf(cout, "  ${cyn}-O${rs}${bld}N${rs}\n");
+	cfprintf(cout, "  ${cyn}-O${bld}N${rs}\n");
 	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: 3)\n");
 	cfprintf(cout, "  ${cyn}-S${rs} ${bld}bfs${rs}|${bld}dfs${rs}|${bld}ids${rs}\n");
 	cfprintf(cout, "      Use ${bld}b${rs}readth-${bld}f${rs}irst/${bld}d${rs}epth-${bld}f${rs}irst/${bld}i${rs}terative ${bld}d${rs}eepening ${bld}s${rs}earch (default: ${cyn}-S${rs} ${bld}bfs${rs})\n\n");
@@ -2768,7 +2774,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Find files whose name matches the ${bld}GLOB${rs}\n");
 	cfprintf(cout, "  ${blu}-newer${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "      Find files newer than ${bld}FILE${rs}\n");
-	cfprintf(cout, "  ${blu}-newer${rs}${bld}XY${rs} ${bld}REFERENCE${rs}\n");
+	cfprintf(cout, "  ${blu}-newer${bld}XY${rs} ${bld}REFERENCE${rs}\n");
 	cfprintf(cout, "      Find files whose ${bld}X${rs} time is newer than the ${bld}Y${rs} time of"
 	               " ${bld}REFERENCE${rs}.  ${bld}X${rs} and ${bld}Y${rs}\n");
 	cfprintf(cout, "      can be any of [${bld}aBcm${rs}].  ${bld}Y${rs} may also be ${bld}t${rs} to parse ${bld}REFERENCE${rs} an explicit\n");
@@ -3063,7 +3069,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	match = table_lookup_fuzzy(arg);
 
-	parse_error(state, "Unknown argument '%s'; did you mean '%s'?", arg, match->arg);
+	parse_error(state, "Unknown argument ${er}%s${rs}; did you mean ${blu}%s${rs}?", arg, match->arg);
 
 	if (!state->interactive || !match->parse) {
 		fprintf(stderr, "\n");
@@ -3085,7 +3091,7 @@ unmatched:
 	return NULL;
 
 unexpected:
-	parse_error(state, "Expected a predicate; found '%s'.\n", arg);
+	parse_error(state, "Expected a predicate; found ${er}%s${rs}.\n", arg);
 	return NULL;
 }
 
@@ -3101,7 +3107,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 
 	const char *arg = state->argv[0];
 	if (!arg) {
-		parse_error(state, "Expression terminated prematurely after '%s'.\n", state->last_arg);
+		parse_error(state, "Expression terminated prematurely after ${red}%s${rs}.\n", state->last_arg);
 		return NULL;
 	}
 
@@ -3120,7 +3126,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 
 		arg = state->argv[0];
 		if (!arg || strcmp(arg, ")") != 0) {
-			parse_error(state, "Expected a ')' after '%s'.\n", state->argv[-1]);
+			parse_error(state, "Expected a ${red})${rs} after ${blu}%s${rs}.\n", state->argv[-1]);
 			free_expr(expr);
 			return NULL;
 		}
@@ -3277,7 +3283,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->argv[0]) {
-		parse_error(state, "Unexpected argument '%s'.\n", state->argv[0]);
+		parse_error(state, "Unexpected argument ${er}%s${rs}.\n", state->argv[0]);
 		goto fail;
 	}
 
@@ -3295,11 +3301,11 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->mount_arg && state->xdev_arg) {
-		parse_warning(state, "%s is redundant in the presence of %s.\n\n", state->xdev_arg, state->mount_arg);
+		parse_warning(state, "${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n", state->xdev_arg, state->mount_arg);
 	}
 
 	if (state->cmdline->warn && state->depth_arg && state->prune_arg) {
-		parse_warning(state, "%s does not work in the presence of %s.\n", state->prune_arg, state->depth_arg);
+		parse_warning(state, "${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n", state->prune_arg, state->depth_arg);
 
 		if (state->interactive) {
 			fprintf(stderr, "Do you want to continue? ");

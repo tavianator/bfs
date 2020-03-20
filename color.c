@@ -371,7 +371,7 @@ struct colors *parse_colors(const char *ls_colors) {
 	ret |= init_color(colors, "ec", NULL,     &colors->endcode);
 	ret |= init_color(colors, "cl", "\033[K", &colors->clear_to_eol);
 
-	ret |= init_color(colors, "bld", "01",    &colors->bold);
+	ret |= init_color(colors, "bld", "01;39", &colors->bold);
 	ret |= init_color(colors, "gry", "01;30", &colors->gray);
 	ret |= init_color(colors, "red", "01;31", &colors->red);
 	ret |= init_color(colors, "grn", "01;32", &colors->green);
