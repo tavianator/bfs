@@ -3399,7 +3399,7 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	if (cmdline->flags & BFTW_MOUNT) {
 		cfprintf(cerr, "${blu}-mount${rs} ");
 	} else if (cmdline->flags & BFTW_XDEV) {
-		cfprintf(cerr, "${blu}-xdev{rs} ");
+		cfprintf(cerr, "${blu}-xdev${rs} ");
 	}
 	if (cmdline->mindepth != 0) {
 		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", cmdline->mindepth);
