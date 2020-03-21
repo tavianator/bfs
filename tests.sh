@@ -272,6 +272,8 @@ bsd_tests=(
 
     test_f
 
+    test_s
+
     test_double_dash
     test_flag_double_dash
 
@@ -590,6 +592,12 @@ bfs_tests=(
     test_flag_expr_path
     test_expr_flag_path
     test_expr_path_flag
+
+    # Flags
+
+    test_S_bfs
+    test_S_dfs
+    test_S_ids
 
     # Primaries
 
@@ -1745,6 +1753,16 @@ function test_f() {
     bfs_diff -f '-' -f '('
 }
 
+function test_s() {
+    invoke_bfs -s weirdnames -maxdepth 1 >"$TMP/test_s.out"
+
+    if [ "$UPDATE" ]; then
+        cp {"$TMP","$TESTS"}/test_s.out
+    else
+        diff -u {"$TESTS","$TMP"}/test_s.out
+    fi
+}
+
 function test_hidden() {
     bfs_diff weirdnames -hidden
 }
@@ -2566,6 +2584,28 @@ function test_help() {
     invoke_bfs -regextype help | grep -E '\{...?\}' && return 1
 
     return 0
+}
+
+function test_S() {
+    invoke_bfs -S "$1" -s basic >"$TMP/test_S_$1.out"
+
+    if [ "$UPDATE" ]; then
+        cp {"$TMP","$TESTS"}/"test_S_$1.out"
+    else
+        diff -u {"$TESTS","$TMP"}/"test_S_$1.out"
+    fi
+}
+
+function test_S_bfs() {
+    test_S bfs
+}
+
+function test_S_dfs() {
+    test_S dfs
+}
+
+function test_S_ids() {
+    test_S ids
 }
 
 

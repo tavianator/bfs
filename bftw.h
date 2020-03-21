@@ -188,6 +188,8 @@ enum bftw_flags {
 	BFTW_MOUNT         = 1 << 6,
 	/** Skip the descendents of mount points. */
 	BFTW_XDEV          = 1 << 7,
+	/** Sort directory entries before processing them. */
+	BFTW_SORT          = 1 << 8,
 };
 
 /**

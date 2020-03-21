@@ -2221,6 +2221,14 @@ list_types:
 }
 
 /**
+ * Parse -s.
+ */
+static struct expr *parse_s(struct parser_state *state, int arg1, int arg2) {
+	state->cmdline->flags |= BFTW_SORT;
+	return parse_nullary_flag(state);
+}
+
+/**
  * Parse -samefile FILE.
  */
 static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg2) {
@@ -2651,6 +2659,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Filter out files with non-${ex}xargs${rs}-safe names\n");
 	cfprintf(cout, "  ${cyn}-d${rs}\n");
 	cfprintf(cout, "      Search in post-order (same as ${blu}-depth${rs})\n");
+	cfprintf(cout, "  ${cyn}-s${rs}\n");
+	cfprintf(cout, "      Visit directory entries in sorted order\n");
 	cfprintf(cout, "  ${cyn}-x${rs}\n");
 	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs})\n");
 
@@ -2991,6 +3001,7 @@ static const struct table_entry parse_table[] = {
 	{"-regex", parse_regex, 0},
 	{"-regextype", parse_regextype},
 	{"-rm", parse_delete},
+	{"-s", parse_s},
 	{"-samefile", parse_samefile},
 	{"-since", parse_since, BFS_STAT_MTIME},
 	{"-size", parse_size},

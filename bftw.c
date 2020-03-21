@@ -549,6 +549,67 @@ static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 	return file;
 }
 
+/** The split phase of mergesort. */
+static struct bftw_file **bftw_sort_split(struct bftw_file **head, struct bftw_file **tail) {
+	struct bftw_file **tortoise = head, **hare = head;
+
+	while (*hare != *tail) {
+		tortoise = &(*tortoise)->next;
+		hare = &(*hare)->next;
+		if (*hare != *tail) {
+			hare = &(*hare)->next;
+		}
+	}
+
+	return tortoise;
+}
+
+/** The merge phase of mergesort. */
+static struct bftw_file **bftw_sort_merge(struct bftw_file **head, struct bftw_file **mid, struct bftw_file **tail) {
+	struct bftw_file *left = *head, *right = *mid, *end = *tail;
+	*mid = NULL;
+	*tail = NULL;
+
+	while (left || right) {
+		struct bftw_file *next;
+		if (left && (!right || strcoll(left->name, right->name) <= 0)) {
+			next = left;
+			left = left->next;
+		} else {
+			next = right;
+			right = right->next;
+		}
+
+		*head = next;
+		head = &next->next;
+	}
+
+	*head = end;
+	return head;
+}
+
+/**
+ * Sort a (sub-)list of files.
+ *
+ * @param head
+ *         The head of the (sub-)list to sort.
+ * @param tail
+ *         The tail of the (sub-)list to sort.
+ * @return
+ *         The new tail of the (sub-)list.
+ */
+static struct bftw_file **bftw_sort_files(struct bftw_file **head, struct bftw_file **tail) {
+	struct bftw_file **mid = bftw_sort_split(head, tail);
+	if (*mid == *head || *mid == *tail) {
+		return tail;
+	}
+
+	mid = bftw_sort_files(head, mid);
+	tail = bftw_sort_files(mid, tail);
+
+	return bftw_sort_merge(head, mid, tail);
+}
+
 /**
  * A directory reader.
  */
@@ -635,6 +696,8 @@ struct bftw_state {
 	struct bftw_cache cache;
 	/** The queue of directories left to explore. */
 	struct bftw_queue queue;
+	/** The start of the current batch of files. */
+	struct bftw_file **batch;
 
 	/** The current path. */
 	char *path;
@@ -672,6 +735,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 
 	bftw_queue_init(&state->queue);
+	state->batch = NULL;
 
 	state->path = dstralloc(0);
 	if (!state->path) {
@@ -1345,6 +1409,14 @@ static void bftw_batch_start(struct bftw_state *state) {
 	if (state->strategy == BFTW_DFS) {
 		state->queue.target = &state->queue.head;
 	}
+	state->batch = state->queue.target;
+}
+
+/** Finish adding a batch of files. */
+static void bftw_batch_finish(struct bftw_state *state) {
+	if (state->flags & BFTW_SORT) {
+		state->queue.target = bftw_sort_files(state->batch, state->queue.target);
+	}
 }
 
 /**
@@ -1362,6 +1434,7 @@ static int bftw_batch(const struct bftw_args *args) {
 			goto done;
 		}
 	}
+	bftw_batch_finish(&state);
 
 	while (bftw_pop(&state) > 0) {
 		enum bftw_release_flags relflags = BFTW_VISIT_ALL;
@@ -1384,6 +1457,7 @@ static int bftw_batch(const struct bftw_args *args) {
 				goto done;
 			}
 		}
+		bftw_batch_finish(&state);
 
 		if (bftw_release_reader(&state, relflags) == BFTW_STOP) {
 			goto done;
@@ -1499,7 +1573,7 @@ static int bftw_ids(const struct bftw_args *args) {
 
 	while (ret == 0 && !state.quit && !state.bottom) {
 		state.bottom = true;
-		ret = bftw_stream(&ids_args);
+		ret = args->flags & BFTW_SORT ? bftw_batch(&ids_args) : bftw_stream(&ids_args);
 		++state.depth;
 	}
 
@@ -1508,7 +1582,7 @@ static int bftw_ids(const struct bftw_args *args) {
 
 		while (ret == 0 && !state.quit && state.depth > 0) {
 			--state.depth;
-			ret = bftw_stream(&ids_args);
+			ret = args->flags & BFTW_SORT ? bftw_batch(&ids_args) : bftw_stream(&ids_args);
 		}
 	}
 
@@ -1525,7 +1599,10 @@ static int bftw_ids(const struct bftw_args *args) {
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
-		return bftw_stream(args);
+		if (!(args->flags & BFTW_SORT)) {
+			return bftw_stream(args);
+		}
+		// Fallthrough
 	case BFTW_DFS:
 		return bftw_batch(args);
 	case BFTW_IDS:

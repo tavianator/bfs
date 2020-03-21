@@ -101,6 +101,13 @@ names.
 Search in post-order (same as
 .BR \-depth ).
 .TP
+.B \-s
+Visit directory entries in sorted order.
+The sorting takes place within each directory separately, which makes it different from
+.B bfs ... |
+.BR sort ,
+but still provides a deterministic ordering.
+.TP
 .B \-x
 Don't descend into other mount points (same as \fB\-xdev\fR).
 .TP
