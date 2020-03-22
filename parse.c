@@ -3343,6 +3343,26 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 
 	cfprintf(cerr, "${ex}%s${rs} ", cmdline->argv[0]);
 
+	if (cmdline->flags & BFTW_LOGICAL) {
+		cfprintf(cerr, "${cyn}-L${rs} ");
+	} else if (cmdline->flags & BFTW_COMFOLLOW) {
+		cfprintf(cerr, "${cyn}-H${rs} ");
+	} else {
+		cfprintf(cerr, "${cyn}-P${rs} ");
+	}
+
+	if (cmdline->xargs_safe) {
+		cfprintf(cerr, "${cyn}-X${rs} ");
+	}
+
+	if (cmdline->flags & BFTW_SORT) {
+		cfprintf(cerr, "${cyn}-s${rs} ");
+	}
+
+	if (cmdline->optlevel != 3) {
+		cfprintf(cerr, "${cyn}-O%d${rs} ", cmdline->optlevel);
+	}
+
 	const char *strategy = NULL;
 	switch (cmdline->strategy) {
 	case BFTW_BFS:
@@ -3357,18 +3377,6 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	}
 	assert(strategy);
 	cfprintf(cerr, "${cyn}-S${rs} ${bld}%s${rs} ", strategy);
-
-	if (cmdline->flags & BFTW_LOGICAL) {
-		cfprintf(cerr, "${cyn}-L${rs} ");
-	} else if (cmdline->flags & BFTW_COMFOLLOW) {
-		cfprintf(cerr, "${cyn}-H${rs} ");
-	} else {
-		cfprintf(cerr, "${cyn}-P${rs} ");
-	}
-
-	if (cmdline->optlevel != 3) {
-		cfprintf(cerr, "${cyn}-O%d${rs} ", cmdline->optlevel);
-	}
 
 	enum debug_flags debug = cmdline->debug;
 	if (debug) {
@@ -3407,19 +3415,20 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 	if (cmdline->ignore_races) {
 		cfprintf(cerr, "${blu}-ignore_readdir_race${rs} ");
 	}
-	if (cmdline->flags & BFTW_MOUNT) {
-		cfprintf(cerr, "${blu}-mount${rs} ");
-	} else if (cmdline->flags & BFTW_XDEV) {
-		cfprintf(cerr, "${blu}-xdev${rs} ");
-	}
 	if (cmdline->mindepth != 0) {
 		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", cmdline->mindepth);
 	}
 	if (cmdline->maxdepth != INT_MAX) {
 		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", cmdline->maxdepth);
 	}
+	if (cmdline->flags & BFTW_MOUNT) {
+		cfprintf(cerr, "${blu}-mount${rs} ");
+	}
 	if (cmdline->unique) {
 		cfprintf(cerr, "${blu}-unique${rs} ");
+	}
+	if ((cmdline->flags & (BFTW_MOUNT | BFTW_XDEV)) == BFTW_XDEV) {
+		cfprintf(cerr, "${blu}-xdev${rs} ");
 	}
 
 	dump_expr(cerr, cmdline->expr, verbose);
