@@ -69,6 +69,10 @@ ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 
+ifeq ($(OS),Linux)
+DISTCHECK_FLAGS := TEST_FLAGS="--all --sudo"
+endif
+
 default: bfs
 
 all: bfs tests/mksock
@@ -108,21 +112,16 @@ tests/mksock: tests/mksock.o
 check: check-bfs check-dfs check-ids
 
 check-%: all
-	./tests.sh --bfs="$(CURDIR)/bfs -S $*"
+	./tests.sh --bfs="$(CURDIR)/bfs -S $*" $(TEST_FLAGS)
 
 distcheck:
-	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) $(ASAN_CFLAGS) $(UBSAN_CFLAGS)"
+	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) $(ASAN_CFLAGS) $(UBSAN_CFLAGS)" $(DISTCHECK_FLAGS)
 ifneq ($(OS),Darwin)
-	+$(MAKE) -Bs check CC=clang CFLAGS="$(CFLAGS) $(MSAN_CFLAGS)"
-	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -m32"
+	+$(MAKE) -Bs check CC=clang CFLAGS="$(CFLAGS) $(MSAN_CFLAGS)" $(DISTCHECK_FLAGS)
+	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -m32" $(DISTCHECK_FLAGS)
 endif
-	+$(MAKE) -Bs release check
-	+$(MAKE) -Bs check
-ifeq ($(OS),Linux)
-	./tests.sh --sudo --bfs="$(CURDIR)/bfs"
-	./tests.sh --sudo --bfs="$(CURDIR)/bfs -S dfs"
-	./tests.sh --sudo --bfs="$(CURDIR)/bfs -S ids"
-endif
+	+$(MAKE) -Bs release check $(DISTCHECK_FLAGS)
+	+$(MAKE) -Bs check $(DISTCHECK_FLAGS)
 
 clean:
 	$(RM) bfs *.[od] tests/mksock tests/*.[od]
