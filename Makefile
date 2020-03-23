@@ -100,6 +100,15 @@ bfs: \
     util.o
 	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
+asan: LOCAL_CFLAGS += $(ASAN_CFLAGS)
+asan: bfs
+
+ubsan: LOCAL_CFLAGS += $(UBSAN_CFLAGS)
+ubsan: bfs
+
+msan: LOCAL_CFLAGS += $(MSAN_CFLAGS)
+msan: bfs
+
 release: CFLAGS := -g $(WFLAGS) -O3 -flto -DNDEBUG
 release: bfs
 
@@ -115,10 +124,10 @@ check-%: all
 	./tests.sh --bfs="$(CURDIR)/bfs -S $*" $(TEST_FLAGS)
 
 distcheck:
-	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) $(ASAN_CFLAGS) $(UBSAN_CFLAGS)" $(DISTCHECK_FLAGS)
+	+$(MAKE) -Bs asan ubsan check $(DISTCHECK_FLAGS)
 ifneq ($(OS),Darwin)
-	+$(MAKE) -Bs check CC=clang CFLAGS="$(CFLAGS) $(MSAN_CFLAGS)" $(DISTCHECK_FLAGS)
-	+$(MAKE) -Bs check CFLAGS="$(CFLAGS) -m32" $(DISTCHECK_FLAGS)
+	+$(MAKE) -Bs msan check CC=clang $(DISTCHECK_FLAGS)
+	+$(MAKE) -Bs check CFLAGS="-m32" $(DISTCHECK_FLAGS)
 endif
 	+$(MAKE) -Bs release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -Bs check $(DISTCHECK_FLAGS)
