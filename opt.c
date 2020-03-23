@@ -308,11 +308,11 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 		has_parent = false;
 	}
 
+	assert(expr->eval == eval_and || expr->eval == eval_or);
 	if (expr->eval == eval_and) {
 		expr->eval = eval_or;
 		expr->argv = &fake_or_arg;
 	} else {
-		assert(expr->eval == eval_or);
 		expr->eval = eval_and;
 		expr->argv = &fake_and_arg;
 	}
@@ -342,11 +342,13 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 	} else {
 		expr = optimize_or_expr(state, expr);
 	}
+	if (has_parent) {
+		parent->rhs = expr;
+	} else {
+		parent = expr;
+	}
 	if (!expr) {
-		if (has_parent) {
-			parent->rhs = NULL;
-			free_expr(parent);
-		}
+		free_expr(parent);
 		return NULL;
 	}
 
