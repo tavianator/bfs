@@ -62,16 +62,30 @@ LOCAL_LDLIBS += -lacl -lcap -lattr -lrt
 
 # These libraries are not built with msan, so disable them
 MSAN_CFLAGS += -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTR=0
+
+DISTCHECK_FLAGS := TEST_FLAGS="--all --sudo"
+endif
+
+ifneq ($(filter asan,$(MAKECMDGOALS)),)
+LOCAL_CFLAGS += $(ASAN_CFLAGS)
+endif
+
+ifneq ($(filter msan,$(MAKECMDGOALS)),)
+LOCAL_CFLAGS += $(MSAN_CFLAGS)
+endif
+
+ifneq ($(filter ubsan,$(MAKECMDGOALS)),)
+LOCAL_CFLAGS += $(UBSAN_CFLAGS)
+endif
+
+ifneq ($(filter release,$(MAKECMDGOALS)),)
+CFLAGS := -g $(WFLAGS) -O3 -flto -DNDEBUG
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
-
-ifeq ($(OS),Linux)
-DISTCHECK_FLAGS := TEST_FLAGS="--all --sudo"
-endif
 
 default: bfs
 
@@ -100,17 +114,14 @@ bfs: \
     util.o
 	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-asan: LOCAL_CFLAGS += $(ASAN_CFLAGS)
 asan: bfs
-
-ubsan: LOCAL_CFLAGS += $(UBSAN_CFLAGS)
+	@:
 ubsan: bfs
-
-msan: LOCAL_CFLAGS += $(MSAN_CFLAGS)
+	@:
 msan: bfs
-
-release: CFLAGS := -g $(WFLAGS) -O3 -flto -DNDEBUG
+	@:
 release: bfs
+	@:
 
 tests/mksock: tests/mksock.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
@@ -124,13 +135,13 @@ check-%: all
 	./tests.sh --bfs="$(CURDIR)/bfs -S $*" $(TEST_FLAGS)
 
 distcheck:
-	+$(MAKE) -Bs asan ubsan check $(DISTCHECK_FLAGS)
+	+$(MAKE) -B asan ubsan check $(DISTCHECK_FLAGS)
 ifneq ($(OS),Darwin)
-	+$(MAKE) -Bs msan check CC=clang $(DISTCHECK_FLAGS)
-	+$(MAKE) -Bs check CFLAGS="-m32" $(DISTCHECK_FLAGS)
+	+$(MAKE) -B msan check CC=clang $(DISTCHECK_FLAGS)
+	+$(MAKE) -B check CFLAGS="-m32" $(DISTCHECK_FLAGS)
 endif
-	+$(MAKE) -Bs release check $(DISTCHECK_FLAGS)
-	+$(MAKE) -Bs check $(DISTCHECK_FLAGS)
+	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
+	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
 	$(RM) bfs *.[od] tests/mksock tests/*.[od]
@@ -145,6 +156,6 @@ uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 
-.PHONY: all release check distcheck clean install uninstall
+.PHONY: all asan ubsan msan release check distcheck clean install uninstall
 
 -include $(wildcard *.d)
