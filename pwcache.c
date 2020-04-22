@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#include "passwd.h"
+#include "pwcache.h"
 #include "darray.h"
 #include "trie.h"
 #include <errno.h>

@@ -18,8 +18,8 @@
  * A caching wrapper for /etc/{passwd,group}.
  */
 
-#ifndef BFS_PASSWD_H
-#define BFS_PASSWD_H
+#ifndef BFS_PWCACHE_H
+#define BFS_PWCACHE_H
 
 #include <grp.h>
 #include <pwd.h>
@@ -114,4 +114,4 @@ const struct group *bfs_getgrgid(const struct bfs_groups *groups, gid_t gid);
  */
 void bfs_free_groups(struct bfs_groups *groups);
 
-#endif // BFS_PASSWD_H
+#endif // BFS_PWCACHE_H

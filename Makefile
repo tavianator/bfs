@@ -104,8 +104,8 @@ bfs: \
     mtab.o \
     opt.o \
     parse.o \
-    passwd.o \
     printf.o \
+    pwcache.o \
     spawn.o \
     stat.o \
     time.o \

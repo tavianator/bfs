@@ -21,7 +21,7 @@
 #include "dstring.h"
 #include "expr.h"
 #include "mtab.h"
-#include "passwd.h"
+#include "pwcache.h"
 #include "stat.h"
 #include "time.h"
 #include "util.h"
