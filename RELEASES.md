@@ -1,6 +1,16 @@
 1.*
 ===
 
+1.7
+---
+
+**April 22, 2020**
+
+- Fixed `-ls` printing numeric IDs instead of user/group names in large directory trees
+- Cached the user and group tables for a performance boost
+- Fixed interpretation of "default" ACLs
+- Implemented `-s` flag to sort results
+
 
 1.6
 ---
