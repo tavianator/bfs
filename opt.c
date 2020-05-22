@@ -48,6 +48,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <unistd.h>
 
 static char *fake_and_arg = "-a";
 static char *fake_or_arg = "-o";
