@@ -53,7 +53,7 @@ LOCAL_LDFLAGS :=
 LOCAL_LDLIBS :=
 
 ASAN_CFLAGS := -fsanitize=address
-MSAN_CFLAGS := -fsanitize=memory
+MSAN_CFLAGS := -fsanitize=memory -fsanitize-memory-track-origins
 UBSAN_CFLAGS := -fsanitize=undefined
 
 ifeq ($(OS),Linux)
