@@ -43,6 +43,7 @@
 #include "color.h"
 #include "eval.h"
 #include "expr.h"
+#include "pwcache.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -116,7 +117,7 @@ static void range_union(struct range *result, const struct range *lhs, const str
 }
 
 /** Check if a range contains no values. */
-static bool range_impossible(const struct range *range) {
+static bool range_is_impossible(const struct range *range) {
 	return range->min > range->max;
 }
 
@@ -143,7 +144,73 @@ enum range_type {
 	/** User ID. */
 	UID_RANGE,
 	/** The number of range_types. */
-	MAX_RANGE,
+	RANGE_TYPES,
+};
+
+/**
+ * A possibly-known value of a predicate.
+ */
+enum known_pred {
+	/** The state is impossible to reach. */
+	PRED_IMPOSSIBLE = -2,
+	/** The value of the predicate is not known. */
+	PRED_UNKNOWN = -1,
+	/** The predicate is known to be false. */
+	PRED_FALSE = false,
+	/** The predicate is known to be true. */
+	PRED_TRUE = true,
+};
+
+/** Make a predicate known. */
+static void constrain_pred(enum known_pred *pred, bool value) {
+	if (*pred == PRED_UNKNOWN) {
+		*pred = value;
+	} else if (*pred == !value) {
+		*pred = PRED_IMPOSSIBLE;
+	}
+}
+
+/** Compute the union of two known predicates. */
+static enum known_pred pred_union(enum known_pred lhs, enum known_pred rhs) {
+	if (lhs == PRED_IMPOSSIBLE) {
+		return rhs;
+	} else if (rhs == PRED_IMPOSSIBLE) {
+		return lhs;
+	} else if (lhs == rhs) {
+		return lhs;
+	} else {
+		return PRED_UNKNOWN;
+	}
+}
+
+/**
+ * Types of predicates we track.
+ */
+enum pred_type {
+	/** -readable */
+	READABLE_PRED,
+	/** -writable */
+	WRITABLE_PRED,
+	/** -executable */
+	EXECUTABLE_PRED,
+	/** -acl */
+	ACL_PRED,
+	/** -capable */
+	CAPABLE_PRED,
+	/** -empty */
+	EMPTY_PRED,
+	/** -hidden */
+	HIDDEN_PRED,
+	/** -nogroup */
+	NOGROUP_PRED,
+	/** -nouser */
+	NOUSER_PRED,
+	/** -sparse */
+	SPARSE_PRED,
+	/** -xattr */
+	XATTR_PRED,
+	/** The number of pred_types. */
+	PRED_TYPES,
 };
 
 /**
@@ -151,7 +218,10 @@ enum range_type {
  */
 struct opt_facts {
 	/** The value ranges we track. */
-	struct range ranges[MAX_RANGE];
+	struct range ranges[RANGE_TYPES];
+
+	/** The predicates we track. */
+	enum known_pred preds[PRED_TYPES];
 
 	/** Bitmask of possible file types. */
 	enum bftw_typeflag types;
@@ -161,10 +231,14 @@ struct opt_facts {
 
 /** Initialize some data flow facts. */
 static void facts_init(struct opt_facts *facts) {
-	for (int i = 0; i < MAX_RANGE; ++i) {
-		struct range *range = facts->ranges + i;
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		struct range *range = &facts->ranges[i];
 		range->min = 0; // All ranges we currently track are non-negative
 		range->max = LLONG_MAX;
+	}
+
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		facts->preds[i] = PRED_UNKNOWN;
 	}
 
 	facts->types = ~0;
@@ -173,8 +247,12 @@ static void facts_init(struct opt_facts *facts) {
 
 /** Compute the union of two fact sets. */
 static void facts_union(struct opt_facts *result, const struct opt_facts *lhs, const struct opt_facts *rhs) {
-	for (int i = 0; i < MAX_RANGE; ++i) {
-		range_union(result->ranges + i, lhs->ranges + i, rhs->ranges + i);
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		range_union(&result->ranges[i], &lhs->ranges[i], &rhs->ranges[i]);
+	}
+
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		result->preds[i] = pred_union(lhs->preds[i], rhs->preds[i]);
 	}
 
 	result->types = lhs->types | rhs->types;
@@ -182,9 +260,15 @@ static void facts_union(struct opt_facts *result, const struct opt_facts *lhs, c
 }
 
 /** Determine whether a fact set is impossible. */
-static bool facts_impossible(const struct opt_facts *facts) {
-	for (int i = 0; i < MAX_RANGE; ++i) {
-		if (range_impossible(facts->ranges + i)) {
+static bool facts_are_impossible(const struct opt_facts *facts) {
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		if (range_is_impossible(&facts->ranges[i])) {
+			return true;
+		}
+	}
+
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		if (facts->preds[i] == PRED_IMPOSSIBLE) {
 			return true;
 		}
 	}
@@ -198,8 +282,12 @@ static bool facts_impossible(const struct opt_facts *facts) {
 
 /** Set some facts to be impossible. */
 static void set_facts_impossible(struct opt_facts *facts) {
-	for (int i = 0; i < MAX_RANGE; ++i) {
-		set_range_impossible(facts->ranges + i);
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		set_range_impossible(&facts->ranges[i]);
+	}
+
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		facts->preds[i] = PRED_IMPOSSIBLE;
 	}
 
 	facts->types = 0;
@@ -638,10 +726,29 @@ fail:
 	return NULL;
 }
 
-/** Infer data flow facts about an icmp-style ([+-]N) expression */
+/** Infer data flow facts about a predicate. */
+static void infer_pred_facts(struct opt_state *state, enum pred_type pred) {
+	constrain_pred(&state->facts_when_true.preds[pred], true);
+	constrain_pred(&state->facts_when_false.preds[pred], true);
+}
+
+/** Infer data flow facts about an -{execut,read,writ}able expression. */
+static void infer_access_facts(struct opt_state *state, const struct expr *expr) {
+	if (expr->idata & R_OK) {
+		infer_pred_facts(state, READABLE_PRED);
+	}
+	if (expr->idata & W_OK) {
+		infer_pred_facts(state, WRITABLE_PRED);
+	}
+	if (expr->idata & X_OK) {
+		infer_pred_facts(state, EXECUTABLE_PRED);
+	}
+}
+
+/** Infer data flow facts about an icmp-style ([+-]N) expression. */
 static void infer_icmp_facts(struct opt_state *state, const struct expr *expr, enum range_type type) {
-	struct range *range_when_true = state->facts_when_true.ranges + type;
-	struct range *range_when_false = state->facts_when_false.ranges + type;
+	struct range *range_when_true = &state->facts_when_true.ranges[type];
+	struct range *range_when_false =& state->facts_when_false.ranges[type];
 	long long value = expr->idata;
 
 	switch (expr->cmp_flag) {
@@ -665,9 +772,35 @@ static void infer_icmp_facts(struct opt_state *state, const struct expr *expr, e
 	}
 }
 
+/** Infer data flow facts about a -gid expression. */
+static void infer_gid_facts(struct opt_state *state, const struct expr *expr) {
+	infer_icmp_facts(state, expr, GID_RANGE);
+
+	struct bfs_groups *groups = state->cmdline->groups;
+	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
+	if (groups && range->min == range->max) {
+		gid_t gid = range->min;
+		bool nogroup = !bfs_getgrgid(groups, gid);
+		constrain_pred(&state->facts_when_true.preds[NOGROUP_PRED], nogroup);
+	}
+}
+
+/** Infer data flow facts about a -uid expression. */
+static void infer_uid_facts(struct opt_state *state, const struct expr *expr) {
+	infer_icmp_facts(state, expr, UID_RANGE);
+
+	struct bfs_users *users = state->cmdline->users;
+	struct range *range = &state->facts_when_true.ranges[UID_RANGE];
+	if (users && range->min == range->max) {
+		uid_t uid = range->min;
+		bool nouser = !bfs_getpwuid(users, uid);
+		constrain_pred(&state->facts_when_true.preds[NOUSER_PRED], nouser);
+	}
+}
+
 /** Infer data flow facts about a -samefile expression. */
 static void infer_samefile_facts(struct opt_state *state, const struct expr *expr) {
-	struct range *range_when_true = state->facts_when_true.ranges + INUM_RANGE;
+	struct range *range_when_true = &state->facts_when_true.ranges[INUM_RANGE];
 	constrain_min(range_when_true, expr->ino);
 	constrain_max(range_when_true, expr->ino);
 }
@@ -688,22 +821,40 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 	state->facts_when_true = state->facts;
 	state->facts_when_false = state->facts;
 
-	if (expr->eval == eval_depth) {
+	if (expr->eval == eval_access) {
+		infer_access_facts(state, expr);
+	} else if (expr->eval == eval_acl) {
+		infer_pred_facts(state, ACL_PRED);
+	} else if (expr->eval == eval_capable) {
+		infer_pred_facts(state, CAPABLE_PRED);
+	} else if (expr->eval == eval_depth) {
 		infer_icmp_facts(state, expr, DEPTH_RANGE);
+	} else if (expr->eval == eval_empty) {
+		infer_pred_facts(state, EMPTY_PRED);
 	} else if (expr->eval == eval_gid) {
-		infer_icmp_facts(state, expr, GID_RANGE);
+		infer_gid_facts(state, expr);
+	} else if (expr->eval == eval_hidden) {
+		infer_pred_facts(state, HIDDEN_PRED);
 	} else if (expr->eval == eval_inum) {
 		infer_icmp_facts(state, expr, INUM_RANGE);
 	} else if (expr->eval == eval_links) {
 		infer_icmp_facts(state, expr, LINKS_RANGE);
+	} else if (expr->eval == eval_nogroup) {
+		infer_pred_facts(state, NOGROUP_PRED);
+	} else if (expr->eval == eval_nouser) {
+		infer_pred_facts(state, NOUSER_PRED);
 	} else if (expr->eval == eval_samefile) {
 		infer_samefile_facts(state, expr);
 	} else if (expr->eval == eval_size) {
 		infer_icmp_facts(state, expr, SIZE_RANGE);
+	} else if (expr->eval == eval_sparse) {
+		infer_pred_facts(state, SPARSE_PRED);
 	} else if (expr->eval == eval_type) {
 		infer_type_facts(state, expr);
 	} else if (expr->eval == eval_uid) {
-		infer_icmp_facts(state, expr, UID_RANGE);
+		infer_uid_facts(state, expr);
+	} else if (expr->eval == eval_xattr) {
+		infer_pred_facts(state, XATTR_PRED);
 	} else if (expr->eval == eval_xtype) {
 		infer_xtype_facts(state, expr);
 	} else if (expr->eval == eval_not) {
@@ -746,7 +897,7 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		goto done;
 	}
 
-	if (facts_impossible(&state->facts_when_true)) {
+	if (facts_are_impossible(&state->facts_when_true)) {
 		if (expr->pure) {
 			debug_opt(state, "-O2: data flow: %e --> %e\n", expr, &expr_false);
 			free_expr(expr);
@@ -755,7 +906,7 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 			expr->always_false = true;
 			expr->probability = 0.0;
 		}
-	} else if (facts_impossible(&state->facts_when_false)) {
+	} else if (facts_are_impossible(&state->facts_when_false)) {
 		if (expr->pure) {
 			debug_opt(state, "-O2: data flow: %e --> %e\n", expr, &expr_true);
 			free_expr(expr);
@@ -826,7 +977,7 @@ int optimize_cmdline(struct cmdline *cmdline) {
 	};
 	facts_init(&state.facts);
 
-	struct range *depth = state.facts.ranges + DEPTH_RANGE;
+	struct range *depth = &state.facts.ranges[DEPTH_RANGE];
 	depth->min = cmdline->mindepth;
 	depth->max = cmdline->maxdepth;
 
@@ -848,7 +999,7 @@ int optimize_cmdline(struct cmdline *cmdline) {
 
 	cmdline->expr = ignore_result(&state, cmdline->expr);
 
-	const struct range *depth_when_impure = facts_when_impure.ranges + DEPTH_RANGE;
+	const struct range *depth_when_impure = &facts_when_impure.ranges[DEPTH_RANGE];
 	long long mindepth = depth_when_impure->min;
 	long long maxdepth = depth_when_impure->max;
 

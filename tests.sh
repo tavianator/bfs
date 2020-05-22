@@ -209,6 +209,12 @@ posix_tests=(
     test_newer
     test_newer_link
 
+    test_nogroup
+    test_nogroup_ulimit
+
+    test_nouser
+    test_nouser_ulimit
+
     test_ok_stdin
     test_ok_plus_semicolon
 
@@ -253,6 +259,8 @@ posix_tests=(
     test_de_morgan_not
     test_de_morgan_and
     test_de_morgan_or
+    test_data_flow_group
+    test_data_flow_user
     test_data_flow_type
     test_data_flow_and_swap
     test_data_flow_or_swap
@@ -346,12 +354,6 @@ bsd_tests=(
     test_newerma
     test_newermt
     test_newermt_epoch_minus_one
-
-    test_nogroup
-    test_nogroup_ulimit
-
-    test_nouser
-    test_nouser_ulimit
 
     test_ok_stdin
     test_ok_closed_stdin
@@ -497,12 +499,6 @@ gnu_tests=(
     test_newermt
     test_newermt_epoch_minus_one
 
-    test_nogroup
-    test_nogroup_ulimit
-
-    test_nouser
-    test_nouser_ulimit
-
     test_ok_closed_stdin
     test_ok_nothing
 
@@ -583,6 +579,7 @@ gnu_tests=(
     test_and_false_or_true
     test_comma_redundant_true
     test_comma_redundant_false
+    test_data_flow_sparse
 )
 
 bfs_tests=(
@@ -661,6 +658,9 @@ bfs_tests=(
 
     test_xtype_multi
     test_xtype_reorder
+
+    # Optimizer tests
+    test_data_flow_hidden
 
     # PATH_MAX handling
     test_deep_strict
@@ -2287,6 +2287,22 @@ function test_comma_redundant_false() {
 
 function test_data_flow_depth() {
     bfs_diff basic -depth +1 -depth -4
+}
+
+function test_data_flow_group() {
+    bfs_diff basic \( -group "$(id -g)" -nogroup \) -o \( -group "$(id -g)" -o -nogroup \)
+}
+
+function test_data_flow_user() {
+    bfs_diff basic \( -user "$(id -u)" -nouser \) -o \( -user "$(id -u)" -o -nouser \)
+}
+
+function test_data_flow_hidden() {
+    bfs_diff basic \( -hidden -not -hidden \) -o \( -hidden -o -not -hidden \)
+}
+
+function test_data_flow_sparse() {
+    bfs_diff basic \( -sparse -not -sparse \) -o \( -sparse -o -not -sparse \)
 }
 
 function test_data_flow_type() {
