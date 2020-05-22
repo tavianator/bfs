@@ -38,7 +38,7 @@
 #define BFS_CAN_CHECK_XATTRS (BFS_HAS_SYS_EXTATTR || BFS_HAS_SYS_XATTR)
 
 /**
- * Check if a file has a non-trvial Access Control List.
+ * Check if a file has a non-trivial Access Control List.
  *
  * @param ftwbuf
  *         The file to check.
@@ -48,7 +48,7 @@
 int bfs_check_acl(const struct BFTW *ftwbuf);
 
 /**
- * Check if a file has a non-trvial capability set.
+ * Check if a file has a non-trivial capability set.
  *
  * @param ftwbuf
  *         The file to check.
