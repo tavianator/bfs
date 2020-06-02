@@ -41,6 +41,7 @@
 
 #include "cmdline.h"
 #include "color.h"
+#include "diag.h"
 #include "eval.h"
 #include "expr.h"
 #include "pwcache.h"
@@ -313,41 +314,17 @@ struct opt_state {
 };
 
 /** Log an optimization. */
-static void debug_opt(const struct opt_state *state, const char *format, ...) {
-	if (!(state->cmdline->debug & DEBUG_OPT)) {
-		return;
+BFS_FORMATTER(3, 4)
+static bool debug_opt(const struct opt_state *state, int level, const char *format, ...) {
+	if (bfs_debug(state->cmdline, DEBUG_OPT, "${cyn}-O%d${rs}: ", level)) {
+		va_list args;
+		va_start(args, format);
+		cvfprintf(state->cmdline->cerr, format, args);
+		va_end(args);
+		return true;
+	} else {
+		return false;
 	}
-
-	CFILE *cerr = state->cmdline->cerr;
-
-	va_list args;
-	va_start(args, format);
-
-	for (const char *i = format; *i != '\0'; ++i) {
-		if (*i == '%') {
-			switch (*++i) {
-			case 'd':
-				fprintf(cerr->file, "%d", va_arg(args, int));
-				break;
-
-			case 'e':
-				dump_expr(cerr, va_arg(args, const struct expr *), false);
-				break;
-
-			case 'g':
-				cfprintf(cerr, "${ylw}%g${rs}", va_arg(args, double));
-				break;
-
-			default:
-				assert(false);
-				break;
-			}
-		} else {
-			fputc(*i, stderr);
-		}
-	}
-
-	va_end(args);
 }
 
 /** Extract a child expression, freeing the outer expression. */
@@ -384,7 +361,7 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
  * Apply De Morgan's laws.
  */
 static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, char **argv) {
-	debug_opt(state, "-O1: De Morgan's laws: %e ", expr);
+	bool debug = debug_opt(state, 1, "De Morgan's laws: %pe ", expr);
 
 	struct expr *parent = negate_expr(expr, argv);
 	if (!parent) {
@@ -413,7 +390,9 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 		return NULL;
 	}
 
-	debug_opt(state, "<==> %e\n", parent);
+	if (debug) {
+		cfprintf(state->cmdline->cerr, "<==> %pe\n", parent);
+	}
 
 	if (expr->lhs->eval == eval_not) {
 		expr->lhs = optimize_not_expr(state, expr->lhs);
@@ -461,18 +440,18 @@ static struct expr *optimize_not_expr(const struct opt_state *state, struct expr
 	int optlevel = state->cmdline->optlevel;
 	if (optlevel >= 1) {
 		if (rhs == &expr_true) {
-			debug_opt(state, "-O1: constant propagation: %e <==> %e\n", expr, &expr_false);
+			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &expr_false);
 			free_expr(expr);
 			return &expr_false;
 		} else if (rhs == &expr_false) {
-			debug_opt(state, "-O1: constant propagation: %e <==> %e\n", expr, &expr_true);
+			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &expr_true);
 			free_expr(expr);
 			return &expr_true;
 		} else if (rhs->eval == eval_not) {
-			debug_opt(state, "-O1: double negation: %e <==> %e\n", expr, rhs->rhs);
+			debug_opt(state, 1, "double negation: %pe <==> %pe\n", expr, rhs->rhs);
 			return extract_child_expr(expr, &rhs->rhs);
 		} else if (expr_never_returns(rhs)) {
-			debug_opt(state, "-O1: reachability: %e <==> %e\n", expr, rhs);
+			debug_opt(state, 1, "reachability: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		} else if ((rhs->eval == eval_and || rhs->eval == eval_or)
 			   && (rhs->lhs->eval == eval_not || rhs->rhs->eval == eval_not)) {
@@ -514,27 +493,28 @@ static struct expr *optimize_and_expr(const struct opt_state *state, struct expr
 	struct expr *lhs = expr->lhs;
 	struct expr *rhs = expr->rhs;
 
-	int optlevel = state->cmdline->optlevel;
+	const struct cmdline *cmdline = state->cmdline;
+	int optlevel = cmdline->optlevel;
 	if (optlevel >= 1) {
 		if (lhs == &expr_true) {
-			debug_opt(state, "-O1: conjunction elimination: %e <==> %e\n", expr, rhs);
+			debug_opt(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		} else if (rhs == &expr_true) {
-			debug_opt(state, "-O1: conjunction elimination: %e <==> %e\n", expr, lhs);
+			debug_opt(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs->always_false) {
-			debug_opt(state, "-O1: short-circuit: %e <==> %e\n", expr, lhs);
+			debug_opt(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs->always_true && rhs == &expr_false) {
-			debug_opt(state, "-O1: strength reduction: %e <==> ", expr);
+			bool debug = debug_opt(state, 1, "strength reduction: %pe <==> ", expr);
 			struct expr *ret = extract_child_expr(expr, &expr->lhs);
 			ret = negate_expr(ret, &fake_not_arg);
-			if (ret) {
-				debug_opt(state, "%e\n", ret);
+			if (debug && ret) {
+				cfprintf(cmdline->cerr, "%pe\n", ret);
 			}
 			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_false) {
-			debug_opt(state, "-O2: purity: %e <==> %e\n", expr, rhs);
+			debug_opt(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
 			return de_morgan(state, expr, expr->lhs->argv);
@@ -582,27 +562,28 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 	struct expr *lhs = expr->lhs;
 	struct expr *rhs = expr->rhs;
 
-	int optlevel = state->cmdline->optlevel;
+	const struct cmdline *cmdline = state->cmdline;
+	int optlevel = cmdline->optlevel;
 	if (optlevel >= 1) {
 		if (lhs->always_true) {
-			debug_opt(state, "-O1: short-circuit: %e <==> %e\n", expr, lhs);
+			debug_opt(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs == &expr_false) {
-			debug_opt(state, "-O1: disjunctive syllogism: %e <==> %e\n", expr, rhs);
+			debug_opt(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		} else if (rhs == &expr_false) {
-			debug_opt(state, "-O1: disjunctive syllogism: %e <==> %e\n", expr, lhs);
+			debug_opt(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs->always_false && rhs == &expr_true) {
-			debug_opt(state, "-O1: strength reduction: %e <==> ", expr);
+			bool debug = debug_opt(state, 1, "strength reduction: %pe <==> ", expr);
 			struct expr *ret = extract_child_expr(expr, &expr->lhs);
 			ret = negate_expr(ret, &fake_not_arg);
-			if (ret) {
-				debug_opt(state, "%e\n", ret);
+			if (debug && ret) {
+				cfprintf(cmdline->cerr, "%pe\n", ret);
 			}
 			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_true) {
-			debug_opt(state, "-O2: purity: %e <==> %e\n", expr, rhs);
+			debug_opt(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
 			return de_morgan(state, expr, expr->lhs->argv);
@@ -650,12 +631,12 @@ static struct expr *ignore_result(const struct opt_state *state, struct expr *ex
 	if (optlevel >= 1) {
 		while (true) {
 			if (expr->eval == eval_not) {
-				debug_opt(state, "-O1: ignored result: %e --> %e\n", expr, expr->rhs);
+				debug_opt(state, 1, "ignored result: %pe --> %pe\n", expr, expr->rhs);
 				expr = extract_child_expr(expr, &expr->rhs);
 			} else if (optlevel >= 2
 			           && (expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
 			           && expr->rhs->pure) {
-				debug_opt(state, "-O2: ignored result: %e --> %e\n", expr, expr->lhs);
+				debug_opt(state, 2, "ignored result: %pe --> %pe\n", expr, expr->lhs);
 				expr = extract_child_expr(expr, &expr->lhs);
 			} else {
 				break;
@@ -663,7 +644,7 @@ static struct expr *ignore_result(const struct opt_state *state, struct expr *ex
 		}
 
 		if (optlevel >= 2 && expr->pure && expr != &expr_false) {
-			debug_opt(state, "-O2: ignored result: %e --> %e\n", expr, &expr_false);
+			debug_opt(state, 2, "ignored result: %pe --> %pe\n", expr, &expr_false);
 			free_expr(expr);
 			expr = &expr_false;
 		}
@@ -684,14 +665,14 @@ static struct expr *optimize_comma_expr(const struct opt_state *state, struct ex
 		lhs = expr->lhs = ignore_result(state, lhs);
 
 		if (expr_never_returns(lhs)) {
-			debug_opt(state, "-O1: reachability: %e <==> %e\n", expr, lhs);
+			debug_opt(state, 1, "reachability: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if ((lhs->always_true && rhs == &expr_true)
 			   || (lhs->always_false && rhs == &expr_false)) {
-			debug_opt(state, "-O1: redundancy elimination: %e <==> %e\n", expr, lhs);
+			debug_opt(state, 1, "redundancy elimination: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (optlevel >= 2 && lhs->pure) {
-			debug_opt(state, "-O2: purity: %e <==> %e\n", expr, rhs);
+			debug_opt(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
 		}
 	}
@@ -900,7 +881,7 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 
 	if (facts_are_impossible(&state->facts_when_true)) {
 		if (expr->pure) {
-			debug_opt(state, "-O2: data flow: %e --> %e\n", expr, &expr_false);
+			debug_opt(state, 2, "data flow: %pe --> %pe\n", expr, &expr_false);
 			free_expr(expr);
 			expr = &expr_false;
 		} else {
@@ -909,7 +890,7 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		}
 	} else if (facts_are_impossible(&state->facts_when_false)) {
 		if (expr->pure) {
-			debug_opt(state, "-O2: data flow: %e --> %e\n", expr, &expr_true);
+			debug_opt(state, 2, "data flow: %pe --> %pe\n", expr, &expr_true);
 			free_expr(expr);
 			expr = &expr_true;
 		} else {
@@ -925,11 +906,13 @@ done:
 /** Swap the children of a binary expression if it would reduce the cost. */
 static bool reorder_expr(const struct opt_state *state, struct expr *expr, double swapped_cost) {
 	if (swapped_cost < expr->cost) {
-		debug_opt(state, "-O3: cost: %e", expr);
+		bool debug = debug_opt(state, 3, "cost: %pe <==> ", expr);
 		struct expr *lhs = expr->lhs;
 		expr->lhs = expr->rhs;
 		expr->rhs = lhs;
-		debug_opt(state, " <==> %e (~%g --> ~%g)\n", expr, expr->cost, swapped_cost);
+		if (debug) {
+			cfprintf(state->cmdline->cerr, "%pe (~${ylw}%g${rs} --> ~${ylw}%g${rs})\n", expr, expr->cost, swapped_cost);
+		}
 		expr->cost = swapped_cost;
 		return true;
 	} else {
@@ -1009,7 +992,7 @@ int optimize_cmdline(struct cmdline *cmdline) {
 			mindepth = INT_MAX;
 		}
 		cmdline->mindepth = mindepth;
-		debug_opt(&state, "-O2: data flow: mindepth --> %d\n", cmdline->mindepth);
+		debug_opt(&state, 2, "data flow: mindepth --> %d\n", cmdline->mindepth);
 	}
 
 	if (optlevel >= 4 && maxdepth < cmdline->maxdepth) {
@@ -1017,7 +1000,7 @@ int optimize_cmdline(struct cmdline *cmdline) {
 			maxdepth = INT_MIN;
 		}
 		cmdline->maxdepth = maxdepth;
-		debug_opt(&state, "-O4: data flow: maxdepth --> %d\n", cmdline->maxdepth);
+		debug_opt(&state, 4, "data flow: maxdepth --> %d\n", cmdline->maxdepth);
 	}
 
 	return 0;

@@ -17,6 +17,7 @@
 #include "color.h"
 #include "bftw.h"
 #include "dstring.h"
+#include "expr.h"
 #include "fsade.h"
 #include "stat.h"
 #include "trie.h"
@@ -863,6 +864,65 @@ done:
 	return ret;
 }
 
+/** Dump a parsed expression tree, for debugging. */
+static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
+	if (fputs("(", cfile->file) == EOF) {
+		return -1;
+	}
+
+	if (expr->lhs || expr->rhs) {
+		if (cfprintf(cfile, "${red}%s${rs}", expr->argv[0]) < 0) {
+			return -1;
+		}
+	} else {
+		if (cfprintf(cfile, "${blu}%s${rs}", expr->argv[0]) < 0) {
+			return -1;
+		}
+	}
+
+	for (size_t i = 1; i < expr->argc; ++i) {
+		if (cfprintf(cfile, " ${bld}%s${rs}", expr->argv[i]) < 0) {
+			return -1;
+		}
+	}
+
+	if (verbose) {
+		double rate = 0.0, time = 0.0;
+		if (expr->evaluations) {
+			rate = 100.0*expr->successes/expr->evaluations;
+			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
+		}
+		if (cfprintf(cfile, " [${ylw}%zu${rs}/${ylw}%zu${rs}=${ylw}%g%%${rs}; ${ylw}%gns${rs}]",
+		             expr->successes, expr->evaluations, rate, time)) {
+			return -1;
+		}
+	}
+
+	if (expr->lhs) {
+		if (fputs(" ", cfile->file) == EOF) {
+			return -1;
+		}
+		if (print_expr(cfile, expr->lhs, verbose) != 0) {
+			return -1;
+		}
+	}
+
+	if (expr->rhs) {
+		if (fputs(" ", cfile->file) == EOF) {
+			return -1;
+		}
+		if (print_expr(cfile, expr->rhs, verbose) != 0) {
+			return -1;
+		}
+	}
+
+	if (fputs(")", cfile->file) == EOF) {
+		return -1;
+	}
+
+	return 0;
+}
+
 int cfprintf(CFILE *cfile, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
@@ -942,6 +1002,17 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 
 				case 'L':
 					if (print_link_target(cfile, va_arg(args, const struct BFTW *)) != 0) {
+						return -1;
+					}
+					break;
+
+				case 'e':
+					if (print_expr(cfile, va_arg(args, const struct expr *), false) != 0) {
+						return -1;
+					}
+					break;
+				case 'E':
+					if (print_expr(cfile, va_arg(args, const struct expr *), true) != 0) {
 						return -1;
 					}
 					break;

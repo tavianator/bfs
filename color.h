@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -108,6 +108,8 @@ int cfclose(CFILE *cfile);
  *         %m: strerror(errno)
  *         %pP: A colored file path, from a const struct BFTW * argument
  *         %pL: A colored link target, from a const struct BFTW * argument
+ *         %pe: Dump a const struct expr *, for debugging.
+ *         %pE: Dump a const struct expr * in verbose form, for debugging.
  *         %%: A literal '%'
  *         ${cc}: Change the color to 'cc'
  *         $$: A literal '$'

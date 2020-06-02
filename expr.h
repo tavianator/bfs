@@ -211,11 +211,6 @@ bool expr_never_returns(const struct expr *expr);
 bool expr_cmp(const struct expr *expr, long long n);
 
 /**
- * Dump a parsed expression.
- */
-void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose);
-
-/**
  * Free an expression tree.
  */
 void free_expr(struct expr *expr);

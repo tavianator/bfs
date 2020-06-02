@@ -37,7 +37,9 @@
 /** Print some debugging info. */
 BFS_FORMATTER(2, 3)
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
-	if (!(execbuf->cmdline->debug & DEBUG_EXEC)) {
+	const struct cmdline *cmdline = execbuf->cmdline;
+
+	if (!bfs_debug(cmdline, DEBUG_EXEC, "${blu}")) {
 		return;
 	}
 
@@ -49,7 +51,7 @@ static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, .
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		fputs("dir", stderr);
 	}
-	fputs(": ", stderr);
+	cfprintf(cmdline->cerr, "${rs}: ");
 
 	va_list args;
 	va_start(args, format);

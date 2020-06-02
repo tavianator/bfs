@@ -1052,7 +1052,9 @@ static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
 /**
  * Log a stat() call.
  */
-static void debug_stat(const struct BFTW *ftwbuf, const struct bftw_stat *cache, enum bfs_stat_flag flags) {
+static void debug_stat(const struct cmdline *cmdline, const struct BFTW *ftwbuf, const struct bftw_stat *cache, enum bfs_stat_flag flags) {
+	bfs_debug_prefix(cmdline, DEBUG_STAT);
+
 	fprintf(stderr, "bfs_stat(");
 	if (ftwbuf->at_fd == AT_FDCWD) {
 		fprintf(stderr, "AT_FDCWD");
@@ -1081,15 +1083,19 @@ static void debug_stat(const struct BFTW *ftwbuf, const struct bftw_stat *cache,
 /**
  * Log any stat() calls that happened.
  */
-static void debug_stats(const struct BFTW *ftwbuf) {
+static void debug_stats(const struct cmdline *cmdline, const struct BFTW *ftwbuf) {
+	if (!(cmdline->debug & DEBUG_STAT)) {
+		return;
+	}
+
 	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
 	if (statbuf || ftwbuf->stat_cache.error) {
-		debug_stat(ftwbuf, &ftwbuf->stat_cache, BFS_STAT_FOLLOW);
+		debug_stat(cmdline, ftwbuf, &ftwbuf->stat_cache, BFS_STAT_FOLLOW);
 	}
 
 	const struct bfs_stat *lstatbuf = ftwbuf->lstat_cache.buf;
 	if ((lstatbuf && lstatbuf != statbuf) || ftwbuf->lstat_cache.error) {
-		debug_stat(ftwbuf, &ftwbuf->lstat_cache, BFS_STAT_NOFOLLOW);
+		debug_stat(cmdline, ftwbuf, &ftwbuf->lstat_cache, BFS_STAT_NOFOLLOW);
 	}
 }
 
@@ -1213,12 +1219,9 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 	}
 
 done:
-	if (cmdline->debug & DEBUG_STAT) {
-		debug_stats(ftwbuf);
-	}
+	debug_stats(cmdline, ftwbuf);
 
-	if (cmdline->debug & DEBUG_SEARCH) {
-		fprintf(stderr, "cmdline_callback({\n");
+	if (bfs_debug(cmdline, DEBUG_SEARCH, "cmdline_callback({\n")) {
 		fprintf(stderr, "\t.path = \"%s\",\n", ftwbuf->path);
 		fprintf(stderr, "\t.root = \"%s\",\n", ftwbuf->root);
 		fprintf(stderr, "\t.depth = %zu,\n", ftwbuf->depth);
@@ -1336,8 +1339,7 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		.mtab = cmdline->mtab,
 	};
 
-	if (cmdline->debug & DEBUG_SEARCH) {
-		fprintf(stderr, "bftw({\n");
+	if (bfs_debug(cmdline, DEBUG_SEARCH, "bftw({\n")) {
 		fprintf(stderr, "\t.paths = {\n");
 		for (size_t i = 0; i < bftw_args.npaths; ++i) {
 			fprintf(stderr, "\t\t\"%s\",\n", bftw_args.paths[i]);
@@ -1368,9 +1370,7 @@ int eval_cmdline(const struct cmdline *cmdline) {
 		args.ret = EXIT_FAILURE;
 	}
 
-	if (cmdline->debug & DEBUG_RATES) {
-		dump_cmdline(cmdline, true);
-	}
+	dump_cmdline(cmdline, DEBUG_RATES);
 
 	if (cmdline->unique) {
 		trie_destroy(&seen);

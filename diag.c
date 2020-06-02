@@ -18,6 +18,7 @@
 #include "cmdline.h"
 #include "color.h"
 #include "util.h"
+#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -30,11 +31,20 @@ void bfs_error(const struct cmdline *cmdline, const char *format, ...)  {
 	va_end(args);
 }
 
-void bfs_warning(const struct cmdline *cmdline, const char *format, ...)  {
+bool bfs_warning(const struct cmdline *cmdline, const char *format, ...)  {
 	va_list args;
 	va_start(args, format);
-	bfs_vwarning(cmdline, format, args);
+	bool ret = bfs_vwarning(cmdline, format, args);
 	va_end(args);
+	return ret;
+}
+
+bool bfs_debug(const struct cmdline *cmdline, enum debug_flags flag, const char *format, ...)  {
+	va_list args;
+	va_start(args, format);
+	bool ret = bfs_vdebug(cmdline, flag, format, args);
+	va_end(args);
+	return ret;
 }
 
 void bfs_verror(const struct cmdline *cmdline, const char *format, va_list args) {
@@ -46,14 +56,27 @@ void bfs_verror(const struct cmdline *cmdline, const char *format, va_list args)
 	cvfprintf(cmdline->cerr, format, args);
 }
 
-void bfs_vwarning(const struct cmdline *cmdline, const char *format, va_list args) {
-	if (cmdline->warn) {
-		int error = errno;
+bool bfs_vwarning(const struct cmdline *cmdline, const char *format, va_list args) {
+	int error = errno;
 
-		bfs_warning_prefix(cmdline);
-
+	if (bfs_warning_prefix(cmdline)) {
 		errno = error;
 		cvfprintf(cmdline->cerr, format, args);
+		return true;
+	} else {
+		return false;
+	}
+}
+
+bool bfs_vdebug(const struct cmdline *cmdline, enum debug_flags flag, const char *format, va_list args) {
+	int error = errno;
+
+	if (bfs_debug_prefix(cmdline, flag)) {
+		errno = error;
+		cvfprintf(cmdline->cerr, format, args);
+		return true;
+	} else {
+		return false;
 	}
 }
 
@@ -61,6 +84,50 @@ void bfs_error_prefix(const struct cmdline *cmdline) {
 	cfprintf(cmdline->cerr, "${bld}%s:${rs} ${er}error:${rs} ", xbasename(cmdline->argv[0]));
 }
 
-void bfs_warning_prefix(const struct cmdline *cmdline) {
-	cfprintf(cmdline->cerr, "${bld}%s:${rs} ${wr}warning:${rs} ", xbasename(cmdline->argv[0]));
+bool bfs_warning_prefix(const struct cmdline *cmdline) {
+	if (cmdline->warn) {
+		cfprintf(cmdline->cerr, "${bld}%s:${rs} ${wr}warning:${rs} ", xbasename(cmdline->argv[0]));
+		return true;
+	} else {
+		return false;
+	}
+}
+
+bool bfs_debug_prefix(const struct cmdline *cmdline, enum debug_flags flag) {
+	if (!(cmdline->debug & flag)) {
+		return false;
+	}
+
+	const char *str;
+
+	switch (flag) {
+	case DEBUG_COST:
+		str = "cost";
+		break;
+	case DEBUG_EXEC:
+		str = "exec";
+		break;
+	case DEBUG_OPT:
+		str = "opt";
+		break;
+	case DEBUG_RATES:
+		str = "rates";
+		break;
+	case DEBUG_SEARCH:
+		str = "search";
+		break;
+	case DEBUG_STAT:
+		str = "stat";
+		break;
+	case DEBUG_TREE:
+		str = "tree";
+		break;
+	default:
+		assert(false);
+		str = "???";
+		break;
+	}
+
+	cfprintf(cmdline->cerr, "${bld}%s:${rs} ${cyn}-D %s${rs}: ", xbasename(cmdline->argv[0]), str);
+	return true;
 }

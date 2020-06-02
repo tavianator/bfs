@@ -207,44 +207,6 @@ static void expr_set_never_returns(struct expr *expr) {
 }
 
 /**
- * Dump the parsed expression tree, for debugging.
- */
-void dump_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
-	fputs("(", cfile->file);
-
-	if (expr->lhs || expr->rhs) {
-		cfprintf(cfile, "${red}%s${rs}", expr->argv[0]);
-	} else {
-		cfprintf(cfile, "${blu}%s${rs}", expr->argv[0]);
-	}
-
-	for (size_t i = 1; i < expr->argc; ++i) {
-		cfprintf(cfile, " ${bld}%s${rs}", expr->argv[i]);
-	}
-
-	if (verbose) {
-		double rate = 0.0, time = 0.0;
-		if (expr->evaluations) {
-			rate = 100.0*expr->successes/expr->evaluations;
-			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
-		}
-		cfprintf(cfile, " [${ylw}%zu${rs}/${ylw}%zu${rs}=${ylw}%g%%${rs}; ${ylw}%gns${rs}]", expr->successes, expr->evaluations, rate, time);
-	}
-
-	if (expr->lhs) {
-		fputs(" ", cfile->file);
-		dump_expr(cfile, expr->lhs, verbose);
-	}
-
-	if (expr->rhs) {
-		fputs(" ", cfile->file);
-		dump_expr(cfile, expr->rhs, verbose);
-	}
-
-	fputs(")", cfile->file);
-}
-
-/**
  * An open file for the command line.
  */
 struct open_file {
@@ -392,11 +354,12 @@ static void parse_error(const struct parser_state *state, const char *format, ..
  * Print a warning message during parsing.
  */
 BFS_FORMATTER(2, 3)
-static void parse_warning(const struct parser_state *state, const char *format, ...) {
+static bool parse_warning(const struct parser_state *state, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bfs_vwarning(state->cmdline, format, args);
+	bool ret = bfs_vwarning(state->cmdline, format, args);
 	va_end(args);
+	return ret;
 }
 
 /**
@@ -917,8 +880,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		for (int i = 0; ; ++i) {
 			const char *expected = debug_flags[i].name;
 			if (!expected) {
-				if (cmdline->warn) {
-					parse_warning(state, "Unrecognized debug flag ${bld}");
+				if (parse_warning(state, "Unrecognized debug flag ${bld}")) {
 					fwrite(flag, 1, len, stderr);
 					cfprintf(cmdline->cerr, "${rs}.\n\n");
 					unrecognized = true;
@@ -3351,7 +3313,11 @@ fail:
 /**
  * Dump the parsed form of the command line, for debugging.
  */
-void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
+void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
+	if (!bfs_debug_prefix(cmdline, flag)) {
+		return;
+	}
+
 	CFILE *cerr = cmdline->cerr;
 
 	cfprintf(cerr, "${ex}%s${rs} ", cmdline->argv[0]);
@@ -3444,7 +3410,11 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
 		cfprintf(cerr, "${blu}-xdev${rs} ");
 	}
 
-	dump_expr(cerr, cmdline->expr, verbose);
+	if (flag == DEBUG_RATES) {
+		cfprintf(cerr, "%pE", cmdline->expr);
+	} else {
+		cfprintf(cerr, "%pe", cmdline->expr);
+	}
 
 	fputs("\n", stderr);
 }
@@ -3453,10 +3423,9 @@ void dump_cmdline(const struct cmdline *cmdline, bool verbose) {
  * Dump the estimated costs.
  */
 static void dump_costs(const struct cmdline *cmdline) {
-	CFILE *cerr = cmdline->cerr;
 	const struct expr *expr = cmdline->expr;
-	cfprintf(cerr, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
-	cfprintf(cerr, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
+	bfs_debug(cmdline, DEBUG_COST, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
+	bfs_debug(cmdline, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
 }
 
 /**
@@ -3621,12 +3590,8 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		cmdline->flags |= BFTW_DETECT_CYCLES;
 	}
 
-	if (cmdline->debug & DEBUG_TREE) {
-		dump_cmdline(cmdline, false);
-	}
-	if (cmdline->debug & DEBUG_COST) {
-		dump_costs(cmdline);
-	}
+	dump_cmdline(cmdline, DEBUG_TREE);
+	dump_costs(cmdline);
 
 done:
 	return cmdline;
