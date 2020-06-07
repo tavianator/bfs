@@ -998,6 +998,10 @@ int optimize_cmdline(struct cmdline *cmdline) {
 		return -1;
 	}
 
+	if (cmdline->exclude->always_true) {
+		bfs_warning(cmdline, "${red}-exclude${rs} applies to all files.\n");
+	}
+
 	// Only non-excluded files are evaluated
 	state.facts = state.facts_when_false;
 

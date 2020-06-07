@@ -308,6 +308,8 @@ struct parser_state {
 	bool non_option_seen;
 	/** Whether an information option like -help or -version was passed. */
 	bool just_info;
+	/** Whether we are currently parsing an -exclude expression. */
+	bool excluding;
 
 	/** The last non-path argument. */
 	const char *last_arg;
@@ -755,11 +757,18 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
  * Parse a single action.
  */
 static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t argc) {
+	char **argv = state->argv;
+
+	if (state->excluding) {
+		parse_error(state, "The ${blu}%s${rs} action is not supported within ${red}-exclude${rs}.\n", argv[0]);
+		return NULL;
+	}
+
 	if (eval != eval_prune && eval != eval_quit) {
 		state->implicit_print = false;
 	}
 
-	char **argv = parser_advance(state, T_ACTION, argc);
+	parser_advance(state, T_ACTION, argc);
 	return new_expr(eval, argc, argv);
 }
 
@@ -3145,10 +3154,18 @@ static struct expr *parse_factor(struct parser_state *state) {
 	} else if (strcmp(arg, "-exclude") == 0) {
 		parser_advance(state, T_OPERATOR, 1);
 
+		if (state->excluding) {
+			parse_error(state, "${er}%s${rs} is not supported within ${red}-exclude${rs}.\n", arg);
+			return NULL;
+		}
+		state->excluding = true;
+
 		struct expr *factor = parse_factor(state);
 		if (!factor) {
 			return NULL;
 		}
+
+		state->excluding = false;
 
 		struct cmdline *cmdline = state->cmdline;
 		cmdline->exclude = new_binary_expr(eval_or, cmdline->exclude, factor, &fake_or_arg);
@@ -3595,6 +3612,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		.implicit_print = true,
 		.non_option_seen = false,
 		.just_info = false,
+		.excluding = false,
 		.last_arg = NULL,
 		.depth_arg = NULL,
 		.prune_arg = NULL,

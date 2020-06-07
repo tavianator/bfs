@@ -601,6 +601,7 @@ bfs_tests=(
     test_exclude_name
     test_exclude_depth
     test_exclude_mindepth
+    test_exclude_print
 
     # Primaries
 
@@ -2651,6 +2652,10 @@ function test_exclude_depth() {
 
 function test_exclude_mindepth() {
     bfs_diff basic -mindepth 3 -exclude -name foo
+}
+
+function test_exclude_print() {
+    ! invoke_bfs basic -exclude -print 2>/dev/null
 }
 
 
