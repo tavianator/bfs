@@ -657,10 +657,11 @@ bfs_tests=(
     test_L_unique_depth
 
     test_xtype_multi
-    test_xtype_reorder
 
     # Optimizer tests
     test_data_flow_hidden
+    test_xtype_reorder
+    test_xtype_depth
 
     # PATH_MAX handling
     test_deep_strict
@@ -1321,6 +1322,11 @@ function test_xtype_reorder() {
     # before -links 100, it will report an ELOOP error
     bfs_diff loops -links 100 -xtype l
     invoke_bfs loops -links 100 -xtype l
+}
+
+function test_xtype_depth() {
+    # Make sure -xtype is considered side-effecting for facts_when_impure
+    ! invoke_bfs loops -xtype l -depth 100 2>/dev/null
 }
 
 function test_iname() {

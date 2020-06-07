@@ -803,6 +803,10 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 	state->facts_when_true = state->facts;
 	state->facts_when_false = state->facts;
 
+	if (!expr->rhs && !expr->pure) {
+		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
+	}
+
 	if (expr->eval == eval_access) {
 		infer_access_facts(state, expr);
 	} else if (expr->eval == eval_acl) {
@@ -847,8 +851,6 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		expr = optimize_or_expr_recursive(state, expr);
 	} else if (expr->eval == eval_comma) {
 		expr = optimize_comma_expr_recursive(state, expr);
-	} else if (!expr->pure) {
-		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
 	if (!expr) {
