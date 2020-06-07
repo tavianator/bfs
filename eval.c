@@ -1193,6 +1193,11 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 		}
 	}
 
+	if (eval_expr(cmdline->exclude, &state)) {
+		state.action = BFTW_PRUNE;
+		goto done;
+	}
+
 	if (cmdline->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
 		args->ret = EXIT_FAILURE;
 		eval_error(&state, "Path is not safe for xargs.\n");

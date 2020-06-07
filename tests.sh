@@ -596,6 +596,12 @@ bfs_tests=(
     test_S_dfs
     test_S_ids
 
+    # Special forms
+
+    test_exclude_name
+    test_exclude_depth
+    test_exclude_mindepth
+
     # Primaries
 
     test_color
@@ -2628,6 +2634,18 @@ function test_S_dfs() {
 
 function test_S_ids() {
     test_S ids
+}
+
+function test_exclude_name() {
+    bfs_diff basic -exclude -name foo
+}
+
+function test_exclude_depth() {
+    bfs_diff basic -depth -exclude -name foo
+}
+
+function test_exclude_mindepth() {
+    bfs_diff basic -mindepth 3 -exclude -name foo
 }
 
 

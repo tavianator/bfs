@@ -803,6 +803,13 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 	state->facts_when_true = state->facts;
 	state->facts_when_false = state->facts;
 
+	if (facts_are_impossible(&state->facts)) {
+		debug_opt(state, 2, "reachability: %pe --> %pe\n", expr, &expr_false);
+		free_expr(expr);
+		expr = &expr_false;
+		goto done;
+	}
+
 	if (!expr->rhs && !expr->pure) {
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
@@ -953,6 +960,29 @@ static bool reorder_expr_recursive(const struct opt_state *state, struct expr *e
 	return ret;
 }
 
+/**
+ * Optimize a top-level expression.
+ */
+static struct expr *optimize_expr(struct opt_state *state, struct expr *expr) {
+	struct opt_facts saved_impure = *state->facts_when_impure;
+
+	expr = optimize_expr_recursive(state, expr);
+	if (!expr) {
+		return NULL;
+	}
+
+	if (state->cmdline->optlevel >= 3 && reorder_expr_recursive(state, expr)) {
+		// Re-do optimizations to account for the new ordering
+		*state->facts_when_impure = saved_impure;
+		expr = optimize_expr_recursive(state, expr);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
+	return expr;
+}
+
 int optimize_cmdline(struct cmdline *cmdline) {
 	struct opt_facts facts_when_impure;
 	set_facts_impossible(&facts_when_impure);
@@ -963,24 +993,21 @@ int optimize_cmdline(struct cmdline *cmdline) {
 	};
 	facts_init(&state.facts);
 
-	struct range *depth = &state.facts.ranges[DEPTH_RANGE];
-	depth->min = cmdline->mindepth;
-	depth->max = cmdline->maxdepth;
-
-	int optlevel = cmdline->optlevel;
-
-	cmdline->expr = optimize_expr_recursive(&state, cmdline->expr);
-	if (!cmdline->expr) {
+	cmdline->exclude = optimize_expr(&state, cmdline->exclude);
+	if (!cmdline->exclude) {
 		return -1;
 	}
 
-	if (optlevel >= 3 && reorder_expr_recursive(&state, cmdline->expr)) {
-		// Re-do optimizations to account for the new ordering
-		set_facts_impossible(&facts_when_impure);
-		cmdline->expr = optimize_expr_recursive(&state, cmdline->expr);
-		if (!cmdline->expr) {
-			return -1;
-		}
+	// Only non-excluded files are evaluated
+	state.facts = state.facts_when_false;
+
+	struct range *depth = &state.facts.ranges[DEPTH_RANGE];
+	constrain_min(depth, cmdline->mindepth);
+	constrain_max(depth, cmdline->maxdepth);
+
+	cmdline->expr = optimize_expr(&state, cmdline->expr);
+	if (!cmdline->expr) {
+		return -1;
 	}
 
 	cmdline->expr = ignore_result(&state, cmdline->expr);
@@ -988,6 +1015,8 @@ int optimize_cmdline(struct cmdline *cmdline) {
 	const struct range *depth_when_impure = &facts_when_impure.ranges[DEPTH_RANGE];
 	long long mindepth = depth_when_impure->min;
 	long long maxdepth = depth_when_impure->max;
+
+	int optlevel = cmdline->optlevel;
 
 	if (optlevel >= 2 && mindepth > cmdline->mindepth) {
 		if (mindepth > INT_MAX) {

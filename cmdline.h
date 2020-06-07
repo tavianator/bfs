@@ -100,7 +100,9 @@ struct cmdline {
 	/** Whether to only handle paths with xargs-safe characters (-X). */
 	bool xargs_safe;
 
-	/** The command line expression. */
+	/** An expression for files to filter out. */
+	struct expr *exclude;
+	/** The main command line expression. */
 	struct expr *expr;
 
 	/** All the open files owned by the command line. */

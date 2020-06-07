@@ -154,7 +154,7 @@ Use
 .IR d eepening
 .IR s earch
 (default:
-.B -S
+.B \-S
 .IR bfs ).
 .RE
 .SH OPERATORS
@@ -211,6 +211,20 @@ The "comma" operator: evaluates the left-hand
 .I expression
 but discards the result, returning the right-hand
 .IR expression .
+.SH SPECIAL FORMS
+.TP
+\fB\-exclude \fIexpression\fR
+Exclude all paths matching the
+.I expression
+from the search.
+This is more powerful than
+.BR \-prune ,
+because it applies even when the expression wouldn't otherwise be evaluated, due to
+.B \-depth
+or
+.B \-mindepth
+for example.
+Exclusions are always applied before other expressions, so it may be least confusing to put them first on the command line.
 .SH OPTIONS
 .PP
 .B \-color
@@ -607,7 +621,7 @@ Like
 but use the null character ('\\0') as a separator rather than newlines.
 Useful in conjunction with
 .B xargs
-.IR -0 .
+.IR \-0 .
 .TP
 \fB\-printf \fIFORMAT\fR
 Print according to a format string (see
@@ -662,7 +676,7 @@ is quoted to ensure the glob is processed by
 .B bfs
 rather than the shell.
 .TP
-\fBbfs \-name access_log -L \fI/var\fR
+\fBbfs \-name access_log \-L \fI/var\fR
 Finds all files named
 .B access_log
 under
@@ -677,7 +691,7 @@ Prints all files in your home directory not owned by you.
 .B bfs \-xtype l
 Finds broken symbolic links.
 .TP
-.B bfs \-name .git \-prune \-false \-o \-name config
+.B bfs \-name config \-exclude \-name .git
 Finds all files named
 .BR config,
 skipping every

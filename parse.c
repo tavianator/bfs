@@ -61,6 +61,7 @@
 // Strings printed by -D tree for "fake" expressions
 static char *fake_and_arg = "-a";
 static char *fake_false_arg = "-false";
+static char *fake_or_arg = "-o";
 static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
 
@@ -227,6 +228,7 @@ int free_cmdline(struct cmdline *cmdline) {
 		CFILE *cerr = cmdline->cerr;
 
 		free_expr(cmdline->expr);
+		free_expr(cmdline->exclude);
 
 		free_bfs_mtab(cmdline->mtab);
 
@@ -2651,6 +2653,11 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 
 	cfprintf(cout, "  ${blu}expression${rs} ${red},${rs} ${blu}expression${rs}\n\n");
 
+	cfprintf(cout, "${bld}Special forms:${rs}\n\n");
+
+	cfprintf(cout, "  ${red}-exclude${rs} ${blu}expression${rs}\n");
+	cfprintf(cout, "      Exclude all paths matching the ${blu}expression${rs} from the search.\n\n");
+
 	cfprintf(cout, "${bld}Options:${rs}\n\n");
 
 	cfprintf(cout, "  ${blu}-color${rs}\n");
@@ -2904,6 +2911,7 @@ static const struct table_entry parse_table[] = {
 	{"-delete", T_ACTION, parse_delete},
 	{"-depth", T_OPTION, parse_depth_n},
 	{"-empty", T_TEST, parse_empty},
+	{"-exclude", T_OPERATOR},
 	{"-exec", T_ACTION, parse_exec, 0},
 	{"-execdir", T_ACTION, parse_exec, BFS_EXEC_CHDIR},
 	{"-executable", T_TEST, parse_access, X_OK},
@@ -3084,6 +3092,7 @@ unexpected:
 /**
  * FACTOR : "(" EXPR ")"
  *        | "!" FACTOR | "-not" FACTOR
+ *        | "-exclude" FACTOR
  *        | LITERAL
  */
 static struct expr *parse_factor(struct parser_state *state) {
@@ -3119,6 +3128,21 @@ static struct expr *parse_factor(struct parser_state *state) {
 		parser_advance(state, T_OPERATOR, 1);
 
 		return expr;
+	} else if (strcmp(arg, "-exclude") == 0) {
+		parser_advance(state, T_OPERATOR, 1);
+
+		struct expr *factor = parse_factor(state);
+		if (!factor) {
+			return NULL;
+		}
+
+		struct cmdline *cmdline = state->cmdline;
+		cmdline->exclude = new_binary_expr(eval_or, cmdline->exclude, factor, &fake_or_arg);
+		if (!cmdline->exclude) {
+			return NULL;
+		}
+
+		return &expr_true;
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
 		char **argv = parser_advance(state, T_OPERATOR, 1);
 
@@ -3411,8 +3435,14 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 	}
 
 	if (flag == DEBUG_RATES) {
+		if (cmdline->exclude != &expr_false) {
+			cfprintf(cerr, "${red}-exclude${rs} %pE ", cmdline->exclude);
+		}
 		cfprintf(cerr, "%pE", cmdline->expr);
 	} else {
+		if (cmdline->exclude != &expr_false) {
+			cfprintf(cerr, "${red}-exclude${rs} %pe ", cmdline->exclude);
+		}
 		cfprintf(cerr, "%pe", cmdline->expr);
 	}
 
@@ -3482,6 +3512,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	cmdline->unique = false;
 	cmdline->warn = false;
 	cmdline->xargs_safe = false;
+	cmdline->exclude = &expr_false;
 	cmdline->expr = &expr_true;
 	cmdline->nopen_files = 0;
 

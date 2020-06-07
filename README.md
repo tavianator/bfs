@@ -94,9 +94,9 @@ $ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'
 </pre>
 
 `bfs` also adds some extra options that make some common tasks easier.
-Compare `bfs -nohidden` to
+Compare `bfs -name config -exclude -name .git` to
 
-    find -name '.?*' -prune -o -print
+    find ! \( -name '.git' -prune \) -name config
 
 
 Try it!
