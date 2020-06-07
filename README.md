@@ -96,7 +96,7 @@ $ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'
 `bfs` also adds some extra options that make some common tasks easier.
 Compare `bfs -name config -exclude -name .git` to
 
-    find ! \( -name '.git' -prune \) -name config
+    find ! \( -name .git -prune \) -name config
 
 
 Try it!
