@@ -3394,7 +3394,7 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 	}
 
 	if (cmdline->optlevel != 3) {
-		cfprintf(cerr, "${cyn}-O%d${rs} ", cmdline->optlevel);
+		cfprintf(cerr, "${cyn}-O${bld}%d${rs} ", cmdline->optlevel);
 	}
 
 	const char *strategy = NULL;
