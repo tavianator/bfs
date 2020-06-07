@@ -1000,10 +1000,6 @@ int optimize_cmdline(struct cmdline *cmdline) {
 		return -1;
 	}
 
-	if (cmdline->exclude->always_true) {
-		bfs_warning(cmdline, "${red}-exclude${rs} applies to all files.\n");
-	}
-
 	// Only non-excluded files are evaluated
 	state.facts = state.facts_when_false;
 
@@ -1017,6 +1013,10 @@ int optimize_cmdline(struct cmdline *cmdline) {
 	}
 
 	cmdline->expr = ignore_result(&state, cmdline->expr);
+
+	if (facts_are_impossible(&facts_when_impure)) {
+		bfs_warning(cmdline, "This command won't do anything.\n");
+	}
 
 	const struct range *depth_when_impure = &facts_when_impure.ranges[DEPTH_RANGE];
 	long long mindepth = depth_when_impure->min;
