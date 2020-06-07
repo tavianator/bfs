@@ -984,6 +984,8 @@ static struct expr *optimize_expr(struct opt_state *state, struct expr *expr) {
 }
 
 int optimize_cmdline(struct cmdline *cmdline) {
+	dump_cmdline(cmdline, DEBUG_OPT);
+
 	struct opt_facts facts_when_impure;
 	set_facts_impossible(&facts_when_impure);
 

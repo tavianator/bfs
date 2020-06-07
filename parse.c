@@ -3467,12 +3467,12 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 
 	if (flag == DEBUG_RATES) {
 		if (cmdline->exclude != &expr_false) {
-			cfprintf(cerr, "${red}-exclude${rs} %pE ", cmdline->exclude);
+			cfprintf(cerr, "(${red}-exclude${rs} %pE) ", cmdline->exclude);
 		}
 		cfprintf(cerr, "%pE", cmdline->expr);
 	} else {
 		if (cmdline->exclude != &expr_false) {
-			cfprintf(cerr, "${red}-exclude${rs} %pe ", cmdline->exclude);
+			cfprintf(cerr, "(${red}-exclude${rs} %pe) ", cmdline->exclude);
 		}
 		cfprintf(cerr, "%pe", cmdline->expr);
 	}
