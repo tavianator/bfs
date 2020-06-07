@@ -449,18 +449,6 @@ bool eval_hidden(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -nohidden action.
- */
-bool eval_nohidden(const struct expr *expr, struct eval_state *state) {
-	if (eval_hidden(expr, state)) {
-		eval_prune(expr, state);
-		return false;
-	} else {
-		return true;
-	}
-}
-
-/**
  * -inum test.
  */
 bool eval_inum(const struct expr *expr, struct eval_state *state) {

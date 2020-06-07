@@ -646,6 +646,7 @@ bfs_tests=(
     test_hidden
 
     test_nohidden
+    test_nohidden_depth
 
     test_perm_symbolic_trailing_comma
     test_perm_symbolic_double_comma
@@ -1781,6 +1782,10 @@ function test_hidden() {
 
 function test_nohidden() {
     bfs_diff weirdnames -nohidden
+}
+
+function test_nohidden_depth() {
+    bfs_diff weirdnames -depth -nohidden
 }
 
 function test_depth_n() {

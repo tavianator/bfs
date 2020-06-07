@@ -61,6 +61,7 @@
 // Strings printed by -D tree for "fake" expressions
 static char *fake_and_arg = "-a";
 static char *fake_false_arg = "-false";
+static char *fake_hidden_arg = "-hidden";
 static char *fake_or_arg = "-o";
 static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
@@ -754,7 +755,7 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
  * Parse a single action.
  */
 static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t argc) {
-	if (eval != eval_nohidden && eval != eval_prune && eval != eval_quit) {
+	if (eval != eval_prune && eval != eval_quit) {
 		state->implicit_print = false;
 	}
 
@@ -1733,8 +1734,22 @@ static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2
  * Parse -nohidden.
  */
 static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg2) {
-	state->prune_arg = state->argv[0];
-	return parse_nullary_action(state, eval_nohidden);
+	struct expr *hidden = new_expr(eval_hidden, 1, &fake_hidden_arg);
+	if (!hidden) {
+		return NULL;
+	}
+
+	hidden->probability = 0.01;
+	hidden->pure = true;
+
+	struct cmdline *cmdline = state->cmdline;
+	cmdline->exclude = new_binary_expr(eval_or, cmdline->exclude, hidden, &fake_or_arg);
+	if (!cmdline->exclude) {
+		return NULL;
+	}
+
+	parser_advance(state, T_OPTION, 1);
+	return &expr_true;
 }
 
 /**
@@ -2680,6 +2695,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
 	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs} for now, but will\n");
 	cfprintf(cout, "      skip mount points entirely in the future)\n");
+	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
+	cfprintf(cout, "      Exclude hidden files\n");
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
 	cfprintf(cout, "      Ignored; for compatibility with GNU find\n");
 	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
@@ -2732,8 +2749,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-user${rs}  ${bld}NAME${rs}\n");
 	cfprintf(cout, "      Find files owned by the group/user ${bld}NAME${rs}\n");
 	cfprintf(cout, "  ${blu}-hidden${rs}\n");
-	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
-	cfprintf(cout, "      Find hidden files, or filter them out\n");
+	cfprintf(cout, "      Find hidden files\n");
 #ifdef FNM_CASEFOLD
 	cfprintf(cout, "  ${blu}-ilname${rs} ${bld}GLOB${rs}\n");
 	cfprintf(cout, "  ${blu}-iname${rs}  ${bld}GLOB${rs}\n");
@@ -2815,8 +2831,6 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	               "      output\n");
 	cfprintf(cout, "  ${blu}-ls${rs}\n");
 	cfprintf(cout, "      List files like ${ex}ls${rs} ${bld}-dils${rs}\n");
-	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
-	cfprintf(cout, "      Filter out hidden files and directories\n");
 	cfprintf(cout, "  ${blu}-print${rs}\n");
 	cfprintf(cout, "      Print the path to the found file\n");
 	cfprintf(cout, "  ${blu}-print0${rs}\n");

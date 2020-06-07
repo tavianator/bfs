@@ -271,6 +271,9 @@ Don't descend into other mount points (same as
 .B \-xdev
 for now, but will skip mount points entirely in the future).
 .TP
+.B \-nohidden
+Exclude hidden files and directories.
+.TP
 .B \-noleaf
 Ignored; for compatibility with GNU find.
 .TP
@@ -608,9 +611,6 @@ instead of standard output.
 List files like
 .B ls
 .IR \-dils .
-.TP
-.B \-nohidden
-Filter out hidden files and directories.
 .TP
 .B \-print
 Print the path to the found file.
