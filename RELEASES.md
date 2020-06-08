@@ -6,7 +6,7 @@
 
 **Unreleased**
 
-- New `-exclude <expression>` syntax to more easily and reliably filter out paths (#8).
+- New `-exclude <expression>` syntax to more easily and reliably filter out paths ([#8]).
   For example:
 
       bfs -name config -exclude -name .git
@@ -29,9 +29,12 @@
 
       bfs -type f -nohidden
 
-  to do what was intended (#30).
+  to do what was intended ([#30]).
 
 - Fixed an optimizer bug that could skip `-empty`/`-xtype` if they didn't always lead to an action
+
+[#8]: https://github.com/tavianator/bfs/issues/8
+[#30]: https://github.com/tavianator/bfs/issues/30
 
 
 1.*
