@@ -1,3 +1,39 @@
+2.*
+===
+
+2.0
+---
+
+**Unreleased**
+
+- New `-exclude <expression>` syntax to more easily and reliably filter out paths (#8).
+  For example:
+
+      bfs -name config -exclude -name .git
+
+  will find all files named `config`, without searching any directories (or files) named `.git`.
+  In this case, the same effect could have been achieved (more awkwardly) with `-prune`:
+
+      bfs ! \( -name .git -prune \) -name config
+
+  But `-exclude` will work in more cases:
+
+      # -exclude works with -depth, while -prune doesn't:
+      bfs -depth -name config -exclude -name .git
+
+      # -exclude applies even to paths below the minimum depth:
+      bfs -mindepth 3 -name config -exclude -name .git
+
+- `-nohidden` is now equivalent to `-exclude -hidden`.
+  This changes the behavior of command lines like
+
+      bfs -type f -nohidden
+
+  to do what was intended (#30).
+
+- Fixed an optimizer bug that could skip `-empty`/`-xtype` if they didn't always lead to an action
+
+
 1.*
 ===
 
