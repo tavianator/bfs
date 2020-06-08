@@ -1,7 +1,7 @@
 `bfs`
 =====
 
-[![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/master/COPYING)
+[![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/v/tag/tavianator/bfs?label=version)](https://github.com/tavianator/bfs/releases)
 [![Travis CI Status](https://api.travis-ci.org/tavianator/bfs.svg?branch=master)](https://travis-ci.org/tavianator/bfs)
 [![Cirrus CI Status](https://api.cirrus-ci.com/github/tavianator/bfs.svg)](https://cirrus-ci.com/github/tavianator/bfs)
