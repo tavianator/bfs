@@ -111,13 +111,16 @@
 
 **April 15, 2019**
 
-- New `-unique` option that filters out duplicate files (https://github.com/tavianator/bfs/issues/40)
+- New `-unique` option that filters out duplicate files ([#40])
 - Optimized the file coloring implementation
 - Fixed the coloring implementation to match GNU ls more closely in many corner cases
   - Implemented escape sequence parsing for `LS_COLORS`
   - Implemented `ln=target` for coloring links like their targets
   - Fixed the order of fallbacks used when some color keys are unset
-- Add a workaround for incorrect file types for bind-mounted files on Linux (https://github.com/tavianator/bfs/issues/37)
+- Add a workaround for incorrect file types for bind-mounted files on Linux ([#37])
+
+[#40]: https://github.com/tavianator/bfs/issues/40
+[#37]: https://github.com/tavianator/bfs/issues/37
 
 
 1.3.3
@@ -382,7 +385,7 @@ Changes since 0.96:
 
 Bugfix release.
 
-- Fixed https://github.com/tavianator/bfs/issues/7 again
+- Fixed [#7] again
 - Like GNU find, don't print warnings by default if standard input is not a terminal
 - Redirect standard input from /dev/null for -ok and -okdir
 - Skip . when -delete'ing
@@ -390,6 +393,8 @@ Bugfix release.
 - Fixed -execdir in /
 - Support -perm +MODE for symbolic modes
 - Fixed the build on FreeBSD
+
+[#7]: https://github.com/tavianator/bfs/issues/7
 
 
 0.84
@@ -455,11 +460,13 @@ Bugfix release.
 56/76 GNU find features supported.
 
 - Color broken symlinks correctly
-- Fix https://github.com/tavianator/bfs/issues/7
+- Fix [#7]
 - Fix `-daystart`'s rounding of midnight
 - Implement (most of) `-newerXY`
 - Implement `-used`
 - Implement `-size`
+
+[#7]: https://github.com/tavianator/bfs/issues/7
 
 
 0.70
