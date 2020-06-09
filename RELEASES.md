@@ -111,7 +111,7 @@
 
 **April 15, 2019**
 
-- New `-unique` option that filters out duplicate files ([#40])
+- New `-unique` option that filters out duplicate files ([#48])
 - Optimized the file coloring implementation
 - Fixed the coloring implementation to match GNU ls more closely in many corner cases
   - Implemented escape sequence parsing for `LS_COLORS`
@@ -119,7 +119,7 @@
   - Fixed the order of fallbacks used when some color keys are unset
 - Add a workaround for incorrect file types for bind-mounted files on Linux ([#37])
 
-[#40]: https://github.com/tavianator/bfs/issues/40
+[#48]: https://github.com/tavianator/bfs/issues/48
 [#37]: https://github.com/tavianator/bfs/issues/37
 
 
