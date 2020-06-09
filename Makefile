@@ -89,7 +89,7 @@ ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 
 default: bfs
 
-all: bfs tests/mksock tests/xtimegm
+all: bfs tests/mksock tests/trie tests/xtimegm
 
 bfs: \
     bftw.o \
@@ -126,13 +126,19 @@ release: bfs
 tests/mksock: tests/mksock.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
+tests/trie: trie.o tests/trie.o
+	$(CC) $(ALL_LDFLAGS) $^ -o $@
+
 tests/xtimegm: time.o tests/xtimegm.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-check: check-xtimegm check-bfs check-dfs check-ids
+check: check-trie check-xtimegm check-bfs check-dfs check-ids
+
+check-trie: tests/trie
+	$<
 
 check-xtimegm: tests/xtimegm
 	$<
@@ -150,7 +156,7 @@ endif
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
-	$(RM) bfs *.[od] tests/mksock tests/xtimegm tests/*.[od]
+	$(RM) bfs *.[od] tests/mksock tests/trie tests/xtimegm tests/*.[od]
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
@@ -162,6 +168,6 @@ uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 
-.PHONY: all asan ubsan msan release check distcheck clean install uninstall
+.PHONY: all asan ubsan msan release check check-trie check-xtimegm distcheck clean install uninstall
 
 -include $(wildcard *.d)

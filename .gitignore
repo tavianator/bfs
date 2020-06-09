@@ -2,4 +2,5 @@
 *.d
 /bfs
 /tests/mksock
+/tests/trie
 /tests/xtimegm
