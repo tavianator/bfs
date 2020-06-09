@@ -2,3 +2,4 @@
 *.d
 /bfs
 /tests/mksock
+/tests/xtimegm
