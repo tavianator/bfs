@@ -55,7 +55,7 @@ int main(void) {
 		.tm_isdst = -1,
 	};
 
-	for (tm.tm_year = 0; tm.tm_year <= 200; tm.tm_year += 10)
+	for (tm.tm_year = 10; tm.tm_year <= 200; tm.tm_year += 10)
 	for (tm.tm_mon = -3; tm.tm_mon <= 15; tm.tm_mon += 3)
 	for (tm.tm_mday = -31; tm.tm_mday <= 61; tm.tm_mday += 4)
 	for (tm.tm_hour = -1; tm.tm_hour <= 24; tm.tm_hour += 5)
