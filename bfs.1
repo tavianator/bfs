@@ -662,6 +662,57 @@ Print version information.
 .TP
 .B \-help
 Print usage information.
+.SH ENVIRONMENT
+Certain environment variables affect the behavior of
+.BR bfs .
+.PP
+.B LANG
+.br
+.B LC_*
+.RS
+Specifies the
+.BR locale (7)
+in use for various things.
+.B bfs
+is not (yet) translated to any languages except English, but the locale will still affect the format of printed values.
+Yes/no prompts (e.g. from
+.BR \-ok )
+will also be interpreted according to the current locale.
+.RE
+.TP
+.B LS_COLORS
+Controls the colors used when displaying file paths if
+.B \-color
+is enabled.
+.B bfs
+interprets this environment variable is interpreted the same way GNU
+.BR ls (1)
+does (see
+.BR dir_colors (5)).
+.TP
+.B NO_COLOR
+Causes
+.B bfs
+to default to
+.B \-nocolor
+if it is set (see https://no-color.org/).
+.TP
+.B PAGER
+Specifies the pager used for
+.B \-help
+output.
+Defaults to
+.BR more (1).
+.TP
+.B POSIXLY_CORRECT
+Makes
+.B bfs
+conform more strictly to the POSIX.1-2017 specification for
+.BR find (1).
+Currently this just disables warnings by default.
+It does not disable
+.BR bfs 's
+various extensions to the base POSIX functionality.
 .SH EXAMPLES
 .TP
 .B bfs
