@@ -2261,6 +2261,8 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 		cmdline->strategy = BFTW_DFS;
 	} else if (strcmp(arg, "ids") == 0) {
 		cmdline->strategy = BFTW_IDS;
+	} else if (strcmp(arg, "eds") == 0) {
+		cmdline->strategy = BFTW_EDS;
 	} else if (strcmp(arg, "help") == 0) {
 		state->just_info = true;
 		cfile = cmdline->cout;
@@ -2277,6 +2279,7 @@ list_strategies:
 	cfprintf(cfile, "  ${bld}bfs${rs}: breadth-first search\n");
 	cfprintf(cfile, "  ${bld}dfs${rs}: depth-first search\n");
 	cfprintf(cfile, "  ${bld}ids${rs}: iterative deepening search\n");
+	cfprintf(cfile, "  ${bld}eds${rs}: exponential deepening search\n");
 	return NULL;
 }
 
@@ -2657,9 +2660,10 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${cyn}-D${rs} ${bld}FLAG${rs}\n");
 	cfprintf(cout, "      Turn on a debugging flag (see ${cyn}-D${rs} ${bld}help${rs})\n");
 	cfprintf(cout, "  ${cyn}-O${bld}N${rs}\n");
-	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: 3)\n");
-	cfprintf(cout, "  ${cyn}-S${rs} ${bld}bfs${rs}|${bld}dfs${rs}|${bld}ids${rs}\n");
-	cfprintf(cout, "      Use ${bld}b${rs}readth-${bld}f${rs}irst/${bld}d${rs}epth-${bld}f${rs}irst/${bld}i${rs}terative ${bld}d${rs}eepening ${bld}s${rs}earch (default: ${cyn}-S${rs} ${bld}bfs${rs})\n\n");
+	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: ${bld}3${rs})\n");
+	cfprintf(cout, "  ${cyn}-S${rs} ${bld}bfs${rs}|${bld}dfs${rs}|${bld}ids${rs}|${bld}eds${rs}\n");
+	cfprintf(cout, "      Use ${bld}b${rs}readth-${bld}f${rs}irst/${bld}d${rs}epth-${bld}f${rs}irst/${bld}i${rs}terative/${bld}e${rs}xponential ${bld}d${rs}eepening ${bld}s${rs}earch\n");
+	cfprintf(cout, "      (default: ${cyn}-S${rs} ${bld}bfs${rs})\n\n");
 
 	cfprintf(cout, "${bld}Operators:${rs}\n\n");
 
@@ -3407,6 +3411,9 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 		break;
 	case BFTW_IDS:
 		strategy = "ids";
+		break;
+	case BFTW_EDS:
+		strategy = "eds";
 		break;
 	}
 	assert(strategy);

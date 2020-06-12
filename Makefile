@@ -135,7 +135,7 @@ tests/xtimegm: time.o tests/xtimegm.o
 %.o: %.c
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-check: check-trie check-xtimegm check-bfs check-dfs check-ids
+check: check-trie check-xtimegm check-bfs check-dfs check-ids check-eds
 
 check-trie: tests/trie
 	$<

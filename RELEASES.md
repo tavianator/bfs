@@ -6,7 +6,7 @@
 
 **Unreleased**
 
-- New `-exclude <expression>` syntax to more easily and reliably filter out paths ([#8]).
+- [#8]: New `-exclude <expression>` syntax to more easily and reliably filter out paths.
   For example:
 
       bfs -name config -exclude -name .git
@@ -24,12 +24,17 @@
       # -exclude applies even to paths below the minimum depth:
       bfs -mindepth 3 -name config -exclude -name .git
 
-- `-nohidden` is now equivalent to `-exclude -hidden`.
+- [#30]: `-nohidden` is now equivalent to `-exclude -hidden`.
   This changes the behavior of command lines like
 
       bfs -type f -nohidden
 
-  to do what was intended ([#30]).
+  to do what was intended.
+
+- Optimized the iterative deepening (`-S ids`) implementation
+
+- Added a new search strategy: exponential deepening search (`-S eds`).
+  This strategy provides many of the benefits of iterative deepening, but much faster due to fewer re-traversals.
 
 - Fixed an optimizer bug that could skip `-empty`/`-xtype` if they didn't always lead to an action
 

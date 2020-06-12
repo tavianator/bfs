@@ -1498,8 +1498,12 @@ struct bftw_ids_state {
 	void *ptr;
 	/** Which visit this search corresponds to. */
 	enum bftw_visit visit;
-	/** The current target depth. */
-	size_t depth;
+	/** Whether to override the bftw_visit. */
+	bool force_visit;
+	/** The current minimum depth (inclusive). */
+	size_t min_depth;
+	/** The current maximum depth (exclusive). */
+	size_t max_depth;
 	/** The set of pruned paths. */
 	struct trie pruned;
 	/** An error code to report. */
@@ -1514,18 +1518,20 @@ struct bftw_ids_state {
 static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) {
 	struct bftw_ids_state *state = ptr;
 
-	struct BFTW *mutbuf = (struct BFTW *)ftwbuf;
-	mutbuf->visit = state->visit;
+	if (state->force_visit) {
+		struct BFTW *mutbuf = (struct BFTW *)ftwbuf;
+		mutbuf->visit = state->visit;
+	}
 
 	if (ftwbuf->typeflag == BFTW_ERROR) {
-		if (state->depth - ftwbuf->depth <= 1) {
+		if (ftwbuf->depth + 1 >= state->min_depth) {
 			return state->delegate(ftwbuf, state->ptr);
 		} else {
 			return BFTW_PRUNE;
 		}
 	}
 
-	if (ftwbuf->depth < state->depth) {
+	if (ftwbuf->depth < state->min_depth) {
 		if (trie_find_str(&state->pruned, ftwbuf->path)) {
 			return BFTW_PRUNE;
 		} else {
@@ -1537,11 +1543,14 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 		}
 	}
 
-	enum bftw_action ret = state->delegate(ftwbuf, state->ptr);
+	enum bftw_action ret = BFTW_CONTINUE;
+	if (ftwbuf->visit == state->visit) {
+		ret = state->delegate(ftwbuf, state->ptr);
+	}
 
 	switch (ret) {
 	case BFTW_CONTINUE:
-		if (ftwbuf->typeflag == BFTW_DIR) {
+		if (ftwbuf->typeflag == BFTW_DIR && ftwbuf->depth + 1 >= state->max_depth) {
 			state->bottom = false;
 			ret = BFTW_PRUNE;
 		}
@@ -1568,7 +1577,9 @@ static void bftw_ids_init(const struct bftw_args *args, struct bftw_ids_state *s
 	state->delegate = args->callback;
 	state->ptr = args->ptr;
 	state->visit = BFTW_PRE;
-	state->depth = 0;
+	state->force_visit = false;
+	state->min_depth = 0;
+	state->max_depth = 1;
 	trie_init(&state->pruned);
 	state->error = 0;
 	state->bottom = false;
@@ -1613,19 +1624,55 @@ static int bftw_ids(const struct bftw_args *args) {
 			state.quit = true;
 		}
 
-		++state.depth;
+		++state.min_depth;
+		++state.max_depth;
 	}
 
 	if (args->flags & BFTW_DEPTH) {
 		state.visit = BFTW_POST;
+		state.force_visit = true;
 
-		while (!state.quit && state.depth > 0) {
-			--state.depth;
+		while (!state.quit && state.min_depth > 0) {
+			--state.max_depth;
+			--state.min_depth;
 
 			if (bftw_auto(&ids_args) != 0) {
 				state.error = errno;
 				state.quit = true;
 			}
+		}
+	}
+
+	return bftw_ids_finish(&state);
+}
+
+/**
+ * Exponential deepening bftw() wrapper.
+ */
+static int bftw_eds(const struct bftw_args *args) {
+	struct bftw_ids_state state;
+	struct bftw_args ids_args;
+	bftw_ids_init(args, &state, &ids_args);
+
+	while (!state.quit && !state.bottom) {
+		state.bottom = true;
+
+		if (bftw_auto(&ids_args) != 0) {
+			state.error = errno;
+			state.quit = true;
+		}
+
+		state.min_depth = state.max_depth;
+		state.max_depth *= 2;
+	}
+
+	if (!state.quit && (args->flags & BFTW_DEPTH)) {
+		state.visit = BFTW_POST;
+		state.min_depth = 0;
+		ids_args.flags |= BFTW_DEPTH;
+
+		if (bftw_auto(&ids_args) != 0) {
+			state.error = errno;
 		}
 	}
 
@@ -1640,6 +1687,8 @@ int bftw(const struct bftw_args *args) {
 		return bftw_batch(args);
 	case BFTW_IDS:
 		return bftw_ids(args);
+	case BFTW_EDS:
+		return bftw_eds(args);
 	}
 
 	errno = EINVAL;

@@ -126,20 +126,21 @@ Turn on a debugging flag (see
 .RS
 Enable optimization level
 .I N
-(default: 3)
+(default:
+.IR 3 ).
 .TP
-\fB\-O\fI0\fR
+.BI \-O 0
 Disable all optimizations.
 .TP
-\fB\-O\fI1\fR
+.BI \-O 1
 Basic logical simplifications.
 .TP
-\fB\-O\fI2\fR
+.BI \-O 2
 All
 .BI \-O 1
 optimizations, plus dead code elimination and data flow analysis.
 .TP
-\fB\-O\fI3\fR
+.BI \-O 3
 All
 .BI \-O 2
 optimizations, plus re-order expressions to reduce expected cost.
@@ -147,15 +148,34 @@ optimizations, plus re-order expressions to reduce expected cost.
 \fB\-O\fI4\fR/\fB\-O\fIfast\fR
 All optimizations, including aggressive optimizations that may alter the observed behavior in corner cases.
 .RE
+.PP
+\fB\-S \fIbfs\fR|\fIdfs\fR|\fIids\fR|\fIeds\fR
+.RS
+Choose the search strategy.
 .TP
-\fB\-S \fIbfs\fR|\fIdfs\fR|\fIids\fR
-Use
-.IR b readth- f irst/ d epth- f irst/ i terative
-.IR d eepening
-.IR s earch
-(default:
+.I bfs
+Breadth-first search (the default).
+.TP
+.I dfs
+Depth-first search.
+Uses less memory than breadth-first search, but is typically slower to return relevant results.
+.TP
+.I ids
+Iterative deepening search.
+Performs repeated depth-first searches with increasing depth limits.
+This gives results in the same order as breadth-first search, but with the reduced memory consumption of depth-first search.
+Tends to be very slow in practice, so use it only if you absolutely need breadth-first ordering, but
 .B \-S
-.IR bfs ).
+.I bfs
+consumes too much memory.
+.TP
+.I eds
+Exponential deepening search.
+A compromise between breadth- and depth-first search, which searches exponentially increasing depth ranges (e.g 0-1, 1-2, 2-4, 4-8, etc.).
+Provides many of the benefits of breadth-first search with depth-first's reduced memory consumption.
+Typically far faster than
+.B \-S
+.IR ids .
 .RE
 .SH OPERATORS
 .TP

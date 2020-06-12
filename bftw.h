@@ -202,6 +202,8 @@ enum bftw_strategy {
 	BFTW_DFS,
 	/** Iterative deepening search. */
 	BFTW_IDS,
+	/** Exponential deepening search. */
+	BFTW_EDS,
 };
 
 /**
