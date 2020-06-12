@@ -1479,6 +1479,15 @@ done:
 	return bftw_state_destroy(&state);
 }
 
+/** Select bftw_stream() or bftw_batch() appropriately. */
+static int bftw_auto(const struct bftw_args *args) {
+	if (args->flags & BFTW_SORT) {
+		return bftw_batch(args);
+	} else {
+		return bftw_stream(args);
+	}
+}
+
 /**
  * Iterative deepening search state.
  */
@@ -1492,7 +1501,7 @@ struct bftw_ids_state {
 	/** The current target depth. */
 	size_t depth;
 	/** The set of pruned paths. */
-	struct trie *pruned;
+	struct trie pruned;
 	/** An error code to report. */
 	int error;
 	/** Whether the bottom has been found. */
@@ -1517,13 +1526,13 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 	}
 
 	if (ftwbuf->depth < state->depth) {
-		if (trie_find_str(state->pruned, ftwbuf->path)) {
+		if (trie_find_str(&state->pruned, ftwbuf->path)) {
 			return BFTW_PRUNE;
 		} else {
 			return BFTW_CONTINUE;
 		}
 	} else if (state->visit == BFTW_POST) {
-		if (trie_find_str(state->pruned, ftwbuf->path)) {
+		if (trie_find_str(&state->pruned, ftwbuf->path)) {
 			return BFTW_PRUNE;
 		}
 	}
@@ -1539,7 +1548,7 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 		break;
 	case BFTW_PRUNE:
 		if (ftwbuf->typeflag == BFTW_DIR) {
-			if (!trie_insert_str(state->pruned, ftwbuf->path)) {
+			if (!trie_insert_str(&state->pruned, ftwbuf->path)) {
 				state->error = errno;
 				state->quit = true;
 				ret = BFTW_STOP;
@@ -1554,62 +1563,79 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 	return ret;
 }
 
+/** Initialize iterative deepening state. */
+static void bftw_ids_init(const struct bftw_args *args, struct bftw_ids_state *state, struct bftw_args *ids_args) {
+	state->delegate = args->callback;
+	state->ptr = args->ptr;
+	state->visit = BFTW_PRE;
+	state->depth = 0;
+	trie_init(&state->pruned);
+	state->error = 0;
+	state->bottom = false;
+	state->quit = false;
+
+	*ids_args = *args;
+	ids_args->callback = bftw_ids_callback;
+	ids_args->ptr = state;
+	ids_args->flags &= ~BFTW_DEPTH;
+	ids_args->strategy = BFTW_DFS;
+}
+
+/** Finish an iterative deepening search. */
+static int bftw_ids_finish(struct bftw_ids_state *state) {
+	int ret = 0;
+
+	if (state->error) {
+		ret = -1;
+	} else {
+		state->error = errno;
+	}
+
+	trie_destroy(&state->pruned);
+
+	errno = state->error;
+	return ret;
+}
+
 /**
  * Iterative deepening bftw() wrapper.
  */
 static int bftw_ids(const struct bftw_args *args) {
-	struct trie pruned;
-	trie_init(&pruned);
+	struct bftw_ids_state state;
+	struct bftw_args ids_args;
+	bftw_ids_init(args, &state, &ids_args);
 
-	struct bftw_ids_state state = {
-		.delegate = args->callback,
-		.ptr = args->ptr,
-		.visit = BFTW_PRE,
-		.depth = 0,
-		.pruned = &pruned,
-		.bottom = false,
-	};
-
-	struct bftw_args ids_args = *args;
-	ids_args.callback = bftw_ids_callback;
-	ids_args.ptr = &state;
-	ids_args.flags &= ~BFTW_DEPTH;
-	ids_args.strategy = BFTW_DFS;
-
-	int ret = 0;
-
-	while (ret == 0 && !state.quit && !state.bottom) {
+	while (!state.quit && !state.bottom) {
 		state.bottom = true;
-		ret = args->flags & BFTW_SORT ? bftw_batch(&ids_args) : bftw_stream(&ids_args);
+
+		if (bftw_auto(&ids_args) != 0) {
+			state.error = errno;
+			state.quit = true;
+		}
+
 		++state.depth;
 	}
 
 	if (args->flags & BFTW_DEPTH) {
 		state.visit = BFTW_POST;
 
-		while (ret == 0 && !state.quit && state.depth > 0) {
+		while (!state.quit && state.depth > 0) {
 			--state.depth;
-			ret = args->flags & BFTW_SORT ? bftw_batch(&ids_args) : bftw_stream(&ids_args);
+
+			if (bftw_auto(&ids_args) != 0) {
+				state.error = errno;
+				state.quit = true;
+			}
 		}
 	}
 
-	if (state.error) {
-		ret = -1;
-	} else {
-		state.error = errno;
-	}
-	trie_destroy(&pruned);
-	errno = state.error;
-	return ret;
+	return bftw_ids_finish(&state);
 }
 
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
-		if (!(args->flags & BFTW_SORT)) {
-			return bftw_stream(args);
-		}
-		// Fallthrough
+		return bftw_auto(args);
 	case BFTW_DFS:
 		return bftw_batch(args);
 	case BFTW_IDS:
