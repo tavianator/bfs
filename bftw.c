@@ -1346,6 +1346,21 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	return state->error ? -1 : 0;
 }
 
+/** Start a batch of files. */
+static void bftw_batch_start(struct bftw_state *state) {
+	if (state->strategy == BFTW_DFS) {
+		state->queue.target = &state->queue.head;
+	}
+	state->batch = state->queue.target;
+}
+
+/** Finish adding a batch of files. */
+static void bftw_batch_finish(struct bftw_state *state) {
+	if (state->flags & BFTW_SORT) {
+		state->queue.target = bftw_sort_files(state->batch, state->queue.target);
+	}
+}
+
 /**
  * Streaming mode: visit files as they are encountered.
  */
@@ -1355,6 +1370,9 @@ static int bftw_stream(const struct bftw_args *args) {
 		return -1;
 	}
 
+	assert(!(state.flags & BFTW_SORT));
+
+	bftw_batch_start(&state);
 	for (size_t i = 0; i < args->npaths; ++i) {
 		const char *path = args->paths[i];
 
@@ -1371,10 +1389,12 @@ static int bftw_stream(const struct bftw_args *args) {
 			goto done;
 		}
 	}
+	bftw_batch_finish(&state);
 
 	while (bftw_pop(&state) > 0) {
 		struct bftw_reader *reader = bftw_open(&state);
 
+		bftw_batch_start(&state);
 		while (bftw_reader_read(reader) > 0) {
 			const char *name = reader->de->d_name;
 
@@ -1391,6 +1411,7 @@ static int bftw_stream(const struct bftw_args *args) {
 				goto done;
 			}
 		}
+		bftw_batch_finish(&state);
 
 		if (bftw_release_reader(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
 			goto done;
@@ -1402,21 +1423,6 @@ static int bftw_stream(const struct bftw_args *args) {
 
 done:
 	return bftw_state_destroy(&state);
-}
-
-/** Start a batch of files. */
-static void bftw_batch_start(struct bftw_state *state) {
-	if (state->strategy == BFTW_DFS) {
-		state->queue.target = &state->queue.head;
-	}
-	state->batch = state->queue.target;
-}
-
-/** Finish adding a batch of files. */
-static void bftw_batch_finish(struct bftw_state *state) {
-	if (state->flags & BFTW_SORT) {
-		state->queue.target = bftw_sort_files(state->batch, state->queue.target);
-	}
 }
 
 /**
