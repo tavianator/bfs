@@ -1528,13 +1528,14 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 		}
 	}
 
-	state->bottom = false;
-
 	enum bftw_action ret = state->delegate(ftwbuf, state->ptr);
 
 	switch (ret) {
 	case BFTW_CONTINUE:
-		ret = BFTW_PRUNE;
+		if (ftwbuf->typeflag == BFTW_DIR) {
+			state->bottom = false;
+			ret = BFTW_PRUNE;
+		}
 		break;
 	case BFTW_PRUNE:
 		if (ftwbuf->typeflag == BFTW_DIR) {
