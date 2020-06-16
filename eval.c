@@ -1286,6 +1286,7 @@ static void dump_bftw_flags(enum bftw_flags flags) {
 	DEBUG_FLAG(flags, BFTW_DETECT_CYCLES);
 	DEBUG_FLAG(flags, BFTW_MOUNT);
 	DEBUG_FLAG(flags, BFTW_XDEV);
+	DEBUG_FLAG(flags, BFTW_SORT);
 
 	assert(!flags);
 }
