@@ -1298,6 +1298,7 @@ static const char *dump_bftw_strategy(enum bftw_strategy strategy) {
 		DUMP_BFTW_MAP(BFTW_BFS),
 		DUMP_BFTW_MAP(BFTW_DFS),
 		DUMP_BFTW_MAP(BFTW_IDS),
+		DUMP_BFTW_MAP(BFTW_EDS),
 	};
 	return strategies[strategy];
 }
