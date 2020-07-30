@@ -73,7 +73,7 @@ struct bftw_file {
 	int fd;
 
 	/** This file's type, if known. */
-	enum bftw_typeflag typeflag;
+	enum bftw_type type;
 	/** The device number, for cycle detection. */
 	dev_t dev;
 	/** The inode number, for cycle detection. */
@@ -325,7 +325,7 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 	file->refcount = 1;
 	file->fd = -1;
 
-	file->typeflag = BFTW_UNKNOWN;
+	file->type = BFTW_UNKNOWN;
 	file->dev = -1;
 	file->ino = -1;
 
@@ -754,7 +754,7 @@ err:
 	return -1;
 }
 
-enum bftw_typeflag bftw_mode_typeflag(mode_t mode) {
+enum bftw_type bftw_mode_to_type(mode_t mode) {
 	switch (mode & S_IFMT) {
 #ifdef S_IFBLK
 	case S_IFBLK:
@@ -802,7 +802,7 @@ enum bftw_typeflag bftw_mode_typeflag(mode_t mode) {
 	}
 }
 
-static enum bftw_typeflag bftw_dirent_typeflag(const struct dirent *de) {
+static enum bftw_type bftw_dirent_type(const struct dirent *de) {
 #if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
 	switch (de->d_type) {
 #ifdef DT_BLK
@@ -886,18 +886,18 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag f
 	return ret;
 }
 
-enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
-		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->typeflag != BFTW_LNK) {
-			return ftwbuf->typeflag;
+		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->type != BFTW_LNK) {
+			return ftwbuf->type;
 		}
-	} else if ((flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW || ftwbuf->typeflag == BFTW_LNK) {
-		return ftwbuf->typeflag;
+	} else if ((flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW || ftwbuf->type == BFTW_LNK) {
+		return ftwbuf->type;
 	}
 
 	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, flags);
 	if (statbuf) {
-		return bftw_mode_typeflag(statbuf->mode);
+		return bftw_mode_to_type(statbuf->mode);
 	} else {
 		return BFTW_ERROR;
 	}
@@ -934,15 +934,15 @@ static bool bftw_need_stat(const struct bftw_state *state) {
 	}
 
 	const struct BFTW *ftwbuf = &state->ftwbuf;
-	if (ftwbuf->typeflag == BFTW_UNKNOWN) {
+	if (ftwbuf->type == BFTW_UNKNOWN) {
 		return true;
 	}
 
-	if (ftwbuf->typeflag == BFTW_LNK && !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
+	if (ftwbuf->type == BFTW_LNK && !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
 		return true;
 	}
 
-	if (ftwbuf->typeflag == BFTW_DIR) {
+	if (ftwbuf->type == BFTW_DIR) {
 		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_MOUNT | BFTW_XDEV)) {
 			return true;
 		}
@@ -1007,7 +1007,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	ftwbuf->root = file ? file->root->name : ftwbuf->path;
 	ftwbuf->depth = 0;
 	ftwbuf->visit = visit;
-	ftwbuf->typeflag = BFTW_UNKNOWN;
+	ftwbuf->type = BFTW_UNKNOWN;
 	ftwbuf->error = reader->error;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
@@ -1019,12 +1019,12 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	if (de) {
 		parent = file;
 		ftwbuf->depth = file->depth + 1;
-		ftwbuf->typeflag = bftw_dirent_typeflag(de);
+		ftwbuf->type = bftw_dirent_type(de);
 		ftwbuf->nameoff = bftw_child_nameoff(file);
 	} else if (file) {
 		parent = file->parent;
 		ftwbuf->depth = file->depth;
-		ftwbuf->typeflag = file->typeflag;
+		ftwbuf->type = file->type;
 		ftwbuf->nameoff = file->nameoff;
 	}
 
@@ -1044,7 +1044,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	}
 
 	if (ftwbuf->error != 0) {
-		ftwbuf->typeflag = BFTW_ERROR;
+		ftwbuf->type = BFTW_ERROR;
 		return;
 	}
 
@@ -1061,18 +1061,18 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	if (bftw_need_stat(state)) {
 		statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 		if (statbuf) {
-			ftwbuf->typeflag = bftw_mode_typeflag(statbuf->mode);
+			ftwbuf->type = bftw_mode_to_type(statbuf->mode);
 		} else {
-			ftwbuf->typeflag = BFTW_ERROR;
+			ftwbuf->type = BFTW_ERROR;
 			ftwbuf->error = errno;
 			return;
 		}
 	}
 
-	if (ftwbuf->typeflag == BFTW_DIR && (state->flags & BFTW_DETECT_CYCLES)) {
+	if (ftwbuf->type == BFTW_DIR && (state->flags & BFTW_DETECT_CYCLES)) {
 		for (const struct bftw_file *ancestor = parent; ancestor; ancestor = ancestor->parent) {
 			if (ancestor->dev == statbuf->dev && ancestor->ino == statbuf->ino) {
-				ftwbuf->typeflag = BFTW_ERROR;
+				ftwbuf->type = BFTW_ERROR;
 				ftwbuf->error = ELOOP;
 				return;
 			}
@@ -1122,7 +1122,7 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 	bftw_init_ftwbuf(state, visit);
 
 	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
-	if (ftwbuf->typeflag == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
+	if (ftwbuf->type == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
 		state->error = ftwbuf->error;
 		return BFTW_STOP;
 	}
@@ -1143,7 +1143,7 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		return BFTW_STOP;
 	}
 
-	if (visit != BFTW_PRE || ftwbuf->typeflag != BFTW_DIR) {
+	if (visit != BFTW_PRE || ftwbuf->type != BFTW_DIR) {
 		ret = BFTW_PRUNE;
 		goto done;
 	}
@@ -1174,7 +1174,7 @@ static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 
 	struct dirent *de = state->reader.de;
 	if (de) {
-		file->typeflag = bftw_dirent_typeflag(de);
+		file->type = bftw_dirent_type(de);
 	}
 
 	if (fill_id) {
@@ -1523,7 +1523,7 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 		mutbuf->visit = state->visit;
 	}
 
-	if (ftwbuf->typeflag == BFTW_ERROR) {
+	if (ftwbuf->type == BFTW_ERROR) {
 		if (ftwbuf->depth + 1 >= state->min_depth) {
 			return state->delegate(ftwbuf, state->ptr);
 		} else {
@@ -1550,13 +1550,13 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 
 	switch (ret) {
 	case BFTW_CONTINUE:
-		if (ftwbuf->typeflag == BFTW_DIR && ftwbuf->depth + 1 >= state->max_depth) {
+		if (ftwbuf->type == BFTW_DIR && ftwbuf->depth + 1 >= state->max_depth) {
 			state->bottom = false;
 			ret = BFTW_PRUNE;
 		}
 		break;
 	case BFTW_PRUNE:
-		if (ftwbuf->typeflag == BFTW_DIR) {
+		if (ftwbuf->type == BFTW_DIR) {
 			if (!trie_insert_str(&state->pruned, ftwbuf->path)) {
 				state->error = errno;
 				state->quit = true;

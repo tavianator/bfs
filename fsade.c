@@ -199,7 +199,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 	};
 	static const size_t n_acl_types = sizeof(acl_types)/sizeof(acl_types[0]);
 
-	if (ftwbuf->typeflag == BFTW_LNK) {
+	if (ftwbuf->type == BFTW_LNK) {
 		return 0;
 	}
 
@@ -209,7 +209,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 	for (size_t i = 0; i < n_acl_types && ret <= 0; ++i) {
 		acl_type_t type = acl_types[i];
 
-		if (type == ACL_TYPE_DEFAULT && ftwbuf->typeflag != BFTW_DIR) {
+		if (type == ACL_TYPE_DEFAULT && ftwbuf->type != BFTW_DIR) {
 			// ACL_TYPE_DEFAULT is supported only for directories,
 			// otherwise acl_get_file() gives EACCESS
 			continue;
@@ -246,7 +246,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 #if BFS_CAN_CHECK_CAPABILITIES
 
 int bfs_check_capabilities(const struct BFTW *ftwbuf) {
-	if (ftwbuf->typeflag == BFTW_LNK) {
+	if (ftwbuf->type == BFTW_LNK) {
 		return 0;
 	}
 
@@ -297,17 +297,17 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 
 #if BFS_HAS_SYS_EXTATTR
 	ssize_t (*extattr_list)(const char *, int, void*, size_t) =
-		ftwbuf->typeflag == BFTW_LNK ? extattr_list_link : extattr_list_file;
+		ftwbuf->type == BFTW_LNK ? extattr_list_link : extattr_list_file;
 
 	len = extattr_list(path, EXTATTR_NAMESPACE_SYSTEM, NULL, 0);
 	if (len <= 0) {
 		len = extattr_list(path, EXTATTR_NAMESPACE_USER, NULL, 0);
 	}
 #elif __APPLE__
-	int options = ftwbuf->typeflag == BFTW_LNK ? XATTR_NOFOLLOW : 0;
+	int options = ftwbuf->type == BFTW_LNK ? XATTR_NOFOLLOW : 0;
 	len = listxattr(path, NULL, 0, options);
 #else
-	if (ftwbuf->typeflag == BFTW_LNK) {
+	if (ftwbuf->type == BFTW_LNK) {
 		len = llistxattr(path, NULL, 0);
 	} else {
 		len = listxattr(path, NULL, 0);

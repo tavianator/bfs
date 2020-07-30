@@ -29,37 +29,37 @@
 /**
  * Possible file types.
  */
-enum bftw_typeflag {
-	/** Unknown type. */
-	BFTW_UNKNOWN = 0,
-	/** Block device. */
-	BFTW_BLK     = 1 << 0,
-	/** Character device. */
-	BFTW_CHR     = 1 << 1,
-	/** Directory. */
-	BFTW_DIR     = 1 << 2,
-	/** Solaris door. */
-	BFTW_DOOR    = 1 << 3,
-	/** Pipe. */
-	BFTW_FIFO    = 1 << 4,
-	/** Symbolic link. */
-	BFTW_LNK     = 1 << 5,
-	/** Solaris event port. */
-	BFTW_PORT    = 1 << 6,
-	/** Regular file. */
-	BFTW_REG     = 1 << 7,
-	/** Socket. */
-	BFTW_SOCK    = 1 << 8,
-	/** BSD whiteout. */
-	BFTW_WHT     = 1 << 9,
+enum bftw_type {
 	/** An error occurred for this file. */
-	BFTW_ERROR   = 1 << 10,
+	BFTW_ERROR = -1,
+	/** Unknown type. */
+	BFTW_UNKNOWN,
+	/** Block device. */
+	BFTW_BLK,
+	/** Character device. */
+	BFTW_CHR,
+	/** Directory. */
+	BFTW_DIR,
+	/** Solaris door. */
+	BFTW_DOOR,
+	/** Pipe. */
+	BFTW_FIFO,
+	/** Symbolic link. */
+	BFTW_LNK,
+	/** Solaris event port. */
+	BFTW_PORT,
+	/** Regular file. */
+	BFTW_REG,
+	/** Socket. */
+	BFTW_SOCK,
+	/** BSD whiteout. */
+	BFTW_WHT,
 };
 
 /**
- * Convert a bfs_stat() mode to a bftw() typeflag.
+ * Convert a bfs_stat() mode to a bftw_type.
  */
-enum bftw_typeflag bftw_mode_typeflag(mode_t mode);
+enum bftw_type bftw_mode_to_type(mode_t mode);
 
 /**
  * Possible visit occurrences.
@@ -100,8 +100,8 @@ struct BFTW {
 	enum bftw_visit visit;
 
 	/** The file type. */
-	enum bftw_typeflag typeflag;
-	/** The errno that occurred, if typeflag == BFTW_ERROR. */
+	enum bftw_type type;
+	/** The errno that occurred, if type == BFTW_ERROR. */
 	int error;
 
 	/** A parent file descriptor for the *at() family of calls. */
@@ -142,7 +142,7 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag f
  * @return
  *         The type of the file, or BFTW_ERROR if an error occurred.
  */
-enum bftw_typeflag bftw_typeflag(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
 
 /**
  * Walk actions returned by the bftw() callback.

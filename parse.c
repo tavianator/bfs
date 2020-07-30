@@ -2388,12 +2388,12 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 		return NULL;
 	}
 
-	enum bftw_typeflag types = 0;
+	unsigned int types = 0;
 	double probability = 0.0;
 
 	const char *c = expr->sdata;
 	while (true) {
-		enum bftw_typeflag type;
+		enum bftw_type type;
 		double type_prob;
 
 		switch (*c) {
@@ -2444,8 +2444,9 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 			goto fail;
 		}
 
-		if (!(types & type)) {
-			types |= type;
+		unsigned int flag = 1 << type;
+		if (!(types & flag)) {
+			types |= flag;
 			probability += type_prob;
 		}
 

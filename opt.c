@@ -226,9 +226,9 @@ struct opt_facts {
 	enum known_pred preds[PRED_TYPES];
 
 	/** Bitmask of possible file types. */
-	enum bftw_typeflag types;
+	unsigned int types;
 	/** Bitmask of possible link target types. */
-	enum bftw_typeflag xtypes;
+	unsigned int xtypes;
 };
 
 /** Initialize some data flow facts. */

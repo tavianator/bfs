@@ -557,15 +557,15 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 
 /** Get the color for a file. */
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
-	enum bftw_typeflag typeflag = bftw_typeflag(ftwbuf, flags);
-	if (typeflag == BFTW_ERROR) {
+	enum bftw_type type = bftw_type(ftwbuf, flags);
+	if (type == BFTW_ERROR) {
 		goto error;
 	}
 
 	const struct bfs_stat *statbuf = NULL;
 	const char *color = NULL;
 
-	switch (typeflag) {
+	switch (type) {
 	case BFTW_REG:
 		if (colors->setuid || colors->setgid || colors->executable || colors->multi_hard) {
 			statbuf = bftw_stat(ftwbuf, flags);
@@ -719,7 +719,7 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags, size_t max) {
 	ssize_t ret = max;
 
-	if (bftw_typeflag(ftwbuf, flags) != BFTW_ERROR) {
+	if (bftw_type(ftwbuf, flags) != BFTW_ERROR) {
 		goto out;
 	}
 
@@ -830,7 +830,7 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	}
 
 	enum bfs_stat_flag flags = ftwbuf->stat_flags;
-	if (colors && colors->link_as_target && ftwbuf->typeflag == BFTW_LNK) {
+	if (colors && colors->link_as_target && ftwbuf->type == BFTW_LNK) {
 		flags = BFS_STAT_TRYFOLLOW;
 	}
 

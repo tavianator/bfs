@@ -166,7 +166,7 @@ char *xregerror(int err, const regex_t *regex) {
 void format_mode(mode_t mode, char str[11]) {
 	strcpy(str, "----------");
 
-	switch (bftw_mode_typeflag(mode)) {
+	switch (bftw_mode_to_type(mode)) {
 	case BFTW_REG:
 		break;
 	case BFTW_BLK:

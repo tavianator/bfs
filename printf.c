@@ -306,7 +306,7 @@ static int bfs_printf_k(FILE *file, const struct bfs_printf *directive, const st
 
 /** %l: link target */
 static int bfs_printf_l(FILE *file, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	if (ftwbuf->typeflag != BFTW_LNK) {
+	if (ftwbuf->type != BFTW_LNK) {
 		return 0;
 	}
 
@@ -421,8 +421,8 @@ static int bfs_printf_u(FILE *file, const struct bfs_printf *directive, const st
 	return fprintf(file, directive->str, pwd->pw_name);
 }
 
-static const char *bfs_printf_type(enum bftw_typeflag typeflag) {
-	switch (typeflag) {
+static const char *bfs_printf_type(enum bftw_type type) {
+	switch (type) {
 	case BFTW_BLK:
 		return "b";
 	case BFTW_CHR:
@@ -446,7 +446,7 @@ static const char *bfs_printf_type(enum bftw_typeflag typeflag) {
 
 /** %y: type */
 static int bfs_printf_y(FILE *file, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	const char *type = bfs_printf_type(ftwbuf->typeflag);
+	const char *type = bfs_printf_type(ftwbuf->type);
 	return fprintf(file, directive->str, type);
 }
 
@@ -454,7 +454,7 @@ static int bfs_printf_y(FILE *file, const struct bfs_printf *directive, const st
 static int bfs_printf_Y(FILE *file, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
 	int error = 0;
 
-	if (ftwbuf->typeflag != BFTW_LNK) {
+	if (ftwbuf->type != BFTW_LNK) {
 		return bfs_printf_y(file, directive, ftwbuf);
 	}
 
@@ -462,7 +462,7 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf *directive, const st
 
 	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, BFS_STAT_FOLLOW);
 	if (statbuf) {
-		type = bfs_printf_type(bftw_mode_typeflag(statbuf->mode));
+		type = bfs_printf_type(bftw_mode_to_type(statbuf->mode));
 	} else {
 		switch (errno) {
 		case ELOOP:
