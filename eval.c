@@ -1197,7 +1197,7 @@ static enum bftw_action cmdline_callback(const struct BFTW *ftwbuf, void *ptr) {
 
 	// In -depth mode, only handle directories on the BFTW_POST visit
 	enum bftw_visit expected_visit = BFTW_PRE;
-	if ((cmdline->flags & BFTW_DEPTH)
+	if ((cmdline->flags & BFTW_POST_ORDER)
 	    && (cmdline->strategy == BFTW_IDS || ftwbuf->type == BFTW_DIR)
 	    && ftwbuf->depth < cmdline->maxdepth) {
 		expected_visit = BFTW_POST;
@@ -1278,12 +1278,12 @@ static void dump_bftw_flags(enum bftw_flags flags) {
 	DEBUG_FLAG(flags, 0);
 	DEBUG_FLAG(flags, BFTW_STAT);
 	DEBUG_FLAG(flags, BFTW_RECOVER);
-	DEBUG_FLAG(flags, BFTW_DEPTH);
-	DEBUG_FLAG(flags, BFTW_COMFOLLOW);
-	DEBUG_FLAG(flags, BFTW_LOGICAL);
+	DEBUG_FLAG(flags, BFTW_POST_ORDER);
+	DEBUG_FLAG(flags, BFTW_FOLLOW_ROOTS);
+	DEBUG_FLAG(flags, BFTW_FOLLOW_ALL);
 	DEBUG_FLAG(flags, BFTW_DETECT_CYCLES);
-	DEBUG_FLAG(flags, BFTW_MOUNT);
-	DEBUG_FLAG(flags, BFTW_XDEV);
+	DEBUG_FLAG(flags, BFTW_SKIP_MOUNTS);
+	DEBUG_FLAG(flags, BFTW_PRUNE_MOUNTS);
 	DEBUG_FLAG(flags, BFTW_SORT);
 
 	assert(!flags);

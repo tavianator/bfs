@@ -177,17 +177,17 @@ enum bftw_flags {
 	/** Attempt to recover from encountered errors. */
 	BFTW_RECOVER       = 1 << 1,
 	/** Visit directories in post-order as well as pre-order. */
-	BFTW_DEPTH         = 1 << 2,
+	BFTW_POST_ORDER    = 1 << 2,
 	/** If the initial path is a symbolic link, follow it. */
-	BFTW_COMFOLLOW     = 1 << 3,
+	BFTW_FOLLOW_ROOTS  = 1 << 3,
 	/** Follow all symbolic links. */
-	BFTW_LOGICAL       = 1 << 4,
+	BFTW_FOLLOW_ALL    = 1 << 4,
 	/** Detect directory cycles. */
 	BFTW_DETECT_CYCLES = 1 << 5,
 	/** Skip mount points and their descendents. */
-	BFTW_MOUNT         = 1 << 6,
+	BFTW_SKIP_MOUNTS   = 1 << 6,
 	/** Skip the descendents of mount points. */
-	BFTW_XDEV          = 1 << 7,
+	BFTW_PRUNE_MOUNTS  = 1 << 7,
 	/** Sort directory entries before processing them. */
 	BFTW_SORT          = 1 << 8,
 };

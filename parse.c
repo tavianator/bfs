@@ -441,7 +441,7 @@ out:
 static int stat_arg(const struct parser_state *state, struct expr *expr, struct bfs_stat *sb) {
 	const struct cmdline *cmdline = state->cmdline;
 
-	bool follow = cmdline->flags & (BFTW_COMFOLLOW | BFTW_LOGICAL);
+	bool follow = cmdline->flags & (BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
 	enum bfs_stat_flag flags = follow ? BFS_STAT_TRYFOLLOW : BFS_STAT_NOFOLLOW;
 
 	int ret = bfs_stat(AT_FDCWD, expr->sdata, flags, sb);
@@ -939,7 +939,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
  */
 static struct expr *parse_follow(struct parser_state *state, int flags, int option) {
 	struct cmdline *cmdline = state->cmdline;
-	cmdline->flags &= ~(BFTW_COMFOLLOW | BFTW_LOGICAL);
+	cmdline->flags &= ~(BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
 	cmdline->flags |= flags;
 	if (option) {
 		return parse_nullary_positional_option(state);
@@ -1116,7 +1116,7 @@ static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg
  * Parse -delete.
  */
 static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_DEPTH;
+	state->cmdline->flags |= BFTW_POST_ORDER;
 	state->depth_arg = state->argv[0];
 	return parse_nullary_action(state, eval_delete);
 }
@@ -1125,7 +1125,7 @@ static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2)
  * Parse -d.
  */
 static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_DEPTH;
+	state->cmdline->flags |= BFTW_POST_ORDER;
 	state->depth_arg = state->argv[0];
 	return parse_nullary_flag(state);
 }
@@ -1540,7 +1540,7 @@ static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) 
 	              "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
 	              state->argv[0]);
 
-	state->cmdline->flags |= BFTW_XDEV;
+	state->cmdline->flags |= BFTW_PRUNE_MOUNTS;
 	state->mount_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
@@ -2508,7 +2508,7 @@ static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) 
  * Parse -xdev.
  */
 static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_XDEV;
+	state->cmdline->flags |= BFTW_PRUNE_MOUNTS;
 	state->xdev_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
@@ -2915,8 +2915,8 @@ static const struct table_entry parse_table[] = {
 	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME, DAYS},
 	{"-D", T_FLAG, parse_debug},
 	{"-E", T_FLAG, parse_regex_extended},
-	{"-H", T_FLAG, parse_follow, BFTW_COMFOLLOW, false},
-	{"-L", T_FLAG, parse_follow, BFTW_LOGICAL, false},
+	{"-H", T_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
+	{"-L", T_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
 	{"-O", T_FLAG, parse_optlevel, 0, 0, true},
 	{"-P", T_FLAG, parse_follow, 0, false},
 	{"-S", T_FLAG, parse_search_strategy},
@@ -2947,7 +2947,7 @@ static const struct table_entry parse_table[] = {
 	{"-f", T_FLAG, parse_f},
 	{"-false", T_TEST, parse_const, false},
 	{"-fls", T_ACTION, parse_fls},
-	{"-follow", T_OPTION, parse_follow, BFTW_LOGICAL, true},
+	{"-follow", T_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
 	{"-fprint", T_ACTION, parse_fprint},
 	{"-fprint0", T_ACTION, parse_fprint0},
 	{"-fprintf", T_ACTION, parse_fprintf},
@@ -3382,9 +3382,9 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 
 	cfprintf(cerr, "${ex}%s${rs} ", cmdline->argv[0]);
 
-	if (cmdline->flags & BFTW_LOGICAL) {
+	if (cmdline->flags & BFTW_FOLLOW_ALL) {
 		cfprintf(cerr, "${cyn}-L${rs} ");
-	} else if (cmdline->flags & BFTW_COMFOLLOW) {
+	} else if (cmdline->flags & BFTW_FOLLOW_ROOTS) {
 		cfprintf(cerr, "${cyn}-H${rs} ");
 	} else {
 		cfprintf(cerr, "${cyn}-P${rs} ");
@@ -3451,7 +3451,7 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 	} else {
 		cfprintf(cerr, "${blu}-nocolor${rs} ");
 	}
-	if (cmdline->flags & BFTW_DEPTH) {
+	if (cmdline->flags & BFTW_POST_ORDER) {
 		cfprintf(cerr, "${blu}-depth${rs} ");
 	}
 	if (cmdline->ignore_races) {
@@ -3463,13 +3463,13 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 	if (cmdline->maxdepth != INT_MAX) {
 		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", cmdline->maxdepth);
 	}
-	if (cmdline->flags & BFTW_MOUNT) {
+	if (cmdline->flags & BFTW_SKIP_MOUNTS) {
 		cfprintf(cerr, "${blu}-mount${rs} ");
 	}
 	if (cmdline->unique) {
 		cfprintf(cerr, "${blu}-unique${rs} ");
 	}
-	if ((cmdline->flags & (BFTW_MOUNT | BFTW_XDEV)) == BFTW_XDEV) {
+	if ((cmdline->flags & (BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) == BFTW_PRUNE_MOUNTS) {
 		cfprintf(cerr, "${blu}-xdev${rs} ");
 	}
 
@@ -3656,7 +3656,7 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
-	if ((cmdline->flags & BFTW_LOGICAL) && !cmdline->unique) {
+	if ((cmdline->flags & BFTW_FOLLOW_ALL) && !cmdline->unique) {
 		// We need bftw() to detect cycles unless -unique does it for us
 		cmdline->flags |= BFTW_DETECT_CYCLES;
 	}

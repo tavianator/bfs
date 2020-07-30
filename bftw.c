@@ -943,7 +943,7 @@ static bool bftw_need_stat(const struct bftw_state *state) {
 	}
 
 	if (ftwbuf->type == BFTW_DIR) {
-		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_MOUNT | BFTW_XDEV)) {
+		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) {
 			return true;
 		}
 #if __linux__
@@ -1048,9 +1048,9 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 		return;
 	}
 
-	int follow_flags = BFTW_LOGICAL;
+	int follow_flags = BFTW_FOLLOW_ALL;
 	if (ftwbuf->depth == 0) {
-		follow_flags |= BFTW_COMFOLLOW;
+		follow_flags |= BFTW_FOLLOW_ROOTS;
 	}
 	bool follow = state->flags & follow_flags;
 	if (follow) {
@@ -1127,7 +1127,7 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		return BFTW_STOP;
 	}
 
-	if ((state->flags & BFTW_MOUNT) && bftw_is_mount(state, name)) {
+	if ((state->flags & BFTW_SKIP_MOUNTS) && bftw_is_mount(state, name)) {
 		return BFTW_PRUNE;
 	}
 
@@ -1148,7 +1148,7 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		goto done;
 	}
 
-	if ((state->flags & BFTW_XDEV) && bftw_is_mount(state, name)) {
+	if ((state->flags & BFTW_PRUNE_MOUNTS) && bftw_is_mount(state, name)) {
 		ret = BFTW_PRUNE;
 		goto done;
 	}
@@ -1288,7 +1288,7 @@ static enum bftw_action bftw_release_reader(struct bftw_state *state, enum bftw_
 static enum bftw_action bftw_release_file(struct bftw_state *state, enum bftw_release_flags flags) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
-	if (!(state->flags & BFTW_DEPTH)) {
+	if (!(state->flags & BFTW_POST_ORDER)) {
 		flags = 0;
 	}
 	bool visit = flags & BFTW_VISIT_FILE;
@@ -1588,7 +1588,7 @@ static void bftw_ids_init(const struct bftw_args *args, struct bftw_ids_state *s
 	*ids_args = *args;
 	ids_args->callback = bftw_ids_callback;
 	ids_args->ptr = state;
-	ids_args->flags &= ~BFTW_DEPTH;
+	ids_args->flags &= ~BFTW_POST_ORDER;
 	ids_args->strategy = BFTW_DFS;
 }
 
@@ -1628,7 +1628,7 @@ static int bftw_ids(const struct bftw_args *args) {
 		++state.max_depth;
 	}
 
-	if (args->flags & BFTW_DEPTH) {
+	if (args->flags & BFTW_POST_ORDER) {
 		state.visit = BFTW_POST;
 		state.force_visit = true;
 
@@ -1666,10 +1666,10 @@ static int bftw_eds(const struct bftw_args *args) {
 		state.max_depth *= 2;
 	}
 
-	if (!state.quit && (args->flags & BFTW_DEPTH)) {
+	if (!state.quit && (args->flags & BFTW_POST_ORDER)) {
 		state.visit = BFTW_POST;
 		state.min_depth = 0;
-		ids_args.flags |= BFTW_DEPTH;
+		ids_args.flags |= BFTW_POST_ORDER;
 
 		if (bftw_auto(&ids_args) != 0) {
 			state.error = errno;
