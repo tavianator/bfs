@@ -152,6 +152,17 @@ struct bfs_groups {
 	struct trie by_gid;
 };
 
+/**
+ * struct group::gr_mem isn't properly aligned on macOS, so do this to avoid
+ * ASAN warnings.
+ */
+static char *next_gr_mem(void **gr_mem) {
+	char *mem;
+	memcpy(&mem, *gr_mem, sizeof(mem));
+	*gr_mem = (char *)*gr_mem + sizeof(mem);
+	return mem;
+}
+
 struct bfs_groups *bfs_parse_groups(void) {
 	int error;
 
@@ -190,10 +201,10 @@ struct bfs_groups *bfs_parse_groups(void) {
 			goto fail_end;
 		}
 
-		char **members = ent->gr_mem;
+		void *members = ent->gr_mem;
 		ent->gr_mem = NULL;
-		for (char **mem = members; *mem; ++mem) {
-			char *dup = strdup(*mem);
+		for (char *mem = next_gr_mem(&members); mem; mem = next_gr_mem(&members)) {
+			char *dup = strdup(mem);
 			if (!dup) {
 				error = errno;
 				goto fail_end;
