@@ -2505,6 +2505,23 @@ static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) 
 }
 
 /**
+ * Parse -xattrname.
+ */
+static struct expr *parse_xattrname(struct parser_state *state, int arg1, int arg2) {
+#if BFS_CAN_CHECK_XATTRS
+	struct expr *expr = parse_unary_test(state, eval_xattrname);
+	if (expr) {
+		expr->cost = STAT_COST;
+		expr->probability = 0.01;
+	}
+	return expr;
+#else
+	parse_error(state, "${blu}%s${rs} is missing platform support.\n", state->argv[0]);
+	return NULL;
+#endif
+}
+
+/**
  * Parse -xdev.
  */
 static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
@@ -2814,6 +2831,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 #if BFS_CAN_CHECK_XATTRS
 	cfprintf(cout, "  ${blu}-xattr${rs}\n");
 	cfprintf(cout, "      Find files with extended attributes\n");
+	cfprintf(cout, "  ${blu}-xattrname${rs} ${bld}NAME${rs}\n");
+	cfprintf(cout, "      Find files with the extended attribute ${bld}NAME${rs}\n");
 #endif
 	cfprintf(cout, "  ${blu}-xtype${rs} ${bld}[bcdlpfswD]${rs}\n");
 	cfprintf(cout, "      Find files of the given type, following links when ${blu}-type${rs} would not, and\n");
@@ -3017,6 +3036,7 @@ static const struct table_entry parse_table[] = {
 	{"-writable", T_TEST, parse_access, W_OK},
 	{"-x", T_FLAG, parse_xdev},
 	{"-xattr", T_TEST, parse_xattr},
+	{"-xattrname", T_TEST, parse_xattrname},
 	{"-xdev", T_OPTION, parse_xdev},
 	{"-xtype", T_TEST, parse_type, true},
 	{0},

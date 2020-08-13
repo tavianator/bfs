@@ -330,9 +330,53 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	}
 }
 
+int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
+	const char *path = fake_at(ftwbuf);
+	ssize_t len;
+
+#if BFS_HAS_SYS_EXTATTR
+	ssize_t (*extattr_get)(const char *, int, const char *, void*, size_t) =
+		ftwbuf->type == BFTW_LNK ? extattr_get_link : extattr_get_file;
+
+	len = extattr_get(path, EXTATTR_NAMESPACE_SYSTEM, name, NULL, 0);
+	if (len < 0) {
+		len = extattr_get(path, EXTATTR_NAMESPACE_USER, name, NULL, 0);
+	}
+#elif __APPLE__
+	int options = ftwbuf->type == BFTW_LNK ? XATTR_NOFOLLOW : 0;
+	len = getxattr(path, name, NULL, 0, 0, options);
+#else
+	if (ftwbuf->type == BFTW_LNK) {
+		len = lgetxattr(path, name, NULL, 0);
+	} else {
+		len = getxattr(path, name, NULL, 0);
+	}
+#endif
+
+	int error = errno;
+
+	free_fake_at(ftwbuf, path);
+
+	if (len >= 0) {
+		return 1;
+	} else if (is_absence_error(error)) {
+		return 0;
+	} else if (error == E2BIG) {
+		return 1;
+	} else {
+		errno = error;
+		return -1;
+	}
+}
+
 #else // !BFS_CAN_CHECK_XATTRS
 
 int bfs_check_xattrs(const struct BFTW *ftwbuf) {
+	errno = ENOTSUP;
+	return -1;
+}
+
+int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 	errno = ENOTSUP;
 	return -1;
 }

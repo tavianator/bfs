@@ -38,6 +38,8 @@
 
 - Fixed an optimizer bug that could skip `-empty`/`-xtype` if they didn't always lead to an action
 
+- Implemented `-xattrname` to find files with a particular extended attribute (from macOS find)
+
 [#8]: https://github.com/tavianator/bfs/issues/8
 [#30]: https://github.com/tavianator/bfs/issues/30
 

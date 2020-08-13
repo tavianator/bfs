@@ -695,12 +695,18 @@ case "$UNAME" in
         bsd_tests+=(
             test_xattr
             test_L_xattr
+
+            test_xattrname
+            test_L_xattrname
         )
         ;;
     *)
         sudo_tests+=(
             test_xattr
             test_L_xattr
+
+            test_xattrname
+            test_L_xattrname
         )
         ;;
 esac
@@ -2562,53 +2568,84 @@ function test_L_capable() {
     bfs_diff -L scratch -capable
 }
 
-function set_xattr() {
+function make_xattrs() {
+    rm -rf scratch/*
+
+    touch scratch/{normal,xattr,xattr_2}
+    ln -s xattr scratch/link
+    ln -s normal scratch/xattr_link
+
     case "$UNAME" in
         Darwin)
-            xattr -w bfs_test true "$1"
-            xattr -s -w bfs_test true "$2"
+            xattr -w bfs_test true scratch/xattr
+            xattr -w bfs_test_2 true scratch/xattr_2
+            xattr -s -w bfs_test true scratch/xattr_link
             ;;
         FreeBSD)
-            setextattr user bfs_test true "$1"
-            setextattr -h user bfs_test true "$2"
+            setextattr user bfs_test true scratch/xattr
+            setextattr user bfs_test_2 true scratch/xattr_2
+            setextattr -h user bfs_test true scratch/xattr_link
             ;;
         *)
             # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
             # namespace, which is writable by root and readable by others
-            sudo setfattr -n security.bfs_test "$1"
-            sudo setfattr -h -n security.bfs_test "$2"
+            sudo setfattr -n security.bfs_test scratch/xattr
+            sudo setfattr -n security.bfs_test_2 scratch/xattr_2
+            sudo setfattr -h -n security.bfs_test scratch/xattr_link
             ;;
     esac
 }
 
 function test_xattr() {
-    rm -rf scratch/*
-
     if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
         return 0
     fi
 
-    touch scratch/{normal,xattr}
-    ln -s xattr scratch/link
-    ln -s normal scratch/xattr_link
-    set_xattr scratch/xattr scratch/xattr_link
-
+    make_xattrs
     bfs_diff scratch -xattr
 }
 
 function test_L_xattr() {
-    rm -rf scratch/*
-
     if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
         return 0
     fi
 
-    touch scratch/{normal,xattr}
-    ln -s xattr scratch/link
-    ln -s normal scratch/xattr_link
-    set_xattr scratch/xattr scratch/xattr_link
-
+    make_xattrs
     bfs_diff -L scratch -xattr
+}
+
+function test_xattrname() {
+    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+        return 0
+    fi
+
+    make_xattrs
+
+    case "$UNAME" in
+        Darwin|FreeBSD)
+            bfs_diff scratch -xattrname bfs_test
+            ;;
+        *)
+            bfs_diff scratch -xattrname security.bfs_test
+            ;;
+    esac
+}
+
+function test_L_xattrname() {
+    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+        return 0
+    fi
+
+    make_xattrs
+
+    case "$UNAME" in
+        Darwin|FreeBSD)
+            bfs_diff -L scratch -xattrname bfs_test
+            ;;
+        *)
+            bfs_diff -L scratch -xattrname security.bfs_test
+            ;;
+    esac
 }
 
 function test_help() {

@@ -67,4 +67,16 @@ int bfs_check_capabilities(const struct BFTW *ftwbuf);
  */
 int bfs_check_xattrs(const struct BFTW *ftwbuf);
 
+/**
+ * Check if a file has an extended attribute with the given name.
+ *
+ * @param ftwbuf
+ *         The file to check.
+ * @param name
+ *         The name of the xattr to check.
+ * @return
+ *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
+ */
+int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name);
+
 #endif // BFS_FSADE_H
