@@ -193,16 +193,17 @@ struct bfs_groups *bfs_parse_groups(void) {
 			error = errno;
 			goto fail_end;
 		}
-
 		ent = groups->entries + darray_length(groups->entries) - 1;
+
+		void *members = ent->gr_mem;
+		ent->gr_mem = NULL;
+
 		ent->gr_name = strdup(ent->gr_name);
 		if (!ent->gr_name) {
 			error = errno;
 			goto fail_end;
 		}
 
-		void *members = ent->gr_mem;
-		ent->gr_mem = NULL;
 		for (char *mem = next_gr_mem(&members); mem; mem = next_gr_mem(&members)) {
 			char *dup = strdup(mem);
 			if (!dup) {
