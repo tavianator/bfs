@@ -77,6 +77,7 @@
  */
 
 #include "trie.h"
+#include "util.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -319,7 +320,7 @@ struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
 
 /** Create a new leaf, holding a copy of the given key. */
 static struct trie_leaf *new_trie_leaf(const void *key, size_t length) {
-	struct trie_leaf *leaf = malloc(sizeof(*leaf) + length);
+	struct trie_leaf *leaf = malloc(BFS_FLEX_SIZEOF(struct trie_leaf, key, length));
 	if (leaf) {
 		leaf->value = NULL;
 		leaf->length = length;
@@ -335,7 +336,7 @@ static size_t trie_node_size(unsigned int size) {
 	// Node size must be a power of two
 	assert((size & (size - 1)) == 0);
 
-	return sizeof(struct trie_node) + size*sizeof(uintptr_t);
+	return BFS_FLEX_SIZEOF(struct trie_node, children, size);
 }
 
 /** Find the offset of the first nibble that differs between two keys. */

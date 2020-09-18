@@ -26,6 +26,7 @@
 #include <fnmatch.h>
 #include <regex.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <sys/types.h>
 
 // Some portability concerns
@@ -90,6 +91,28 @@
 #else
 #	define BFS_FORMATTER(fmt, args)
 #endif
+
+// Lower bound on BFS_FLEX_SIZEOF()
+#define BFS_FLEX_LB(type, member, length) (offsetof(type, member) + sizeof(((type *)NULL)->member[0]) * (length))
+
+// Maximum macro for BFS_FLEX_SIZE()
+#define BFS_FLEX_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+/**
+ * Computes the size of a struct containing a flexible array member of the given
+ * length.
+ *
+ * @param type
+ *         The type of the struct containing the flexible array.
+ * @param member
+ *         The name of the flexible array member.
+ * @param length
+ *         The length of the flexible array.
+ */
+#define BFS_FLEX_SIZEOF(type, member, length) \
+	(sizeof(type) <= BFS_FLEX_LB(type, member, 0) \
+		? BFS_FLEX_LB(type, member, length) \
+		: BFS_FLEX_MAX(sizeof(type), BFS_FLEX_LB(type, member, length)))
 
 /**
  * readdir() wrapper that makes error handling cleaner.
