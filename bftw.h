@@ -110,7 +110,7 @@ struct BFTW {
 	const char *at_path;
 
 	/** Flags for bfs_stat(). */
-	enum bfs_stat_flag stat_flags;
+	enum bfs_stat_flags stat_flags;
 	/** Cached bfs_stat() info for BFS_STAT_NOFOLLOW. */
 	struct bftw_stat lstat_cache;
 	/** Cached bfs_stat() info for BFS_STAT_FOLLOW. */
@@ -128,7 +128,7 @@ struct BFTW {
  * @return
  *         A pointer to a bfs_stat() buffer, or NULL if the call failed.
  */
-const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
 
 /**
  * Get bfs_stat() info for a file encountered during bftw(), if it has already
@@ -141,7 +141,7 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag f
  * @return
  *         A pointer to a bfs_stat() buffer, or NULL if no stat info is cached.
  */
-const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
 
 /**
  * Get the type of a file encountered during bftw(), with flags controlling
@@ -155,7 +155,7 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
  * @return
  *         The type of the file, or BFTW_ERROR if an error occurred.
  */
-enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
 
 /**
  * Walk actions returned by the bftw() callback.

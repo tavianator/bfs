@@ -879,7 +879,7 @@ bool eval_xattrname(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	enum bfs_stat_flag flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
+	enum bfs_stat_flags flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
 	enum bftw_type type = bftw_type(ftwbuf, flags);
 	if (type == BFTW_ERROR) {
 		eval_report_error(state);
@@ -1051,7 +1051,7 @@ static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
 /**
  * Log a stat() call.
  */
-static void debug_stat(const struct cmdline *cmdline, const struct BFTW *ftwbuf, const struct bftw_stat *cache, enum bfs_stat_flag flags) {
+static void debug_stat(const struct cmdline *cmdline, const struct BFTW *ftwbuf, const struct bftw_stat *cache, enum bfs_stat_flags flags) {
 	bfs_debug_prefix(cmdline, DEBUG_STAT);
 
 	fprintf(stderr, "bfs_stat(");

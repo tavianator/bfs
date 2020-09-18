@@ -62,7 +62,7 @@ const char *bfs_stat_field_name(enum bfs_stat_field field);
 /**
  * bfs_stat() flags.
  */
-enum bfs_stat_flag {
+enum bfs_stat_flags {
 	/** Follow symlinks (the default). */
 	BFS_STAT_FOLLOW = 0,
 	/** Never follow symlinks. */
@@ -132,7 +132,7 @@ struct bfs_stat {
  * @return
  *         0 on success, -1 on error.
  */
-int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flag flags, struct bfs_stat *buf);
+int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct bfs_stat *buf);
 
 /**
  * Get a particular time field from a bfs_stat() buffer.

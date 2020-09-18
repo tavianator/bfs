@@ -442,7 +442,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 	const struct cmdline *cmdline = state->cmdline;
 
 	bool follow = cmdline->flags & (BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
-	enum bfs_stat_flag flags = follow ? BFS_STAT_TRYFOLLOW : BFS_STAT_NOFOLLOW;
+	enum bfs_stat_flags flags = follow ? BFS_STAT_TRYFOLLOW : BFS_STAT_NOFOLLOW;
 
 	int ret = bfs_stat(AT_FDCWD, expr->sdata, flags, sb);
 	if (ret != 0) {

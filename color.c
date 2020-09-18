@@ -556,7 +556,7 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 }
 
 /** Get the color for a file. */
-static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	enum bftw_type type = bftw_type(ftwbuf, flags);
 	if (type == BFTW_ERROR) {
 		goto error;
@@ -716,7 +716,7 @@ static int print_colored(const struct colors *colors, const char *esc, const cha
 }
 
 /** Find the offset of the first broken path component. */
-static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags, size_t max) {
+static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t max) {
 	ssize_t ret = max;
 
 	if (bftw_type(ftwbuf, flags) != BFTW_ERROR) {
@@ -775,7 +775,7 @@ out:
 }
 
 /** Print the directories leading up to a file. */
-static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags, size_t nameoff) {
+static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t nameoff) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
 
@@ -804,7 +804,7 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 }
 
 /** Print a path with colors. */
-static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	const struct colors *colors = cfile->colors;
 	FILE *file = cfile->file;
 
@@ -829,7 +829,7 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 		return fputs(ftwbuf->path, cfile->file) == EOF ? -1 : 0;
 	}
 
-	enum bfs_stat_flag flags = ftwbuf->stat_flags;
+	enum bfs_stat_flags flags = ftwbuf->stat_flags;
 	if (colors && colors->link_as_target && ftwbuf->type == BFTW_LNK) {
 		flags = BFS_STAT_TRYFOLLOW;
 	}

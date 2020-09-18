@@ -852,7 +852,7 @@ static enum bftw_type bftw_dirent_type(const struct dirent *de) {
 }
 
 /** Cached bfs_stat(). */
-static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, struct bftw_stat *cache, enum bfs_stat_flag flags) {
+static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, struct bftw_stat *cache, enum bfs_stat_flags flags) {
 	if (!cache->buf) {
 		if (cache->error) {
 			errno = cache->error;
@@ -866,7 +866,7 @@ static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, struct bftw_st
 	return cache->buf;
 }
 
-const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	struct BFTW *mutbuf = (struct BFTW *)ftwbuf;
 	const struct bfs_stat *ret;
 
@@ -886,7 +886,7 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag f
 	return ret;
 }
 
-const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	if (flags & BFS_STAT_NOFOLLOW) {
 		return ftwbuf->lstat_cache.buf;
 	} else {
@@ -894,7 +894,7 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
 	}
 }
 
-enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
 		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->type != BFTW_LNK) {
 			return ftwbuf->type;
