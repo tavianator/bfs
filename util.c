@@ -59,9 +59,14 @@ int xreaddir(DIR *dir, struct dirent **de) {
 }
 
 char *xreadlinkat(int fd, const char *path, size_t size) {
-	++size; // NUL-terminator
 	ssize_t len;
 	char *name = NULL;
+
+	if (size == 0) {
+		size = 64;
+	} else {
+		++size; // NUL terminator
+	}
 
 	while (true) {
 		char *new_name = realloc(name, size);
