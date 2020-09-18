@@ -310,7 +310,10 @@ static int bfs_printf_l(FILE *file, const struct bfs_printf *directive, const st
 		return 0;
 	}
 
-	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, 0);
+	const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
+	size_t len = statbuf ? statbuf->size : 0;
+
+	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
 	if (!target) {
 		return -1;
 	}

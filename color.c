@@ -841,11 +841,8 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	int ret = -1;
 
-	size_t len = 0;
-	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, BFS_STAT_NOFOLLOW);
-	if (statbuf) {
-		len = statbuf->size;
-	}
+	const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
+	size_t len = statbuf ? statbuf->size : 0;
 
 	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
 	if (!target) {

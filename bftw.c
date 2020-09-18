@@ -886,6 +886,14 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag f
 	return ret;
 }
 
+const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
+	if (flags & BFS_STAT_NOFOLLOW) {
+		return ftwbuf->lstat_cache.buf;
+	} else {
+		return ftwbuf->stat_cache.buf;
+	}
+}
+
 enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flag flags) {
 	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
 		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->type != BFTW_LNK) {

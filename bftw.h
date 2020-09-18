@@ -131,6 +131,19 @@ struct BFTW {
 const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
 
 /**
+ * Get bfs_stat() info for a file encountered during bftw(), if it has already
+ * been cached.
+ *
+ * @param ftwbuf
+ *         bftw() data for the file to stat.
+ * @param flags
+ *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
+ * @return
+ *         A pointer to a bfs_stat() buffer, or NULL if no stat info is cached.
+ */
+const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flag flags);
+
+/**
  * Get the type of a file encountered during bftw(), with flags controlling
  * whether to follow links.  This function will avoid calling bfs_stat() if
  * possible.

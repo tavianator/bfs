@@ -484,12 +484,10 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 		goto done;
 	}
 
-	const struct bfs_stat *statbuf = eval_stat(state);
-	if (!statbuf) {
-		goto done;
-	}
+	const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
+	size_t len = statbuf ? statbuf->size : 0;
 
-	name = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, statbuf->size);
+	name = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
 	if (!name) {
 		eval_report_error(state);
 		goto done;
