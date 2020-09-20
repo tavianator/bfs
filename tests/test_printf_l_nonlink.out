@@ -1,0 +1,12 @@
+|                    links ->                          |
+|               links/file ->                          |
+|             links/broken -> nowhere                  |
+|             links/deeply ->                          |
+|            links/symlink -> file                     |
+|           links/hardlink ->                          |
+|               links/skip -> deeply/nested            |
+|             links/notdir -> symlink/file             |
+|      links/deeply/nested ->                          |
+|  links/deeply/nested/dir ->                          |
+| links/deeply/nested/file ->                          |
+| links/deeply/nested/link -> file                     |
