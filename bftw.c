@@ -889,8 +889,12 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags 
 const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	if (flags & BFS_STAT_NOFOLLOW) {
 		return ftwbuf->lstat_cache.buf;
-	} else {
+	} else if (ftwbuf->stat_cache.buf) {
 		return ftwbuf->stat_cache.buf;
+	} else if ((flags & BFS_STAT_TRYFOLLOW) && is_nonexistence_error(ftwbuf->stat_cache.error)) {
+		return ftwbuf->lstat_cache.buf;
+	} else {
+		return NULL;
 	}
 }
 
