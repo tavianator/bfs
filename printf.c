@@ -306,20 +306,21 @@ static int bfs_printf_k(FILE *file, const struct bfs_printf *directive, const st
 
 /** %l: link target */
 static int bfs_printf_l(FILE *file, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	if (ftwbuf->type != BFTW_LNK) {
-		return 0;
-	}
+	char *buf = NULL;
+	const char *target = "";
 
-	const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
-	size_t len = statbuf ? statbuf->size : 0;
+	if (ftwbuf->type == BFTW_LNK) {
+		const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
+		size_t len = statbuf ? statbuf->size : 0;
 
-	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
-	if (!target) {
-		return -1;
+		target = buf = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
+		if (!target) {
+			return -1;
+		}
 	}
 
 	int ret = fprintf(file, directive->str, target);
-	free(target);
+	free(buf);
 	return ret;
 }
 

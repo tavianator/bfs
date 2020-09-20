@@ -528,6 +528,7 @@ gnu_tests=(
     test_printf_Y_error
     test_printf_H
     test_printf_u_g_ulimit
+    test_printf_l_nonlink
 
     test_quit
     test_quit_child
@@ -1988,6 +1989,10 @@ function test_printf_u_g_ulimit() {
     closefrom 4
     ulimit -n 16
     [ "$(invoke_bfs deep -printf '%u %g\n' | uniq)" = "$(id -un) $(id -gn)" ]
+}
+
+function test_printf_l_nonlink() {
+    bfs_diff links -printf '| %24p -> %-24l |\n'
 }
 
 function test_fstype() {
