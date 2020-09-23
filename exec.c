@@ -390,7 +390,11 @@ fail:
 		}
 	} else if (WIFSIGNALED(wstatus)) {
 		int sig = WTERMSIG(wstatus);
-		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated by signal %d\n", execbuf->argv[0], sig);
+		const char *str = strsignal(sig);
+		if (!str) {
+			str = "unknown";
+		}
+		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
 	} else {
 		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
 	}
