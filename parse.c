@@ -21,8 +21,9 @@
  * flags like always-true options, and skipping over paths wherever they appear.
  */
 
+#include "parse.h"
 #include "bfs.h"
-#include "cmdline.h"
+#include "ctx.h"
 #include "darray.h"
 #include "diag.h"
 #include "dstring.h"
@@ -31,6 +32,7 @@
 #include "expr.h"
 #include "fsade.h"
 #include "mtab.h"
+#include "opt.h"
 #include "printf.h"
 #include "pwcache.h"
 #include "spawn.h"
@@ -209,69 +211,6 @@ static void expr_set_never_returns(struct expr *expr) {
 }
 
 /**
- * An open file for the command line.
- */
-struct open_file {
-	/** The file itself. */
-	CFILE *cfile;
-	/** The path to the file (for diagnostics). */
-	const char *path;
-};
-
-/**
- * Free the parsed command line.
- */
-int free_cmdline(struct cmdline *cmdline) {
-	int ret = 0;
-
-	if (cmdline) {
-		CFILE *cout = cmdline->cout;
-		CFILE *cerr = cmdline->cerr;
-
-		free_expr(cmdline->expr);
-		free_expr(cmdline->exclude);
-
-		free_bfs_mtab(cmdline->mtab);
-
-		bfs_free_groups(cmdline->groups);
-		bfs_free_users(cmdline->users);
-
-		struct trie_leaf *leaf;
-		while ((leaf = trie_first_leaf(&cmdline->open_files))) {
-			struct open_file *ofile = leaf->value;
-
-			if (cfclose(ofile->cfile) != 0) {
-				if (cerr) {
-					bfs_error(cmdline, "'%s': %m.\n", ofile->path);
-				}
-				ret = -1;
-			}
-
-			free(ofile);
-			trie_remove(&cmdline->open_files, leaf);
-		}
-		trie_destroy(&cmdline->open_files);
-
-		if (cout && fflush(cout->file) != 0) {
-			if (cerr) {
-				bfs_error(cmdline, "standard output: %m.\n");
-			}
-			ret = -1;
-		}
-
-		cfclose(cout);
-		cfclose(cerr);
-
-		free_colors(cmdline->colors);
-		darray_free(cmdline->paths);
-		free(cmdline->argv);
-		free(cmdline);
-	}
-
-	return ret;
-}
-
-/**
  * Color use flags.
  */
 enum use_color {
@@ -285,7 +224,7 @@ enum use_color {
  */
 struct parser_state {
 	/** The command line being constructed. */
-	struct cmdline *cmdline;
+	struct bfs_ctx *ctx;
 	/** The command line arguments being parsed. */
 	char **argv;
 	/** The name of this program. */
@@ -351,7 +290,7 @@ BFS_FORMATTER(2, 3)
 static void parse_error(const struct parser_state *state, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bfs_verror(state->cmdline, format, args);
+	bfs_verror(state->ctx, format, args);
 	va_end(args);
 }
 
@@ -362,7 +301,7 @@ BFS_FORMATTER(2, 3)
 static bool parse_warning(const struct parser_state *state, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bool ret = bfs_vwarning(state->cmdline, format, args);
+	bool ret = bfs_vwarning(state->ctx, format, args);
 	va_end(args);
 	return ret;
 }
@@ -373,75 +312,31 @@ static bool parse_warning(const struct parser_state *state, const char *format, 
 static void init_print_expr(struct parser_state *state, struct expr *expr) {
 	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
-	expr->cfile = state->cmdline->cout;
+	expr->cfile = state->ctx->cout;
 }
 
 /**
  * Open a file for an expression.
  */
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
-	int ret = -1;
+	struct bfs_ctx *ctx = state->ctx;
 
-	struct cmdline *cmdline = state->cmdline;
-
-	CFILE *cfile = cfopen(path, state->use_color ? cmdline->colors : NULL);
-	if (!cfile) {
+	expr->cfile = bfs_ctx_open(ctx, path, state->use_color);
+	if (!expr->cfile) {
 		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
-		goto out;
+		return -1;
 	}
 
-	struct bfs_stat sb;
-	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
-		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
-		goto out_close;
-	}
-
-	bfs_file_id id;
-	bfs_stat_id(&sb, &id);
-
-	struct trie_leaf *leaf = trie_insert_mem(&cmdline->open_files, id, sizeof(id));
-	if (!leaf) {
-		perror("trie_insert_mem()");
-		goto out_close;
-	}
-
-	if (leaf->value) {
-		struct open_file *ofile = leaf->value;
-		expr->cfile = ofile->cfile;
-		ret = 0;
-		goto out_close;
-	}
-
-	struct open_file *ofile = malloc(sizeof(*ofile));
-	if (!ofile) {
-		perror("malloc()");
-		trie_remove(&cmdline->open_files, leaf);
-		goto out_close;
-	}
-
-	ofile->cfile = cfile;
-	ofile->path = path;
-	leaf->value = ofile;
-	++cmdline->nopen_files;
-
-	expr->cfile = cfile;
-
-	ret = 0;
-	goto out;
-
-out_close:
-	cfclose(cfile);
-out:
-	return ret;
+	return 0;
 }
 
 /**
  * Invoke bfs_stat() on an argument.
  */
 static int stat_arg(const struct parser_state *state, struct expr *expr, struct bfs_stat *sb) {
-	const struct cmdline *cmdline = state->cmdline;
+	const struct bfs_ctx *ctx = state->ctx;
 
-	bool follow = cmdline->flags & (BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
+	bool follow = ctx->flags & (BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
 	enum bfs_stat_flags flags = follow ? BFS_STAT_TRYFOLLOW : BFS_STAT_NOFOLLOW;
 
 	int ret = bfs_stat(AT_FDCWD, expr->sdata, flags, sb);
@@ -481,12 +376,12 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
  * Parse a root path.
  */
 static int parse_root(struct parser_state *state, const char *path) {
-	struct cmdline *cmdline = state->cmdline;
-	return DARRAY_PUSH(&cmdline->paths, &path);
+	struct bfs_ctx *ctx = state->ctx;
+	return DARRAY_PUSH(&ctx->paths, &path);
 }
 
 /**
- * While parsing an expression, skip any paths and add them to the cmdline.
+ * While parsing an expression, skip any paths and add them to ctx->paths.
  */
 static int skip_paths(struct parser_state *state) {
 	while (true) {
@@ -863,13 +758,13 @@ static bool parse_debug_flag(const char *flag, size_t len, const char *expected)
  * Parse -D FLAG.
  */
 static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
+	struct bfs_ctx *ctx = state->ctx;
 
 	const char *arg = state->argv[0];
 	const char *flags = state->argv[1];
 	if (!flags) {
 		parse_error(state, "${cyn}%s${rs} needs a flag.\n\n", arg);
-		debug_help(cmdline->cerr);
+		debug_help(ctx->cerr);
 		return NULL;
 	}
 
@@ -884,7 +779,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 		}
 
 		if (parse_debug_flag(flag, len, "help")) {
-			debug_help(cmdline->cout);
+			debug_help(ctx->cout);
 			state->just_info = true;
 			return NULL;
 		}
@@ -894,22 +789,22 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 			if (!expected) {
 				if (parse_warning(state, "Unrecognized debug flag ${bld}")) {
 					fwrite(flag, 1, len, stderr);
-					cfprintf(cmdline->cerr, "${rs}.\n\n");
+					cfprintf(ctx->cerr, "${rs}.\n\n");
 					unrecognized = true;
 				}
 				break;
 			}
 
 			if (parse_debug_flag(flag, len, expected)) {
-				cmdline->debug |= debug_flags[i].flag;
+				ctx->debug |= debug_flags[i].flag;
 				break;
 			}
 		}
 	}
 
 	if (unrecognized) {
-		debug_help(cmdline->cerr);
-		cfprintf(cmdline->cerr, "\n");
+		debug_help(ctx->cerr);
+		cfprintf(ctx->cerr, "\n");
 	}
 
 	return parse_unary_flag(state);
@@ -919,7 +814,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
  * Parse -On.
  */
 static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg2) {
-	int *optlevel = &state->cmdline->optlevel;
+	int *optlevel = &state->ctx->optlevel;
 
 	if (strcmp(state->argv[0], "-Ofast") == 0) {
 		*optlevel = 4;
@@ -938,9 +833,9 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
  * Parse -[PHL], -(no)?follow.
  */
 static struct expr *parse_follow(struct parser_state *state, int flags, int option) {
-	struct cmdline *cmdline = state->cmdline;
-	cmdline->flags &= ~(BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
-	cmdline->flags |= flags;
+	struct bfs_ctx *ctx = state->ctx;
+	ctx->flags &= ~(BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
+	ctx->flags |= flags;
 	if (option) {
 		return parse_nullary_positional_option(state);
 	} else {
@@ -952,7 +847,7 @@ static struct expr *parse_follow(struct parser_state *state, int flags, int opti
  * Parse -X.
  */
 static struct expr *parse_xargs_safe(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->xargs_safe = true;
+	state->ctx->xargs_safe = true;
 	return parse_nullary_flag(state);
 }
 
@@ -1061,16 +956,16 @@ static struct expr *parse_capable(struct parser_state *state, int flag, int arg2
  * Parse -(no)?color.
  */
 static struct expr *parse_color(struct parser_state *state, int color, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	struct colors *colors = cmdline->colors;
+	struct bfs_ctx *ctx = state->ctx;
+	struct colors *colors = ctx->colors;
 	if (color) {
 		state->use_color = COLOR_ALWAYS;
-		cmdline->cout->colors = colors;
-		cmdline->cerr->colors = colors;
+		ctx->cout->colors = colors;
+		ctx->cerr->colors = colors;
 	} else {
 		state->use_color = COLOR_NEVER;
-		cmdline->cout->colors = NULL;
-		cmdline->cerr->colors = NULL;
+		ctx->cout->colors = NULL;
+		ctx->cerr->colors = NULL;
 	}
 	return parse_nullary_option(state);
 }
@@ -1116,7 +1011,7 @@ static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg
  * Parse -delete.
  */
 static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_POST_ORDER;
+	state->ctx->flags |= BFTW_POST_ORDER;
 	state->depth_arg = state->argv[0];
 	return parse_nullary_action(state, eval_delete);
 }
@@ -1125,7 +1020,7 @@ static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2)
  * Parse -d.
  */
 static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_POST_ORDER;
+	state->ctx->flags |= BFTW_POST_ORDER;
 	state->depth_arg = state->argv[0];
 	return parse_nullary_flag(state);
 }
@@ -1146,7 +1041,7 @@ static struct expr *parse_depth_n(struct parser_state *state, int arg1, int arg2
  * Parse -{min,max}depth N.
  */
 static struct expr *parse_depth_limit(struct parser_state *state, int is_min, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
+	struct bfs_ctx *ctx = state->ctx;
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
@@ -1154,7 +1049,7 @@ static struct expr *parse_depth_limit(struct parser_state *state, int is_min, in
 		return NULL;
 	}
 
-	int *depth = is_min ? &cmdline->mindepth : &cmdline->maxdepth;
+	int *depth = is_min ? &ctx->mindepth : &ctx->maxdepth;
 	if (!parse_int(state, value, depth, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
@@ -1174,7 +1069,7 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
 	expr->cost = 2000.0;
 	expr->probability = 0.01;
 
-	if (state->cmdline->optlevel < 4) {
+	if (state->ctx->optlevel < 4) {
 		// Since -empty attempts to open and read directories, it may
 		// have side effects such as reporting permission errors, and
 		// thus shouldn't be re-ordered without aggressive optimizations
@@ -1190,7 +1085,7 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
-	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->cmdline);
+	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->ctx);
 	if (!execbuf) {
 		return NULL;
 	}
@@ -1266,14 +1161,23 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
  */
 static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_unary_action(state, eval_fls);
-	if (expr) {
-		expr_set_always_true(expr);
-		expr->cost = PRINT_COST;
-		if (expr_open(state, expr, expr->sdata) != 0) {
-			goto fail;
-		}
-		expr->reftime = state->now;
+	if (!expr) {
+		goto fail;
 	}
+
+	if (expr_open(state, expr, expr->sdata) != 0) {
+		goto fail;
+	}
+
+	expr_set_always_true(expr);
+	expr->cost = PRINT_COST;
+	expr->reftime = state->now;
+
+	// We'll need these for user/group names, so initialize them now to
+	// avoid EMFILE later
+	bfs_ctx_users(state->ctx);
+	bfs_ctx_groups(state->ctx);
+
 	return expr;
 
 fail:
@@ -1350,7 +1254,7 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 		goto fail;
 	}
 
-	expr->printf = parse_bfs_printf(format, state->cmdline);
+	expr->printf = parse_bfs_printf(format, state->ctx);
 	if (!expr->printf) {
 		goto fail;
 	}
@@ -1366,9 +1270,8 @@ fail:
  * Parse -fstype TYPE.
  */
 static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	if (!cmdline->mtab) {
-		parse_error(state, "Couldn't parse the mount table: %s.\n", strerror(cmdline->mtab_error));
+	if (!bfs_ctx_mtab(state->ctx)) {
+		parse_error(state, "Couldn't parse the mount table: %m.\n");
 		return NULL;
 	}
 
@@ -1383,9 +1286,9 @@ static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2)
  * Parse -gid/-group.
  */
 static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	if (!cmdline->groups) {
-		parse_error(state, "Couldn't parse the group table: %s.\n", strerror(cmdline->groups_error));
+	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
+	if (!groups) {
+		parse_error(state, "Couldn't parse the group table: %m.\n");
 		return NULL;
 	}
 
@@ -1396,7 +1299,7 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 		return NULL;
 	}
 
-	const struct group *grp = bfs_getgrnam(cmdline->groups, expr->sdata);
+	const struct group *grp = bfs_getgrnam(groups, expr->sdata);
 	if (grp) {
 		expr->idata = grp->gr_gid;
 		expr->cmp_flag = CMP_EXACT;
@@ -1422,7 +1325,7 @@ fail:
  * Parse -unique.
  */
 static struct expr *parse_unique(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->unique = true;
+	state->ctx->unique = true;
 	return parse_nullary_option(state);
 }
 
@@ -1441,9 +1344,9 @@ static struct expr *parse_used(struct parser_state *state, int arg1, int arg2) {
  * Parse -uid/-user.
  */
 static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	if (!cmdline->users) {
-		parse_error(state, "Couldn't parse the user table: %s.\n", strerror(cmdline->users_error));
+	const struct bfs_users *users = bfs_ctx_users(state->ctx);
+	if (!users) {
+		parse_error(state, "Couldn't parse the user table: %m.\n");
 		return NULL;
 	}
 
@@ -1454,7 +1357,7 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 		return NULL;
 	}
 
-	const struct passwd *pwd = bfs_getpwnam(cmdline->users, expr->sdata);
+	const struct passwd *pwd = bfs_getpwnam(users, expr->sdata);
 	if (pwd) {
 		expr->idata = pwd->pw_uid;
 		expr->cmp_flag = CMP_EXACT;
@@ -1491,7 +1394,7 @@ static struct expr *parse_hidden(struct parser_state *state, int arg1, int arg2)
  * Parse -(no)?ignore_readdir_race.
  */
 static struct expr *parse_ignore_races(struct parser_state *state, int ignore, int arg2) {
-	state->cmdline->ignore_races = ignore;
+	state->ctx->ignore_races = ignore;
 	return parse_nullary_option(state);
 }
 
@@ -1524,10 +1427,18 @@ static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) 
  */
 static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
 	struct expr *expr = parse_nullary_action(state, eval_fls);
-	if (expr) {
-		init_print_expr(state, expr);
-		expr->reftime = state->now;
+	if (!expr) {
+		return NULL;
 	}
+
+	init_print_expr(state, expr);
+	expr->reftime = state->now;
+
+	// We'll need these for user/group names, so initialize them now to
+	// avoid EMFILE later
+	bfs_ctx_users(state->ctx);
+	bfs_ctx_groups(state->ctx);
+
 	return expr;
 }
 
@@ -1540,7 +1451,7 @@ static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) 
 	              "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
 	              state->argv[0]);
 
-	state->cmdline->flags |= BFTW_PRUNE_MOUNTS;
+	state->ctx->flags |= BFTW_PRUNE_MOUNTS;
 	state->mount_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
@@ -1725,9 +1636,8 @@ fail:
  * Parse -nogroup.
  */
 static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	if (!cmdline->groups) {
-		parse_error(state, "Couldn't parse the group table: %s.\n", strerror(cmdline->groups_error));
+	if (!bfs_ctx_groups(state->ctx)) {
+		parse_error(state, "Couldn't parse the group table: %m.\n");
 		return NULL;
 	}
 
@@ -1751,9 +1661,9 @@ static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg
 	hidden->probability = 0.01;
 	hidden->pure = true;
 
-	struct cmdline *cmdline = state->cmdline;
-	cmdline->exclude = new_binary_expr(eval_or, cmdline->exclude, hidden, &fake_or_arg);
-	if (!cmdline->exclude) {
+	struct bfs_ctx *ctx = state->ctx;
+	ctx->exclude = new_binary_expr(eval_or, ctx->exclude, hidden, &fake_or_arg);
+	if (!ctx->exclude) {
 		return NULL;
 	}
 
@@ -1773,9 +1683,8 @@ static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2)
  * Parse -nouser.
  */
 static struct expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	if (!cmdline->users) {
-		parse_error(state, "Couldn't parse the user table: %s.\n", strerror(cmdline->users_error));
+	if (!bfs_ctx_users(state->ctx)) {
+		parse_error(state, "Couldn't parse the user table: %m.\n");
 		return NULL;
 	}
 
@@ -2083,7 +1992,7 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 
 	init_print_expr(state, expr);
 
-	expr->printf = parse_bfs_printf(expr->sdata, state->cmdline);
+	expr->printf = parse_bfs_printf(expr->sdata, state->ctx);
 	if (!expr->printf) {
 		free_expr(expr);
 		return NULL;
@@ -2176,8 +2085,8 @@ static struct expr *parse_regex_extended(struct parser_state *state, int arg1, i
  * Parse -regextype TYPE.
  */
 static struct expr *parse_regextype(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	CFILE *cfile = cmdline->cerr;
+	struct bfs_ctx *ctx = state->ctx;
+	CFILE *cfile = ctx->cerr;
 
 	const char *arg = state->argv[0];
 	const char *type = state->argv[1];
@@ -2192,7 +2101,7 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 		state->regex_flags = REG_EXTENDED;
 	} else if (strcmp(type, "help") == 0) {
 		state->just_info = true;
-		cfile = cmdline->cout;
+		cfile = ctx->cout;
 		goto list_types;
 	} else {
 		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Unsupported regex type.\n\n", arg, type);
@@ -2212,7 +2121,7 @@ list_types:
  * Parse -s.
  */
 static struct expr *parse_s(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_SORT;
+	state->ctx->flags |= BFTW_SORT;
 	return parse_nullary_flag(state);
 }
 
@@ -2244,8 +2153,8 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
  * Parse -S STRATEGY.
  */
 static struct expr *parse_search_strategy(struct parser_state *state, int arg1, int arg2) {
-	struct cmdline *cmdline = state->cmdline;
-	CFILE *cfile = cmdline->cerr;
+	struct bfs_ctx *ctx = state->ctx;
+	CFILE *cfile = ctx->cerr;
 
 	const char *flag = state->argv[0];
 	const char *arg = state->argv[1];
@@ -2256,16 +2165,16 @@ static struct expr *parse_search_strategy(struct parser_state *state, int arg1, 
 
 
 	if (strcmp(arg, "bfs") == 0) {
-		cmdline->strategy = BFTW_BFS;
+		ctx->strategy = BFTW_BFS;
 	} else if (strcmp(arg, "dfs") == 0) {
-		cmdline->strategy = BFTW_DFS;
+		ctx->strategy = BFTW_DFS;
 	} else if (strcmp(arg, "ids") == 0) {
-		cmdline->strategy = BFTW_IDS;
+		ctx->strategy = BFTW_IDS;
 	} else if (strcmp(arg, "eds") == 0) {
-		cmdline->strategy = BFTW_EDS;
+		ctx->strategy = BFTW_EDS;
 	} else if (strcmp(arg, "help") == 0) {
 		state->just_info = true;
-		cfile = cmdline->cout;
+		cfile = ctx->cout;
 		goto list_strategies;
 	} else {
 		parse_error(state, "${cyn}%s${rs} ${bld}%s${rs}: Unrecognized search strategy.\n\n", flag, arg);
@@ -2465,7 +2374,7 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 	expr->idata = types;
 	expr->probability = probability;
 
-	if (x && state->cmdline->optlevel < 4) {
+	if (x && state->ctx->optlevel < 4) {
 		// Since -xtype dereferences symbolic links, it may have side
 		// effects such as reporting permission errors, and thus
 		// shouldn't be re-ordered without aggressive optimizations
@@ -2483,7 +2392,7 @@ fail:
  * Parse -(no)?warn.
  */
 static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
-	state->cmdline->warn = warn;
+	state->ctx->warn = warn;
 	return parse_nullary_positional_option(state);
 }
 
@@ -2525,7 +2434,7 @@ static struct expr *parse_xattrname(struct parser_state *state, int arg1, int ar
  * Parse -xdev.
  */
 static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
-	state->cmdline->flags |= BFTW_PRUNE_MOUNTS;
+	state->ctx->flags |= BFTW_PRUNE_MOUNTS;
 	state->xdev_arg = state->argv[0];
 	return parse_nullary_option(state);
 }
@@ -2639,7 +2548,7 @@ fail:
  * "Parse" -help.
  */
 static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
-	CFILE *cout = state->cmdline->cout;
+	CFILE *cout = state->ctx->cout;
 
 	pid_t pager = -1;
 	if (state->stdout_tty) {
@@ -2899,7 +2808,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
  * "Parse" -version.
  */
 static struct expr *parse_version(struct parser_state *state, int arg1, int arg2) {
-	cfprintf(state->cmdline->cout, "${ex}bfs${rs} ${bld}%s${rs}\n\n", BFS_VERSION);
+	cfprintf(state->ctx->cout, "${ex}bfs${rs} ${bld}%s${rs}\n\n", BFS_VERSION);
 
 	printf("%s\n", BFS_HOMEPAGE);
 
@@ -3099,7 +3008,7 @@ static struct expr *parse_literal(struct parser_state *state) {
 
 	match = table_lookup_fuzzy(arg);
 
-	CFILE *cerr = state->cmdline->cerr;
+	CFILE *cerr = state->ctx->cerr;
 	parse_error(state, "Unknown argument ${er}%s${rs}; did you mean ", arg);
 	switch (match->type) {
 	case T_FLAG:
@@ -3192,9 +3101,9 @@ static struct expr *parse_factor(struct parser_state *state) {
 
 		state->excluding = false;
 
-		struct cmdline *cmdline = state->cmdline;
-		cmdline->exclude = new_binary_expr(eval_or, cmdline->exclude, factor, &fake_or_arg);
-		if (!cmdline->exclude) {
+		struct bfs_ctx *ctx = state->ctx;
+		ctx->exclude = new_binary_expr(eval_or, ctx->exclude, factor, &fake_or_arg);
+		if (!ctx->exclude) {
 			return NULL;
 		}
 
@@ -3370,7 +3279,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 		parse_warning(state, "${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n", state->xdev_arg, state->mount_arg);
 	}
 
-	if (state->cmdline->warn && state->depth_arg && state->prune_arg) {
+	if (state->ctx->warn && state->depth_arg && state->prune_arg) {
 		parse_warning(state, "${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n", state->prune_arg, state->depth_arg);
 
 		if (state->interactive) {
@@ -3390,40 +3299,37 @@ fail:
 	return NULL;
 }
 
-/**
- * Dump the parsed form of the command line, for debugging.
- */
-void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
-	if (!bfs_debug_prefix(cmdline, flag)) {
+void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
+	if (!bfs_debug_prefix(ctx, flag)) {
 		return;
 	}
 
-	CFILE *cerr = cmdline->cerr;
+	CFILE *cerr = ctx->cerr;
 
-	cfprintf(cerr, "${ex}%s${rs} ", cmdline->argv[0]);
+	cfprintf(cerr, "${ex}%s${rs} ", ctx->argv[0]);
 
-	if (cmdline->flags & BFTW_FOLLOW_ALL) {
+	if (ctx->flags & BFTW_FOLLOW_ALL) {
 		cfprintf(cerr, "${cyn}-L${rs} ");
-	} else if (cmdline->flags & BFTW_FOLLOW_ROOTS) {
+	} else if (ctx->flags & BFTW_FOLLOW_ROOTS) {
 		cfprintf(cerr, "${cyn}-H${rs} ");
 	} else {
 		cfprintf(cerr, "${cyn}-P${rs} ");
 	}
 
-	if (cmdline->xargs_safe) {
+	if (ctx->xargs_safe) {
 		cfprintf(cerr, "${cyn}-X${rs} ");
 	}
 
-	if (cmdline->flags & BFTW_SORT) {
+	if (ctx->flags & BFTW_SORT) {
 		cfprintf(cerr, "${cyn}-s${rs} ");
 	}
 
-	if (cmdline->optlevel != 3) {
-		cfprintf(cerr, "${cyn}-O${bld}%d${rs} ", cmdline->optlevel);
+	if (ctx->optlevel != 3) {
+		cfprintf(cerr, "${cyn}-O${bld}%d${rs} ", ctx->optlevel);
 	}
 
 	const char *strategy = NULL;
-	switch (cmdline->strategy) {
+	switch (ctx->strategy) {
 	case BFTW_BFS:
 		strategy = "bfs";
 		break;
@@ -3440,7 +3346,7 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 	assert(strategy);
 	cfprintf(cerr, "${cyn}-S${rs} ${bld}%s${rs} ", strategy);
 
-	enum debug_flags debug = cmdline->debug;
+	enum debug_flags debug = ctx->debug;
 	if (debug) {
 		cfprintf(cerr, "${cyn}-D${rs} ");
 		for (int i = 0; debug; ++i) {
@@ -3457,8 +3363,8 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 		cfprintf(cerr, " ");
 	}
 
-	for (size_t i = 0; i < darray_length(cmdline->paths); ++i) {
-		const char *path = cmdline->paths[i];
+	for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+		const char *path = ctx->paths[i];
 		char c = path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
 			cfprintf(cerr, "${cyn}-f${rs} ");
@@ -3466,43 +3372,43 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 		cfprintf(cerr, "${mag}%s${rs} ", path);
 	}
 
-	if (cmdline->cout->colors) {
+	if (ctx->cout->colors) {
 		cfprintf(cerr, "${blu}-color${rs} ");
 	} else {
 		cfprintf(cerr, "${blu}-nocolor${rs} ");
 	}
-	if (cmdline->flags & BFTW_POST_ORDER) {
+	if (ctx->flags & BFTW_POST_ORDER) {
 		cfprintf(cerr, "${blu}-depth${rs} ");
 	}
-	if (cmdline->ignore_races) {
+	if (ctx->ignore_races) {
 		cfprintf(cerr, "${blu}-ignore_readdir_race${rs} ");
 	}
-	if (cmdline->mindepth != 0) {
-		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", cmdline->mindepth);
+	if (ctx->mindepth != 0) {
+		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", ctx->mindepth);
 	}
-	if (cmdline->maxdepth != INT_MAX) {
-		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", cmdline->maxdepth);
+	if (ctx->maxdepth != INT_MAX) {
+		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", ctx->maxdepth);
 	}
-	if (cmdline->flags & BFTW_SKIP_MOUNTS) {
+	if (ctx->flags & BFTW_SKIP_MOUNTS) {
 		cfprintf(cerr, "${blu}-mount${rs} ");
 	}
-	if (cmdline->unique) {
+	if (ctx->unique) {
 		cfprintf(cerr, "${blu}-unique${rs} ");
 	}
-	if ((cmdline->flags & (BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) == BFTW_PRUNE_MOUNTS) {
+	if ((ctx->flags & (BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) == BFTW_PRUNE_MOUNTS) {
 		cfprintf(cerr, "${blu}-xdev${rs} ");
 	}
 
 	if (flag == DEBUG_RATES) {
-		if (cmdline->exclude != &expr_false) {
-			cfprintf(cerr, "(${red}-exclude${rs} %pE) ", cmdline->exclude);
+		if (ctx->exclude != &expr_false) {
+			cfprintf(cerr, "(${red}-exclude${rs} %pE) ", ctx->exclude);
 		}
-		cfprintf(cerr, "%pE", cmdline->expr);
+		cfprintf(cerr, "%pE", ctx->expr);
 	} else {
-		if (cmdline->exclude != &expr_false) {
-			cfprintf(cerr, "(${red}-exclude${rs} %pe) ", cmdline->exclude);
+		if (ctx->exclude != &expr_false) {
+			cfprintf(cerr, "(${red}-exclude${rs} %pe) ", ctx->exclude);
 		}
-		cfprintf(cerr, "%pe", cmdline->expr);
+		cfprintf(cerr, "%pe", ctx->expr);
 	}
 
 	fputs("\n", stderr);
@@ -3511,10 +3417,10 @@ void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag) {
 /**
  * Dump the estimated costs.
  */
-static void dump_costs(const struct cmdline *cmdline) {
-	const struct expr *expr = cmdline->expr;
-	bfs_debug(cmdline, DEBUG_COST, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
-	bfs_debug(cmdline, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
+static void dump_costs(const struct bfs_ctx *ctx) {
+	const struct expr *expr = ctx->expr;
+	bfs_debug(ctx, DEBUG_COST, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
+	bfs_debug(ctx, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
 }
 
 /**
@@ -3540,42 +3446,12 @@ static int parse_gettime(struct timespec *ts) {
 #endif
 }
 
-/**
- * Parse the command line.
- */
-struct cmdline *parse_cmdline(int argc, char *argv[]) {
-	struct cmdline *cmdline = malloc(sizeof(struct cmdline));
-	if (!cmdline) {
-		perror("malloc()");
+struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
+	struct bfs_ctx *ctx = bfs_ctx_new();
+	if (!ctx) {
+		perror("bfs_new_ctx()");
 		goto fail;
 	}
-
-	cmdline->argv = NULL;
-	cmdline->paths = NULL;
-	cmdline->colors = NULL;
-	cmdline->cout = NULL;
-	cmdline->cerr = NULL;
-	cmdline->users = NULL;
-	cmdline->users_error = 0;
-	cmdline->groups = NULL;
-	cmdline->groups_error = 0;
-	cmdline->mtab = NULL;
-	cmdline->mtab_error = 0;
-	cmdline->mindepth = 0;
-	cmdline->maxdepth = INT_MAX;
-	cmdline->flags = BFTW_RECOVER;
-	cmdline->strategy = BFTW_BFS;
-	cmdline->optlevel = 3;
-	cmdline->debug = 0;
-	cmdline->ignore_races = false;
-	cmdline->unique = false;
-	cmdline->warn = false;
-	cmdline->xargs_safe = false;
-	cmdline->exclude = &expr_false;
-	cmdline->expr = &expr_true;
-	cmdline->nopen_files = 0;
-
-	trie_init(&cmdline->open_files);
 
 	static char* default_argv[] = {"bfs", NULL};
 	if (argc < 1) {
@@ -3583,13 +3459,13 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		argv = default_argv;
 	}
 
-	cmdline->argv = malloc((argc + 1)*sizeof(*cmdline->argv));
-	if (!cmdline->argv) {
+	ctx->argv = malloc((argc + 1)*sizeof(*ctx->argv));
+	if (!ctx->argv) {
 		perror("malloc()");
 		goto fail;
 	}
 	for (int i = 0; i <= argc; ++i) {
-		cmdline->argv[i] = argv[i];
+		ctx->argv[i] = argv[i];
 	}
 
 	enum use_color use_color = COLOR_AUTO;
@@ -3598,27 +3474,12 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		use_color = COLOR_NEVER;
 	}
 
-	cmdline->colors = parse_colors(getenv("LS_COLORS"));
-	cmdline->cout = cfdup(stdout, use_color ? cmdline->colors : NULL);
-	cmdline->cerr = cfdup(stderr, use_color ? cmdline->colors : NULL);
-	if (!cmdline->cout || !cmdline->cerr) {
+	ctx->colors = parse_colors(getenv("LS_COLORS"));
+	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
+	ctx->cerr = cfdup(stderr, use_color ? ctx->colors : NULL);
+	if (!ctx->cout || !ctx->cerr) {
 		perror("cfdup()");
 		goto fail;
-	}
-
-	cmdline->users = bfs_parse_users();
-	if (!cmdline->users) {
-		cmdline->users_error = errno;
-	}
-
-	cmdline->groups = bfs_parse_groups();
-	if (!cmdline->groups) {
-		cmdline->groups_error = errno;
-	}
-
-	cmdline->mtab = parse_bfs_mtab();
-	if (!cmdline->mtab) {
-		cmdline->mtab_error = errno;
 	}
 
 	bool stdin_tty = isatty(STDIN_FILENO);
@@ -3626,13 +3487,13 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 	bool stderr_tty = isatty(STDERR_FILENO);
 
 	if (!getenv("POSIXLY_CORRECT")) {
-		cmdline->warn = stdin_tty;
+		ctx->warn = stdin_tty;
 	}
 
 	struct parser_state state = {
-		.cmdline = cmdline,
-		.argv = cmdline->argv + 1,
-		.command = cmdline->argv[0],
+		.ctx = ctx,
+		.argv = ctx->argv + 1,
+		.command = ctx->argv[0],
 		.regex_flags = 0,
 		.stdout_tty = stdout_tty,
 		.interactive = stdin_tty && stderr_tty,
@@ -3650,15 +3511,16 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 
 	if (strcmp(xbasename(state.command), "find") == 0) {
 		// Operate depth-first when invoked as "find"
-		cmdline->strategy = BFTW_DFS;
+		ctx->strategy = BFTW_DFS;
 	}
 
 	if (parse_gettime(&state.now) != 0) {
 		goto fail;
 	}
 
-	cmdline->expr = parse_whole_expr(&state);
-	if (!cmdline->expr) {
+	ctx->exclude = &expr_false;
+	ctx->expr = parse_whole_expr(&state);
+	if (!ctx->expr) {
 		if (state.just_info) {
 			goto done;
 		} else {
@@ -3666,28 +3528,28 @@ struct cmdline *parse_cmdline(int argc, char *argv[]) {
 		}
 	}
 
-	if (optimize_cmdline(cmdline) != 0) {
+	if (bfs_optimize(ctx) != 0) {
 		goto fail;
 	}
 
-	if (darray_length(cmdline->paths) == 0) {
+	if (darray_length(ctx->paths) == 0) {
 		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}
 	}
 
-	if ((cmdline->flags & BFTW_FOLLOW_ALL) && !cmdline->unique) {
+	if ((ctx->flags & BFTW_FOLLOW_ALL) && !ctx->unique) {
 		// We need bftw() to detect cycles unless -unique does it for us
-		cmdline->flags |= BFTW_DETECT_CYCLES;
+		ctx->flags |= BFTW_DETECT_CYCLES;
 	}
 
-	dump_cmdline(cmdline, DEBUG_TREE);
-	dump_costs(cmdline);
+	bfs_ctx_dump(ctx, DEBUG_TREE);
+	dump_costs(ctx);
 
 done:
-	return cmdline;
+	return ctx;
 
 fail:
-	free_cmdline(cmdline);
+	bfs_ctx_free(ctx);
 	return NULL;
 }

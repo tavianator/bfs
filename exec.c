@@ -16,7 +16,7 @@
 
 #include "exec.h"
 #include "bftw.h"
-#include "cmdline.h"
+#include "ctx.h"
 #include "color.h"
 #include "diag.h"
 #include "dstring.h"
@@ -37,9 +37,9 @@
 /** Print some debugging info. */
 BFS_FORMATTER(2, 3)
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
-	const struct cmdline *cmdline = execbuf->cmdline;
+	const struct bfs_ctx *ctx = execbuf->ctx;
 
-	if (!bfs_debug(cmdline, DEBUG_EXEC, "${blu}")) {
+	if (!bfs_debug(ctx, DEBUG_EXEC, "${blu}")) {
 		return;
 	}
 
@@ -51,7 +51,7 @@ static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, .
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		fputs("dir", stderr);
 	}
-	cfprintf(cmdline->cerr, "${rs}: ");
+	cfprintf(ctx->cerr, "${rs}: ");
 
 	va_list args;
 	va_start(args, format);
@@ -117,7 +117,7 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	return arg_max;
 }
 
-struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct cmdline *cmdline) {
+struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct bfs_ctx *ctx) {
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
 		perror("malloc()");
@@ -125,7 +125,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	}
 
 	execbuf->flags = flags;
-	execbuf->cmdline = cmdline;
+	execbuf->ctx = ctx;
 	execbuf->argv = NULL;
 	execbuf->argc = 0;
 	execbuf->argv_cap = 0;
@@ -141,9 +141,9 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 		const char *arg = argv[i];
 		if (!arg) {
 			if (execbuf->flags & BFS_EXEC_CONFIRM) {
-				bfs_error(cmdline, "%s: Expected '... ;'.\n", argv[0]);
+				bfs_error(ctx, "%s: Expected '... ;'.\n", argv[0]);
 			} else {
-				bfs_error(cmdline, "%s: Expected '... ;' or '... {} +'.\n", argv[0]);
+				bfs_error(ctx, "%s: Expected '... ;' or '... {} +'.\n", argv[0]);
 			}
 			goto fail;
 		} else if (strcmp(arg, ";") == 0) {
@@ -160,7 +160,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	execbuf->tmpl_argc = i - 1;
 
 	if (execbuf->tmpl_argc == 0) {
-		bfs_error(cmdline, "%s: Missing command.\n", argv[0]);
+		bfs_error(ctx, "%s: Missing command.\n", argv[0]);
 		goto fail;
 	}
 
@@ -175,7 +175,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 		for (i = 0; i < execbuf->tmpl_argc - 1; ++i) {
 			char *arg = execbuf->tmpl_argv[i];
 			if (strstr(arg, "{}")) {
-				bfs_error(cmdline, "%s ... +: Only one '{}' is supported.\n", argv[0]);
+				bfs_error(ctx, "%s ... +: Only one '{}' is supported.\n", argv[0]);
 				goto fail;
 			}
 			execbuf->argv[i] = arg;
@@ -394,9 +394,9 @@ fail:
 		if (!str) {
 			str = "unknown";
 		}
-		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
+		bfs_warning(execbuf->ctx, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
 	} else {
-		bfs_warning(execbuf->cmdline, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
+		bfs_warning(execbuf->ctx, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
 	}
 
 	errno = 0;

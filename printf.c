@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -15,8 +15,8 @@
  ****************************************************************************/
 
 #include "printf.h"
-#include "cmdline.h"
 #include "color.h"
+#include "ctx.h"
 #include "diag.h"
 #include "dstring.h"
 #include "expr.h"
@@ -550,7 +550,7 @@ static struct bfs_printf **append_literal(struct bfs_printf **tail, struct bfs_p
 	}
 }
 
-struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline) {
+struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 	struct bfs_printf *head = NULL;
 	struct bfs_printf **tail = &head;
 
@@ -595,11 +595,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				goto done;
 
 			case '\0':
-				bfs_error(cmdline, "'%s': Incomplete escape sequence '\\'.\n", format);
+				bfs_error(ctx, "'%s': Incomplete escape sequence '\\'.\n", format);
 				goto error;
 
 			default:
-				bfs_error(cmdline, "'%s': Unrecognized escape sequence '\\%c'.\n", format, c);
+				bfs_error(ctx, "'%s': Unrecognized escape sequence '\\%c'.\n", format, c);
 				goto error;
 			}
 		} else if (c == '%') {
@@ -633,7 +633,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				case ' ':
 				case '-':
 					if (strchr(directive->str, c)) {
-						bfs_error(cmdline, "'%s': Duplicate flag '%c'.\n", format, c);
+						bfs_error(ctx, "'%s': Duplicate flag '%c'.\n", format, c);
 						goto directive_error;
 					}
 					if (dstrapp(&directive->str, c) != 0) {
@@ -689,19 +689,19 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				directive->fn = bfs_printf_f;
 				break;
 			case 'F':
-				if (!cmdline->mtab) {
-					bfs_error(cmdline, "Couldn't parse the mount table: %s.\n", strerror(cmdline->mtab_error));
+				directive->ptr = bfs_ctx_mtab(ctx);
+				if (!directive->ptr) {
+					bfs_error(ctx, "Couldn't parse the mount table: %m.\n");
 					goto directive_error;
 				}
-				directive->ptr = cmdline->mtab;
 				directive->fn = bfs_printf_F;
 				break;
 			case 'g':
-				if (!cmdline->groups) {
-					bfs_error(cmdline, "Couldn't parse the group table: %s.\n", strerror(cmdline->groups_error));
+				directive->ptr = bfs_ctx_groups(ctx);
+				if (!directive->ptr) {
+					bfs_error(ctx, "Couldn't parse the group table: %m.\n");
 					goto directive_error;
 				}
-				directive->ptr = cmdline->groups;
 				directive->fn = bfs_printf_g;
 				break;
 			case 'G':
@@ -750,11 +750,11 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				directive->stat_field = BFS_STAT_MTIME;
 				break;
 			case 'u':
-				if (!cmdline->users) {
-					bfs_error(cmdline, "Couldn't parse the user table: %s.\n", strerror(cmdline->users_error));
+				directive->ptr = bfs_ctx_users(ctx);
+				if (!directive->ptr) {
+					bfs_error(ctx, "Couldn't parse the user table: %m.\n");
 					goto directive_error;
 				}
-				directive->ptr = cmdline->users;
 				directive->fn = bfs_printf_u;
 				break;
 			case 'U':
@@ -789,27 +789,27 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct cmdline *cmdline)
 				directive->fn = bfs_printf_strftime;
 				c = *++i;
 				if (!c) {
-					bfs_error(cmdline, "'%s': Incomplete time specifier '%s%c'.\n", format, directive->str, i[-1]);
+					bfs_error(ctx, "'%s': Incomplete time specifier '%s%c'.\n", format, directive->str, i[-1]);
 					goto directive_error;
 				} else if (strchr("%+@aAbBcCdDeFgGhHIjklmMnprRsStTuUVwWxXyYzZ", c)) {
 					directive->c = c;
 				} else {
-					bfs_error(cmdline, "'%s': Unrecognized time specifier '%%%c%c'.\n", format, i[-1], c);
+					bfs_error(ctx, "'%s': Unrecognized time specifier '%%%c%c'.\n", format, i[-1], c);
 					goto directive_error;
 				}
 				break;
 
 			case '\0':
-				bfs_error(cmdline, "'%s': Incomplete format specifier '%s'.\n", format, directive->str);
+				bfs_error(ctx, "'%s': Incomplete format specifier '%s'.\n", format, directive->str);
 				goto directive_error;
 
 			default:
-				bfs_error(cmdline, "'%s': Unrecognized format specifier '%%%c'.\n", format, c);
+				bfs_error(ctx, "'%s': Unrecognized format specifier '%%%c'.\n", format, c);
 				goto directive_error;
 			}
 
 			if (must_be_numeric && strcmp(specifier, "s") == 0) {
-				bfs_error(cmdline, "'%s': Invalid flags '%s' for string format '%%%c'.\n", format, directive->str + 1, c);
+				bfs_error(ctx, "'%s': Invalid flags '%s' for string format '%%%c'.\n", format, directive->str + 1, c);
 				goto directive_error;
 			}
 

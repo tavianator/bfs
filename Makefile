@@ -94,6 +94,7 @@ all: bfs tests/mksock tests/trie tests/xtimegm
 bfs: \
     bftw.o \
     color.o \
+    ctx.o \
     darray.o \
     diag.o \
     dstring.o \

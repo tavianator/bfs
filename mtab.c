@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -102,7 +102,7 @@ fail:
 	return -1;
 }
 
-struct bfs_mtab *parse_bfs_mtab() {
+struct bfs_mtab *bfs_parse_mtab() {
 	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
 	if (!mtab) {
 		return NULL;
@@ -189,7 +189,7 @@ struct bfs_mtab *parse_bfs_mtab() {
 	return mtab;
 
 fail:
-	free_bfs_mtab(mtab);
+	bfs_free_mtab(mtab);
 	errno = error;
 	return NULL;
 }
@@ -230,7 +230,7 @@ bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path) {
 	return trie_find_str(&mtab->names, name);
 }
 
-void free_bfs_mtab(struct bfs_mtab *mtab) {
+void bfs_free_mtab(struct bfs_mtab *mtab) {
 	if (mtab) {
 		trie_destroy(&mtab->types);
 		trie_destroy(&mtab->names);

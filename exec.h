@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -24,7 +24,7 @@
 #include "bftw.h"
 #include "color.h"
 
-struct cmdline;
+struct ctx;
 
 /**
  * Flags for the -exec actions.
@@ -45,8 +45,8 @@ struct bfs_exec {
 	/** Flags for this exec buffer. */
 	enum bfs_exec_flags flags;
 
-	/** The overall command line. */
-	const struct cmdline *cmdline;
+	/** The bfs context. */
+	const struct bfs_ctx *ctx;
 	/** Command line template. */
 	char **tmpl_argv;
 	/** Command line template size. */
@@ -82,11 +82,12 @@ struct bfs_exec {
  *         The (bfs) command line argument to parse.
  * @param flags
  *         Any flags for this exec action.
- * @param cmdline
- *         The command line.
- * @return The parsed exec action, or NULL on failure.
+ * @param ctx
+ *         The bfs context.
+ * @return
+ *         The parsed exec action, or NULL on failure.
  */
-struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct cmdline *cmdline);
+struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct bfs_ctx *ctx);
 
 /**
  * Execute the command for a file.

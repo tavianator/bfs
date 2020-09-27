@@ -15,14 +15,14 @@
  ****************************************************************************/
 
 /**
- * Representation of the parsed command line.
+ * bfs execution context.
  */
 
-#ifndef BFS_CMDLINE_H
-#define BFS_CMDLINE_H
+#ifndef BFS_CTX_H
+#define BFS_CTX_H
 
-#include "color.h"
 #include "trie.h"
+#include "color.h"
 
 /**
  * Various debugging flags.
@@ -47,35 +47,17 @@ enum debug_flags {
 };
 
 /**
- * The parsed command line.
+ * The execution context for bfs.
  */
-struct cmdline {
+struct bfs_ctx {
 	/** The unparsed command line arguments. */
 	char **argv;
-
 	/** The root paths. */
 	const char **paths;
-
-	/** Color data. */
-	struct colors *colors;
-	/** Colored stdout. */
-	CFILE *cout;
-	/** Colored stderr. */
-	CFILE *cerr;
-
-	/** User table. */
-	struct bfs_users *users;
-	/** The error that occurred parsing the user table, if any. */
-	int users_error;
-	/** Group table. */
-	struct bfs_groups *groups;
-	/** The error that occurred parsing the group table, if any. */
-	int groups_error;
-
-	/** Table of mounted file systems. */
-	struct bfs_mtab *mtab;
-	/** The error that occurred parsing the mount table, if any. */
-	int mtab_error;
+	/** The main command line expression. */
+	struct expr *expr;
+	/** An expression for files to filter out. */
+	struct expr *exclude;
 
 	/** -mindepth option. */
 	int mindepth;
@@ -100,44 +82,99 @@ struct cmdline {
 	/** Whether to only handle paths with xargs-safe characters (-X). */
 	bool xargs_safe;
 
-	/** An expression for files to filter out. */
-	struct expr *exclude;
-	/** The main command line expression. */
-	struct expr *expr;
+	/** Color data. */
+	struct colors *colors;
+	/** Colored stdout. */
+	CFILE *cout;
+	/** Colored stderr. */
+	CFILE *cerr;
 
-	/** All the open files owned by the command line. */
-	struct trie open_files;
-	/** The number of open files owned by the command line. */
-	int nopen_files;
+	/** User table. */
+	struct bfs_users *users;
+	/** The error that occurred parsing the user table, if any. */
+	int users_error;
+	/** Group table. */
+	struct bfs_groups *groups;
+	/** The error that occurred parsing the group table, if any. */
+	int groups_error;
+
+	/** Table of mounted file systems. */
+	struct bfs_mtab *mtab;
+	/** The error that occurred parsing the mount table, if any. */
+	int mtab_error;
+
+	/** All the files owned by the context. */
+	struct trie files;
+	/** The number of files owned by the context. */
+	int nfiles;
 };
 
 /**
- * Parse the command line.
+ * @return
+ *         A new bfs context, or NULL on failure.
  */
-struct cmdline *parse_cmdline(int argc, char *argv[]);
+struct bfs_ctx *bfs_ctx_new(void);
+
+/**
+ * Get the users table.
+ *
+ * @param ctx
+ *         The bfs context.
+ * @return
+ *         The cached users table, or NULL on failure.
+ */
+const struct bfs_users *bfs_ctx_users(const struct bfs_ctx *ctx);
+
+/**
+ * Get the groups table.
+ *
+ * @param ctx
+ *         The bfs context.
+ * @return
+ *         The cached groups table, or NULL on failure.
+ */
+const struct bfs_groups *bfs_ctx_groups(const struct bfs_ctx *ctx);
+
+/**
+ * Get the mount table.
+ *
+ * @param ctx
+ *         The bfs context.
+ * @return
+ *         The cached mount table, or NULL on failure.
+ */
+const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx);
+
+/**
+ * Open a file for the bfs context.
+ *
+ * @param ctx
+ *         The bfs context.
+ * @param use_color
+ *         Whether to use colors if the file is a TTY.
+ * @return
+ *         The opened file, or NULL on failure.
+ */
+CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color);
 
 /**
  * Dump the parsed command line.
- */
-void dump_cmdline(const struct cmdline *cmdline, enum debug_flags flag);
-
-/**
- * Optimize the parsed command line.
  *
- * @return 0 if successful, -1 on error.
+ * @param ctx
+ *         The bfs context.
+ * @param flag
+ *         The -D flag that triggered the dump.
  */
-int optimize_cmdline(struct cmdline *cmdline);
+void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag);
 
 /**
- * Evaluate the command line.
- */
-int eval_cmdline(const struct cmdline *cmdline);
-
-/**
- * Free the parsed command line.
+ * Free a bfs context.
  *
- * @return 0 if successful, -1 on error.
+ * @param ctx
+ *         The context to free.
+ * @return
+ *         0 on success, -1 if any errors occurred.
  */
-int free_cmdline(struct cmdline *cmdline);
+int bfs_ctx_free(struct bfs_ctx *ctx);
 
-#endif // BFS_CMDLINE_H
+#endif // BFS_CTX_H

@@ -22,9 +22,21 @@
 #ifndef BFS_EVAL_H
 #define BFS_EVAL_H
 
+#include "ctx.h"
 #include "expr.h"
 
+/**
+ * Evaluate the command line.
+ *
+ * @param ctx
+ *         The bfs context to evaluate.
+ * @return
+ *         EXIT_SUCCESS on success, otherwise on failure.
+ */
+int bfs_eval(const struct bfs_ctx *ctx);
+
 // Predicate evaluation functions
+
 bool eval_true(const struct expr *expr, struct eval_state *state);
 bool eval_false(const struct expr *expr, struct eval_state *state);
 

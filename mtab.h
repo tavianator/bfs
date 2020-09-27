@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -35,7 +35,7 @@ struct bfs_mtab;
  * @return
  *         The parsed mount table, or NULL on error.
  */
-struct bfs_mtab *parse_bfs_mtab(void);
+struct bfs_mtab *bfs_parse_mtab(void);
 
 /**
  * Determine the file system type that a file is on.
@@ -65,6 +65,6 @@ bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path);
 /**
  * Free a mount table.
  */
-void free_bfs_mtab(struct bfs_mtab *mtab);
+void bfs_free_mtab(struct bfs_mtab *mtab);
 
 #endif // BFS_MTAB_H

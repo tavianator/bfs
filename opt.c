@@ -39,8 +39,9 @@
  * effects are reachable at all, and skipping the traversal if not.
  */
 
-#include "cmdline.h"
+#include "opt.h"
 #include "color.h"
+#include "ctx.h"
 #include "diag.h"
 #include "eval.h"
 #include "expr.h"
@@ -300,8 +301,8 @@ static void set_facts_impossible(struct opt_facts *facts) {
  * Optimizer state.
  */
 struct opt_state {
-	/** The command line we're optimizing. */
-	const struct cmdline *cmdline;
+	/** The context we're optimizing. */
+	const struct bfs_ctx *ctx;
 
 	/** Data flow facts before this expression is evaluated. */
 	struct opt_facts facts;
@@ -316,10 +317,10 @@ struct opt_state {
 /** Log an optimization. */
 BFS_FORMATTER(3, 4)
 static bool debug_opt(const struct opt_state *state, int level, const char *format, ...) {
-	if (bfs_debug(state->cmdline, DEBUG_OPT, "${cyn}-O%d${rs}: ", level)) {
+	if (bfs_debug(state->ctx, DEBUG_OPT, "${cyn}-O%d${rs}: ", level)) {
 		va_list args;
 		va_start(args, format);
-		cvfprintf(state->cmdline->cerr, format, args);
+		cvfprintf(state->ctx->cerr, format, args);
 		va_end(args);
 		return true;
 	} else {
@@ -391,7 +392,7 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 	}
 
 	if (debug) {
-		cfprintf(state->cmdline->cerr, "<==> %pe\n", parent);
+		cfprintf(state->ctx->cerr, "<==> %pe\n", parent);
 	}
 
 	if (expr->lhs->eval == eval_not) {
@@ -437,7 +438,7 @@ static struct expr *optimize_not_expr(const struct opt_state *state, struct expr
 
 	struct expr *rhs = expr->rhs;
 
-	int optlevel = state->cmdline->optlevel;
+	int optlevel = state->ctx->optlevel;
 	if (optlevel >= 1) {
 		if (rhs == &expr_true) {
 			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &expr_false);
@@ -493,8 +494,8 @@ static struct expr *optimize_and_expr(const struct opt_state *state, struct expr
 	struct expr *lhs = expr->lhs;
 	struct expr *rhs = expr->rhs;
 
-	const struct cmdline *cmdline = state->cmdline;
-	int optlevel = cmdline->optlevel;
+	const struct bfs_ctx *ctx = state->ctx;
+	int optlevel = ctx->optlevel;
 	if (optlevel >= 1) {
 		if (lhs == &expr_true) {
 			debug_opt(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, rhs);
@@ -510,7 +511,7 @@ static struct expr *optimize_and_expr(const struct opt_state *state, struct expr
 			struct expr *ret = extract_child_expr(expr, &expr->lhs);
 			ret = negate_expr(ret, &fake_not_arg);
 			if (debug && ret) {
-				cfprintf(cmdline->cerr, "%pe\n", ret);
+				cfprintf(ctx->cerr, "%pe\n", ret);
 			}
 			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_false) {
@@ -562,8 +563,8 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 	struct expr *lhs = expr->lhs;
 	struct expr *rhs = expr->rhs;
 
-	const struct cmdline *cmdline = state->cmdline;
-	int optlevel = cmdline->optlevel;
+	const struct bfs_ctx *ctx = state->ctx;
+	int optlevel = ctx->optlevel;
 	if (optlevel >= 1) {
 		if (lhs->always_true) {
 			debug_opt(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
@@ -579,7 +580,7 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 			struct expr *ret = extract_child_expr(expr, &expr->lhs);
 			ret = negate_expr(ret, &fake_not_arg);
 			if (debug && ret) {
-				cfprintf(cmdline->cerr, "%pe\n", ret);
+				cfprintf(ctx->cerr, "%pe\n", ret);
 			}
 			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_true) {
@@ -626,7 +627,7 @@ fail:
 
 /** Optimize an expression in an ignored-result context. */
 static struct expr *ignore_result(const struct opt_state *state, struct expr *expr) {
-	int optlevel = state->cmdline->optlevel;
+	int optlevel = state->ctx->optlevel;
 
 	if (optlevel >= 1) {
 		while (true) {
@@ -660,7 +661,7 @@ static struct expr *optimize_comma_expr(const struct opt_state *state, struct ex
 	struct expr *lhs = expr->lhs;
 	struct expr *rhs = expr->rhs;
 
-	int optlevel = state->cmdline->optlevel;
+	int optlevel = state->ctx->optlevel;
 	if (optlevel >= 1) {
 		lhs = expr->lhs = ignore_result(state, lhs);
 
@@ -758,7 +759,7 @@ static void infer_icmp_facts(struct opt_state *state, const struct expr *expr, e
 static void infer_gid_facts(struct opt_state *state, const struct expr *expr) {
 	infer_icmp_facts(state, expr, GID_RANGE);
 
-	struct bfs_groups *groups = state->cmdline->groups;
+	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
 	if (groups && range->min == range->max) {
 		gid_t gid = range->min;
@@ -771,7 +772,7 @@ static void infer_gid_facts(struct opt_state *state, const struct expr *expr) {
 static void infer_uid_facts(struct opt_state *state, const struct expr *expr) {
 	infer_icmp_facts(state, expr, UID_RANGE);
 
-	struct bfs_users *users = state->cmdline->users;
+	const struct bfs_users *users = bfs_ctx_users(state->ctx);
 	struct range *range = &state->facts_when_true.ranges[UID_RANGE];
 	if (users && range->min == range->max) {
 		uid_t uid = range->min;
@@ -884,7 +885,7 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		set_facts_impossible(&state->facts_when_true);
 	}
 
-	if (state->cmdline->optlevel < 2 || expr == &expr_true || expr == &expr_false) {
+	if (state->ctx->optlevel < 2 || expr == &expr_true || expr == &expr_false) {
 		goto done;
 	}
 
@@ -920,7 +921,7 @@ static bool reorder_expr(const struct opt_state *state, struct expr *expr, doubl
 		expr->lhs = expr->rhs;
 		expr->rhs = lhs;
 		if (debug) {
-			cfprintf(state->cmdline->cerr, "%pe (~${ylw}%g${rs} --> ~${ylw}%g${rs})\n", expr, expr->cost, swapped_cost);
+			cfprintf(state->ctx->cerr, "%pe (~${ylw}%g${rs} --> ~${ylw}%g${rs})\n", expr, expr->cost, swapped_cost);
 		}
 		expr->cost = swapped_cost;
 		return true;
@@ -971,7 +972,7 @@ static struct expr *optimize_expr(struct opt_state *state, struct expr *expr) {
 		return NULL;
 	}
 
-	if (state->cmdline->optlevel >= 3 && reorder_expr_recursive(state, expr)) {
+	if (state->ctx->optlevel >= 3 && reorder_expr_recursive(state, expr)) {
 		// Re-do optimizations to account for the new ordering
 		*state->facts_when_impure = saved_impure;
 		expr = optimize_expr_recursive(state, expr);
@@ -983,20 +984,20 @@ static struct expr *optimize_expr(struct opt_state *state, struct expr *expr) {
 	return expr;
 }
 
-int optimize_cmdline(struct cmdline *cmdline) {
-	dump_cmdline(cmdline, DEBUG_OPT);
+int bfs_optimize(struct bfs_ctx *ctx) {
+	bfs_ctx_dump(ctx, DEBUG_OPT);
 
 	struct opt_facts facts_when_impure;
 	set_facts_impossible(&facts_when_impure);
 
 	struct opt_state state = {
-		.cmdline = cmdline,
+		.ctx = ctx,
 		.facts_when_impure = &facts_when_impure,
 	};
 	facts_init(&state.facts);
 
-	cmdline->exclude = optimize_expr(&state, cmdline->exclude);
-	if (!cmdline->exclude) {
+	ctx->exclude = optimize_expr(&state, ctx->exclude);
+	if (!ctx->exclude) {
 		return -1;
 	}
 
@@ -1004,40 +1005,40 @@ int optimize_cmdline(struct cmdline *cmdline) {
 	state.facts = state.facts_when_false;
 
 	struct range *depth = &state.facts.ranges[DEPTH_RANGE];
-	constrain_min(depth, cmdline->mindepth);
-	constrain_max(depth, cmdline->maxdepth);
+	constrain_min(depth, ctx->mindepth);
+	constrain_max(depth, ctx->maxdepth);
 
-	cmdline->expr = optimize_expr(&state, cmdline->expr);
-	if (!cmdline->expr) {
+	ctx->expr = optimize_expr(&state, ctx->expr);
+	if (!ctx->expr) {
 		return -1;
 	}
 
-	cmdline->expr = ignore_result(&state, cmdline->expr);
+	ctx->expr = ignore_result(&state, ctx->expr);
 
 	if (facts_are_impossible(&facts_when_impure)) {
-		bfs_warning(cmdline, "This command won't do anything.\n");
+		bfs_warning(ctx, "This command won't do anything.\n");
 	}
 
 	const struct range *depth_when_impure = &facts_when_impure.ranges[DEPTH_RANGE];
 	long long mindepth = depth_when_impure->min;
 	long long maxdepth = depth_when_impure->max;
 
-	int optlevel = cmdline->optlevel;
+	int optlevel = ctx->optlevel;
 
-	if (optlevel >= 2 && mindepth > cmdline->mindepth) {
+	if (optlevel >= 2 && mindepth > ctx->mindepth) {
 		if (mindepth > INT_MAX) {
 			mindepth = INT_MAX;
 		}
-		cmdline->mindepth = mindepth;
-		debug_opt(&state, 2, "data flow: mindepth --> %d\n", cmdline->mindepth);
+		ctx->mindepth = mindepth;
+		debug_opt(&state, 2, "data flow: mindepth --> %d\n", ctx->mindepth);
 	}
 
-	if (optlevel >= 4 && maxdepth < cmdline->maxdepth) {
+	if (optlevel >= 4 && maxdepth < ctx->maxdepth) {
 		if (maxdepth < INT_MIN) {
 			maxdepth = INT_MIN;
 		}
-		cmdline->maxdepth = maxdepth;
-		debug_opt(&state, 4, "data flow: maxdepth --> %d\n", cmdline->maxdepth);
+		ctx->maxdepth = maxdepth;
+		debug_opt(&state, 4, "data flow: maxdepth --> %d\n", ctx->maxdepth);
 	}
 
 	return 0;

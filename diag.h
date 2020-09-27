@@ -21,7 +21,7 @@
 #ifndef BFS_DIAG_H
 #define BFS_DIAG_H
 
-#include "cmdline.h"
+#include "ctx.h"
 #include "util.h"
 #include <stdarg.h>
 #include <stdbool.h>
@@ -30,7 +30,7 @@
  * Shorthand for printing error messages.
  */
 BFS_FORMATTER(2, 3)
-void bfs_error(const struct cmdline *cmdline, const char *format, ...);
+void bfs_error(const struct bfs_ctx *ctx, const char *format, ...);
 
 /**
  * Shorthand for printing warning messages.
@@ -38,7 +38,7 @@ void bfs_error(const struct cmdline *cmdline, const char *format, ...);
  * @return Whether a warning was printed.
  */
 BFS_FORMATTER(2, 3)
-bool bfs_warning(const struct cmdline *cmdline, const char *format, ...);
+bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...);
 
 /**
  * Shorthand for printing debug messages.
@@ -46,36 +46,36 @@ bool bfs_warning(const struct cmdline *cmdline, const char *format, ...);
  * @return Whether a debug message was printed.
  */
 BFS_FORMATTER(3, 4)
-bool bfs_debug(const struct cmdline *cmdline, enum debug_flags flag, const char *format, ...);
+bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, ...);
 
 /**
  * bfs_error() variant that takes a va_list.
  */
-void bfs_verror(const struct cmdline *cmdline, const char *format, va_list args);
+void bfs_verror(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_warning() variant that takes a va_list.
  */
-bool bfs_vwarning(const struct cmdline *cmdline, const char *format, va_list args);
+bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_debug() variant that takes a va_list.
  */
-bool bfs_vdebug(const struct cmdline *cmdline, enum debug_flags flag, const char *format, va_list args);
+bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, va_list args);
 
 /**
  * Print the error message prefix.
  */
-void bfs_error_prefix(const struct cmdline *cmdline);
+void bfs_error_prefix(const struct bfs_ctx *ctx);
 
 /**
  * Print the warning message prefix.
  */
-bool bfs_warning_prefix(const struct cmdline *cmdline);
+bool bfs_warning_prefix(const struct bfs_ctx *ctx);
 
 /**
  * Print the debug message prefix.
  */
-bool bfs_debug_prefix(const struct cmdline *cmdline, enum debug_flags flag);
+bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag);
 
 #endif // BFS_DIAG_H

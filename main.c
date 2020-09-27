@@ -18,18 +18,18 @@
  * - main(): the entry point for bfs(1), a breadth-first version of find(1)
  *     - main.c        (this file)
  *
- * - parse_cmdline(): parses the command line into an expression tree
- *     - cmdline.h     (declares the parsed command line structure)
+ * - bfs_parse_cmdline(): parses the command line into an expression tree
+ *     - ctx.[ch]      (struct bfs_ctx, the overall bfs context)
  *     - expr.h        (declares the expression tree nodes)
- *     - parse.c       (the parser itself)
- *     - opt.c         (the expression optimizer)
+ *     - parse.[ch]    (the parser itself)
+ *     - opt.[ch]      (the optimizer)
  *
- * - eval_cmdline(): runs the expression on every file it sees
+ * - bfs_eval(): runs the expression on every file it sees
  *     - eval.[ch]     (the main evaluation functions)
  *     - exec.[ch]     (implements -exec[dir]/-ok[dir])
  *     - printf.[ch]   (implements -[f]printf)
  *
- * - bftw(): used by eval_cmdline() to walk the directory tree(s)
+ * - bftw(): used by bfs_eval() to walk the directory tree(s)
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
@@ -49,7 +49,9 @@
  *     - util.[ch]     (everything else)
  */
 
-#include "cmdline.h"
+#include "ctx.h"
+#include "eval.h"
+#include "parse.h"
 #include "util.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -100,12 +102,12 @@ int main(int argc, char *argv[]) {
 	// Use the system locale instead of "C"
 	setlocale(LC_ALL, "");
 
-	struct cmdline *cmdline = parse_cmdline(argc, argv);
-	if (cmdline) {
-		ret = eval_cmdline(cmdline);
+	struct bfs_ctx *ctx = bfs_parse_cmdline(argc, argv);
+	if (ctx) {
+		ret = bfs_eval(ctx);
 	}
 
-	if (free_cmdline(cmdline) != 0 && ret == EXIT_SUCCESS) {
+	if (bfs_ctx_free(ctx) != 0 && ret == EXIT_SUCCESS) {
 		ret = EXIT_FAILURE;
 	}
 

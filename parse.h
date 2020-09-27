@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2020 Tavian Barnes <tavianator@tavianator.com>             *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -15,52 +15,24 @@
  ****************************************************************************/
 
 /**
- * Implementation of -printf/-fprintf.
+ * bfs command line parsing.
  */
 
-#ifndef BFS_PRINTF_H
-#define BFS_PRINTF_H
+#ifndef BFS_PARSE_H
+#define BFS_PARSE_H
 
-#include "bftw.h"
 #include "ctx.h"
-#include <stdbool.h>
-#include <stdio.h>
 
 /**
- * A printf command, the result of parsing a single format string.
- */
-struct bfs_printf;
-
-/**
- * Parse a -printf format string.
+ * Parse the command line.
  *
- * @param format
- *         The format string to parse.
- * @param ctx
- *         The bfs context.
+ * @param argc
+ *         The number of arguments.
+ * @param argv
+ *         The arguments to parse.
  * @return
- *         The parsed printf command, or NULL on failure.
+ *         A new bfs context, or NULL on failure.
  */
-struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx);
+struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]);
 
-/**
- * Evaluate a parsed format string.
- *
- * @param file
- *         The FILE to print to.
- * @param command
- *         The parsed printf format.
- * @param ftwbuf
- *         The bftw() data for the current file.  If needs_stat is true, statbuf
- *         must be non-NULL.
- * @return
- *         0 on success, -1 on failure.
- */
-int bfs_printf(FILE *file, const struct bfs_printf *command, const struct BFTW *ftwbuf);
-
-/**
- * Free a parsed format string.
- */
-void free_bfs_printf(struct bfs_printf *command);
-
-#endif // BFS_PRINTF_H
+#endif // BFS_PARSE_H
