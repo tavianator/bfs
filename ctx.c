@@ -121,13 +121,17 @@ struct bfs_ctx_file {
 };
 
 CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color) {
+	int error = 0;
+
 	CFILE *cfile = cfopen(path, use_color ? ctx->colors : NULL);
 	if (!cfile) {
+		error = errno;
 		goto out;
 	}
 
 	struct bfs_stat sb;
 	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
+		error = errno;
 		goto out_close;
 	}
 
@@ -136,6 +140,7 @@ CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color) {
 
 	struct trie_leaf *leaf = trie_insert_mem(&ctx->files, id, sizeof(id));
 	if (!leaf) {
+		error = errno;
 		goto out_close;
 	}
 
@@ -148,6 +153,7 @@ CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color) {
 
 	struct bfs_ctx_file *ctx_file = malloc(sizeof(*ctx_file));
 	if (!ctx_file) {
+		error = errno;
 		trie_remove(&ctx->files, leaf);
 		goto out_close;
 	}
@@ -163,6 +169,7 @@ out_close:
 	cfclose(cfile);
 	cfile = NULL;
 out:
+	errno = error;
 	return cfile;
 }
 
