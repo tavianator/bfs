@@ -166,7 +166,7 @@ char *xregerror(int err, const regex_t *regex);
  * @param str
  *         The string to hold the formatted mode.
  */
-void format_mode(mode_t mode, char str[11]);
+void xstrmode(mode_t mode, char str[11]);
 
 /**
  * basename() variant that doesn't modify the input.

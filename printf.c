@@ -342,7 +342,7 @@ static int bfs_printf_M(FILE *file, const struct bfs_printf *directive, const st
 	}
 
 	char buf[11];
-	format_mode(statbuf->mode, buf);
+	xstrmode(statbuf->mode, buf);
 	return fprintf(file, directive->str, buf);
 }
 

@@ -15,7 +15,6 @@
  ****************************************************************************/
 
 #include "util.h"
-#include "bftw.h"
 #include "dstring.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -168,44 +167,44 @@ char *xregerror(int err, const regex_t *regex) {
 	return str;
 }
 
-void format_mode(mode_t mode, char str[11]) {
+/** Get the single character describing the given file type. */
+static char type_char(mode_t mode) {
+	switch (mode & S_IFMT) {
+	case S_IFREG:
+		return '-';
+	case S_IFBLK:
+		return 'b';
+	case S_IFCHR:
+		return 'c';
+	case S_IFDIR:
+		return 'd';
+	case S_IFLNK:
+		return 'l';
+	case S_IFIFO:
+		return 'p';
+	case S_IFSOCK:
+		return 's';
+#ifdef S_IFDOOR
+	case S_IFDOOR:
+		return 'D';
+#endif
+#ifdef S_IFPORT
+	case S_IFPORT:
+		return 'P';
+#endif
+#ifdef S_IFWHT
+	case S_IFWHT:
+		return 'w';
+#endif
+	}
+
+	return '?';
+}
+
+void xstrmode(mode_t mode, char str[11]) {
 	strcpy(str, "----------");
 
-	switch (bftw_mode_to_type(mode)) {
-	case BFTW_REG:
-		break;
-	case BFTW_BLK:
-		str[0] = 'b';
-		break;
-	case BFTW_CHR:
-		str[0] = 'c';
-		break;
-	case BFTW_DIR:
-		str[0] = 'd';
-		break;
-	case BFTW_DOOR:
-		str[0] = 'D';
-		break;
-	case BFTW_LNK:
-		str[0] = 'l';
-		break;
-	case BFTW_FIFO:
-		str[0] = 'p';
-		break;
-	case BFTW_PORT:
-		str[0] = 'P';
-		break;
-	case BFTW_SOCK:
-		str[0] = 's';
-		break;
-	case BFTW_WHT:
-		str[0] = 'w';
-		break;
-	case BFTW_UNKNOWN:
-	case BFTW_ERROR:
-		str[0] = '?';
-		break;
-	}
+	str[0] = type_char(mode);
 
 	if (mode & 00400) {
 		str[1] = 'r';
