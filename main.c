@@ -71,14 +71,15 @@ static bool isopen(int fd) {
  * Open a file and redirect it to a particular descriptor.
  */
 static int redirect(int fd, const char *path, int flags) {
-	int ret = open(path, flags);
-
-	if (ret >= 0 && ret != fd) {
-		int orig = ret;
-		ret = dup2(orig, fd);
-		close(orig);
+	int newfd = open(path, flags);
+	if (newfd < 0 || newfd == fd) {
+		return newfd;
 	}
 
+	int ret = dup2(newfd, fd);
+	int err = errno;
+	close(newfd);
+	errno = err;
 	return ret;
 }
 
