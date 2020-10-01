@@ -21,9 +21,15 @@
 #include <stdlib.h>
 #include <time.h>
 
+/** Whether tzset() has been called. */
+static bool tz_is_set = false;
+
 int xlocaltime(const time_t *timep, struct tm *result) {
 	// Should be called before localtime_r() according to POSIX.1-2004
-	tzset();
+	if (!tz_is_set) {
+		tzset();
+		tz_is_set = true;
+	}
 
 	if (localtime_r(timep, result)) {
 		return 0;
@@ -34,7 +40,10 @@ int xlocaltime(const time_t *timep, struct tm *result) {
 
 int xgmtime(const time_t *timep, struct tm *result) {
 	// Should be called before gmtime_r() according to POSIX.1-2004
-	tzset();
+	if (!tz_is_set) {
+		tzset();
+		tz_is_set = true;
+	}
 
 	if (gmtime_r(timep, result)) {
 		return 0;
