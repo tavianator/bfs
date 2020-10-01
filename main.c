@@ -61,6 +61,28 @@
 #include <unistd.h>
 
 /**
+ * Check if a file descriptor is open.
+ */
+static bool isopen(int fd) {
+	return fcntl(fd, F_GETFD) >= 0 || errno != EBADF;
+}
+
+/**
+ * Open a file and redirect it to a particular descriptor.
+ */
+static int redirect(int fd, const char *path, int flags) {
+	int ret = open(path, flags);
+
+	if (ret >= 0 && ret != fd) {
+		int orig = ret;
+		ret = dup2(orig, fd);
+		close(orig);
+	}
+
+	return ret;
+}
+
+/**
  * Make sure the standard streams std{in,out,err} are open.  If they are not,
  * future open() calls may use those file descriptors, and std{in,out,err} will
  * use them unintentionally.

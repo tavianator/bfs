@@ -110,26 +110,6 @@ int xreaddir(DIR *dir, struct dirent **de);
 char *xreadlinkat(int fd, const char *path, size_t size);
 
 /**
- * Check if a file descriptor is open.
- */
-bool isopen(int fd);
-
-/**
- * Open a file and redirect it to a particular descriptor.
- *
- * @param fd
- *         The file descriptor to redirect.
- * @param path
- *         The path to open.
- * @param flags
- *         The flags passed to open().
- * @param mode
- *         The mode passed to open() (optional).
- * @return fd on success, -1 on failure.
- */
-int redirect(int fd, const char *path, int flags, ...);
-
-/**
  * Like dup(), but set the FD_CLOEXEC flag.
  *
  * @param fd
