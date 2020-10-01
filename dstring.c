@@ -129,28 +129,44 @@ int dstrapp(char **str, char c) {
 }
 
 char *dstrprintf(const char *format, ...) {
-	va_list args;
-
-	va_start(args, format);
-	int len = vsnprintf(NULL, 0, format, args);
-	va_end(args);
-
-	assert(len > 0);
-
-	char *str = dstralloc(len);
+	// Guess a length to try to avoid calling vsnprintf() twice
+	int len, cap = 2*strlen(format);
+	char *str = dstralloc(cap);
 	if (!str) {
 		return NULL;
 	}
 
+	va_list args;
+
 	va_start(args, format);
-	len = vsnprintf(str, len + 1, format, args);
+	len = vsnprintf(str, cap + 1, format, args);
 	va_end(args);
 
-	struct dstring *header = dstrheader(str);
-	assert(len == header->capacity);
-	header->length = len;
+	if (len > cap) {
+		if (dstreserve(&str, len) != 0) {
+			goto fail;
+		}
 
+		cap = len;
+
+		va_start(args, format);
+		len = vsnprintf(str, cap + 1, format, args);
+		va_end(args);
+
+		assert(len == cap);
+	}
+
+	if (len < 0) {
+		goto fail;
+	}
+
+	struct dstring *header = dstrheader(str);
+	header->length = len;
 	return str;
+
+fail:
+	dstrfree(str);
+	return NULL;
 }
 
 void dstrfree(char *dstr) {
