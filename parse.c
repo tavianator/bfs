@@ -377,7 +377,11 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
  */
 static int parse_root(struct parser_state *state, const char *path) {
 	struct bfs_ctx *ctx = state->ctx;
-	return DARRAY_PUSH(&ctx->paths, &path);
+	int ret = DARRAY_PUSH(&ctx->paths, &path);
+	if (ret != 0) {
+		perror("DARRAY_PUSH()");
+	}
+	return ret;
 }
 
 /**
