@@ -504,17 +504,17 @@ static void free_directive(struct bfs_printf *directive) {
 /**
  * Create a new printf directive.
  */
-static struct bfs_printf *new_directive(bfs_printf_fn *fn) {
+static struct bfs_printf *new_directive(const struct bfs_ctx *ctx, bfs_printf_fn *fn) {
 	struct bfs_printf *directive = malloc(sizeof(*directive));
 	if (!directive) {
-		perror("malloc()");
+		bfs_perror(ctx, "malloc()");
 		goto error;
 	}
 
 	directive->fn = fn;
 	directive->str = dstralloc(2);
 	if (!directive->str) {
-		perror("dstralloc()");
+		bfs_perror(ctx, "dstralloc()");
 		goto error;
 	}
 	directive->stat_field = 0;
@@ -554,7 +554,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 	struct bfs_printf *head = NULL;
 	struct bfs_printf **tail = &head;
 
-	struct bfs_printf *literal = new_directive(bfs_printf_literal);
+	struct bfs_printf *literal = new_directive(ctx, bfs_printf_literal);
 	if (!literal) {
 		goto error;
 	}
@@ -587,7 +587,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 
 			case 'c':
 				tail = append_literal(tail, &literal);
-				struct bfs_printf *directive = new_directive(bfs_printf_flush);
+				struct bfs_printf *directive = new_directive(ctx, bfs_printf_flush);
 				if (!directive) {
 					goto error;
 				}
@@ -608,12 +608,12 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 				goto one_char;
 			}
 
-			struct bfs_printf *directive = new_directive(NULL);
+			struct bfs_printf *directive = new_directive(ctx, NULL);
 			if (!directive) {
 				goto directive_error;
 			}
 			if (dstrapp(&directive->str, c) != 0) {
-				perror("dstrapp()");
+				bfs_perror(ctx, "dstrapp()");
 				goto directive_error;
 			}
 
@@ -637,7 +637,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 						goto directive_error;
 					}
 					if (dstrapp(&directive->str, c) != 0) {
-						perror("dstrapp()");
+						bfs_perror(ctx, "dstrapp()");
 						goto directive_error;
 					}
 					continue;
@@ -649,7 +649,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 			// Parse the field width
 			while (c >= '0' && c <= '9') {
 				if (dstrapp(&directive->str, c) != 0) {
-					perror("dstrapp()");
+					bfs_perror(ctx, "dstrapp()");
 					goto directive_error;
 				}
 				c = *++i;
@@ -659,7 +659,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 			if (c == '.') {
 				do {
 					if (dstrapp(&directive->str, c) != 0) {
-						perror("dstrapp()");
+						bfs_perror(ctx, "dstrapp()");
 						goto directive_error;
 					}
 					c = *++i;
@@ -814,7 +814,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 			}
 
 			if (dstrcat(&directive->str, specifier) != 0) {
-				perror("dstrcat()");
+				bfs_perror(ctx, "dstrcat()");
 				goto directive_error;
 			}
 
@@ -822,7 +822,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 			tail = append_directive(tail, directive);
 
 			if (!literal) {
-				literal = new_directive(bfs_printf_literal);
+				literal = new_directive(ctx, bfs_printf_literal);
 				if (!literal) {
 					goto error;
 				}
@@ -837,7 +837,7 @@ struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
 
 	one_char:
 		if (dstrapp(&literal->str, c) != 0) {
-			perror("dstrapp()");
+			bfs_perror(ctx, "dstrapp()");
 			goto error;
 		}
 	}

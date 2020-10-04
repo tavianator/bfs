@@ -295,6 +295,13 @@ static void parse_error(const struct parser_state *state, const char *format, ..
 }
 
 /**
+ * Print a low-level error message during parsing.
+ */
+static void parse_perror(const struct parser_state *state, const char *str) {
+	bfs_perror(state->ctx, str);
+}
+
+/**
  * Print a warning message during parsing.
  */
 BFS_FORMATTER(2, 3)
@@ -379,7 +386,7 @@ static int parse_root(struct parser_state *state, const char *path) {
 	struct bfs_ctx *ctx = state->ctx;
 	int ret = DARRAY_PUSH(&ctx->paths, &path);
 	if (ret != 0) {
-		perror("DARRAY_PUSH()");
+		parse_perror(state, "DARRAY_PUSH()");
 	}
 	return ret;
 }
@@ -995,7 +1002,7 @@ static struct expr *parse_const(struct parser_state *state, int value, int arg2)
 static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg2) {
 	struct tm tm;
 	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
-		perror("xlocaltime()");
+		parse_perror(state, "xlocaltime()");
 		return NULL;
 	}
 
@@ -1008,7 +1015,7 @@ static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg
 
 	time_t time;
 	if (xmktime(&tm, &time) != 0) {
-		perror("xmktime()");
+		parse_perror(state, "xmktime()");
 		return NULL;
 	}
 
@@ -1552,7 +1559,7 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 
 	struct tm tm;
 	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
-		perror("xlocaltime()");
+		parse_perror(state, "xlocaltime()");
 		return -1;
 	}
 
@@ -1572,7 +1579,7 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 	        year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
 
 	if (xgmtime(&state->now.tv_sec, &tm) != 0) {
-		perror("xgmtime()");
+		parse_perror(state, "xgmtime()");
 		return -1;
 	}
 
@@ -2058,7 +2065,7 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 
 	expr->regex = malloc(sizeof(regex_t));
 	if (!expr->regex) {
-		perror("malloc()");
+		parse_perror(state, "malloc()");
 		goto fail;
 	}
 
@@ -2069,7 +2076,7 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
 			free(str);
 		} else {
-			perror("xregerror()");
+			parse_perror(state, "xregerror()");
 		}
 		goto fail_regex;
 	}
@@ -3437,11 +3444,11 @@ static void dump_costs(const struct bfs_ctx *ctx) {
 /**
  * Get the current time.
  */
-static int parse_gettime(struct timespec *ts) {
+static int parse_gettime(const struct bfs_ctx *ctx, struct timespec *ts) {
 #if _POSIX_TIMERS > 0
 	int ret = clock_gettime(CLOCK_REALTIME, ts);
 	if (ret != 0) {
-		perror("clock_gettime()");
+		bfs_perror(ctx, "clock_gettime()");
 	}
 	return ret;
 #else
@@ -3451,7 +3458,7 @@ static int parse_gettime(struct timespec *ts) {
 		ts->tv_sec = tv.tv_sec;
 		ts->tv_nsec = tv.tv_usec * 1000L;
 	} else {
-		perror("gettimeofday()");
+		bfs_perror(ctx, "gettimeofday()");
 	}
 	return ret;
 #endif
@@ -3490,15 +3497,15 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		ctx->colors_error = errno;
 	}
 
-	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
-	if (!ctx->cout) {
+	ctx->cerr = cfdup(stderr, use_color ? ctx->colors : NULL);
+	if (!ctx->cerr) {
 		perror("cfdup()");
 		goto fail;
 	}
 
-	ctx->cerr = cfdup(stderr, use_color ? ctx->colors : NULL);
-	if (!ctx->cerr) {
-		perror("cfdup()");
+	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
+	if (!ctx->cout) {
+		bfs_perror(ctx, "cfdup()");
 		goto fail;
 	}
 
@@ -3534,7 +3541,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		ctx->strategy = BFTW_DFS;
 	}
 
-	if (parse_gettime(&state.now) != 0) {
+	if (parse_gettime(ctx, &state.now) != 0) {
 		goto fail;
 	}
 

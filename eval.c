@@ -799,7 +799,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 			eval_error(state, "%s.\n", str);
 			free(str);
 		} else {
-			perror("xregerror()");
+			eval_error(state, "xregerror(): %m.\n");
 		}
 
 		*state->ret = EXIT_FAILURE;
@@ -915,11 +915,11 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 /**
  * Call clock_gettime(), if available.
  */
-static int eval_gettime(struct timespec *ts) {
+static int eval_gettime(struct eval_state *state, struct timespec *ts) {
 #ifdef BFS_CLOCK
 	int ret = clock_gettime(BFS_CLOCK, ts);
 	if (ret != 0) {
-		perror("clock_gettime()");
+		bfs_warning(state->ctx, "%pP: clock_gettime(): %m.\n", state->ftwbuf);
 	}
 	return ret;
 #else
@@ -949,7 +949,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 	struct timespec start, end;
 	bool time = state->ctx->debug & DEBUG_RATES;
 	if (time) {
-		if (eval_gettime(&start) != 0) {
+		if (eval_gettime(state, &start) != 0) {
 			time = false;
 		}
 	}
@@ -959,7 +959,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 	bool ret = expr->eval(expr, state);
 
 	if (time) {
-		if (eval_gettime(&end) == 0) {
+		if (eval_gettime(state, &end) == 0) {
 			add_elapsed(expr, &start, &end);
 		}
 	}
@@ -1381,7 +1381,7 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 
 	if (bftw(&bftw_args) != 0) {
 		args.ret = EXIT_FAILURE;
-		perror("bftw()");
+		bfs_perror(ctx, "bftw()");
 	}
 
 	if (eval_exec_finish(ctx->expr, ctx) != 0) {

@@ -120,7 +120,7 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct bfs_ctx *ctx) {
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
-		perror("malloc()");
+		bfs_perror(ctx, "malloc()");
 		goto fail;
 	}
 
@@ -167,7 +167,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	execbuf->argv_cap = execbuf->tmpl_argc + 1;
 	execbuf->argv = malloc(execbuf->argv_cap*sizeof(*execbuf->argv));
 	if (!execbuf->argv) {
-		perror("malloc()");
+		bfs_perror(ctx, "malloc()");
 		goto fail;
 	}
 

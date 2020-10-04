@@ -27,6 +27,11 @@
 #include <stdbool.h>
 
 /**
+ * Like perror(), but decorated like bfs_error().
+ */
+void bfs_perror(const struct bfs_ctx *ctx, const char *str);
+
+/**
  * Shorthand for printing error messages.
  */
 BFS_FORMATTER(2, 3)
