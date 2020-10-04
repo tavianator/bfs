@@ -3479,9 +3479,15 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	ctx->colors = parse_colors(getenv("LS_COLORS"));
+
 	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
+	if (!ctx->cout) {
+		perror("cfdup()");
+		goto fail;
+	}
+
 	ctx->cerr = cfdup(stderr, use_color ? ctx->colors : NULL);
-	if (!ctx->cout || !ctx->cerr) {
+	if (!ctx->cerr) {
 		perror("cfdup()");
 		goto fail;
 	}
