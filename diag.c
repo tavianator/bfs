@@ -93,41 +93,37 @@ bool bfs_warning_prefix(const struct bfs_ctx *ctx) {
 	}
 }
 
-bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag) {
-	if (!(ctx->debug & flag)) {
-		return false;
-	}
-
-	const char *str;
-
+static const char *debug_flag_str(enum debug_flags flag) {
 	switch (flag) {
 	case DEBUG_COST:
-		str = "cost";
-		break;
+		return "cost";
 	case DEBUG_EXEC:
-		str = "exec";
-		break;
+		return "exec";
 	case DEBUG_OPT:
-		str = "opt";
-		break;
+		return "opt";
 	case DEBUG_RATES:
-		str = "rates";
-		break;
+		return "rates";
 	case DEBUG_SEARCH:
-		str = "search";
-		break;
+		return "search";
 	case DEBUG_STAT:
-		str = "stat";
-		break;
+		return "stat";
 	case DEBUG_TREE:
-		str = "tree";
-		break;
-	default:
+		return "tree";
+
+	case DEBUG_ALL:
 		assert(false);
-		str = "???";
 		break;
 	}
 
-	cfprintf(ctx->cerr, "${bld}%s:${rs} ${cyn}-D %s${rs}: ", xbasename(ctx->argv[0]), str);
-	return true;
+	assert(false);
+	return "???";
+}
+
+bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag) {
+	if (ctx->debug & flag) {
+		cfprintf(ctx->cerr, "${bld}%s:${rs} ${cyn}-D %s${rs}: ", xbasename(ctx->argv[0]), debug_flag_str(flag));
+		return true;
+	} else {
+		return false;
+	}
 }
