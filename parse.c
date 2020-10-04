@@ -962,7 +962,13 @@ static struct expr *parse_capable(struct parser_state *state, int flag, int arg2
 static struct expr *parse_color(struct parser_state *state, int color, int arg2) {
 	struct bfs_ctx *ctx = state->ctx;
 	struct colors *colors = ctx->colors;
+
 	if (color) {
+		if (!colors) {
+			parse_error(state, "${blu}%s${rs}: %s.\n", state->argv[0], strerror(ctx->colors_error));
+			return NULL;
+		}
+
 		state->use_color = COLOR_ALWAYS;
 		ctx->cout->colors = colors;
 		ctx->cerr->colors = colors;
@@ -971,6 +977,7 @@ static struct expr *parse_color(struct parser_state *state, int color, int arg2)
 		ctx->cout->colors = NULL;
 		ctx->cerr->colors = NULL;
 	}
+
 	return parse_nullary_option(state);
 }
 
@@ -3479,6 +3486,9 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	ctx->colors = parse_colors(getenv("LS_COLORS"));
+	if (!ctx->colors) {
+		ctx->colors_error = errno;
+	}
 
 	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
 	if (!ctx->cout) {

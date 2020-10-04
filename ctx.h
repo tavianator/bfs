@@ -84,6 +84,8 @@ struct bfs_ctx {
 
 	/** Color data. */
 	struct colors *colors;
+	/** The error that occurred parsing the color table, if any. */
+	int colors_error;
 	/** Colored stdout. */
 	CFILE *cout;
 	/** Colored stderr. */

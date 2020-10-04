@@ -48,6 +48,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->xargs_safe = false;
 
 	ctx->colors = NULL;
+	ctx->colors_error = 0;
 	ctx->cout = NULL;
 	ctx->cerr = NULL;
 
