@@ -21,8 +21,8 @@
 #ifndef BFS_CTX_H
 #define BFS_CTX_H
 
+#include "bftw.h"
 #include "trie.h"
-#include "color.h"
 
 /**
  * Various debugging flags.
@@ -87,9 +87,9 @@ struct bfs_ctx {
 	/** The error that occurred parsing the color table, if any. */
 	int colors_error;
 	/** Colored stdout. */
-	CFILE *cout;
+	struct CFILE *cout;
 	/** Colored stderr. */
-	CFILE *cerr;
+	struct CFILE *cerr;
 
 	/** User table. */
 	struct bfs_users *users;
@@ -157,7 +157,7 @@ const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx);
  * @return
  *         The opened file, or NULL on failure.
  */
-CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color);
+struct CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color);
 
 /**
  * Dump the parsed command line.
