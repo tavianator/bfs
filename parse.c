@@ -110,7 +110,7 @@ void free_expr(struct expr *expr) {
 		free(expr->regex);
 	}
 
-	free_bfs_printf(expr->printf);
+	bfs_printf_free(expr->printf);
 	free_bfs_exec(expr->execbuf);
 
 	free_expr(expr->lhs);
@@ -1272,7 +1272,7 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 		goto fail;
 	}
 
-	expr->printf = parse_bfs_printf(format, state->ctx);
+	expr->printf = bfs_printf_parse(state->ctx, format);
 	if (!expr->printf) {
 		goto fail;
 	}
@@ -2010,7 +2010,7 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 
 	init_print_expr(state, expr);
 
-	expr->printf = parse_bfs_printf(expr->sdata, state->ctx);
+	expr->printf = bfs_printf_parse(state->ctx, expr->sdata);
 	if (!expr->printf) {
 		free_expr(expr);
 		return NULL;

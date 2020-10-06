@@ -550,7 +550,7 @@ static struct bfs_printf **append_literal(struct bfs_printf **tail, struct bfs_p
 	}
 }
 
-struct bfs_printf *parse_bfs_printf(const char *format, struct bfs_ctx *ctx) {
+struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *format) {
 	struct bfs_printf *head = NULL;
 	struct bfs_printf **tail = &head;
 
@@ -853,14 +853,14 @@ done:
 
 error:
 	free_directive(literal);
-	free_bfs_printf(head);
+	bfs_printf_free(head);
 	return NULL;
 }
 
-int bfs_printf(FILE *file, const struct bfs_printf *command, const struct BFTW *ftwbuf) {
+int bfs_printf(FILE *file, const struct bfs_printf *format, const struct BFTW *ftwbuf) {
 	int ret = 0, error = 0;
 
-	for (const struct bfs_printf *directive = command; directive; directive = directive->next) {
+	for (const struct bfs_printf *directive = format; directive; directive = directive->next) {
 		if (directive->fn(file, directive, ftwbuf) < 0) {
 			ret = -1;
 			error = errno;
@@ -871,10 +871,10 @@ int bfs_printf(FILE *file, const struct bfs_printf *command, const struct BFTW *
 	return ret;
 }
 
-void free_bfs_printf(struct bfs_printf *command) {
-	while (command) {
-		struct bfs_printf *next = command->next;
-		free_directive(command);
-		command = next;
+void bfs_printf_free(struct bfs_printf *format) {
+	while (format) {
+		struct bfs_printf *next = format->next;
+		free_directive(format);
+		format = next;
 	}
 }
