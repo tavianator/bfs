@@ -25,6 +25,7 @@
 #include "diag.h"
 #include "dstring.h"
 #include "exec.h"
+#include "expr.h"
 #include "fsade.h"
 #include "mtab.h"
 #include "printf.h"

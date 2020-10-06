@@ -22,8 +22,27 @@
 #ifndef BFS_EVAL_H
 #define BFS_EVAL_H
 
-#include "ctx.h"
-#include "expr.h"
+#include <stdbool.h>
+
+struct bfs_ctx;
+struct expr;
+
+/**
+ * Ephemeral state for evaluating an expression.
+ */
+struct eval_state;
+
+/**
+ * Expression evaluation function.
+ *
+ * @param expr
+ *         The current expression.
+ * @param state
+ *         The current evaluation state.
+ * @return
+ *         The result of the test.
+ */
+typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
 
 /**
  * Evaluate the command line.

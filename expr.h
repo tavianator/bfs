@@ -22,6 +22,7 @@
 #define BFS_EXPR_H
 
 #include "color.h"
+#include "eval.h"
 #include "exec.h"
 #include "printf.h"
 #include "stat.h"
@@ -35,23 +36,6 @@
  * A command line expression.
  */
 struct expr;
-
-/**
- * Ephemeral state for evaluating an expression.
- */
-struct eval_state;
-
-/**
- * Expression evaluation function.
- *
- * @param expr
- *         The current expression.
- * @param state
- *         The current evaluation state.
- * @return
- *         The result of the test.
- */
-typedef bool eval_fn(const struct expr *expr, struct eval_state *state);
 
 /**
  * Possible types of numeric comparison.
