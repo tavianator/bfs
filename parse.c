@@ -111,7 +111,7 @@ void free_expr(struct expr *expr) {
 	}
 
 	bfs_printf_free(expr->printf);
-	free_bfs_exec(expr->execbuf);
+	bfs_exec_free(expr->execbuf);
 
 	free_expr(expr->lhs);
 	free_expr(expr->rhs);
@@ -1103,14 +1103,14 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
-	struct bfs_exec *execbuf = parse_bfs_exec(state->argv, flags, state->ctx);
+	struct bfs_exec *execbuf = bfs_exec_parse(state->ctx, state->argv, flags);
 	if (!execbuf) {
 		return NULL;
 	}
 
 	struct expr *expr = parse_action(state, eval_exec, execbuf->tmpl_argc + 2);
 	if (!expr) {
-		free_bfs_exec(execbuf);
+		bfs_exec_free(execbuf);
 		return NULL;
 	}
 

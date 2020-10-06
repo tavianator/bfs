@@ -117,7 +117,7 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	return arg_max;
 }
 
-struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct bfs_ctx *ctx) {
+struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs_exec_flags flags) {
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
 		bfs_perror(ctx, "malloc()");
@@ -188,7 +188,7 @@ struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const st
 	return execbuf;
 
 fail:
-	free_bfs_exec(execbuf);
+	bfs_exec_free(execbuf);
 	return NULL;
 }
 
@@ -613,7 +613,7 @@ int bfs_exec_finish(struct bfs_exec *execbuf) {
 	return execbuf->ret;
 }
 
-void free_bfs_exec(struct bfs_exec *execbuf) {
+void bfs_exec_free(struct bfs_exec *execbuf) {
 	if (execbuf) {
 		bfs_exec_closewd(execbuf, NULL);
 		free(execbuf->argv);

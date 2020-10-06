@@ -21,10 +21,10 @@
 #ifndef BFS_EXEC_H
 #define BFS_EXEC_H
 
-#include "bftw.h"
-#include "color.h"
+#include <stddef.h>
 
-struct ctx;
+struct BFTW;
+struct bfs_ctx;
 
 /**
  * Flags for the -exec actions.
@@ -87,7 +87,7 @@ struct bfs_exec {
  * @return
  *         The parsed exec action, or NULL on failure.
  */
-struct bfs_exec *parse_bfs_exec(char **argv, enum bfs_exec_flags flags, const struct bfs_ctx *ctx);
+struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs_exec_flags flags);
 
 /**
  * Execute the command for a file.
@@ -114,6 +114,6 @@ int bfs_exec_finish(struct bfs_exec *execbuf);
 /**
  * Free a parsed exec action.
  */
-void free_bfs_exec(struct bfs_exec *execbuf);
+void bfs_exec_free(struct bfs_exec *execbuf);
 
 #endif // BFS_EXEC_H
