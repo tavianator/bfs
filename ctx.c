@@ -102,7 +102,7 @@ const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx) {
 	if (mut->mtab_error) {
 		errno = mut->mtab_error;
 	} else if (!mut->mtab) {
-		mut->mtab = bfs_parse_mtab();
+		mut->mtab = bfs_mtab_parse();
 		if (!mut->mtab) {
 			mut->mtab_error = errno;
 		}
@@ -184,7 +184,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		free_expr(ctx->expr);
 		free_expr(ctx->exclude);
 
-		bfs_free_mtab(ctx->mtab);
+		bfs_mtab_free(ctx->mtab);
 
 		bfs_free_groups(ctx->groups);
 		bfs_free_users(ctx->users);

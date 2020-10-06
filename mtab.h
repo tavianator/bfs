@@ -35,7 +35,7 @@ struct bfs_mtab;
  * @return
  *         The parsed mount table, or NULL on error.
  */
-struct bfs_mtab *bfs_parse_mtab(void);
+struct bfs_mtab *bfs_mtab_parse(void);
 
 /**
  * Determine the file system type that a file is on.
@@ -65,6 +65,6 @@ bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path);
 /**
  * Free a mount table.
  */
-void bfs_free_mtab(struct bfs_mtab *mtab);
+void bfs_mtab_free(struct bfs_mtab *mtab);
 
 #endif // BFS_MTAB_H

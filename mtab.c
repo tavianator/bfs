@@ -102,7 +102,7 @@ fail:
 	return -1;
 }
 
-struct bfs_mtab *bfs_parse_mtab() {
+struct bfs_mtab *bfs_mtab_parse() {
 	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
 	if (!mtab) {
 		return NULL;
@@ -189,7 +189,7 @@ struct bfs_mtab *bfs_parse_mtab() {
 	return mtab;
 
 fail:
-	bfs_free_mtab(mtab);
+	bfs_mtab_free(mtab);
 	errno = error;
 	return NULL;
 }
@@ -230,7 +230,7 @@ bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path) {
 	return trie_find_str(&mtab->names, name);
 }
 
-void bfs_free_mtab(struct bfs_mtab *mtab) {
+void bfs_mtab_free(struct bfs_mtab *mtab) {
 	if (mtab) {
 		trie_destroy(&mtab->types);
 		trie_destroy(&mtab->names);
