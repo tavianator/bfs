@@ -72,7 +72,7 @@ const struct bfs_users *bfs_ctx_users(const struct bfs_ctx *ctx) {
 	if (mut->users_error) {
 		errno = mut->users_error;
 	} else if (!mut->users) {
-		mut->users = bfs_parse_users();
+		mut->users = bfs_users_parse();
 		if (!mut->users) {
 			mut->users_error = errno;
 		}
@@ -87,7 +87,7 @@ const struct bfs_groups *bfs_ctx_groups(const struct bfs_ctx *ctx) {
 	if (mut->groups_error) {
 		errno = mut->groups_error;
 	} else if (!mut->groups) {
-		mut->groups = bfs_parse_groups();
+		mut->groups = bfs_groups_parse();
 		if (!mut->groups) {
 			mut->groups_error = errno;
 		}
@@ -186,8 +186,8 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		bfs_mtab_free(ctx->mtab);
 
-		bfs_free_groups(ctx->groups);
-		bfs_free_users(ctx->users);
+		bfs_groups_free(ctx->groups);
+		bfs_users_free(ctx->users);
 
 		struct trie_leaf *leaf;
 		while ((leaf = trie_first_leaf(&ctx->files))) {

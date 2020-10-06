@@ -32,7 +32,7 @@ struct bfs_users {
 	struct trie by_uid;
 };
 
-struct bfs_users *bfs_parse_users(void) {
+struct bfs_users *bfs_users_parse(void) {
 	int error;
 
 	struct bfs_users *users = malloc(sizeof(*users));
@@ -103,7 +103,7 @@ struct bfs_users *bfs_parse_users(void) {
 fail_end:
 	endpwent();
 fail_free:
-	bfs_free_users(users);
+	bfs_users_free(users);
 	errno = error;
 	return NULL;
 }
@@ -126,7 +126,7 @@ const struct passwd *bfs_getpwuid(const struct bfs_users *users, uid_t uid) {
 	}
 }
 
-void bfs_free_users(struct bfs_users *users) {
+void bfs_users_free(struct bfs_users *users) {
 	if (users) {
 		trie_destroy(&users->by_uid);
 		trie_destroy(&users->by_name);
@@ -163,7 +163,7 @@ static char *next_gr_mem(void **gr_mem) {
 	return mem;
 }
 
-struct bfs_groups *bfs_parse_groups(void) {
+struct bfs_groups *bfs_groups_parse(void) {
 	int error;
 
 	struct bfs_groups *groups = malloc(sizeof(*groups));
@@ -249,7 +249,7 @@ struct bfs_groups *bfs_parse_groups(void) {
 fail_end:
 	endgrent();
 fail_free:
-	bfs_free_groups(groups);
+	bfs_groups_free(groups);
 	errno = error;
 	return NULL;
 }
@@ -272,7 +272,7 @@ const struct group *bfs_getgrgid(const struct bfs_groups *groups, gid_t gid) {
 	}
 }
 
-void bfs_free_groups(struct bfs_groups *groups) {
+void bfs_groups_free(struct bfs_groups *groups) {
 	if (groups) {
 		trie_destroy(&groups->by_gid);
 		trie_destroy(&groups->by_name);

@@ -35,7 +35,7 @@ struct bfs_users;
  * @return
  *         The parsed user table, or NULL on failure.
  */
-struct bfs_users *bfs_parse_users(void);
+struct bfs_users *bfs_users_parse(void);
 
 /**
  * Get a user entry by name.
@@ -67,7 +67,7 @@ const struct passwd *bfs_getpwuid(const struct bfs_users *users, uid_t uid);
  * @param users
  *         The user table to free.
  */
-void bfs_free_users(struct bfs_users *users);
+void bfs_users_free(struct bfs_users *users);
 
 /**
  * The group table.
@@ -80,7 +80,7 @@ struct bfs_groups;
  * @return
  *         The parsed group table, or NULL on failure.
  */
-struct bfs_groups *bfs_parse_groups(void);
+struct bfs_groups *bfs_groups_parse(void);
 
 /**
  * Get a group entry by name.
@@ -112,6 +112,6 @@ const struct group *bfs_getgrgid(const struct bfs_groups *groups, gid_t gid);
  * @param groups
  *         The group table to free.
  */
-void bfs_free_groups(struct bfs_groups *groups);
+void bfs_groups_free(struct bfs_groups *groups);
 
 #endif // BFS_PWCACHE_H
