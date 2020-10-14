@@ -26,7 +26,7 @@
 #endif
 
 #ifndef BFS_HOMEPAGE
-#	define BFS_HOMEPAGE "https://github.com/tavianator/bfs"
+#	define BFS_HOMEPAGE "https://tavianator.com/projects/bfs.html"
 #endif
 
 #endif // BFS_H
