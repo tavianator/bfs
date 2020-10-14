@@ -4,7 +4,7 @@
 2.0
 ---
 
-**Unreleased**
+**October 14, 2020**
 
 - [#8]: New `-exclude <expression>` syntax to more easily and reliably filter out paths.
   For example:
@@ -39,6 +39,10 @@
 - Fixed an optimizer bug that could skip `-empty`/`-xtype` if they didn't always lead to an action
 
 - Implemented `-xattrname` to find files with a particular extended attribute (from macOS find)
+
+- Made `-printf %l` still respect the width specifier (e.g. `%10l`) for non-links, to match GNU find
+
+- Made `bfs` fail if `-color` is given explicitly and `LS_COLORS` can't be parsed, rather than falling back to non-colored output
 
 [#8]: https://github.com/tavianator/bfs/issues/8
 [#30]: https://github.com/tavianator/bfs/issues/30
