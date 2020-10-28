@@ -105,6 +105,10 @@ ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(DEPFLAGS)
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 
+# Save the full set of flags to rebuild everything when they change
+ALL_FLAGS := $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
+$(shell ./flags.sh $(ALL_FLAGS))
+
 default: bfs
 
 all: bfs tests/mksock tests/trie tests/xtimegm
@@ -154,7 +158,7 @@ tests/trie: trie.o tests/trie.o
 tests/xtimegm: time.o tests/xtimegm.o
 	$(CC) $(ALL_LDFLAGS) $^ -o $@
 
-%.o: %.c
+%.o: %.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 check: check-trie check-xtimegm check-bfs check-dfs check-ids check-eds

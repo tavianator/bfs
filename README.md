@@ -145,7 +145,6 @@ You can test it out:
 
 If you're interested in speed, you may want to build the release version instead:
 
-    $ make clean
     $ make release
 
 Finally, if you want to install it globally, run

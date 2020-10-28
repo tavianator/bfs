@@ -1,3 +1,4 @@
+.flags
 *.o
 *.d
 *.gcda
