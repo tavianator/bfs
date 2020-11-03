@@ -22,6 +22,7 @@
 #define BFS_DSTRING_H
 
 #include "util.h"
+#include <stdarg.h>
 #include <stddef.h>
 
 /**
@@ -128,6 +129,18 @@ int dstrapp(char **str, char c);
  */
 BFS_FORMATTER(1, 2)
 char *dstrprintf(const char *format, ...);
+
+/**
+ * Create a dynamic string from a format string and a va_list.
+ *
+ * @param format
+ *         The format string to fill in.
+ * @param args
+ *         The arguments for the format string.
+ * @return
+ *         The created string, or NULL on failure.
+ */
+char *dstrvprintf(const char *format, va_list args);
 
 /**
  * Free a dynamic string.

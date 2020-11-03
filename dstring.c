@@ -129,6 +129,16 @@ int dstrapp(char **str, char c) {
 }
 
 char *dstrprintf(const char *format, ...) {
+	va_list args;
+
+	va_start(args, format);
+	char *str = dstrvprintf(format, args);
+	va_end(args);
+
+	return str;
+}
+
+char *dstrvprintf(const char *format, va_list args) {
 	// Guess a length to try to avoid calling vsnprintf() twice
 	int len, cap = 2*strlen(format);
 	char *str = dstralloc(cap);
@@ -136,25 +146,21 @@ char *dstrprintf(const char *format, ...) {
 		return NULL;
 	}
 
-	va_list args;
+	va_list args2;
+	va_copy(args2, args);
 
-	va_start(args, format);
 	len = vsnprintf(str, cap + 1, format, args);
-	va_end(args);
-
 	if (len > cap) {
 		if (dstreserve(&str, len) != 0) {
 			goto fail;
 		}
 
 		cap = len;
-
-		va_start(args, format);
-		len = vsnprintf(str, cap + 1, format, args);
-		va_end(args);
-
+		len = vsnprintf(str, cap + 1, format, args2);
 		assert(len == cap);
 	}
+
+	va_end(args2);
 
 	if (len < 0) {
 		goto fail;
