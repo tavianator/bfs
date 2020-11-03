@@ -92,6 +92,7 @@ default: bfs
 all: bfs tests/mksock tests/trie tests/xtimegm
 
 bfs: \
+    bar.o \
     bftw.o \
     color.o \
     ctx.o \
