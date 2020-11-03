@@ -2306,6 +2306,14 @@ static struct expr *parse_sparse(struct parser_state *state, int arg1, int arg2)
 }
 
 /**
+ * Parse -status.
+ */
+static struct expr *parse_status(struct parser_state *state, int arg1, int arg2) {
+	state->ctx->status = true;
+	return parse_nullary_option(state);
+}
+
+/**
  * Parse -x?type [bcdpflsD].
  */
 static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
@@ -2658,8 +2666,9 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
 	cfprintf(cout, "      Ignored; for compatibility with GNU find\n");
 	cfprintf(cout, "  ${blu}-regextype${rs} ${bld}TYPE${rs}\n");
-	cfprintf(cout, "      Use ${bld}TYPE${rs}-flavored regexes (default: ${bld}posix-basic${rs}; see ${blu}-regextype${rs}"
-	                " ${bld}help${rs})\n");
+	cfprintf(cout, "      Use ${bld}TYPE${rs}-flavored regexes (default: ${bld}posix-basic${rs}; see ${blu}-regextype${rs} ${bld}help${rs})\n");
+	cfprintf(cout, "  ${blu}-status${rs}\n");
+	cfprintf(cout, "      Display a status bar while searching\n");
 	cfprintf(cout, "  ${blu}-unique${rs}\n");
 	cfprintf(cout, "      Skip any files that have already been seen\n");
 	cfprintf(cout, "  ${blu}-warn${rs}\n");
@@ -2951,10 +2960,11 @@ static const struct table_entry parse_table[] = {
 	{"-since", T_TEST, parse_since, BFS_STAT_MTIME},
 	{"-size", T_TEST, parse_size},
 	{"-sparse", T_TEST, parse_sparse},
+	{"-status", T_OPTION, parse_status},
 	{"-true", T_TEST, parse_const, true},
 	{"-type", T_TEST, parse_type, false},
 	{"-uid", T_TEST, parse_user},
-	{"-unique", T_ACTION, parse_unique},
+	{"-unique", T_OPTION, parse_unique},
 	{"-used", T_TEST, parse_used},
 	{"-user", T_TEST, parse_user},
 	{"-version", T_ACTION, parse_version},
@@ -3409,6 +3419,9 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 	}
 	if (ctx->flags & BFTW_SKIP_MOUNTS) {
 		cfprintf(cerr, "${blu}-mount${rs} ");
+	}
+	if (ctx->status) {
+		cfprintf(cerr, "${blu}-status${rs} ");
 	}
 	if (ctx->unique) {
 		cfprintf(cerr, "${blu}-unique${rs} ");

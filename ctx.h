@@ -75,6 +75,8 @@ struct bfs_ctx {
 	enum debug_flags debug;
 	/** Whether to ignore deletions that race with bfs (-ignore_readdir_race). */
 	bool ignore_races;
+	/** Whether to show a status bar (-status). */
+	bool status;
 	/** Whether to only return unique files (-unique). */
 	bool unique;
 	/** Whether to print warnings (-warn/-nowarn). */

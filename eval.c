@@ -19,6 +19,7 @@
  */
 
 #include "eval.h"
+#include "bar.h"
 #include "bftw.h"
 #include "color.h"
 #include "darray.h"
@@ -929,17 +930,17 @@ static int eval_gettime(struct eval_state *state, struct timespec *ts) {
 }
 
 /**
- * Record the time that elapsed evaluating an expression.
+ * Record an elapsed time.
  */
-static void add_elapsed(struct expr *expr, const struct timespec *start, const struct timespec *end) {
-	expr->elapsed.tv_sec += end->tv_sec - start->tv_sec;
-	expr->elapsed.tv_nsec += end->tv_nsec - start->tv_nsec;
-	if (expr->elapsed.tv_nsec < 0) {
-		expr->elapsed.tv_nsec += 1000000000L;
-		--expr->elapsed.tv_sec;
-	} else if (expr->elapsed.tv_nsec >= 1000000000L) {
-		expr->elapsed.tv_nsec -= 1000000000L;
-		++expr->elapsed.tv_sec;
+static void timespec_elapsed(struct timespec *elapsed, const struct timespec *start, const struct timespec *end) {
+	elapsed->tv_sec += end->tv_sec - start->tv_sec;
+	elapsed->tv_nsec += end->tv_nsec - start->tv_nsec;
+	if (elapsed->tv_nsec < 0) {
+		elapsed->tv_nsec += 1000000000L;
+		--elapsed->tv_sec;
+	} else if (elapsed->tv_nsec >= 1000000000L) {
+		elapsed->tv_nsec -= 1000000000L;
+		++elapsed->tv_sec;
 	}
 }
 
@@ -961,7 +962,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 
 	if (time) {
 		if (eval_gettime(state, &end) == 0) {
-			add_elapsed(expr, &start, &end);
+			timespec_elapsed(&expr->elapsed, &start, &end);
 		}
 	}
 
@@ -1028,6 +1029,71 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 	}
 
 	return eval_expr(expr->rhs, state);
+}
+
+/** Update the status bar. */
+static void eval_status(struct eval_state *state, struct bfs_bar *bar, struct timespec *last_status, size_t count) {
+	struct timespec now;
+	if (eval_gettime(state, &now) == 0) {
+		struct timespec elapsed = {0};
+		timespec_elapsed(&elapsed, last_status, &now);
+
+		// Update every 0.1s
+		if (elapsed.tv_sec > 0 || elapsed.tv_nsec >= 100000000L) {
+			*last_status = now;
+		} else {
+			return;
+		}
+	}
+
+	size_t width = bfs_bar_width(bar);
+	if (width < 3) {
+		return;
+	}
+
+	const struct BFTW *ftwbuf = state->ftwbuf;
+
+	char *rhs = dstrprintf(" (visited: %zu, depth: %2zu)", count, ftwbuf->depth);
+	if (!rhs) {
+		return;
+	}
+
+	size_t rhslen = dstrlen(rhs);
+	if (3 + rhslen > width) {
+		dstresize(&rhs, 0);
+		rhslen = 0;
+	}
+
+	size_t pathmax = width - rhslen - 3;
+	size_t pathlen = ftwbuf->nameoff;
+	if (ftwbuf->depth == 0) {
+		pathlen = strlen(ftwbuf->path);
+	}
+	if (pathlen > pathmax) {
+		pathlen = pathmax;
+	}
+
+	char *status = dstrndup(ftwbuf->path, pathlen);
+	if (!status) {
+		goto out_rhs;
+	}
+	if (dstrcat(&status, "...") != 0) {
+		goto out_rhs;
+	}
+	while (dstrlen(status) < pathmax + 3) {
+		if (dstrapp(&status, ' ') != 0) {
+			goto out_rhs;
+		}
+	}
+	if (dstrcat(&status, rhs) != 0) {
+		goto out_rhs;
+	}
+
+	bfs_bar_update(bar, status);
+
+	dstrfree(status);
+out_rhs:
+	dstrfree(rhs);
 }
 
 /** Check if we've seen a file before. */
@@ -1172,8 +1238,17 @@ static const char *dump_bftw_action(enum bftw_action action) {
 struct callback_args {
 	/** The bfs context. */
 	const struct bfs_ctx *ctx;
+
+	/** The status bar. */
+	struct bfs_bar *bar;
+	/** The time of the last status update. */
+	struct timespec last_status;
+	/** The number of files visited so far. */
+	size_t count;
+
 	/** The set of seen files. */
 	struct trie *seen;
+
 	/** Eventual return value from bfs_eval(). */
 	int ret;
 };
@@ -1183,6 +1258,7 @@ struct callback_args {
  */
 static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	struct callback_args *args = ptr;
+	++args->count;
 
 	const struct bfs_ctx *ctx = args->ctx;
 
@@ -1192,6 +1268,10 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
 	state.quit = false;
+
+	if (args->bar) {
+		eval_status(&state, args->bar, &args->last_status, args->count);
+	}
 
 	if (ftwbuf->type == BFTW_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
@@ -1341,6 +1421,13 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 		.ret = EXIT_SUCCESS,
 	};
 
+	if (ctx->status) {
+		args.bar = bfs_bar_show();
+		if (!args.bar) {
+			bfs_warning(ctx, "Couldn't show status bar: %m.\n");
+		}
+	}
+
 	struct trie seen;
 	if (ctx->unique) {
 		trie_init(&seen);
@@ -1394,6 +1481,8 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 	if (ctx->unique) {
 		trie_destroy(&seen);
 	}
+
+	bfs_bar_hide(args.bar);
 
 	return args.ret;
 }

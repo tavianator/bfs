@@ -43,6 +43,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->optlevel = 3;
 	ctx->debug = 0;
 	ctx->ignore_races = false;
+	ctx->status = false;
 	ctx->unique = false;
 	ctx->warn = false;
 	ctx->xargs_safe = false;
