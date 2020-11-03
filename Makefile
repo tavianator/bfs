@@ -55,6 +55,7 @@ LOCAL_LDLIBS :=
 ASAN_CFLAGS := -fsanitize=address
 MSAN_CFLAGS := -fsanitize=memory -fsanitize-memory-track-origins
 UBSAN_CFLAGS := -fsanitize=undefined
+SANFLAGS := -fno-sanitize-recover
 
 ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
@@ -68,14 +69,21 @@ endif
 
 ifneq ($(filter asan,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += $(ASAN_CFLAGS)
+SANITIZE := y
 endif
 
 ifneq ($(filter msan,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += $(MSAN_CFLAGS)
+SANITIZE := y
 endif
 
 ifneq ($(filter ubsan,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += $(UBSAN_CFLAGS)
+SANITIZE := y
+endif
+
+ifdef SANITIZE
+LOCAL_CFLAGS += -fno-sanitize-recover=all
 endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
