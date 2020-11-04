@@ -51,6 +51,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <wchar.h>
 
 struct eval_state {
 	/** Data about the current file. */
@@ -1064,27 +1065,64 @@ static void eval_status(struct eval_state *state, struct bfs_bar *bar, struct ti
 		rhslen = 0;
 	}
 
-	size_t pathmax = width - rhslen - 3;
-	size_t pathlen = ftwbuf->nameoff;
-	if (ftwbuf->depth == 0) {
-		pathlen = strlen(ftwbuf->path);
-	}
-	if (pathlen > pathmax) {
-		pathlen = pathmax;
-	}
-
-	char *status = dstrndup(ftwbuf->path, pathlen);
+	char *status = dstralloc(0);
 	if (!status) {
 		goto out_rhs;
 	}
+
+	// Try to make sure even wide characters fit in the status bar
+	size_t pathmax = width - rhslen - 3;
+	size_t pathwidth = 0;
+
+	const char *path = ftwbuf->path;
+	size_t pathlen = strlen(path);
+
+	mbstate_t mb;
+	memset(&mb, 0, sizeof(mb));
+	while (*path) {
+		wchar_t wc;
+		size_t len = mbrtowc(&wc, path, pathlen, &mb);
+		int width;
+		if (len == (size_t)-1) {
+			// Invalid byte sequence, assume a single-width ?
+			len = 1;
+			width = 1;
+			memset(&mb, 0, sizeof(mb));
+		} else if (len == (size_t)-2) {
+			// Incomplete byte sequence, assume a single-width ?
+			len = pathlen;
+			width = 1;
+		} else {
+			width = wcwidth(wc);
+			if (width < 0) {
+				width = 0;
+			}
+		}
+
+		if (pathwidth + width > pathmax) {
+			break;
+		}
+
+		if (dstrncat(&status, path, len) != 0) {
+			goto out_rhs;
+		}
+
+		path += len;
+		pathlen -= len;
+		pathwidth += width;
+	}
+
 	if (dstrcat(&status, "...") != 0) {
 		goto out_rhs;
 	}
-	while (dstrlen(status) < pathmax + 3) {
+
+	while (pathwidth < pathmax) {
 		if (dstrapp(&status, ' ') != 0) {
 			goto out_rhs;
 		}
+		++pathwidth;
 	}
+
 	if (dstrcat(&status, rhs) != 0) {
 		goto out_rhs;
 	}
