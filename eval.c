@@ -1070,16 +1070,18 @@ static void eval_status(struct eval_state *state, struct bfs_bar *bar, struct ti
 		goto out_rhs;
 	}
 
+	const char *path = ftwbuf->path;
+	size_t pathlen = ftwbuf->nameoff;
+	if (ftwbuf->depth == 0) {
+		pathlen = strlen(path);
+	}
+
 	// Try to make sure even wide characters fit in the status bar
 	size_t pathmax = width - rhslen - 3;
 	size_t pathwidth = 0;
-
-	const char *path = ftwbuf->path;
-	size_t pathlen = strlen(path);
-
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
-	while (*path) {
+	while (pathlen > 0) {
 		wchar_t wc;
 		size_t len = mbrtowc(&wc, path, pathlen, &mb);
 		int width;
