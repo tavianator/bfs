@@ -790,7 +790,7 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 		}
 	}
 
-	if (broken < nameoff) {
+	if ((size_t)broken < nameoff) {
 		const char *color = colors->missing;
 		if (!color) {
 			color = colors->orphan;

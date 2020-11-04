@@ -794,7 +794,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 #endif
 	int err = regexec(expr->regex, path, 1, &match, flags);
 	if (err == 0) {
-		return match.rm_so == 0 && match.rm_eo == len;
+		return match.rm_so == 0 && (size_t)match.rm_eo == len;
 	} else if (err != REG_NOMATCH) {
 		char *str = xregerror(err, expr->regex);
 		if (str) {
@@ -1300,7 +1300,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 		goto done;
 	}
 
-	if (ctx->maxdepth < 0 || ftwbuf->depth >= ctx->maxdepth) {
+	if (ctx->maxdepth < 0 || ftwbuf->depth >= (size_t)ctx->maxdepth) {
 		state.action = BFTW_PRUNE;
 	}
 
@@ -1308,13 +1308,13 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	enum bftw_visit expected_visit = BFTW_PRE;
 	if ((ctx->flags & BFTW_POST_ORDER)
 	    && (ctx->strategy == BFTW_IDS || ftwbuf->type == BFTW_DIR)
-	    && ftwbuf->depth < ctx->maxdepth) {
+	    && ftwbuf->depth < (size_t)ctx->maxdepth) {
 		expected_visit = BFTW_POST;
 	}
 
 	if (ftwbuf->visit == expected_visit
-	    && ftwbuf->depth >= ctx->mindepth
-	    && ftwbuf->depth <= ctx->maxdepth) {
+	    && ftwbuf->depth >= (size_t)ctx->mindepth
+	    && ftwbuf->depth <= (size_t)ctx->maxdepth) {
 		eval_expr(ctx->expr, &state);
 	}
 

@@ -77,7 +77,7 @@ char *xreadlinkat(int fd, const char *path, size_t size) {
 		len = readlinkat(fd, path, name, size);
 		if (len < 0) {
 			goto error;
-		} else if (len >= size) {
+		} else if ((size_t)len >= size) {
 			size *= 2;
 		} else {
 			break;

@@ -73,7 +73,7 @@ static int bfs_printf_flush(FILE *file, const struct bfs_printf *directive, cons
 #define BFS_PRINTF_BUF(buf, format, ...)				\
 	char buf[256];							\
 	int ret = snprintf(buf, sizeof(buf), format, __VA_ARGS__);	\
-	assert(ret >= 0 && ret < sizeof(buf));				\
+	assert(ret >= 0 && (size_t)ret < sizeof(buf));			\
 	(void)ret
 
 /** %a, %c, %t: ctime() */
@@ -172,7 +172,7 @@ static int bfs_printf_strftime(FILE *file, const struct bfs_printf *directive, c
 		break;
 	}
 
-	assert(ret >= 0 && ret < sizeof(buf));
+	assert(ret >= 0 && (size_t)ret < sizeof(buf));
 	(void)ret;
 
 	return fprintf(file, directive->str, buf);

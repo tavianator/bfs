@@ -426,7 +426,7 @@ static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, cons
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component
 
 	// -1 to include the root, which has depth == 0
-	size_t offset = base ? base->depth : -1;
+	size_t offset = base ? base->depth : (size_t)-1;
 	size_t levels = file->depth - offset;
 	if (levels < 2) {
 		return fd;
