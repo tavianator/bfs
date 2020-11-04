@@ -190,7 +190,14 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 
 fail:
 	error = errno;
-	while (write(pipefd[1], &error, sizeof(error)) < sizeof(error));
+
+	while (write(pipefd[1], &error, sizeof(error)) < 0) {
+		if (errno != EINTR) {
+			// Parent will still see that we exited unsuccessfully, but won't know why
+			break;
+		}
+	}
+
 	close(pipefd[1]);
 	_Exit(127);
 }
