@@ -196,6 +196,7 @@ posix_tests=(
 
     test_group_name
     test_group_id
+    test_group_nogroup
 
     test_links
     test_links_plus
@@ -244,6 +245,7 @@ posix_tests=(
 
     test_user_name
     test_user_id
+    test_user_nouser
 
     # Closed file descriptors
     test_closed_stdin
@@ -1376,12 +1378,22 @@ function test_user_id() {
     bfs_diff basic -user "$(id -u)"
 }
 
+function test_user_nouser() {
+    # Regression test: this was wrongly optimized to -false
+    bfs_diff basic -user "$(id -u)" \! -nouser
+}
+
 function test_group_name() {
     bfs_diff basic -group "$(id -gn)"
 }
 
 function test_group_id() {
     bfs_diff basic -group "$(id -g)"
+}
+
+function test_group_nogroup() {
+    # Regression test: this was wrongly optimized to -false
+    bfs_diff basic -group "$(id -g)" \! -nogroup
 }
 
 function test_daystart() {

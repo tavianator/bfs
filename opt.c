@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -712,7 +712,7 @@ fail:
 /** Infer data flow facts about a predicate. */
 static void infer_pred_facts(struct opt_state *state, enum pred_type pred) {
 	constrain_pred(&state->facts_when_true.preds[pred], true);
-	constrain_pred(&state->facts_when_false.preds[pred], true);
+	constrain_pred(&state->facts_when_false.preds[pred], false);
 }
 
 /** Infer data flow facts about an -{execut,read,writ}able expression. */
