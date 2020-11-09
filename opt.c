@@ -801,10 +801,12 @@ static void infer_xtype_facts(struct opt_state *state, const struct expr *expr) 
 }
 
 static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr *expr) {
+	int optlevel = state->ctx->optlevel;
+
 	state->facts_when_true = state->facts;
 	state->facts_when_false = state->facts;
 
-	if (facts_are_impossible(&state->facts)) {
+	if (optlevel >= 2 && facts_are_impossible(&state->facts)) {
 		debug_opt(state, 2, "reachability: %pe --> %pe\n", expr, &expr_false);
 		free_expr(expr);
 		expr = &expr_false;
@@ -885,7 +887,7 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		set_facts_impossible(&state->facts_when_true);
 	}
 
-	if (state->ctx->optlevel < 2 || expr == &expr_true || expr == &expr_false) {
+	if (optlevel < 2 || expr == &expr_true || expr == &expr_false) {
 		goto done;
 	}
 
