@@ -1464,7 +1464,7 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 	if (ctx->status) {
 		args.bar = bfs_bar_show();
 		if (!args.bar) {
-			bfs_warning(ctx, "Couldn't show status bar: %m.\n");
+			bfs_warning(ctx, "Couldn't show status bar: %m.\n\n");
 		}
 	}
 

@@ -1016,7 +1016,7 @@ int bfs_optimize(struct bfs_ctx *ctx) {
 	ctx->expr = ignore_result(&state, ctx->expr);
 
 	if (facts_are_impossible(&facts_when_impure)) {
-		bfs_warning(ctx, "This command won't do anything.\n");
+		bfs_warning(ctx, "This command won't do anything.\n\n");
 	}
 
 	const struct range *depth_when_impure = &facts_when_impure.ranges[DEPTH_RANGE];
