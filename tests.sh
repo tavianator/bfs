@@ -166,6 +166,10 @@ posix_tests=(
 
     test_weird_names
 
+    test_incomplete
+    test_missing_paren
+    test_extra_paren
+
     # Flags
 
     test_H
@@ -231,6 +235,8 @@ posix_tests=(
     test_perm_symbolic_minus
     test_perm_leading_plus_symbolic_minus
     test_permcopy
+    test_perm_setid
+    test_perm_sticky
 
     test_prune
     test_prune_or_print
@@ -338,6 +344,9 @@ bsd_tests=(
 
     test_lname
     test_L_lname
+
+    test_ls
+    test_L_ls
 
     test_maxdepth
 
@@ -456,11 +465,17 @@ gnu_tests=(
 
     test_false
 
+    test_fls
+
     test_follow
 
     test_fprint
     test_fprint_duplicate
     test_fprint_error
+
+    test_fprint0
+
+    test_fprintf
 
     test_fstype
 
@@ -488,6 +503,9 @@ gnu_tests=(
     test_lname
     test_L_lname
 
+    test_ls
+    test_L_ls
+
     test_maxdepth
 
     test_mindepth
@@ -514,6 +532,8 @@ gnu_tests=(
     test_perm_leading_plus_symbolic_slash
 
     test_print_error
+
+    test_print0
 
     test_printf
     test_printf_empty
@@ -543,6 +563,7 @@ gnu_tests=(
 
     test_regex
     test_regex_parens
+    test_regex_error
 
     test_regextype_posix_basic
     test_regextype_posix_extended
@@ -593,7 +614,18 @@ bfs_tests=(
     test_expr_flag_path
     test_expr_path_flag
 
+    test_typo
+
     # Flags
+
+    test_D_multi
+    test_D_all
+
+    test_O0
+    test_O1
+    test_O2
+    test_O3
+    test_Ofast
 
     test_S_bfs
     test_S_dfs
@@ -605,6 +637,7 @@ bfs_tests=(
     test_exclude_depth
     test_exclude_mindepth
     test_exclude_print
+    test_exclude_exclude
 
     # Primaries
 
@@ -649,6 +682,11 @@ bfs_tests=(
 
     test_hidden
 
+    test_newerma_nonexistent
+    test_newermt_invalid
+    test_newermq
+    test_newerqm
+
     test_nohidden
     test_nohidden_depth
 
@@ -658,6 +696,12 @@ bfs_tests=(
     test_perm_leading_plus_symbolic
 
     test_printf_w
+    test_printf_incomplete_escape
+    test_printf_invalid_escape
+    test_printf_incomplete_format
+    test_printf_invalid_format
+    test_printf_duplicate_flag
+    test_printf_must_be_numeric
 
     test_type_multi
 
@@ -666,6 +710,8 @@ bfs_tests=(
     test_L_unique
     test_L_unique_loops
     test_L_unique_depth
+
+    test_version
 
     test_xtype_multi
 
@@ -1416,6 +1462,22 @@ function test_newermt_epoch_minus_one() {
     bfs_diff times -newermt 1969-12-31T23:59:59Z
 }
 
+function test_newermt_invalid() {
+    ! invoke_bfs times -newermt not_a_date_time 2>/dev/null
+}
+
+function test_newerma_nonexistent() {
+    ! invoke_bfs times -newerma basic/nonexistent 2>/dev/null
+}
+
+function test_newermq() {
+    ! invoke_bfs times -newermq times/a 2>/dev/null
+}
+
+function test_newerqm() {
+    ! invoke_bfs times -newerqm times/a 2>/dev/null
+}
+
 function test_size() {
     bfs_diff basic -type f -size 0
 }
@@ -1678,6 +1740,14 @@ function test_permcopy() {
     bfs_diff perms -perm u+rw,g+u-w,o=g
 }
 
+function test_perm_setid() {
+    bfs_diff rainbow -perm /ug+s
+}
+
+function test_perm_sticky() {
+    bfs_diff rainbow -perm /ug+t
+}
+
 function test_prune() {
     bfs_diff basic -name foo -prune
 }
@@ -1756,6 +1826,10 @@ function test_iregex() {
 function test_regex_parens() {
     cd weirdnames
     bfs_diff . -regex '\./\((\)'
+}
+
+function test_regex_error() {
+    ! invoke_bfs basic -regex '[' 2>/dev/null
 }
 
 function test_E() {
@@ -1912,6 +1986,18 @@ function test_nouser_ulimit() {
     bfs_diff deep -nouser
 }
 
+function test_ls() {
+    invoke_bfs rainbow -ls >scratch/test_ls.out
+}
+
+function test_L_ls() {
+    invoke_bfs -L rainbow -ls >scratch/test_L_ls.out
+}
+
+function test_fls() {
+    invoke_bfs rainbow -fls scratch/test_fls.out
+}
+
 function test_printf() {
     bfs_diff basic -printf '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
 }
@@ -2007,6 +2093,41 @@ function test_printf_l_nonlink() {
     bfs_diff links -printf '| %24p -> %-24l |\n'
 }
 
+function test_printf_incomplete_escape() {
+    ! invoke_bfs basic -printf '\' 2>/dev/null
+}
+
+function test_printf_invalid_escape() {
+    ! invoke_bfs basic -printf '\!' 2>/dev/null
+}
+
+function test_printf_incomplete_format() {
+    ! invoke_bfs basic -printf '%' 2>/dev/null
+}
+
+function test_printf_invalid_format() {
+    ! invoke_bfs basic -printf '%!' 2>/dev/null
+}
+
+function test_printf_duplicate_flag() {
+    ! invoke_bfs basic -printf '%--p' 2>/dev/null
+}
+
+function test_printf_must_be_numeric() {
+    ! invoke_bfs basic -printf '%+p' 2>/dev/null
+}
+
+function test_fprintf() {
+    invoke_bfs basic -fprintf scratch/test_fprintf.out '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
+    sort -o scratch/test_fprintf.out scratch/test_fprintf.out
+
+    if [ "$UPDATE" ]; then
+        cp scratch/test_fprintf.out "$TESTS/test_fprintf.out"
+    else
+        diff -u scratch/test_fprintf.out "$TESTS/test_fprintf.out"
+    fi
+}
+
 function test_fstype() {
     fstype="$(invoke_bfs basic -maxdepth 0 -printf '%F\n')"
     bfs_diff basic -fstype "$fstype"
@@ -2070,6 +2191,18 @@ function test_comma() {
 
 function test_precedence() {
     bfs_diff basic \( -name foo -type d -o -name bar -a -type f \) -print , \! -empty -type f -print
+}
+
+function test_incomplete() {
+    ! invoke_bfs basic \( 2>/dev/null
+}
+
+function test_missing_paren() {
+    ! invoke_bfs basic \( -print 2>/dev/null
+}
+
+function test_extra_paren() {
+    ! invoke_bfs basic -print \) 2>/dev/null
 }
 
 function test_color() {
@@ -2367,6 +2500,26 @@ function test_print_error() {
 function test_fprint_error() {
     if [ -e /dev/full ]; then
         ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/null
+    fi
+}
+
+function test_print0() {
+    invoke_bfs basic/a basic/b -print0 >scratch/test_print0.out
+
+    if [ "$UPDATE" ]; then
+        cp scratch/test_print0.out "$TESTS/test_print0.out"
+    else
+        cmp -s scratch/test_print0.out "$TESTS/test_print0.out"
+    fi
+}
+
+function test_fprint0() {
+    invoke_bfs basic/a basic/b -fprint0 scratch/test_fprint0.out
+
+    if [ "$UPDATE" ]; then
+        cp scratch/test_fprint0.out "$TESTS/test_fprint0.out"
+    else
+        cmp -s scratch/test_fprint0.out "$TESTS/test_fprint0.out"
     fi
 }
 
@@ -2674,6 +2827,42 @@ function test_help() {
     return 0
 }
 
+function test_version() {
+    invoke_bfs -version >/dev/null
+}
+
+function test_typo() {
+    invoke_bfs -dikkiq 2>&1 | grep follow >/dev/null
+}
+
+function test_D_multi() {
+    bfs_diff -D opt,tree,unknown basic 2>/dev/null
+}
+
+function test_D_all() {
+    bfs_diff -D all basic 2>/dev/null
+}
+
+function test_O0() {
+    bfs_diff -O0 basic -not \( -type f -not -type f \)
+}
+
+function test_O1() {
+    bfs_diff -O1 basic -not \( -type f -not -type f \)
+}
+
+function test_O2() {
+    bfs_diff -O2 basic -not \( -type f -not -type f \)
+}
+
+function test_O3() {
+    bfs_diff -O3 basic -not \( -type f -not -type f \)
+}
+
+function test_Ofast() {
+    bfs_diff -Ofast basic -not \( -xtype f -not -xtype f \)
+}
+
 function test_S() {
     invoke_bfs -S "$1" -s basic >"$TMP/test_S_$1.out"
 
@@ -2710,6 +2899,10 @@ function test_exclude_mindepth() {
 
 function test_exclude_print() {
     ! invoke_bfs basic -exclude -print 2>/dev/null
+}
+
+function test_exclude_exclude() {
+    ! invoke_bfs basic -exclude -exclude -name foo 2>/dev/null
 }
 
 
