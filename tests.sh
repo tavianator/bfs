@@ -2325,11 +2325,11 @@ function test_color_ext0() {
 }
 
 function test_color_ext_override() {
-    LS_COLORS="*.tar.gz=01;31:*.tar=01;32:*.gz=01;33:" bfs_diff rainbow -color
+    LS_COLORS="*.tar.gz=01;31:*.TAR=01;32:*.gz=01;33:" bfs_diff rainbow -color
 }
 
 function test_color_ext_underride() {
-    LS_COLORS="*.gz=01;33:*.tar=01;32:*.tar.gz=01;31:" bfs_diff rainbow -color
+    LS_COLORS="*.gz=01;33:*.TAR=01;32:*.tar.gz=01;31:" bfs_diff rainbow -color
 }
 
 function test_color_missing_colon() {
