@@ -317,6 +317,8 @@ struct opt_state {
 /** Log an optimization. */
 BFS_FORMATTER(3, 4)
 static bool debug_opt(const struct opt_state *state, int level, const char *format, ...) {
+	assert(state->ctx->optlevel >= level);
+
 	if (bfs_debug(state->ctx, DEBUG_OPT, "${cyn}-O%d${rs}: ", level)) {
 		va_list args;
 		va_start(args, format);
