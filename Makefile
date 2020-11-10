@@ -86,6 +86,10 @@ ifdef SANITIZE
 LOCAL_CFLAGS += -fno-sanitize-recover=all
 endif
 
+ifneq ($(filter gcov,$(MAKECMDGOALS)),)
+LOCAL_CFLAGS += --coverage
+endif
+
 ifneq ($(filter release,$(MAKECMDGOALS)),)
 CFLAGS := -g $(WFLAGS) -O3 -flto -DNDEBUG
 endif
@@ -130,6 +134,8 @@ ubsan: bfs
 	@:
 msan: bfs
 	@:
+gcov: bfs
+	@:
 release: bfs
 	@:
 
@@ -166,7 +172,7 @@ endif
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
-	$(RM) bfs *.[od] tests/mksock tests/trie tests/xtimegm tests/*.[od]
+	$(RM) bfs *.[od] *.gcda *.gcno tests/mksock tests/trie tests/xtimegm tests/*.[od] tests/*.gcda tests/*.gcno
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin

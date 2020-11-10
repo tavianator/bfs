@@ -1,5 +1,7 @@
 *.o
 *.d
+*.gcda
+*.gcno
 /bfs
 /tests/mksock
 /tests/trie
