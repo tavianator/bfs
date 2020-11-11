@@ -1003,6 +1003,15 @@ function invoke_bfs() {
     $BFS "$@"
 }
 
+# Silence stderr unless --verbose is set
+function quiet() {
+    if [ "$VERBOSE" ]; then
+        "$@"
+    else
+        "$@" 2>/dev/null
+    fi
+}
+
 # Return value when bfs fails
 EX_BFS=10
 # Return value when a difference is detected
@@ -1015,11 +1024,18 @@ function bfs_diff() (
     # substitution, even with low ulimit -n
     exec 3>&-
 
-    local EXPECTED="$TESTS/${FUNCNAME[1]}.out"
+    local CALLER
+    for CALLER in "${FUNCNAME[@]}"; do
+        if [[ $CALLER == test_* ]]; then
+            break
+        fi
+    done
+
+    local EXPECTED="$TESTS/$CALLER.out"
     if [ "$UPDATE" ]; then
         local ACTUAL="$EXPECTED"
     else
-        local ACTUAL="$TMP/${FUNCNAME[1]}.out"
+        local ACTUAL="$TMP/$CALLER.out"
     fi
 
     $BFS "$@" | bfs_sort >"$ACTUAL"
@@ -1118,7 +1134,7 @@ function test_depth_error() {
     touchp scratch/foo/bar
     chmod -r scratch/foo
 
-    bfs_diff scratch -depth 2>/dev/null
+    quiet bfs_diff scratch -depth
     local ret=$?
 
     chmod +r scratch/foo
@@ -1303,12 +1319,12 @@ function test_L_loops() {
 }
 
 function test_L_loops_continue() {
-    bfs_diff -L loops 2>/dev/null
+    quiet bfs_diff -L loops
     [ $? -eq $EX_BFS ]
 }
 
 function test_X() {
-    bfs_diff -X weirdnames 2>/dev/null
+    quiet bfs_diff -X weirdnames
     [ $? -eq $EX_BFS ]
 }
 
@@ -1389,7 +1405,7 @@ function test_xtype_reorder() {
 
 function test_xtype_depth() {
     # Make sure -xtype is considered side-effecting for facts_when_impure
-    ! invoke_bfs loops -xtype l -depth 100 2>/dev/null
+    ! quiet invoke_bfs loops -xtype l -depth 100
 }
 
 function test_iname() {
@@ -1463,19 +1479,19 @@ function test_newermt_epoch_minus_one() {
 }
 
 function test_newermt_invalid() {
-    ! invoke_bfs times -newermt not_a_date_time 2>/dev/null
+    ! quiet invoke_bfs times -newermt not_a_date_time
 }
 
 function test_newerma_nonexistent() {
-    ! invoke_bfs times -newerma basic/nonexistent 2>/dev/null
+    ! quiet invoke_bfs times -newerma basic/nonexistent
 }
 
 function test_newermq() {
-    ! invoke_bfs times -newermq times/a 2>/dev/null
+    ! quiet invoke_bfs times -newermq times/a
 }
 
 function test_newerqm() {
-    ! invoke_bfs times -newerqm times/a 2>/dev/null
+    ! quiet invoke_bfs times -newerqm times/a
 }
 
 function test_size() {
@@ -1500,7 +1516,7 @@ function test_exec() {
 
 function test_exec_nothing() {
     # Regression test: don't segfault on missing command
-    ! invoke_bfs basic -exec \; 2>/dev/null
+    ! quiet invoke_bfs basic -exec \;
 }
 
 function test_exec_plus() {
@@ -1641,7 +1657,7 @@ function test_ignore_readdir_race() {
 
 function test_ignore_readdir_race_root() {
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
-    ! invoke_bfs basic/nonexistent -ignore_readdir_race 2>/dev/null
+    ! quiet invoke_bfs basic/nonexistent -ignore_readdir_race
 }
 
 function test_ignore_readdir_race_notdir() {
@@ -1713,15 +1729,15 @@ function test_perm_symbolic_slash() {
 }
 
 function test_perm_symbolic_trailing_comma() {
-    ! invoke_bfs perms -perm a+r, 2>/dev/null
+    ! quiet invoke_bfs perms -perm a+r,
 }
 
 function test_perm_symbolic_double_comma() {
-    ! invoke_bfs perms -perm a+r,,u+w 2>/dev/null
+    ! quiet invoke_bfs perms -perm a+r,,u+w
 }
 
 function test_perm_symbolic_missing_action() {
-    ! invoke_bfs perms -perm a 2>/dev/null
+    ! quiet invoke_bfs perms -perm a
 }
 
 function test_perm_leading_plus_symbolic() {
@@ -1762,26 +1778,26 @@ function test_not_prune() {
 
 function test_ok_nothing() {
     # Regression test: don't segfault on missing command
-    ! invoke_bfs basic -ok \; 2>/dev/null
+    ! quiet invoke_bfs basic -ok \;
 }
 
 function test_ok_stdin() {
     # -ok should *not* close stdin
     # See https://savannah.gnu.org/bugs/?24561
-    yes | bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \; 2>/dev/null
+    yes | quiet bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \;
 }
 
 function test_okdir_stdin() {
     # -okdir should *not* close stdin
-    yes | bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \; 2>/dev/null
+    yes | quiet bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \;
 }
 
 function test_ok_plus_semicolon() {
-    yes | bfs_diff basic -ok echo '{}' + \; 2>/dev/null
+    yes | quiet bfs_diff basic -ok echo '{}' + \;
 }
 
 function test_okdir_plus_semicolon() {
-    yes | bfs_diff basic -okdir echo '{}' + \; 2>/dev/null
+    yes | quiet bfs_diff basic -okdir echo '{}' + \;
 }
 
 function test_delete() {
@@ -1829,7 +1845,7 @@ function test_regex_parens() {
 }
 
 function test_regex_error() {
-    ! invoke_bfs basic -regex '[' 2>/dev/null
+    ! quiet invoke_bfs basic -regex '['
 }
 
 function test_E() {
@@ -2070,7 +2086,7 @@ function test_printf_Y_error() {
     chmod -x scratch/foo
     ln -s foo/bar scratch/bar
 
-    bfs_diff scratch -printf '(%p) (%l) %y %Y\n' 2>/dev/null
+    quiet bfs_diff scratch -printf '(%p) (%l) %y %Y\n'
     local ret=$?
 
     chmod +x scratch/foo
@@ -2094,27 +2110,27 @@ function test_printf_l_nonlink() {
 }
 
 function test_printf_incomplete_escape() {
-    ! invoke_bfs basic -printf '\' 2>/dev/null
+    ! quiet invoke_bfs basic -printf '\'
 }
 
 function test_printf_invalid_escape() {
-    ! invoke_bfs basic -printf '\!' 2>/dev/null
+    ! quiet invoke_bfs basic -printf '\!'
 }
 
 function test_printf_incomplete_format() {
-    ! invoke_bfs basic -printf '%' 2>/dev/null
+    ! quiet invoke_bfs basic -printf '%'
 }
 
 function test_printf_invalid_format() {
-    ! invoke_bfs basic -printf '%!' 2>/dev/null
+    ! quiet invoke_bfs basic -printf '%!'
 }
 
 function test_printf_duplicate_flag() {
-    ! invoke_bfs basic -printf '%--p' 2>/dev/null
+    ! quiet invoke_bfs basic -printf '%--p'
 }
 
 function test_printf_must_be_numeric() {
-    ! invoke_bfs basic -printf '%+p' 2>/dev/null
+    ! quiet invoke_bfs basic -printf '%+p'
 }
 
 function test_fprintf() {
@@ -2194,15 +2210,15 @@ function test_precedence() {
 }
 
 function test_incomplete() {
-    ! invoke_bfs basic \( 2>/dev/null
+    ! quiet invoke_bfs basic \(
 }
 
 function test_missing_paren() {
-    ! invoke_bfs basic \( -print 2>/dev/null
+    ! quiet invoke_bfs basic \( -print
 }
 
 function test_extra_paren() {
-    ! invoke_bfs basic -print \) 2>/dev/null
+    ! quiet invoke_bfs basic -print \)
 }
 
 function test_color() {
@@ -2493,13 +2509,13 @@ function test_data_flow_or_swap() {
 
 function test_print_error() {
     if [ -e /dev/full ]; then
-        ! invoke_bfs basic -maxdepth 0 >/dev/full 2>/dev/null
+        ! quiet invoke_bfs basic -maxdepth 0 >/dev/full
     fi
 }
 
 function test_fprint_error() {
     if [ -e /dev/full ]; then
-        ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/null
+        ! quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
     fi
 }
 
@@ -2528,15 +2544,15 @@ function test_closed_stdin() {
 }
 
 function test_ok_closed_stdin() {
-    bfs_diff basic -ok echo \; <&- 2>/dev/null
+    quiet bfs_diff basic -ok echo \; <&-
 }
 
 function test_okdir_closed_stdin() {
-    bfs_diff basic -okdir echo {} \; <&- 2>/dev/null
+    quiet bfs_diff basic -okdir echo {} \; <&-
 }
 
 function test_closed_stdout() {
-    ! invoke_bfs basic >&- 2>/dev/null
+    ! quiet invoke_bfs basic >&-
 }
 
 function test_closed_stderr() {
@@ -2689,7 +2705,7 @@ function set_acl() {
 function test_acl() {
     rm -rf scratch/*
 
-    invoke_bfs scratch -quit -acl 2>/dev/null || return 0
+    quiet invoke_bfs scratch -quit -acl || return 0
 
     touch scratch/{normal,acl}
     set_acl scratch/acl || return 0
@@ -2701,7 +2717,7 @@ function test_acl() {
 function test_L_acl() {
     rm -rf scratch/*
 
-    invoke_bfs scratch -quit -acl 2>/dev/null || return 0
+    quiet invoke_bfs scratch -quit -acl || return 0
 
     touch scratch/{normal,acl}
     set_acl scratch/acl || return 0
@@ -2713,7 +2729,7 @@ function test_L_acl() {
 function test_capable() {
     rm -rf scratch/*
 
-    if ! invoke_bfs scratch -quit -capable 2>/dev/null; then
+    if ! quiet invoke_bfs scratch -quit -capable; then
         return 0
     fi
 
@@ -2727,7 +2743,7 @@ function test_capable() {
 function test_L_capable() {
     rm -rf scratch/*
 
-    if ! invoke_bfs scratch -quit -capable 2>/dev/null; then
+    if ! quiet invoke_bfs scratch -quit -capable; then
         return 0
     fi
 
@@ -2767,7 +2783,7 @@ function make_xattrs() {
 }
 
 function test_xattr() {
-    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+    if ! quiet invoke_bfs scratch -quit -xattr; then
         return 0
     fi
 
@@ -2776,7 +2792,7 @@ function test_xattr() {
 }
 
 function test_L_xattr() {
-    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+    if ! quiet invoke_bfs scratch -quit -xattr; then
         return 0
     fi
 
@@ -2785,7 +2801,7 @@ function test_L_xattr() {
 }
 
 function test_xattrname() {
-    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+    if ! quiet invoke_bfs scratch -quit -xattr; then
         return 0
     fi
 
@@ -2802,7 +2818,7 @@ function test_xattrname() {
 }
 
 function test_L_xattrname() {
-    if ! invoke_bfs scratch -quit -xattr 2>/dev/null; then
+    if ! quiet invoke_bfs scratch -quit -xattr; then
         return 0
     fi
 
@@ -2836,11 +2852,11 @@ function test_typo() {
 }
 
 function test_D_multi() {
-    bfs_diff -D opt,tree,unknown basic 2>/dev/null
+    quiet bfs_diff -D opt,tree,unknown basic
 }
 
 function test_D_all() {
-    bfs_diff -D all basic 2>/dev/null
+    quiet bfs_diff -D all basic
 }
 
 function test_O0() {
@@ -2898,11 +2914,11 @@ function test_exclude_mindepth() {
 }
 
 function test_exclude_print() {
-    ! invoke_bfs basic -exclude -print 2>/dev/null
+    ! quiet invoke_bfs basic -exclude -print
 }
 
 function test_exclude_exclude() {
-    ! invoke_bfs basic -exclude -exclude -name foo 2>/dev/null
+    ! quiet invoke_bfs basic -exclude -exclude -name foo
 }
 
 
