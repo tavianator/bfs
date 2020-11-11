@@ -1,6 +1,16 @@
 2.*
 ===
 
+2.1
+---
+
+**November 11, 2020**
+
+- Added a new `-status` option that displays the search progress in a bar at the bottom of the terminal
+
+- Fixed an optimizer bug introduced in version 2.0 that affected some combinations of `-user`/`-group` and `-nouser`/`-nogroup`
+
+
 2.0
 ---
 
