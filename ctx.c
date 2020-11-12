@@ -23,6 +23,7 @@
 #include "trie.h"
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 
 struct bfs_ctx *bfs_ctx_new(void) {
