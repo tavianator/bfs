@@ -21,7 +21,7 @@
 #ifndef BFS_OPT_H
 #define BFS_OPT_H
 
-#include "ctx.h"
+struct bfs_ctx;
 
 /**
  * Apply optimizations to the command line.

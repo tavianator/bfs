@@ -18,8 +18,9 @@
 #include "bftw.h"
 #include "dstring.h"
 #include "util.h"
-#include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stddef.h>
 #include <unistd.h>
 
 #if BFS_CAN_CHECK_ACL

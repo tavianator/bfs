@@ -22,6 +22,7 @@
 #include "bar.h"
 #include "bftw.h"
 #include "color.h"
+#include "ctx.h"
 #include "darray.h"
 #include "diag.h"
 #include "dstring.h"
@@ -42,6 +43,7 @@
 #include <fnmatch.h>
 #include <grp.h>
 #include <pwd.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -21,7 +21,6 @@
 #ifndef BFS_PRINTF_H
 #define BFS_PRINTF_H
 
-#include <stdbool.h>
 #include <stdio.h>
 
 struct BFTW;

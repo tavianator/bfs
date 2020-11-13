@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 

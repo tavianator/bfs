@@ -17,7 +17,6 @@
 #ifndef BFS_TRIE_H
 #define BFS_TRIE_H
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 

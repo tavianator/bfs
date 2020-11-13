@@ -23,7 +23,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #ifdef STATX_BASIC_STATS
 #	define HAVE_STATX true

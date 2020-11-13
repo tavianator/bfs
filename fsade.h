@@ -22,7 +22,6 @@
 #ifndef BFS_FSADE_H
 #define BFS_FSADE_H
 
-#include "bftw.h"
 #include "util.h"
 #include <stdbool.h>
 
@@ -36,6 +35,8 @@
 #endif
 
 #define BFS_CAN_CHECK_XATTRS (BFS_HAS_SYS_EXTATTR || BFS_HAS_SYS_XATTR)
+
+struct BFTW;
 
 /**
  * Check if a file has a non-trivial Access Control List.

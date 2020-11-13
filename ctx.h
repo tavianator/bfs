@@ -23,6 +23,7 @@
 
 #include "bftw.h"
 #include "trie.h"
+#include <stdbool.h>
 
 /**
  * Various debugging flags.

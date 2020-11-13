@@ -21,8 +21,9 @@
 #ifndef BFS_MTAB_H
 #define BFS_MTAB_H
 
-#include "stat.h"
 #include <stdbool.h>
+
+struct bfs_stat;
 
 /**
  * A file system mount table.

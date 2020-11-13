@@ -15,15 +15,17 @@
  ****************************************************************************/
 
 #include "ctx.h"
+#include "color.h"
 #include "darray.h"
 #include "diag.h"
 #include "expr.h"
 #include "mtab.h"
 #include "pwcache.h"
+#include "stat.h"
 #include "trie.h"
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 struct bfs_ctx *bfs_ctx_new(void) {

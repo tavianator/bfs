@@ -15,11 +15,10 @@
  ****************************************************************************/
 
 #include "printf.h"
-#include "color.h"
+#include "bftw.h"
 #include "ctx.h"
 #include "diag.h"
 #include "dstring.h"
-#include "expr.h"
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
@@ -29,9 +28,10 @@
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include <stdlib.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 

@@ -23,15 +23,15 @@
 
 #include "parse.h"
 #include "bfs.h"
+#include "bftw.h"
+#include "color.h"
 #include "ctx.h"
 #include "darray.h"
 #include "diag.h"
-#include "dstring.h"
 #include "eval.h"
 #include "exec.h"
 #include "expr.h"
 #include "fsade.h"
-#include "mtab.h"
 #include "opt.h"
 #include "printf.h"
 #include "pwcache.h"
@@ -41,7 +41,6 @@
 #include "typo.h"
 #include "util.h"
 #include <assert.h>
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -50,11 +49,11 @@
 #include <pwd.h>
 #include <regex.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>

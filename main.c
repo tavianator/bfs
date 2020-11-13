@@ -52,10 +52,10 @@
 #include "ctx.h"
 #include "eval.h"
 #include "parse.h"
-#include "util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <locale.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

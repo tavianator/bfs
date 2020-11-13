@@ -16,6 +16,7 @@
 
 #include "mtab.h"
 #include "darray.h"
+#include "stat.h"
 #include "trie.h"
 #include "util.h"
 #include <errno.h>
@@ -23,7 +24,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 #if BFS_HAS_SYS_PARAM

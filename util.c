@@ -19,8 +19,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
+#include <nl_types.h>
 #include <regex.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -20,14 +20,11 @@
  */
 
 #include <errno.h>
-#include <fcntl.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
 

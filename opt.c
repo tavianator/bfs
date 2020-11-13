@@ -46,9 +46,11 @@
 #include "eval.h"
 #include "expr.h"
 #include "pwcache.h"
+#include "util.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 

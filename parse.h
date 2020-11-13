@@ -21,8 +21,6 @@
 #ifndef BFS_PARSE_H
 #define BFS_PARSE_H
 
-#include "ctx.h"
-
 /**
  * Parse the command line.
  *

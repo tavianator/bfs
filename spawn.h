@@ -21,8 +21,6 @@
 #ifndef BFS_SPAWN_H
 #define BFS_SPAWN_H
 
-#include <stdbool.h>
-#include <signal.h>
 #include <sys/types.h>
 
 /**

@@ -37,6 +37,7 @@
 
 #include "bftw.h"
 #include "dstring.h"
+#include "mtab.h"
 #include "stat.h"
 #include "trie.h"
 #include "util.h"
@@ -44,11 +45,10 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /**

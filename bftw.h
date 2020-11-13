@@ -21,7 +21,6 @@
 #ifndef BFS_BFTW_H
 #define BFS_BFTW_H
 
-#include "mtab.h"
 #include "stat.h"
 #include <stddef.h>
 #include <sys/types.h>
