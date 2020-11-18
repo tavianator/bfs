@@ -29,6 +29,7 @@
 #elif __linux__
 #	include <linux/stat.h>
 #	include <sys/syscall.h>
+#	include <unistd.h>
 #endif
 
 #if HAVE_STATX || defined(__NR_statx)
