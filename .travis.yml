@@ -16,10 +16,13 @@ addons:
       - libcap-dev
       - libcap2:i386
 
-matrix:
+jobs:
   include:
     - os: linux
-      dist: xenial
+      dist: focal
+      virt: lxd
+      env:
+        - TMPDIR=/var/ramfs
       before_script:
         # Ubuntu doesn't let you install the -dev packages for both amd64 and
         # i386 at once, so we make our own symlinks to fix -m32 -lacl -lcap
