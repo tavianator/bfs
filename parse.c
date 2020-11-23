@@ -2070,7 +2070,7 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 
 	int err = regcomp(expr->regex, expr->sdata, state->regex_flags | flags);
 	if (err != 0) {
-		char *str = xregerror(err, expr->regex);
+		char *str = xregerror(err, NULL);
 		if (str) {
 			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
 			free(str);
