@@ -24,6 +24,10 @@ ifndef OS
 OS := $(shell uname)
 endif
 
+ifndef ARCH
+ARCH := $(shell uname -m)
+endif
+
 CC ?= gcc
 INSTALL ?= install
 MKDIR ?= mkdir -p
@@ -168,7 +172,9 @@ distcheck:
 	+$(MAKE) -B asan ubsan check $(DISTCHECK_FLAGS)
 ifneq ($(OS),Darwin)
 	+$(MAKE) -B msan check CC=clang $(DISTCHECK_FLAGS)
+ifeq ($(ARCH),x86_64)
 	+$(MAKE) -B check CFLAGS="-m32" $(DISTCHECK_FLAGS)
+endif
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
