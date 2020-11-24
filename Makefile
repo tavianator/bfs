@@ -64,7 +64,9 @@ LOCAL_LDLIBS += -lacl -lcap -lattr -lrt
 # These libraries are not built with msan, so disable them
 MSAN_CFLAGS += -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTR=0
 
-DISTCHECK_FLAGS := TEST_FLAGS="--all --sudo"
+DISTCHECK_FLAGS := TEST_FLAGS="--verbose --all --sudo"
+else
+DISTCHECK_FLAGS := TEST_FLAGS="--verbose"
 endif
 
 ifneq ($(filter asan,$(MAKECMDGOALS)),)
