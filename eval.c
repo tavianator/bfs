@@ -467,7 +467,14 @@ bool eval_fstype(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_hidden(const struct expr *expr, struct eval_state *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	return ftwbuf->nameoff > 0 && ftwbuf->path[ftwbuf->nameoff] == '.';
+	const char *name = ftwbuf->path + ftwbuf->nameoff;
+
+	// Don't treat "." or ".." as hidden directories.  Otherwise we'd filter
+	// out everything when given
+	//
+	//     $ bfs . -nohidden
+	//     $ bfs .. -nohidden
+	return name[0] == '.' && strcmp(name, ".") != 0 && strcmp(name, "..") != 0;
 }
 
 /**

@@ -681,6 +681,7 @@ bfs_tests=(
     test_help
 
     test_hidden
+    test_hidden_root
 
     test_newerma_nonexistent
     test_newermt_invalid
@@ -1888,6 +1889,11 @@ function test_s() {
 
 function test_hidden() {
     bfs_diff weirdnames -hidden
+}
+
+function test_hidden_root() {
+    cd weirdnames
+    bfs_diff . ./. ... ./... .../.. -hidden
 }
 
 function test_nohidden() {
