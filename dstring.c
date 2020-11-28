@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -124,6 +124,10 @@ int dstrncat(char **dest, const char *src, size_t n) {
 	return dstrcat_impl(dest, src, strnlen(src, n));
 }
 
+int dstrdcat(char **dest, const char *src) {
+	return dstrcat_impl(dest, src, dstrlen(src));
+}
+
 int dstrapp(char **str, char c) {
 	return dstrcat_impl(str, &c, 1);
 }
@@ -139,40 +143,69 @@ char *dstrprintf(const char *format, ...) {
 }
 
 char *dstrvprintf(const char *format, va_list args) {
-	// Guess a length to try to avoid calling vsnprintf() twice
-	int len, cap = 2*strlen(format);
-	char *str = dstralloc(cap);
+	// Guess a capacity to try to avoid reallocating
+	char *str = dstralloc(2*strlen(format));
 	if (!str) {
 		return NULL;
 	}
 
-	va_list args2;
-	va_copy(args2, args);
-
-	len = vsnprintf(str, cap + 1, format, args);
-	if (len > cap) {
-		if (dstreserve(&str, len) != 0) {
-			goto fail;
-		}
-
-		cap = len;
-		len = vsnprintf(str, cap + 1, format, args2);
-		assert(len == cap);
+	if (dstrvcatf(&str, format, args) != 0) {
+		dstrfree(str);
+		return NULL;
 	}
 
-	va_end(args2);
+	return str;
+}
 
-	if (len < 0) {
+int dstrcatf(char **str, const char *format, ...) {
+	va_list args;
+
+	va_start(args, format);
+	int ret = dstrvcatf(str, format, args);
+	va_end(args);
+
+	return ret;
+}
+
+int dstrvcatf(char **str, const char *format, va_list args) {
+	// Guess a capacity to try to avoid calling vsnprintf() twice
+	size_t len = dstrlen(*str);
+	dstreserve(str, len + 2*strlen(format));
+	size_t cap = dstrheader(*str)->capacity;
+
+	va_list copy;
+	va_copy(copy, args);
+
+	char *tail = *str + len;
+	int ret = vsnprintf(tail, cap - len + 1, format, args);
+	if (ret < 0) {
 		goto fail;
 	}
 
-	struct dstring *header = dstrheader(str);
-	header->length = len;
-	return str;
+	size_t tail_len = ret;
+	if (tail_len > cap - len) {
+		cap = len + tail_len;
+		if (dstreserve(str, cap) != 0) {
+			goto fail;
+		}
+
+		tail = *str + len;
+		ret = vsnprintf(tail, tail_len + 1, format, copy);
+		if (ret < 0 || (size_t)ret != tail_len) {
+			assert(false);
+			goto fail;
+		}
+	}
+
+	va_end(copy);
+
+	struct dstring *header = dstrheader(*str);
+	header->length += tail_len;
+	return 0;
 
 fail:
-	dstrfree(str);
-	return NULL;
+	*tail = '\0';
+	return -1;
 }
 
 void dstrfree(char *dstr) {

@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -107,6 +107,18 @@ int dstrcat(char **dest, const char *src);
 int dstrncat(char **dest, const char *src, size_t n);
 
 /**
+ * Append a dynamic string to another dynamic string.
+ *
+ * @param dest
+ *         The destination dynamic string.
+ * @param src
+ *         The dynamic string to append.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int dstrdcat(char **dest, const char *src);
+
+/**
  * Append a single character to a dynamic string.
  *
  * @param str
@@ -141,6 +153,35 @@ char *dstrprintf(const char *format, ...);
  *         The created string, or NULL on failure.
  */
 char *dstrvprintf(const char *format, va_list args);
+
+/**
+ * Format some text onto the end of a dynamic string.
+ *
+ * @param str
+ *         The destination dynamic string.
+ * @param format
+ *         The format string to fill in.
+ * @param ...
+ *         Any arguments for the format string.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+BFS_FORMATTER(2, 3)
+int dstrcatf(char **str, const char *format, ...);
+
+/**
+ * Format some text from a va_list onto the end of a dynamic string.
+ *
+ * @param str
+ *         The destination dynamic string.
+ * @param format
+ *         The format string to fill in.
+ * @param args
+ *         The arguments for the format string.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int dstrvcatf(char **str, const char *format, va_list args);
 
 /**
  * Free a dynamic string.
