@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2020 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -495,13 +495,31 @@ void free_colors(struct colors *colors) {
 	}
 }
 
-CFILE *cfopen(const char *path, const struct colors *colors) {
+static CFILE *cfalloc(void) {
 	CFILE *cfile = malloc(sizeof(*cfile));
 	if (!cfile) {
 		return NULL;
 	}
 
+	cfile->buffer = dstralloc(128);
+	if (!cfile->buffer) {
+		free(cfile);
+		return NULL;
+	}
+
+	cfile->file = NULL;
+	cfile->colors = NULL;
 	cfile->close = false;
+
+	return cfile;
+}
+
+CFILE *cfopen(const char *path, const struct colors *colors) {
+	CFILE *cfile = cfalloc();
+	if (!cfile) {
+		return NULL;
+	}
+
 	cfile->file = fopen(path, "wb");
 	if (!cfile->file) {
 		cfclose(cfile);
@@ -519,7 +537,7 @@ CFILE *cfopen(const char *path, const struct colors *colors) {
 }
 
 CFILE *cfdup(FILE *file, const struct colors *colors) {
-	CFILE *cfile = malloc(sizeof(*cfile));
+	CFILE *cfile = cfalloc();
 	if (!cfile) {
 		return NULL;
 	}
@@ -538,12 +556,17 @@ CFILE *cfdup(FILE *file, const struct colors *colors) {
 
 int cfclose(CFILE *cfile) {
 	int ret = 0;
+
 	if (cfile) {
+		dstrfree(cfile->buffer);
+
 		if (cfile->close) {
 			ret = fclose(cfile->file);
 		}
+
 		free(cfile);
 	}
+
 	return ret;
 }
 
@@ -659,29 +682,17 @@ error:
 	}
 }
 
-/** Print a fixed-length string. */
-static int print_strn(const char *str, size_t len, FILE *file) {
-	if (fwrite(str, 1, len, file) == len) {
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-/** Print a dstring. */
-static int print_dstr(const char *str, FILE *file) {
-	return print_strn(str, dstrlen(str), file);
-}
-
 /** Print an ANSI escape sequence. */
-static int print_esc(const struct colors *colors, const char *esc, FILE *file) {
-	if (print_dstr(colors->leftcode, file) != 0) {
+static int print_esc(CFILE *cfile, const char *esc) {
+	const struct colors *colors = cfile->colors;
+
+	if (dstrdcat(&cfile->buffer, colors->leftcode) != 0) {
 		return -1;
 	}
-	if (print_dstr(esc, file) != 0) {
+	if (dstrdcat(&cfile->buffer, esc) != 0) {
 		return -1;
 	}
-	if (print_dstr(colors->rightcode, file) != 0) {
+	if (dstrdcat(&cfile->buffer, colors->rightcode) != 0) {
 		return -1;
 	}
 
@@ -689,26 +700,28 @@ static int print_esc(const struct colors *colors, const char *esc, FILE *file) {
 }
 
 /** Reset after an ANSI escape sequence. */
-static int print_reset(const struct colors *colors, FILE *file) {
+static int print_reset(CFILE *cfile) {
+	const struct colors *colors = cfile->colors;
+
 	if (colors->endcode) {
-		return print_dstr(colors->endcode, file);
+		return dstrdcat(&cfile->buffer, colors->endcode);
 	} else {
-		return print_esc(colors, colors->reset, file);
+		return print_esc(cfile, colors->reset);
 	}
 }
 
 /** Print a string with an optional color. */
-static int print_colored(const struct colors *colors, const char *esc, const char *str, size_t len, FILE *file) {
+static int print_colored(CFILE *cfile, const char *esc, const char *str, size_t len) {
 	if (esc) {
-		if (print_esc(colors, esc, file) != 0) {
+		if (print_esc(cfile, esc) != 0) {
 			return -1;
 		}
 	}
-	if (print_strn(str, len, file) != 0) {
+	if (dstrncat(&cfile->buffer, str, len) != 0) {
 		return -1;
 	}
 	if (esc) {
-		if (print_reset(colors, file) != 0) {
+		if (print_reset(cfile) != 0) {
 			return -1;
 		}
 	}
@@ -778,7 +791,6 @@ out:
 /** Print the directories leading up to a file. */
 static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t nameoff) {
 	const struct colors *colors = cfile->colors;
-	FILE *file = cfile->file;
 
 	ssize_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
 	if (broken < 0) {
@@ -786,7 +798,7 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 	}
 
 	if (broken > 0) {
-		if (print_colored(colors, colors->directory, path, broken, file) != 0) {
+		if (print_colored(cfile, colors->directory, path, broken) != 0) {
 			return -1;
 		}
 	}
@@ -796,7 +808,7 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 		if (!color) {
 			color = colors->orphan;
 		}
-		if (print_colored(colors, color, path + broken, nameoff - broken, file) != 0) {
+		if (print_colored(cfile, color, path + broken, nameoff - broken) != 0) {
 			return -1;
 		}
 	}
@@ -806,9 +818,6 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 
 /** Print a path with colors. */
 static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	const struct colors *colors = cfile->colors;
-	FILE *file = cfile->file;
-
 	size_t nameoff;
 	if (path == ftwbuf->path) {
 		nameoff = ftwbuf->nameoff;
@@ -819,15 +828,15 @@ static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW 
 	print_dirs_colored(cfile, path, ftwbuf, flags, nameoff);
 
 	const char *filename = path + nameoff;
-	const char *color = file_color(colors, filename, ftwbuf, flags);
-	return print_colored(colors, color, filename, strlen(filename), file);
+	const char *color = file_color(cfile->colors, filename, ftwbuf, flags);
+	return print_colored(cfile, color, filename, strlen(filename));
 }
 
 /** Print the path to a file with the appropriate colors. */
 static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	const struct colors *colors = cfile->colors;
 	if (!colors) {
-		return fputs(ftwbuf->path, cfile->file) == EOF ? -1 : 0;
+		return dstrcat(&cfile->buffer, ftwbuf->path);
 	}
 
 	enum bfs_stat_flags flags = ftwbuf->stat_flags;
@@ -851,7 +860,7 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	}
 
 	if (!cfile->colors) {
-		ret = fputs(target, cfile->file) == EOF ? -1 : 0;
+		ret = dstrcat(&cfile->buffer, target);
 		goto done;
 	}
 
@@ -862,24 +871,28 @@ done:
 	return ret;
 }
 
+/** Format some colored output to the buffer. */
+BFS_FORMATTER(2, 3)
+static int cbuff(CFILE *cfile, const char *format, ...);
+
 /** Dump a parsed expression tree, for debugging. */
 static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
-	if (fputs("(", cfile->file) == EOF) {
+	if (dstrcat(&cfile->buffer, "(") != 0) {
 		return -1;
 	}
 
 	if (expr->lhs || expr->rhs) {
-		if (cfprintf(cfile, "${red}%s${rs}", expr->argv[0]) < 0) {
+		if (cbuff(cfile, "${red}%s${rs}", expr->argv[0]) < 0) {
 			return -1;
 		}
 	} else {
-		if (cfprintf(cfile, "${blu}%s${rs}", expr->argv[0]) < 0) {
+		if (cbuff(cfile, "${blu}%s${rs}", expr->argv[0]) < 0) {
 			return -1;
 		}
 	}
 
 	for (size_t i = 1; i < expr->argc; ++i) {
-		if (cfprintf(cfile, " ${bld}%s${rs}", expr->argv[i]) < 0) {
+		if (cbuff(cfile, " ${bld}%s${rs}", expr->argv[i]) < 0) {
 			return -1;
 		}
 	}
@@ -890,14 +903,14 @@ static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 			rate = 100.0*expr->successes/expr->evaluations;
 			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
 		}
-		if (cfprintf(cfile, " [${ylw}%zu${rs}/${ylw}%zu${rs}=${ylw}%g%%${rs}; ${ylw}%gns${rs}]",
-		             expr->successes, expr->evaluations, rate, time)) {
+		if (cbuff(cfile, " [${ylw}%zu${rs}/${ylw}%zu${rs}=${ylw}%g%%${rs}; ${ylw}%gns${rs}]",
+		          expr->successes, expr->evaluations, rate, time)) {
 			return -1;
 		}
 	}
 
 	if (expr->lhs) {
-		if (fputs(" ", cfile->file) == EOF) {
+		if (dstrcat(&cfile->buffer, " ") != 0) {
 			return -1;
 		}
 		if (print_expr(cfile, expr->lhs, verbose) != 0) {
@@ -906,7 +919,7 @@ static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 	}
 
 	if (expr->rhs) {
-		if (fputs(" ", cfile->file) == EOF) {
+		if (dstrcat(&cfile->buffer, " ") != 0) {
 			return -1;
 		}
 		if (print_expr(cfile, expr->rhs, verbose) != 0) {
@@ -914,29 +927,20 @@ static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 		}
 	}
 
-	if (fputs(")", cfile->file) == EOF) {
+	if (dstrcat(&cfile->buffer, ")") != 0) {
 		return -1;
 	}
 
 	return 0;
 }
 
-int cfprintf(CFILE *cfile, const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-	int ret = cvfprintf(cfile, format, args);
-	va_end(args);
-	return ret;
-}
-
-int cvfprintf(CFILE *cfile, const char *format, va_list args) {
+static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	const struct colors *colors = cfile->colors;
-	FILE *file = cfile->file;
 	int error = errno;
 
 	for (const char *i = format; *i; ++i) {
 		size_t verbatim = strcspn(i, "%$");
-		if (fwrite(i, 1, verbatim, file) != verbatim) {
+		if (dstrncat(&cfile->buffer, i, verbatim) != 0) {
 			return -1;
 		}
 
@@ -945,31 +949,31 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 		case '%':
 			switch (*++i) {
 			case '%':
-				if (fputc('%', file) == EOF) {
+				if (dstrapp(&cfile->buffer, '%') != 0) {
 					return -1;
 				}
 				break;
 
 			case 'c':
-				if (fputc(va_arg(args, int), file) == EOF) {
+				if (dstrapp(&cfile->buffer, va_arg(args, int)) != 0) {
 					return -1;
 				}
 				break;
 
 			case 'd':
-				if (fprintf(file, "%d", va_arg(args, int)) < 0) {
+				if (dstrcatf(&cfile->buffer, "%d", va_arg(args, int)) != 0) {
 					return -1;
 				}
 				break;
 
 			case 'g':
-				if (fprintf(file, "%g", va_arg(args, double)) < 0) {
+				if (dstrcatf(&cfile->buffer, "%g", va_arg(args, double)) != 0) {
 					return -1;
 				}
 				break;
 
 			case 's':
-				if (fputs(va_arg(args, const char *), file) == EOF) {
+				if (dstrcat(&cfile->buffer, va_arg(args, const char *)) != 0) {
 					return -1;
 				}
 				break;
@@ -979,13 +983,13 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 				if (*i != 'u') {
 					goto invalid;
 				}
-				if (fprintf(file, "%zu", va_arg(args, size_t)) < 0) {
+				if (dstrcatf(&cfile->buffer, "%zu", va_arg(args, size_t)) != 0) {
 					return -1;
 				}
 				break;
 
 			case 'm':
-				if (fputs(strerror(error), file) == EOF) {
+				if (dstrcat(&cfile->buffer, strerror(error)) != 0) {
 					return -1;
 				}
 				break;
@@ -1029,7 +1033,7 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 		case '$':
 			switch (*++i) {
 			case '$':
-				if (fputc('$', file) == EOF) {
+				if (dstrapp(&cfile->buffer, '$') != 0) {
 					return -1;
 				}
 				break;
@@ -1055,7 +1059,7 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 					goto invalid;
 				}
 				if (*esc) {
-					if (print_esc(colors, *esc, file) != 0) {
+					if (print_esc(cfile, *esc) != 0) {
 						return -1;
 					}
 				}
@@ -1072,7 +1076,6 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 		default:
 			return 0;
 		}
-
 	}
 
 	return 0;
@@ -1081,4 +1084,35 @@ invalid:
 	assert(false);
 	errno = EINVAL;
 	return -1;
+}
+
+static int cbuff(CFILE *cfile, const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	int ret = cvbuff(cfile, format, args);
+	va_end(args);
+	return ret;
+}
+
+int cvfprintf(CFILE *cfile, const char *format, va_list args) {
+	assert(dstrlen(cfile->buffer) == 0);
+
+	int ret = -1;
+	if (cvbuff(cfile, format, args) == 0) {
+		size_t len = dstrlen(cfile->buffer);
+		if (fwrite(cfile->buffer, 1, len, cfile->file) == len) {
+			ret = 0;
+		}
+	}
+
+	dstresize(&cfile->buffer, 0);
+	return ret;
+}
+
+int cfprintf(CFILE *cfile, const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	int ret = cvfprintf(cfile, format, args);
+	va_end(args);
+	return ret;
 }

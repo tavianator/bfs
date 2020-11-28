@@ -56,6 +56,8 @@ typedef struct CFILE {
 	FILE *file;
 	/** The color table to use, if any. */
 	const struct colors *colors;
+	/** A buffer for colored formatting. */
+	char *buffer;
 	/** Whether to close the underlying stream. */
 	bool close;
 } CFILE;
