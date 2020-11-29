@@ -262,7 +262,7 @@ static char *xgetline(void) {
 	}
 
 	while (true) {
-		int c = getchar();
+		int c = fgetc(stdin);
 		if (c == '\n' || c == EOF) {
 			break;
 		}
