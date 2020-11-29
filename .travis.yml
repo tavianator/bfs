@@ -3,7 +3,7 @@ language: c
 dist: focal
 virt: lxd
 
-script: make distcheck
+script: make -j$TRAVIS_NUMCORES distcheck
 
 addons:
   apt:
@@ -46,4 +46,4 @@ jobs:
       before_script:
         - sudo mount -t fdescfs fdescfs /dev/fd
         - sudo ln -s ../usr/local/bin/bash /bin/bash
-      script: gmake distcheck
+      script: gmake -j2 distcheck
