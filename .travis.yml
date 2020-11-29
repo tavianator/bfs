@@ -41,3 +41,9 @@ jobs:
       env: *linux_env
 
     - os: osx
+
+    - os: freebsd
+      before_script:
+        - sudo mount -t fdescfs fdescfs /dev/fd
+        - sudo ln -s ../usr/local/bin/bash /bin/bash
+      script: gmake distcheck

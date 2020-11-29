@@ -4,7 +4,6 @@
 [![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/main/LICENSE)
 [![Version](https://img.shields.io/github/v/tag/tavianator/bfs?label=version)](https://github.com/tavianator/bfs/releases)
 [![Travis CI Status](https://api.travis-ci.com/tavianator/bfs.svg?branch=main)](https://travis-ci.com/tavianator/bfs)
-[![Cirrus CI Status](https://api.cirrus-ci.com/github/tavianator/bfs.svg)](https://cirrus-ci.com/github/tavianator/bfs)
 
 Breadth-first search for your files.
 
