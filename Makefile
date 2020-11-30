@@ -33,8 +33,9 @@ INSTALL ?= install
 MKDIR ?= mkdir -p
 RM ?= rm -f
 
-WFLAGS ?= -Wall -Wmissing-declarations -Wstrict-prototypes -Wsign-compare
-CFLAGS ?= -g $(WFLAGS)
+DEFAULT_CFLAGS ?= -g -Wall -Wmissing-declarations -Wstrict-prototypes -Wsign-compare
+
+CFLAGS ?= $(DEFAULT_CFLAGS)
 LDFLAGS ?=
 DEPFLAGS ?= -MD -MP -MF $(@:.o=.d)
 
@@ -59,7 +60,6 @@ LOCAL_LDLIBS :=
 ASAN_CFLAGS := -fsanitize=address
 MSAN_CFLAGS := -fsanitize=memory -fsanitize-memory-track-origins
 UBSAN_CFLAGS := -fsanitize=undefined
-SANFLAGS := -fno-sanitize-recover
 
 ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
@@ -97,7 +97,7 @@ LOCAL_CFLAGS += --coverage
 endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
-CFLAGS := -g $(WFLAGS) -O3 -flto -DNDEBUG
+CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto -DNDEBUG
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)
