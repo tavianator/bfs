@@ -497,7 +497,7 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 		break;
 
 	default:
-		assert(false);
+		assert(!"Invalid int size");
 		goto bad;
 	}
 

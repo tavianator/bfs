@@ -1081,7 +1081,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	return 0;
 
 invalid:
-	assert(false);
+	assert(!"Invalid format string");
 	errno = EINVAL;
 	return -1;
 }

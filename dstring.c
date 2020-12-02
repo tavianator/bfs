@@ -192,7 +192,7 @@ int dstrvcatf(char **str, const char *format, va_list args) {
 		tail = *str + len;
 		ret = vsnprintf(tail, tail_len + 1, format, copy);
 		if (ret < 0 || (size_t)ret != tail_len) {
-			assert(false);
+			assert(!"Length of formatted string changed");
 			goto fail;
 		}
 	}

@@ -50,7 +50,7 @@ const char *debug_flag_name(enum debug_flags flag) {
 		break;
 	}
 
-	assert(false);
+	assert(!"Unrecognized debug flag");
 	return "???";
 }
 

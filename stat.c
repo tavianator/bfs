@@ -75,7 +75,7 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 		return "modification time";
 	}
 
-	assert(false);
+	assert(!"Unrecognized stat field");
 	return "???";
 }
 
@@ -349,7 +349,7 @@ const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_f
 	case BFS_STAT_MTIME:
 		return &buf->mtime;
 	default:
-		assert(false);
+		assert(!"Invalid stat field for time");
 		errno = EINVAL;
 		return NULL;
 	}
