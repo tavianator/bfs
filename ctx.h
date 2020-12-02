@@ -48,6 +48,11 @@ enum debug_flags {
 };
 
 /**
+ * Convert a debug flag to a string.
+ */
+const char *debug_flag_name(enum debug_flags flag);
+
+/**
  * The execution context for bfs.
  */
 struct bfs_ctx {

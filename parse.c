@@ -736,25 +736,6 @@ static void debug_help(CFILE *cfile) {
 	cfprintf(cfile, "  ${bld}all${rs}:    All debug flags at once.\n");
 }
 
-/** A named debug flag. */
-struct debug_flag {
-	enum debug_flags flag;
-	const char *name;
-};
-
-/** The table of debug flags. */
-struct debug_flag debug_flags[] = {
-	{DEBUG_ALL,    "all"},
-	{DEBUG_COST,   "cost"},
-	{DEBUG_EXEC,   "exec"},
-	{DEBUG_OPT,    "opt"},
-	{DEBUG_RATES,  "rates"},
-	{DEBUG_SEARCH, "search"},
-	{DEBUG_STAT,   "stat"},
-	{DEBUG_TREE,   "tree"},
-	{0},
-};
-
 /** Check if a substring matches a debug flag. */
 static bool parse_debug_flag(const char *flag, size_t len, const char *expected) {
 	if (len == strlen(expected)) {
@@ -792,22 +773,26 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 			debug_help(ctx->cout);
 			state->just_info = true;
 			return NULL;
+		} else if (parse_debug_flag(flag, len, "all")) {
+			ctx->debug = DEBUG_ALL;
+			continue;
 		}
 
-		for (int i = 0; ; ++i) {
-			const char *expected = debug_flags[i].name;
-			if (!expected) {
-				if (parse_warning(state, "Unrecognized debug flag ${bld}")) {
-					fwrite(flag, 1, len, stderr);
-					cfprintf(ctx->cerr, "${rs}.\n\n");
-					unrecognized = true;
-				}
+		enum debug_flags i;
+		for (i = 1; DEBUG_ALL & i; i <<= 1) {
+			const char *name = debug_flag_name(i);
+			if (parse_debug_flag(flag, len, name)) {
 				break;
 			}
+		}
 
-			if (parse_debug_flag(flag, len, expected)) {
-				ctx->debug |= debug_flags[i].flag;
-				break;
+		if (DEBUG_ALL & i) {
+			ctx->debug |= i;
+		} else {
+			if (parse_warning(state, "Unrecognized debug flag ${bld}")) {
+				fwrite(flag, 1, len, stderr);
+				cfprintf(ctx->cerr, "${rs}.\n\n");
+				unrecognized = true;
 			}
 		}
 	}
@@ -3374,14 +3359,14 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 	cfprintf(cerr, "${cyn}-S${rs} ${bld}%s${rs} ", strategy);
 
 	enum debug_flags debug = ctx->debug;
-	if (debug) {
+	if (debug == DEBUG_ALL) {
+		cfprintf(cerr, "${cyn}-D${rs} ${bld}all${rs} ");
+	} else if (debug) {
 		cfprintf(cerr, "${cyn}-D${rs} ");
-		for (int i = 0; debug; ++i) {
-			enum debug_flags flag = debug_flags[i].flag;
-			const char *name = debug_flags[i].name;
-			if ((debug & flag) == flag) {
-				cfprintf(cerr, "${bld}%s${rs}", name);
-				debug ^= flag;
+		for (enum debug_flags i = 1; DEBUG_ALL & i; i <<= 1) {
+			if (debug & i) {
+				cfprintf(cerr, "${bld}%s${rs}", debug_flag_name(i));
+				debug ^= i;
 				if (debug) {
 					cfprintf(cerr, ",");
 				}

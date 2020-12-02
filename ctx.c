@@ -23,10 +23,36 @@
 #include "pwcache.h"
 #include "stat.h"
 #include "trie.h"
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+const char *debug_flag_name(enum debug_flags flag) {
+	switch (flag) {
+	case DEBUG_COST:
+		return "cost";
+	case DEBUG_EXEC:
+		return "exec";
+	case DEBUG_OPT:
+		return "opt";
+	case DEBUG_RATES:
+		return "rates";
+	case DEBUG_SEARCH:
+		return "search";
+	case DEBUG_STAT:
+		return "stat";
+	case DEBUG_TREE:
+		return "tree";
+
+	case DEBUG_ALL:
+		break;
+	}
+
+	assert(false);
+	return "???";
+}
 
 struct bfs_ctx *bfs_ctx_new(void) {
 	struct bfs_ctx *ctx = malloc(sizeof(*ctx));
