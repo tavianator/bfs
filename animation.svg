@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="terminal" baseProfile="full" viewBox="0 0 800 289" width="800" version="1.1">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="terminal" baseProfile="full" viewBox="0 0 838 289" width="838" version="1.1">
     <defs>
         <termtosvg:template_settings xmlns:termtosvg="https://github.com/nbedos/termtosvg">
             <termtosvg:screen_geometry columns="96" rows="15"/>
