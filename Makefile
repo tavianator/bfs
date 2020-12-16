@@ -124,6 +124,13 @@ ifndef GOALS
 FLAG_PREREQS += default
 endif
 
+# The different search strategies that we test
+STRATEGIES := bfs dfs ids eds
+STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
+
+# All the different checks we run
+CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
+
 default: bfs
 
 all: $(BIN_GOALS)
@@ -166,16 +173,13 @@ $(BIN_GOALS):
 $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
 
-check: check-trie check-xtimegm check-bfs check-dfs check-ids check-eds
+check: $(CHECKS)
 
-check-trie: tests/trie
-	$<
-
-check-xtimegm: tests/xtimegm
-	$<
-
-check-%: all
+$(STRATEGY_CHECKS): check-%: bfs tests/mksock
 	./tests.sh --bfs="$(CURDIR)/bfs -S $*" $(TEST_FLAGS)
+
+check-trie check-xtimegm: check-%: tests/%
+	$<
 
 distcheck:
 	+$(MAKE) -B asan ubsan check $(DISTCHECK_FLAGS)
@@ -201,6 +205,6 @@ uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 
-.PHONY: default all $(FLAG_GOALS) check check-trie check-xtimegm distcheck clean install uninstall
+.PHONY: default all $(FLAG_GOALS) check $(CHECKS) distcheck clean install uninstall
 
 -include $(wildcard *.d)
