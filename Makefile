@@ -109,9 +109,24 @@ ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS)
 ALL_FLAGS := $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
 $(shell ./flags.sh $(ALL_FLAGS))
 
+# Goals that make binaries
+BIN_GOALS := bfs tests/mksock tests/trie tests/xtimegm
+
+# Goals that are treated like flags by this Makefile
+FLAG_GOALS := asan msan ubsan gcov release
+
+# These are the remaining non-flag goals
+GOALS := $(filter-out $(FLAG_GOALS),$(MAKECMDGOALS))
+
+# Build the default goal if only flag goals are specified
+FLAG_PREREQS :=
+ifndef GOALS
+FLAG_PREREQS += default
+endif
+
 default: bfs
 
-all: bfs tests/mksock tests/trie tests/xtimegm
+all: $(BIN_GOALS)
 
 bfs: \
     bar.o \
@@ -136,30 +151,20 @@ bfs: \
     trie.o \
     typo.o \
     util.o
-	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
-
-asan: bfs
-	@:
-ubsan: bfs
-	@:
-msan: bfs
-	@:
-gcov: bfs
-	@:
-release: bfs
-	@:
 
 tests/mksock: tests/mksock.o
-	$(CC) $(ALL_LDFLAGS) $^ -o $@
-
 tests/trie: trie.o tests/trie.o
-	$(CC) $(ALL_LDFLAGS) $^ -o $@
-
 tests/xtimegm: time.o tests/xtimegm.o
-	$(CC) $(ALL_LDFLAGS) $^ -o $@
+
+$(BIN_GOALS):
+	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
 %.o: %.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
+
+# Make sure that "make release" builds everything, but "make release main.o" doesn't
+$(FLAG_GOALS): $(FLAG_PREREQS)
+	@:
 
 check: check-trie check-xtimegm check-bfs check-dfs check-ids check-eds
 
@@ -184,7 +189,7 @@ endif
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
-	$(RM) bfs *.[od] *.gcda *.gcno tests/mksock tests/trie tests/xtimegm tests/*.[od] tests/*.gcda tests/*.gcno
+	$(RM) $(BIN_GOALS) *.[od] *.gcda *.gcno tests/*.[od] tests/*.gcda tests/*.gcno
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
@@ -196,6 +201,6 @@ uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 
-.PHONY: all asan ubsan msan release check check-trie check-xtimegm distcheck clean install uninstall
+.PHONY: default all $(FLAG_GOALS) check check-trie check-xtimegm distcheck clean install uninstall
 
 -include $(wildcard *.d)
