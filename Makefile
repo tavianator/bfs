@@ -169,6 +169,10 @@ $(BIN_GOALS):
 %.o: %.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
+# Need a rule for .flags to convince make to apply the above pattern rule if
+# .flags didn't exist when make was run
+.flags:
+
 # Make sure that "make release" builds everything, but "make release main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
@@ -193,7 +197,7 @@ endif
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
-	$(RM) $(BIN_GOALS) *.[od] *.gcda *.gcno tests/*.[od] tests/*.gcda tests/*.gcno
+	$(RM) $(BIN_GOALS) .flags *.[od] *.gcda *.gcno tests/*.[od] tests/*.gcda tests/*.gcno
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
@@ -206,5 +210,7 @@ uninstall:
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 
 .PHONY: default all $(FLAG_GOALS) check $(CHECKS) distcheck clean install uninstall
+
+.SUFFIXES:
 
 -include $(wildcard *.d)
