@@ -13,17 +13,17 @@ _bfs ()
   fi
 
   # arguments with a special completion procedure
-  local options_special='-fprintf -D -S -regextype -fstype -gid -uid -group -user -perm -type -xtype'
+  local options_special='-exec -execdir -ok -okdir -fprintf -D -S -regextype -fstype -gid -uid -group -user -perm -type -xtype'
 
   # arguments whose values should not be completed
   # (e.g. because they are numeric, glob, regexp, time, etc.)
   local options_nocomp='-maxdepth -mindepth -amin -Bmin -cmin -mmin -asince -Bsince -csince -msince -atime -Btime -ctime -mtime -ilname -iname -ipath -iregex -iwholename -inum -links -lname -name -path -wholename -regex -since -size -used -printf -newerat -newerBt -newerct -newermt -xattrname'
 
   # arguments whose value is a filename
-  local options_filecomp='-anewer -Bnewer -cnewer -mnewer -newer -samefile -fls -fprint -fprint0 -neweraa -neweraB -newerac -neweram -newerBa -newerBB -newerBc -newerBm -newerca -newercB -newercc -newercm -newerma -newermB -newermc -newermm'
+  local options_filecomp='-anewer -Bnewer -cnewer -mnewer -newer -samefile -fls -fprint -fprint0 -neweraa -neweraB -newerac -neweram -newerBa -newerBB -newerBc -newerBm -newerca -newercB -newercc -newercm -newerma -newermB -newermc -newermm -f'
 
   # arguments whose value is a dirname
-  local options_dircomp='-f'
+  local options_dircomp=''
 
   # options with no value
   local flags='-H -L -P -E -X -d -s -x -O1 -O2 -O3 -not -and -or -exclude -color -nocolor -daystart -depth -follow -ignore_readdir_race -noignore_readdir_race -mount -nohidden -status -unique -warn -nowarn -xdev -acl -capable -empty -executable -readable -writable -false -true -hidden -nogroup -nouser -sparse -xattr -delete -rm -exit -ls -print -print0 -printx -prune -quit -version -help'
@@ -62,22 +62,23 @@ _bfs ()
 
   # completions with 1-word lookbehind
   case "$prev" in
-    (-maxdepth|-mindepth|-amin|-Bmin|-cmin|-mmin|-asince|-Bsince|-csince|-msince|-atime|-Btime|-ctime|-mtime|-ilname|-iname|-ipath|-iregex|-iwholename|-inum|-links|-lname|-name|-path|-wholename|-regex|-since|-size|-used|-printf|-newerat|-newerBt|-newerct|-newermt|-xattrname)
+    (-maxdepth|-mindepth|-[aBcm]min|-[aBcm]since|-[aBcm]time|-ilname|-iname|-ipath|-iregex|-iwholename|-inum|-links|-lname|-name|-path|-wholename|-regex|-since|-size|-used|-printf|-newer[aBcm]t|-xattrname)
       # arguments whose values should not be completed
       # (e.g. because they are numeric, glob, regexp, time, etc.)
       COMPREPLY=()
       return
     ;;
-    (-anewer|-Bnewer|-cnewer|-mnewer|-newer|-samefile|-fls|-fprint|-fprint0|-neweraa|-neweraB|-newerac|-neweram|-newerBa|-newerBB|-newerBc|-newerBm|-newerca|-newercB|-newercc|-newercm|-newerma|-newermB|-newermc|-newermm)
+    (-[aBcm]newer|-newer|-samefile|-fls|-fprint|-fprint0|-newer[aBcm][aBcm]|-f)
       # arguments whose value is a filename
-      COMPREPLY=($(compgen -f -- "$cur"))
+      #FIXME: -o filenames should suppress spaces and add trailing / to dirnames
+      COMPREPLY=($(compgen -o filenames -f -- "$cur"))
       return
     ;;
-    (-f)
-      # arguments whose value is a dirname
-      COMPREPLY=($(compgen -d -- "$cur"))
-      return
-    ;;
+    # (-f)
+    #   # arguments whose value is a dirname
+    #   COMPREPLY=($(compgen -d -- "$cur"))
+    #   return
+    # ;;
     (-type|-xtype)
       # -type [bcdlpfswD]
       #     Find files of the given type
@@ -87,7 +88,7 @@ _bfs ()
       if [[ -n $cur ]] && ! [[ $cur =~ ,$ ]]; then
         cur+=,
       fi
-      COMPREPLY=("${cur}b" "${cur}c" "${cur}d" "${cur}l" "${cur}p" "${cur}f" "${cur}s" "${cur}w" "${cur}D")
+      COMPREPLY=("${cur}"{b,c,d,l,p,f,s,w,D})
       return
     ;;
     (-gid|-uid)
@@ -139,15 +140,38 @@ _bfs ()
     (-perm)
       # -perm [-]MODE
       #     Find files with a matching mode
+      # sample syntax:
+      #   -perm 777
+      #   -perm 507
+      #   -perm u+rw
+      #   -perm og-rx
       if [[ -z "$cur" ]]; then
-        COMPREPLY=(- / + 0 1 2 3 4 5 6 7 8 9)
+        # initial completion
+        COMPREPLY=(0 1 2 3 4 5 6 7 u g o)
         return
-      elif [[ "$cur" =~ ^(-|/|+)?[[:digit:]][[:digit:]][[:digit:]] ]]; then
+      elif [[ "$cur" =~ [rwx][rwx][rwx]$ ]] || [[ "$cur" =~ [0-7][0-7][0-7]$ ]]; then
+        # final completion (filled in all possible mode bits)
         COMPREPLY=("$cur")
         return
-      elif [[ "$cur" =~ ^(-|/|+)?[[:digit:]] ]]; then
-        COMPREPLY=(0 1 2 3 4 5 6 7 8 9)
+      elif [[ "$cur" =~ [0-7]$ ]]; then
+        # intermediate completion, octal mode specifier
+        COMPREPLY=("$cur"{0,1,2,3,4,5,6,7})
         return
+      elif [[ "$cur" =~ ^[ugo]*[+-][rwx]*$ ]]; then
+        # intermediate completion, symbolic mode specifier
+        COMPREPLY=()
+        [[ "$cur" =~ [rwx]$ ]] && COMPREPLY+=("${cur}")
+        [[ "$cur" =~ [+-][wx]*r ]] || COMPREPLY+=("${cur}r")
+        [[ "$cur" =~ [+-][rx]*w ]] || COMPREPLY+=("${cur}w")
+        [[ "$cur" =~ [+-][rw]*x ]] || COMPREPLY+=("${cur}x")
+        return 0
+      elif [[ "$cur" =~ ^[ugo] ]]; then
+        # intermediate completion, symbolic group specifier
+        COMPREPLY=(+ -)
+        [[ "$cur" =~ ^[go]*u ]] || COMPREPLY+=("${cur}u")
+        [[ "$cur" =~ ^[uo]*g ]] || COMPREPLY+=("${cur}g")
+        [[ "$cur" =~ ^[ug]*o ]] || COMPREPLY+=("${cur}o")
+        return 0
       fi
       COMPREPLY=()
       return
