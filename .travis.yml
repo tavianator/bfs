@@ -2,6 +2,7 @@ language: c
 
 dist: focal
 virt: lxd
+group: edge
 
 script: make -j$TRAVIS_NUMCORES distcheck
 
