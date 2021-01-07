@@ -41,6 +41,10 @@ jobs:
       arch: ppc64le
       env: *linux_env
 
+    - os: linux
+      arch: arm64-graviton2
+      env: *linux_env
+
     - os: osx
 
     - os: freebsd
