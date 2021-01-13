@@ -1762,7 +1762,7 @@ function test_perm_setid() {
 }
 
 function test_perm_sticky() {
-    bfs_diff rainbow -perm /ug+t
+    bfs_diff rainbow -perm /+t
 }
 
 function test_prune() {

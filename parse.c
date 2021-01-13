@@ -1896,8 +1896,10 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 				}
 				break;
 			case 't':
-				file_change |= S_ISVTX;
-				dir_change |= S_ISVTX;
+				if (who & 0007) {
+					file_change |= S_ISVTX;
+					dir_change |= S_ISVTX;
+				}
 				break;
 			default:
 				mstate = MODE_ACTION_APPLY;
