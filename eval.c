@@ -261,8 +261,13 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
 		return false;
 	}
 
-	time_t diff = timespec_diff(atime, ctime);
-	diff /= 60*60*24;
+	long long diff = timespec_diff(atime, ctime);
+	if (diff < 0) {
+		return false;
+	}
+
+	long long day_seconds = 60*60*24;
+	diff = (diff + day_seconds - 1) / day_seconds;
 	return expr_cmp(expr, diff);
 }
 
