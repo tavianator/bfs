@@ -406,6 +406,9 @@ bsd_tests=(
     test_size_big
 
     test_uid_name
+
+    # Optimizer tests
+    test_data_flow_sparse
 )
 
 gnu_tests=(
@@ -603,7 +606,6 @@ gnu_tests=(
     test_and_false_or_true
     test_comma_redundant_true
     test_comma_redundant_false
-    test_data_flow_sparse
 )
 
 bfs_tests=(
