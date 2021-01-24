@@ -204,10 +204,13 @@ install:
 	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
 	$(MKDIR) $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -m644 bfs.1 $(DESTDIR)$(MANDIR)/man1/bfs.1
+	$(MKDIR) $(DESTDIR)$(PREFIX)/share/bash-completion/completions
+	$(INSTALL) -m644 completions/bfs.bash $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
 
 uninstall:
-	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
+	$(RM) $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
+	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 
 .PHONY: default all $(FLAG_GOALS) check $(CHECKS) distcheck clean install uninstall
 
