@@ -2924,7 +2924,7 @@ static const struct table_entry parse_table[] = {
 	{"-noleaf", T_OPTION, parse_noleaf},
 	{"-not", T_OPERATOR},
 	{"-nouser", T_TEST, parse_nouser},
-	{"-nowarn", T_TEST, parse_warn, false},
+	{"-nowarn", T_OPTION, parse_warn, false},
 	{"-o", T_OPERATOR},
 	{"-ok", T_ACTION, parse_exec, BFS_EXEC_CONFIRM},
 	{"-okdir", T_ACTION, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
