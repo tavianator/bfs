@@ -21,7 +21,6 @@
 #ifndef BFS_UTIL_H
 #define BFS_UTIL_H
 
-#include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <regex.h>
@@ -113,11 +112,6 @@
 	(sizeof(type) <= BFS_FLEX_LB(type, member, 0) \
 		? BFS_FLEX_LB(type, member, length) \
 		: BFS_FLEX_MAX(sizeof(type), BFS_FLEX_LB(type, member, length)))
-
-/**
- * readdir() wrapper that makes error handling cleaner.
- */
-int xreaddir(DIR *dir, struct dirent **de);
 
 /**
  * readlinkat() wrapper that dynamically allocates the result.

@@ -25,6 +25,7 @@
 #include "ctx.h"
 #include "darray.h"
 #include "diag.h"
+#include "dir.h"
 #include "dstring.h"
 #include "exec.h"
 #include "expr.h"
@@ -37,7 +38,6 @@
 #include "trie.h"
 #include "util.h"
 #include <assert.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -345,10 +345,10 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 	int flag = 0;
 
 	// We need to know the actual type of the path, not what it points to
-	enum bftw_type type = bftw_type(ftwbuf, BFS_STAT_NOFOLLOW);
-	if (type == BFTW_DIR) {
+	enum bfs_type type = bftw_type(ftwbuf, BFS_STAT_NOFOLLOW);
+	if (type == BFS_DIR) {
 		flag |= AT_REMOVEDIR;
-	} else if (type == BFTW_ERROR) {
+	} else if (type == BFS_ERROR) {
 		eval_report_error(state);
 		return false;
 	}
@@ -415,29 +415,22 @@ bool eval_empty(const struct expr *expr, struct eval_state *state) {
 	bool ret = false;
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
-	if (ftwbuf->type == BFTW_DIR) {
-		int dfd = openat(ftwbuf->at_fd, ftwbuf->at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
-		if (dfd < 0) {
-			eval_report_error(state);
-			goto done;
-		}
-
-		DIR *dir = fdopendir(dfd);
+	if (ftwbuf->type == BFS_DIR) {
+		struct bfs_dir *dir = bfs_opendir(ftwbuf->at_fd, ftwbuf->at_path);
 		if (!dir) {
 			eval_report_error(state);
-			close(dfd);
 			goto done;
 		}
 
-		struct dirent *de;
-		if (xreaddir(dir, &de) == 0) {
-			ret = !de;
-		} else {
+		int did_read = bfs_readdir(dir, NULL);
+		if (did_read < 0) {
 			eval_report_error(state);
+		} else {
+			ret = !did_read;
 		}
 
-		closedir(dir);
-	} else if (ftwbuf->type == BFTW_REG) {
+		bfs_closedir(dir);
+	} else if (ftwbuf->type == BFS_REG) {
 		const struct bfs_stat *statbuf = eval_stat(state);
 		if (statbuf) {
 			ret = statbuf->size == 0;
@@ -514,7 +507,7 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 	char *name = NULL;
 
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	if (ftwbuf->type != BFTW_LNK) {
+	if (ftwbuf->type != BFS_LNK) {
 		goto done;
 	}
 
@@ -580,7 +573,7 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 
 	mode_t mode = statbuf->mode;
 	mode_t target;
-	if (state->ftwbuf->type == BFTW_DIR) {
+	if (state->ftwbuf->type == BFS_DIR) {
 		target = expr->dir_mode;
 	} else {
 		target = expr->file_mode;
@@ -648,7 +641,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	if (ftwbuf->type == BFTW_BLK || ftwbuf->type == BFTW_CHR) {
+	if (ftwbuf->type == BFS_BLK || ftwbuf->type == BFS_CHR) {
 		int ma = bfs_major(statbuf->rdev);
 		int mi = bfs_minor(statbuf->rdev);
 		if (fprintf(file, " %3d, %3d", ma, mi) < 0) {
@@ -686,7 +679,7 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 		goto error;
 	}
 
-	if (ftwbuf->type == BFTW_LNK) {
+	if (ftwbuf->type == BFS_LNK) {
 		if (cfprintf(cfile, " -> %pL", ftwbuf) < 0) {
 			goto error;
 		}
@@ -914,8 +907,8 @@ bool eval_xattrname(const struct expr *expr, struct eval_state *state) {
 bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	enum bfs_stat_flags flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
-	enum bftw_type type = bftw_type(ftwbuf, flags);
-	if (type == BFTW_ERROR) {
+	enum bfs_type type = bftw_type(ftwbuf, flags);
+	if (type == BFS_ERROR) {
 		eval_report_error(state);
 		return false;
 	} else {
@@ -1236,28 +1229,28 @@ static void debug_stats(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf) {
 	}
 }
 
-#define DUMP_BFTW_MAP(value) [value] = #value
+#define DUMP_MAP(value) [value] = #value
 
 /**
- * Dump the bftw_type for -D search.
+ * Dump the bfs_type for -D search.
  */
-static const char *dump_bftw_type(enum bftw_type type) {
+static const char *dump_bfs_type(enum bfs_type type) {
 	static const char *types[] = {
-		DUMP_BFTW_MAP(BFTW_UNKNOWN),
-		DUMP_BFTW_MAP(BFTW_BLK),
-		DUMP_BFTW_MAP(BFTW_CHR),
-		DUMP_BFTW_MAP(BFTW_DIR),
-		DUMP_BFTW_MAP(BFTW_DOOR),
-		DUMP_BFTW_MAP(BFTW_FIFO),
-		DUMP_BFTW_MAP(BFTW_LNK),
-		DUMP_BFTW_MAP(BFTW_PORT),
-		DUMP_BFTW_MAP(BFTW_REG),
-		DUMP_BFTW_MAP(BFTW_SOCK),
-		DUMP_BFTW_MAP(BFTW_WHT),
+		DUMP_MAP(BFS_UNKNOWN),
+		DUMP_MAP(BFS_BLK),
+		DUMP_MAP(BFS_CHR),
+		DUMP_MAP(BFS_DIR),
+		DUMP_MAP(BFS_DOOR),
+		DUMP_MAP(BFS_FIFO),
+		DUMP_MAP(BFS_LNK),
+		DUMP_MAP(BFS_PORT),
+		DUMP_MAP(BFS_REG),
+		DUMP_MAP(BFS_SOCK),
+		DUMP_MAP(BFS_WHT),
 	};
 
-	if (type == BFTW_ERROR) {
-		return "BFTW_ERROR";
+	if (type == BFS_ERROR) {
+		return "BFS_ERROR";
 	} else {
 		return types[type];
 	}
@@ -1268,8 +1261,8 @@ static const char *dump_bftw_type(enum bftw_type type) {
  */
 static const char *dump_bftw_visit(enum bftw_visit visit) {
 	static const char *visits[] = {
-		DUMP_BFTW_MAP(BFTW_PRE),
-		DUMP_BFTW_MAP(BFTW_POST),
+		DUMP_MAP(BFTW_PRE),
+		DUMP_MAP(BFTW_POST),
 	};
 	return visits[visit];
 }
@@ -1279,9 +1272,9 @@ static const char *dump_bftw_visit(enum bftw_visit visit) {
  */
 static const char *dump_bftw_action(enum bftw_action action) {
 	static const char *actions[] = {
-		DUMP_BFTW_MAP(BFTW_CONTINUE),
-		DUMP_BFTW_MAP(BFTW_PRUNE),
-		DUMP_BFTW_MAP(BFTW_STOP),
+		DUMP_MAP(BFTW_CONTINUE),
+		DUMP_MAP(BFTW_PRUNE),
+		DUMP_MAP(BFTW_STOP),
 	};
 	return actions[action];
 }
@@ -1327,7 +1320,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 		eval_status(&state, args->bar, &args->last_status, args->count);
 	}
 
-	if (ftwbuf->type == BFTW_ERROR) {
+	if (ftwbuf->type == BFS_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
 			args->ret = EXIT_FAILURE;
 			eval_error(&state, "%s.\n", strerror(ftwbuf->error));
@@ -1361,7 +1354,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	// In -depth mode, only handle directories on the BFTW_POST visit
 	enum bftw_visit expected_visit = BFTW_PRE;
 	if ((ctx->flags & BFTW_POST_ORDER)
-	    && (ctx->strategy == BFTW_IDS || ftwbuf->type == BFTW_DIR)
+	    && (ctx->strategy == BFTW_IDS || ftwbuf->type == BFS_DIR)
 	    && ftwbuf->depth < (size_t)ctx->maxdepth) {
 		expected_visit = BFTW_POST;
 	}
@@ -1380,7 +1373,7 @@ done:
 		fprintf(stderr, "\t.root = \"%s\",\n", ftwbuf->root);
 		fprintf(stderr, "\t.depth = %zu,\n", ftwbuf->depth);
 		fprintf(stderr, "\t.visit = %s,\n", dump_bftw_visit(ftwbuf->visit));
-		fprintf(stderr, "\t.type = %s,\n", dump_bftw_type(ftwbuf->type));
+		fprintf(stderr, "\t.type = %s,\n", dump_bfs_type(ftwbuf->type));
 		fprintf(stderr, "\t.error = %d,\n", ftwbuf->error);
 		fprintf(stderr, "}) == %s\n", dump_bftw_action(state.action));
 	}
@@ -1406,20 +1399,19 @@ static int infer_fdlimit(const struct bfs_ctx *ctx) {
 
 	// Check /proc/self/fd for the current number of open fds, if possible
 	// (we may have inherited more than just the standard ones)
-	DIR *dir = opendir("/proc/self/fd");
+	struct bfs_dir *dir = bfs_opendir(AT_FDCWD, "/proc/self/fd");
 	if (!dir) {
-		dir = opendir("/dev/fd");
+		dir = bfs_opendir(AT_FDCWD, "/dev/fd");
 	}
 	if (dir) {
 		// Account for 'dir' itself
 		nopen = -1;
 
-		struct dirent *de;
-		while (xreaddir(dir, &de) == 0 && de) {
+		while (bfs_readdir(dir, NULL) > 0) {
 			++nopen;
 		}
 
-		closedir(dir);
+		bfs_closedir(dir);
 	}
 
 	ret -= nopen;
@@ -1457,10 +1449,10 @@ static void dump_bftw_flags(enum bftw_flags flags) {
  */
 static const char *dump_bftw_strategy(enum bftw_strategy strategy) {
 	static const char *strategies[] = {
-		DUMP_BFTW_MAP(BFTW_BFS),
-		DUMP_BFTW_MAP(BFTW_DFS),
-		DUMP_BFTW_MAP(BFTW_IDS),
-		DUMP_BFTW_MAP(BFTW_EDS),
+		DUMP_MAP(BFTW_BFS),
+		DUMP_MAP(BFTW_DFS),
+		DUMP_MAP(BFTW_IDS),
+		DUMP_MAP(BFTW_EDS),
 	};
 	return strategies[strategy];
 }

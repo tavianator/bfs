@@ -33,13 +33,13 @@
  */
 
 #include "bftw.h"
+#include "dir.h"
 #include "dstring.h"
 #include "mtab.h"
 #include "stat.h"
 #include "trie.h"
 #include "util.h"
 #include <assert.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -70,7 +70,7 @@ struct bftw_file {
 	int fd;
 
 	/** This file's type, if known. */
-	enum bftw_type type;
+	enum bfs_type type;
 	/** The device number, for cycle detection. */
 	dev_t dev;
 	/** The inode number, for cycle detection. */
@@ -322,7 +322,7 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 	file->refcount = 1;
 	file->fd = -1;
 
-	file->type = BFTW_UNKNOWN;
+	file->type = BFS_UNKNOWN;
 	file->dev = -1;
 	file->ino = -1;
 
@@ -433,7 +433,7 @@ static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, cons
 }
 
 /**
- * Open a DIR* for a bftw_file.
+ * Open a bftw_file as a directory.
  *
  * @param cache
  *         The cache to hold the file.
@@ -442,16 +442,16 @@ static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, cons
  * @param path
  *         The full path to the directory.
  * @return
- *         The opened DIR *, or NULL on error.
+ *         The opened directory, or NULL on error.
  */
-static DIR *bftw_file_opendir(struct bftw_cache *cache, struct bftw_file *file, const char *path) {
+static struct bfs_dir *bftw_file_opendir(struct bftw_cache *cache, struct bftw_file *file, const char *path) {
 	int fd = bftw_file_open(cache, file, path);
 	if (fd < 0) {
 		return NULL;
 	}
 
 	// Now we dup() the fd and pass it to fdopendir().  This way we can
-	// close the DIR* as soon as we're done with it, reducing the memory
+	// close the bfs_dir as soon as we're done with it, reducing the memory
 	// footprint significantly, while keeping the fd around for future
 	// openat() calls.
 
@@ -467,7 +467,7 @@ static DIR *bftw_file_opendir(struct bftw_cache *cache, struct bftw_file *file, 
 		return NULL;
 	}
 
-	DIR *ret = fdopendir(dfd);
+	struct bfs_dir *ret = bfs_opendir(dfd, NULL);
 	if (!ret) {
 		int error = errno;
 		close(dfd);
@@ -618,9 +618,11 @@ struct bftw_state {
 	struct bftw_file *previous;
 
 	/** The currently open directory. */
-	DIR *dir;
+	struct bfs_dir *dir;
 	/** The current directory entry. */
-	struct dirent *de;
+	struct bfs_dirent *de;
+	/** Storage for the directory entry. */
+	struct bfs_dirent de_storage;
 	/** Any error encountered while reading the directory. */
 	int direrror;
 
@@ -645,7 +647,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 		goto err;
 	}
 
-	// Reserve 1 fd for the open DIR *
+	// Reserve 1 fd for the open bfs_dir
 	if (bftw_cache_init(&state->cache, args->nopenfd - 1) != 0) {
 		goto err;
 	}
@@ -671,103 +673,6 @@ err_cache:
 	bftw_cache_destroy(&state->cache);
 err:
 	return -1;
-}
-
-enum bftw_type bftw_mode_to_type(mode_t mode) {
-	switch (mode & S_IFMT) {
-#ifdef S_IFBLK
-	case S_IFBLK:
-		return BFTW_BLK;
-#endif
-#ifdef S_IFCHR
-	case S_IFCHR:
-		return BFTW_CHR;
-#endif
-#ifdef S_IFDIR
-	case S_IFDIR:
-		return BFTW_DIR;
-#endif
-#ifdef S_IFDOOR
-	case S_IFDOOR:
-		return BFTW_DOOR;
-#endif
-#ifdef S_IFIFO
-	case S_IFIFO:
-		return BFTW_FIFO;
-#endif
-#ifdef S_IFLNK
-	case S_IFLNK:
-		return BFTW_LNK;
-#endif
-#ifdef S_IFPORT
-	case S_IFPORT:
-		return BFTW_PORT;
-#endif
-#ifdef S_IFREG
-	case S_IFREG:
-		return BFTW_REG;
-#endif
-#ifdef S_IFSOCK
-	case S_IFSOCK:
-		return BFTW_SOCK;
-#endif
-#ifdef S_IFWHT
-	case S_IFWHT:
-		return BFTW_WHT;
-#endif
-
-	default:
-		return BFTW_UNKNOWN;
-	}
-}
-
-static enum bftw_type bftw_dirent_type(const struct dirent *de) {
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
-	switch (de->d_type) {
-#ifdef DT_BLK
-	case DT_BLK:
-		return BFTW_BLK;
-#endif
-#ifdef DT_CHR
-	case DT_CHR:
-		return BFTW_CHR;
-#endif
-#ifdef DT_DIR
-	case DT_DIR:
-		return BFTW_DIR;
-#endif
-#ifdef DT_DOOR
-	case DT_DOOR:
-		return BFTW_DOOR;
-#endif
-#ifdef DT_FIFO
-	case DT_FIFO:
-		return BFTW_FIFO;
-#endif
-#ifdef DT_LNK
-	case DT_LNK:
-		return BFTW_LNK;
-#endif
-#ifdef DT_PORT
-	case DT_PORT:
-		return BFTW_PORT;
-#endif
-#ifdef DT_REG
-	case DT_REG:
-		return BFTW_REG;
-#endif
-#ifdef DT_SOCK
-	case DT_SOCK:
-		return BFTW_SOCK;
-#endif
-#ifdef DT_WHT
-	case DT_WHT:
-		return BFTW_WHT;
-#endif
-	}
-#endif
-
-	return BFTW_UNKNOWN;
 }
 
 /** Cached bfs_stat(). */
@@ -817,20 +722,20 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
 	}
 }
 
-enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
-		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->type != BFTW_LNK) {
+		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->type != BFS_LNK) {
 			return ftwbuf->type;
 		}
-	} else if ((flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW || ftwbuf->type == BFTW_LNK) {
+	} else if ((flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW || ftwbuf->type == BFS_LNK) {
 		return ftwbuf->type;
 	}
 
 	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, flags);
 	if (statbuf) {
-		return bftw_mode_to_type(statbuf->mode);
+		return bfs_mode_to_type(statbuf->mode);
 	} else {
-		return BFTW_ERROR;
+		return BFS_ERROR;
 	}
 }
 
@@ -865,15 +770,15 @@ static bool bftw_need_stat(const struct bftw_state *state) {
 	}
 
 	const struct BFTW *ftwbuf = &state->ftwbuf;
-	if (ftwbuf->type == BFTW_UNKNOWN) {
+	if (ftwbuf->type == BFS_UNKNOWN) {
 		return true;
 	}
 
-	if (ftwbuf->type == BFTW_LNK && !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
+	if (ftwbuf->type == BFS_LNK && !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
 		return true;
 	}
 
-	if (ftwbuf->type == BFTW_DIR) {
+	if (ftwbuf->type == BFS_DIR) {
 		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) {
 			return true;
 		}
@@ -930,14 +835,14 @@ static int bftw_ensure_open(struct bftw_cache *cache, struct bftw_file *file, co
  */
 static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	struct bftw_file *file = state->file;
-	const struct dirent *de = state->de;
+	const struct bfs_dirent *de = state->de;
 
 	struct BFTW *ftwbuf = &state->ftwbuf;
 	ftwbuf->path = state->path;
 	ftwbuf->root = file ? file->root->name : ftwbuf->path;
 	ftwbuf->depth = 0;
 	ftwbuf->visit = visit;
-	ftwbuf->type = BFTW_UNKNOWN;
+	ftwbuf->type = BFS_UNKNOWN;
 	ftwbuf->error = state->direrror;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
@@ -949,7 +854,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	if (de) {
 		parent = file;
 		ftwbuf->depth = file->depth + 1;
-		ftwbuf->type = bftw_dirent_type(de);
+		ftwbuf->type = de->type;
 		ftwbuf->nameoff = bftw_child_nameoff(file);
 	} else if (file) {
 		parent = file->parent;
@@ -974,7 +879,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	}
 
 	if (ftwbuf->error != 0) {
-		ftwbuf->type = BFTW_ERROR;
+		ftwbuf->type = BFS_ERROR;
 		return;
 	}
 
@@ -991,18 +896,18 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	if (bftw_need_stat(state)) {
 		statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 		if (statbuf) {
-			ftwbuf->type = bftw_mode_to_type(statbuf->mode);
+			ftwbuf->type = bfs_mode_to_type(statbuf->mode);
 		} else {
-			ftwbuf->type = BFTW_ERROR;
+			ftwbuf->type = BFS_ERROR;
 			ftwbuf->error = errno;
 			return;
 		}
 	}
 
-	if (ftwbuf->type == BFTW_DIR && (state->flags & BFTW_DETECT_CYCLES)) {
+	if (ftwbuf->type == BFS_DIR && (state->flags & BFTW_DETECT_CYCLES)) {
 		for (const struct bftw_file *ancestor = parent; ancestor; ancestor = ancestor->parent) {
 			if (ancestor->dev == statbuf->dev && ancestor->ino == statbuf->ino) {
-				ftwbuf->type = BFTW_ERROR;
+				ftwbuf->type = BFS_ERROR;
 				ftwbuf->error = ELOOP;
 				return;
 			}
@@ -1051,8 +956,8 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 	const struct BFTW *ftwbuf = &state->ftwbuf;
 	bftw_init_ftwbuf(state, visit);
 
-	// Never give the callback BFTW_ERROR unless BFTW_RECOVER is specified
-	if (ftwbuf->type == BFTW_ERROR && !(state->flags & BFTW_RECOVER)) {
+	// Never give the callback BFS_ERROR unless BFTW_RECOVER is specified
+	if (ftwbuf->type == BFS_ERROR && !(state->flags & BFTW_RECOVER)) {
 		state->error = ftwbuf->error;
 		return BFTW_STOP;
 	}
@@ -1073,7 +978,7 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 		return BFTW_STOP;
 	}
 
-	if (visit != BFTW_PRE || ftwbuf->type != BFTW_DIR) {
+	if (visit != BFTW_PRE || ftwbuf->type != BFS_DIR) {
 		ret = BFTW_PRUNE;
 		goto done;
 	}
@@ -1103,7 +1008,7 @@ static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 	}
 
 	if (state->de) {
-		file->type = bftw_dirent_type(state->de);
+		file->type = state->de->type;
 	}
 
 	if (fill_id) {
@@ -1190,14 +1095,17 @@ static int bftw_readdir(struct bftw_state *state) {
 		return -1;
 	}
 
-	if (xreaddir(state->dir, &state->de) != 0) {
-		state->direrror = errno;
-		return -1;
-	} else if (state->de) {
-		return 1;
+	int ret = bfs_readdir(state->dir, &state->de_storage);
+	if (ret > 0) {
+		state->de = &state->de_storage;
+	} else if (ret == 0) {
+		state->de = NULL;
 	} else {
-		return 0;
+		state->de = NULL;
+		state->direrror = errno;
 	}
+
+	return ret;
 }
 
 /**
@@ -1220,7 +1128,7 @@ enum bftw_release_flags {
 static enum bftw_action bftw_closedir(struct bftw_state *state, enum bftw_release_flags flags) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
-	if (state->dir && closedir(state->dir) != 0) {
+	if (state->dir && bfs_closedir(state->dir) != 0) {
 		state->direrror = errno;
 	}
 	state->de = NULL;
@@ -1352,7 +1260,7 @@ static int bftw_stream(const struct bftw_args *args) {
 
 		bftw_batch_start(&state);
 		while (bftw_readdir(&state) > 0) {
-			const char *name = state.de->d_name;
+			const char *name = state.de->name;
 
 			switch (bftw_visit(&state, name, BFTW_PRE)) {
 			case BFTW_CONTINUE:
@@ -1415,7 +1323,7 @@ static int bftw_batch(const struct bftw_args *args) {
 
 		bftw_batch_start(&state);
 		while (bftw_readdir(&state) > 0) {
-			if (bftw_push(&state, state.de->d_name, false) != 0) {
+			if (bftw_push(&state, state.de->name, false) != 0) {
 				goto done;
 			}
 		}
@@ -1479,7 +1387,7 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 		mutbuf->visit = state->visit;
 	}
 
-	if (ftwbuf->type == BFTW_ERROR) {
+	if (ftwbuf->type == BFS_ERROR) {
 		if (ftwbuf->depth + 1 >= state->min_depth) {
 			return state->delegate(ftwbuf, state->ptr);
 		} else {
@@ -1506,13 +1414,13 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 
 	switch (ret) {
 	case BFTW_CONTINUE:
-		if (ftwbuf->type == BFTW_DIR && ftwbuf->depth + 1 >= state->max_depth) {
+		if (ftwbuf->type == BFS_DIR && ftwbuf->depth + 1 >= state->max_depth) {
 			state->bottom = false;
 			ret = BFTW_PRUNE;
 		}
 		break;
 	case BFTW_PRUNE:
-		if (ftwbuf->type == BFTW_DIR) {
+		if (ftwbuf->type == BFS_DIR) {
 			if (!trie_insert_str(&state->pruned, ftwbuf->path)) {
 				state->error = errno;
 				state->quit = true;

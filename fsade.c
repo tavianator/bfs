@@ -16,6 +16,7 @@
 
 #include "fsade.h"
 #include "bftw.h"
+#include "dir.h"
 #include "dstring.h"
 #include "util.h"
 #include <errno.h>
@@ -200,7 +201,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 	};
 	static const size_t n_acl_types = sizeof(acl_types)/sizeof(acl_types[0]);
 
-	if (ftwbuf->type == BFTW_LNK) {
+	if (ftwbuf->type == BFS_LNK) {
 		return 0;
 	}
 
@@ -210,7 +211,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 	for (size_t i = 0; i < n_acl_types && ret <= 0; ++i) {
 		acl_type_t type = acl_types[i];
 
-		if (type == ACL_TYPE_DEFAULT && ftwbuf->type != BFTW_DIR) {
+		if (type == ACL_TYPE_DEFAULT && ftwbuf->type != BFS_DIR) {
 			// ACL_TYPE_DEFAULT is supported only for directories,
 			// otherwise acl_get_file() gives EACCESS
 			continue;
@@ -247,7 +248,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 #if BFS_CAN_CHECK_CAPABILITIES
 
 int bfs_check_capabilities(const struct BFTW *ftwbuf) {
-	if (ftwbuf->type == BFTW_LNK) {
+	if (ftwbuf->type == BFS_LNK) {
 		return 0;
 	}
 
@@ -298,17 +299,17 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 
 #if BFS_HAS_SYS_EXTATTR
 	ssize_t (*extattr_list)(const char *, int, void*, size_t) =
-		ftwbuf->type == BFTW_LNK ? extattr_list_link : extattr_list_file;
+		ftwbuf->type == BFS_LNK ? extattr_list_link : extattr_list_file;
 
 	len = extattr_list(path, EXTATTR_NAMESPACE_SYSTEM, NULL, 0);
 	if (len <= 0) {
 		len = extattr_list(path, EXTATTR_NAMESPACE_USER, NULL, 0);
 	}
 #elif __APPLE__
-	int options = ftwbuf->type == BFTW_LNK ? XATTR_NOFOLLOW : 0;
+	int options = ftwbuf->type == BFS_LNK ? XATTR_NOFOLLOW : 0;
 	len = listxattr(path, NULL, 0, options);
 #else
-	if (ftwbuf->type == BFTW_LNK) {
+	if (ftwbuf->type == BFS_LNK) {
 		len = llistxattr(path, NULL, 0);
 	} else {
 		len = listxattr(path, NULL, 0);
@@ -337,17 +338,17 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 
 #if BFS_HAS_SYS_EXTATTR
 	ssize_t (*extattr_get)(const char *, int, const char *, void*, size_t) =
-		ftwbuf->type == BFTW_LNK ? extattr_get_link : extattr_get_file;
+		ftwbuf->type == BFS_LNK ? extattr_get_link : extattr_get_file;
 
 	len = extattr_get(path, EXTATTR_NAMESPACE_SYSTEM, name, NULL, 0);
 	if (len < 0) {
 		len = extattr_get(path, EXTATTR_NAMESPACE_USER, name, NULL, 0);
 	}
 #elif __APPLE__
-	int options = ftwbuf->type == BFTW_LNK ? XATTR_NOFOLLOW : 0;
+	int options = ftwbuf->type == BFS_LNK ? XATTR_NOFOLLOW : 0;
 	len = getxattr(path, name, NULL, 0, 0, options);
 #else
-	if (ftwbuf->type == BFTW_LNK) {
+	if (ftwbuf->type == BFS_LNK) {
 		len = lgetxattr(path, name, NULL, 0);
 	} else {
 		len = getxattr(path, name, NULL, 0);

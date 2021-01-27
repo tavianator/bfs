@@ -142,6 +142,7 @@ bfs: \
     ctx.o \
     darray.o \
     diag.o \
+    dir.o \
     dstring.o \
     eval.o \
     exec.o \

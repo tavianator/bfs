@@ -21,44 +21,10 @@
 #ifndef BFS_BFTW_H
 #define BFS_BFTW_H
 
+#include "dir.h"
 #include "stat.h"
 #include <stddef.h>
 #include <sys/types.h>
-
-/**
- * Possible file types.
- */
-enum bftw_type {
-	/** An error occurred for this file. */
-	BFTW_ERROR = -1,
-	/** Unknown type. */
-	BFTW_UNKNOWN,
-	/** Block device. */
-	BFTW_BLK,
-	/** Character device. */
-	BFTW_CHR,
-	/** Directory. */
-	BFTW_DIR,
-	/** Solaris door. */
-	BFTW_DOOR,
-	/** Pipe. */
-	BFTW_FIFO,
-	/** Symbolic link. */
-	BFTW_LNK,
-	/** Solaris event port. */
-	BFTW_PORT,
-	/** Regular file. */
-	BFTW_REG,
-	/** Socket. */
-	BFTW_SOCK,
-	/** BSD whiteout. */
-	BFTW_WHT,
-};
-
-/**
- * Convert a bfs_stat() mode to a bftw_type.
- */
-enum bftw_type bftw_mode_to_type(mode_t mode);
 
 /**
  * Possible visit occurrences.
@@ -99,7 +65,7 @@ struct BFTW {
 	enum bftw_visit visit;
 
 	/** The file type. */
-	enum bftw_type type;
+	enum bfs_type type;
 	/** The errno that occurred, if type == BFTW_ERROR. */
 	int error;
 
@@ -154,7 +120,7 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
  * @return
  *         The type of the file, or BFTW_ERROR if an error occurred.
  */
-enum bftw_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
+enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
 
 /**
  * Walk actions returned by the bftw() callback.

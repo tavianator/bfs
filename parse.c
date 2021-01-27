@@ -28,6 +28,7 @@
 #include "ctx.h"
 #include "darray.h"
 #include "diag.h"
+#include "dir.h"
 #include "eval.h"
 #include "exec.h"
 #include "expr.h"
@@ -2314,44 +2315,44 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 
 	const char *c = expr->sdata;
 	while (true) {
-		enum bftw_type type;
+		enum bfs_type type;
 		double type_prob;
 
 		switch (*c) {
 		case 'b':
-			type = BFTW_BLK;
+			type = BFS_BLK;
 			type_prob = 0.00000721183;
 			break;
 		case 'c':
-			type = BFTW_CHR;
+			type = BFS_CHR;
 			type_prob = 0.0000499855;
 			break;
 		case 'd':
-			type = BFTW_DIR;
+			type = BFS_DIR;
 			type_prob = 0.114475;
 			break;
 		case 'D':
-			type = BFTW_DOOR;
+			type = BFS_DOOR;
 			type_prob = 0.000001;
 			break;
 		case 'p':
-			type = BFTW_FIFO;
+			type = BFS_FIFO;
 			type_prob = 0.00000248684;
 			break;
 		case 'f':
-			type = BFTW_REG;
+			type = BFS_REG;
 			type_prob = 0.859772;
 			break;
 		case 'l':
-			type = BFTW_LNK;
+			type = BFS_LNK;
 			type_prob = 0.0256816;
 			break;
 		case 's':
-			type = BFTW_SOCK;
+			type = BFS_SOCK;
 			type_prob = 0.0000116881;
 			break;
 		case 'w':
-			type = BFTW_WHT;
+			type = BFS_WHT;
 			type_prob = 0.000001;
 			break;
 

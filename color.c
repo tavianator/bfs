@@ -16,6 +16,7 @@
 
 #include "color.h"
 #include "bftw.h"
+#include "dir.h"
 #include "dstring.h"
 #include "expr.h"
 #include "fsade.h"
@@ -581,8 +582,8 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 
 /** Get the color for a file. */
 static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	enum bftw_type type = bftw_type(ftwbuf, flags);
-	if (type == BFTW_ERROR) {
+	enum bfs_type type = bftw_type(ftwbuf, flags);
+	if (type == BFS_ERROR) {
 		goto error;
 	}
 
@@ -590,7 +591,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 	const char *color = NULL;
 
 	switch (type) {
-	case BFTW_REG:
+	case BFS_REG:
 		if (colors->setuid || colors->setgid || colors->executable || colors->multi_hard) {
 			statbuf = bftw_stat(ftwbuf, flags);
 			if (!statbuf) {
@@ -620,7 +621,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 
 		break;
 
-	case BFTW_DIR:
+	case BFS_DIR:
 		if (colors->sticky_other_writable || colors->other_writable || colors->sticky) {
 			statbuf = bftw_stat(ftwbuf, flags);
 			if (!statbuf) {
@@ -640,7 +641,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 
 		break;
 
-	case BFTW_LNK:
+	case BFS_LNK:
 		if (colors->orphan && is_link_broken(ftwbuf)) {
 			color = colors->orphan;
 		} else {
@@ -648,19 +649,19 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		}
 		break;
 
-	case BFTW_BLK:
+	case BFS_BLK:
 		color = colors->blockdev;
 		break;
-	case BFTW_CHR:
+	case BFS_CHR:
 		color = colors->chardev;
 		break;
-	case BFTW_FIFO:
+	case BFS_FIFO:
 		color = colors->pipe;
 		break;
-	case BFTW_SOCK:
+	case BFS_SOCK:
 		color = colors->socket;
 		break;
-	case BFTW_DOOR:
+	case BFS_DOOR:
 		color = colors->door;
 		break;
 
@@ -733,7 +734,7 @@ static int print_colored(CFILE *cfile, const char *esc, const char *str, size_t 
 static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t max) {
 	ssize_t ret = max;
 
-	if (bftw_type(ftwbuf, flags) != BFTW_ERROR) {
+	if (bftw_type(ftwbuf, flags) != BFS_ERROR) {
 		goto out;
 	}
 
@@ -840,7 +841,7 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	}
 
 	enum bfs_stat_flags flags = ftwbuf->stat_flags;
-	if (colors && colors->link_as_target && ftwbuf->type == BFTW_LNK) {
+	if (colors && colors->link_as_target && ftwbuf->type == BFS_LNK) {
 		flags = BFS_STAT_TRYFOLLOW;
 	}
 

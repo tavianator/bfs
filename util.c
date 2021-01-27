@@ -39,24 +39,6 @@
 #	include <sys/mkdev.h>
 #endif
 
-int xreaddir(DIR *dir, struct dirent **de) {
-	while (true) {
-		errno = 0;
-		*de = readdir(dir);
-
-		if (*de) {
-			const char *name = (*de)->d_name;
-			if (name[0] != '.' || (name[1] != '\0' && (name[1] != '.' || name[2] != '\0'))) {
-				return 0;
-			}
-		} else if (errno != 0) {
-			return -1;
-		} else {
-			return 0;
-		}
-	}
-}
-
 char *xreadlinkat(int fd, const char *path, size_t size) {
 	ssize_t len;
 	char *name = NULL;

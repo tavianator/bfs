@@ -18,6 +18,7 @@
 #include "bftw.h"
 #include "ctx.h"
 #include "diag.h"
+#include "dir.h"
 #include "dstring.h"
 #include "mtab.h"
 #include "pwcache.h"
@@ -309,7 +310,7 @@ static int bfs_printf_l(FILE *file, const struct bfs_printf *directive, const st
 	char *buf = NULL;
 	const char *target = "";
 
-	if (ftwbuf->type == BFTW_LNK) {
+	if (ftwbuf->type == BFS_LNK) {
 		const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
 		size_t len = statbuf ? statbuf->size : 0;
 
@@ -425,23 +426,23 @@ static int bfs_printf_u(FILE *file, const struct bfs_printf *directive, const st
 	return fprintf(file, directive->str, pwd->pw_name);
 }
 
-static const char *bfs_printf_type(enum bftw_type type) {
+static const char *bfs_printf_type(enum bfs_type type) {
 	switch (type) {
-	case BFTW_BLK:
+	case BFS_BLK:
 		return "b";
-	case BFTW_CHR:
+	case BFS_CHR:
 		return "c";
-	case BFTW_DIR:
+	case BFS_DIR:
 		return "d";
-	case BFTW_DOOR:
+	case BFS_DOOR:
 		return "D";
-	case BFTW_FIFO:
+	case BFS_FIFO:
 		return "p";
-	case BFTW_LNK:
+	case BFS_LNK:
 		return "l";
-	case BFTW_REG:
+	case BFS_REG:
 		return "f";
-	case BFTW_SOCK:
+	case BFS_SOCK:
 		return "s";
 	default:
 		return "U";
@@ -458,7 +459,7 @@ static int bfs_printf_y(FILE *file, const struct bfs_printf *directive, const st
 static int bfs_printf_Y(FILE *file, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
 	int error = 0;
 
-	if (ftwbuf->type != BFTW_LNK) {
+	if (ftwbuf->type != BFS_LNK) {
 		return bfs_printf_y(file, directive, ftwbuf);
 	}
 
@@ -466,7 +467,7 @@ static int bfs_printf_Y(FILE *file, const struct bfs_printf *directive, const st
 
 	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, BFS_STAT_FOLLOW);
 	if (statbuf) {
-		type = bfs_printf_type(bftw_mode_to_type(statbuf->mode));
+		type = bfs_printf_type(bfs_mode_to_type(statbuf->mode));
 	} else {
 		switch (errno) {
 		case ELOOP:
