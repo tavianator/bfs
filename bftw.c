@@ -336,32 +336,6 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 }
 
 /**
- * Get the appropriate (fd, path) pair for the *at() family of functions.
- *
- * @param file
- *         The file being accessed.
- * @param[out] at_fd
- *         Will hold the appropriate file descriptor to use.
- * @param[in,out] at_path
- *         Will hold the appropriate path to use.
- * @return The closest open ancestor file.
- */
-static struct bftw_file *bftw_file_base(struct bftw_file *file, int *at_fd, const char **at_path) {
-	struct bftw_file *base = file;
-
-	do {
-		base = base->parent;
-	} while (base && base->fd < 0);
-
-	if (base) {
-		*at_fd = base->fd;
-		*at_path += bftw_child_nameoff(base);
-	}
-
-	return base;
-}
-
-/**
  * Open a bftw_file relative to another one.
  *
  * @param cache
@@ -377,8 +351,14 @@ static struct bftw_file *bftw_file_base(struct bftw_file *file, int *at_fd, cons
  * @return
  *         The opened file descriptor, or negative on error.
  */
-static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, const struct bftw_file *base, int at_fd, const char *at_path) {
+static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, const struct bftw_file *base, const char *at_path) {
 	assert(file->fd < 0);
+
+	int at_fd = AT_FDCWD;
+	if (base) {
+		at_fd = base->fd;
+		assert(at_fd >= 0);
+	}
 
 	int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
 	int fd = openat(at_fd, at_path, flags);
@@ -414,46 +394,44 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, co
  *         The opened file descriptor, or negative on error.
  */
 static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, const char *path) {
-	int at_fd = AT_FDCWD;
-	const char *at_path = path;
-	struct bftw_file *base = bftw_file_base(file, &at_fd, &at_path);
+	// Find the nearest open ancestor
+	struct bftw_file *base = file;
+	do {
+		base = base->parent;
+	} while (base && base->fd < 0);
 
-	int fd = bftw_file_openat(cache, file, base, at_fd, at_path);
+	const char *at_path = path;
+	if (base) {
+		at_path += bftw_child_nameoff(base);
+	}
+
+	int fd = bftw_file_openat(cache, file, base, at_path);
 	if (fd >= 0 || errno != ENAMETOOLONG) {
 		return fd;
 	}
 
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component
 
-	// -1 to include the root, which has depth == 0
-	size_t offset = base ? base->depth : (size_t)-1;
-	size_t levels = file->depth - offset;
-	if (levels < 2) {
-		return fd;
+	// Use the ->next linked list to temporarily hold the reversed parent
+	// chain between base and file
+	struct bftw_file *cur;
+	for (cur = file; cur->parent != base; cur = cur->parent) {
+		cur->parent->next = cur;
 	}
 
-	struct bftw_file **parents = malloc(levels * sizeof(*parents));
-	if (!parents) {
-		return fd;
-	}
-
-	struct bftw_file *parent = file;
-	for (size_t i = levels; i-- > 0;) {
-		parents[i] = parent;
-		parent = parent->parent;
-	}
-
-	for (size_t i = 0; i < levels; ++i) {
-		fd = bftw_file_openat(cache, parents[i], base, at_fd, parents[i]->name);
-		if (fd < 0) {
+	// Open the files in the chain one by one
+	for (base = cur; base; base = base->next) {
+		fd = bftw_file_openat(cache, base, base->parent, base->name);
+		if (fd < 0 || base == file) {
 			break;
 		}
-
-		base = parents[i];
-		at_fd = fd;
 	}
 
-	free(parents);
+	// Clear out the linked list
+	for (struct bftw_file *next = cur->next; cur != file; cur = next, next = next->next) {
+		cur->next = NULL;
+	}
+
 	return fd;
 }
 
