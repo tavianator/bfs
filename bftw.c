@@ -385,7 +385,7 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, co
 
 	if (fd < 0 && errno == EMFILE) {
 		if (bftw_cache_shrink(cache, base) == 0) {
-			fd = openat(base->fd, at_path, flags);
+			fd = openat(at_fd, at_path, flags);
 		}
 	}
 
