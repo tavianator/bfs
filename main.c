@@ -34,9 +34,11 @@
  *
  * - Utilities:
  *     - bfs.h         (constants about bfs itself)
+ *     - bar.[ch]      (a terminal status bar)
  *     - color.[ch]    (for pretty terminal colors)
  *     - darray.[ch]   (a dynamic array library)
  *     - diag.[ch]     (formats diagnostic messages)
+ *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
  *     - mtab.[ch]     (parses the system's mount table)
