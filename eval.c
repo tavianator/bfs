@@ -1098,24 +1098,24 @@ static void eval_status(struct eval_state *state, struct bfs_bar *bar, struct ti
 	while (pathlen > 0) {
 		wchar_t wc;
 		size_t len = mbrtowc(&wc, path, pathlen, &mb);
-		int width;
+		int cwidth;
 		if (len == (size_t)-1) {
-			// Invalid byte sequence, assume a single-width ?
+			// Invalid byte sequence, assume a single-width '?'
 			len = 1;
-			width = 1;
+			cwidth = 1;
 			memset(&mb, 0, sizeof(mb));
 		} else if (len == (size_t)-2) {
-			// Incomplete byte sequence, assume a single-width ?
+			// Incomplete byte sequence, assume a single-width '?'
 			len = pathlen;
-			width = 1;
+			cwidth = 1;
 		} else {
-			width = wcwidth(wc);
-			if (width < 0) {
-				width = 0;
+			cwidth = wcwidth(wc);
+			if (cwidth < 0) {
+				cwidth = 0;
 			}
 		}
 
-		if (pathwidth + width > pathmax) {
+		if (pathwidth + cwidth > pathmax) {
 			break;
 		}
 
@@ -1125,7 +1125,7 @@ static void eval_status(struct eval_state *state, struct bfs_bar *bar, struct ti
 
 		path += len;
 		pathlen -= len;
-		pathwidth += width;
+		pathwidth += cwidth;
 	}
 
 	if (dstrcat(&status, "...") != 0) {
