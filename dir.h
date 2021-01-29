@@ -101,7 +101,7 @@ int bfs_dirfd(const struct bfs_dir *dir);
  * @return
  *         1 on success, 0 on EOF, or -1 on failure.
  */
-int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *dirent);
+int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de);
 
 /**
  * Close a directory.

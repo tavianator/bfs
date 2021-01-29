@@ -21,8 +21,13 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#if __linux__
+#	include <sys/syscall.h>
+#endif // __linux__
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
 	switch (mode & S_IFMT) {
@@ -72,13 +77,40 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
 	}
 }
 
+#if __linux__
+/**
+ * This is not defined in the kernel headers for some reason, callers have to
+ * define it themselves.
+ */
+struct linux_dirent64 {
+	ino64_t d_ino;
+	off64_t d_off;
+	unsigned short d_reclen;
+	unsigned char d_type;
+	char d_name[];
+};
+
+// Make the whole allocation 64k
+#define BUF_SIZE ((64 << 10) - 8)
+#endif
+
 struct bfs_dir {
+#if __linux__
+	int fd;
+	unsigned short pos;
+	unsigned short size;
+#else
 	DIR *dir;
-	struct dirent *ent;
+	struct dirent *de;
+#endif
 };
 
 struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
+#if __linux__
+	struct bfs_dir *dir = malloc(sizeof(*dir) + BUF_SIZE);
+#else
 	struct bfs_dir *dir = malloc(sizeof(*dir));
+#endif
 	if (!dir) {
 		return NULL;
 	}
@@ -99,6 +131,11 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 		return NULL;
 	}
 
+#if __linux__
+	dir->fd = fd;
+	dir->pos = 0;
+	dir->size = 0;
+#else
 	dir->dir = fdopendir(fd);
 	if (!dir->dir) {
 		int error = errno;
@@ -108,18 +145,23 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 		return NULL;
 	}
 
-	dir->ent = NULL;
+	dir->de = NULL;
+#endif // __linux__
 
 	return dir;
 }
 
 int bfs_dirfd(const struct bfs_dir *dir) {
+#if __linux__
+	return dir->fd;
+#else
 	return dirfd(dir->dir);
+#endif
 }
 
-static enum bfs_type dirent_type(const struct dirent *de) {
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
-	switch (de->d_type) {
+/** Convert a dirent type to a bfs_type. */
+static enum bfs_type translate_type(int d_type) {
+	switch (d_type) {
 #ifdef DT_BLK
 	case DT_BLK:
 		return BFS_BLK;
@@ -161,23 +203,68 @@ static enum bfs_type dirent_type(const struct dirent *de) {
 		return BFS_WHT;
 #endif
 	}
-#endif
 
 	return BFS_UNKNOWN;
 }
 
-int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *dirent) {
+#if !__linux__
+/** Get the type from a struct dirent if it exists, and convert it. */
+static enum bfs_type dirent_type(const struct dirent *de) {
+#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
+	return translate_type(de->d_type);
+#else
+	return BFS_UNKNOWN;
+#endif
+}
+#endif
+
+/** Check if a name is . or .. */
+static bool is_dot(const char *name) {
+	return name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'));
+}
+
+int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 	while (true) {
+#if __linux__
+		char *buf = (char *)(dir + 1);
+
+		if (dir->pos >= dir->size) {
+			// Make sure msan knows the buffer is initialized
+#if BFS_HAS_FEATURE(memory_sanitizer, false)
+			memset(buf, 0, BUF_SIZE);
+#endif
+
+			ssize_t size = syscall(__NR_getdents64, dir->fd, buf, BUF_SIZE);
+			if (size <= 0) {
+				return size;
+			}
+			dir->pos = 0;
+			dir->size = size;
+		}
+
+		const struct linux_dirent64 *lde = (void *)(buf + dir->pos);
+		dir->pos += lde->d_reclen;
+
+		if (is_dot(lde->d_name)) {
+			continue;
+		}
+
+		if (de) {
+			de->type = translate_type(lde->d_type);
+			de->name = lde->d_name;
+		}
+
+		return 1;
+#else // !__linux__
 		errno = 0;
-		dir->ent = readdir(dir->dir);
-		if (dir->ent) {
-			const char *name = dir->ent->d_name;
-			if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) {
+		dir->de = readdir(dir->dir);
+		if (dir->de) {
+			if (is_dot(dir->de->d_name)) {
 				continue;
 			}
-			if (dirent) {
-				dirent->type = dirent_type(dir->ent);
-				dirent->name = name;
+			if (de) {
+				de->type = dirent_type(dir->de);
+				de->name = dir->de->d_name;
 			}
 			return 1;
 		} else if (errno != 0) {
@@ -185,17 +272,28 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *dirent) {
 		} else {
 			return 0;
 		}
+#endif // !__linux__
 	}
 }
 
 int bfs_closedir(struct bfs_dir *dir) {
+#if __linux__
+	int ret = close(dir->fd);
+#else
 	int ret = closedir(dir->dir);
+#endif
 	free(dir);
 	return ret;
 }
 
 int bfs_freedir(struct bfs_dir *dir) {
+#if __linux__
+	int ret = dir->fd;
+	free(dir);
+	return ret;
+#else
 	int ret = dup_cloexec(dirfd(dir->dir));
 	bfs_closedir(dir);
 	return ret;
+#endif
 }
