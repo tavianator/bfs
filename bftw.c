@@ -228,7 +228,6 @@ static void bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
 /** Remove a bftw_file from the cache. */
 static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
 	assert(cache->size > 0);
-	assert(file->fd >= 0);
 
 	size_t size = --cache->size;
 	size_t i = file->heap_index;
@@ -450,31 +449,7 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_cache *cache, struct bftw_f
 		return NULL;
 	}
 
-	// Now we dup() the fd and pass it to fdopendir().  This way we can
-	// close the bfs_dir as soon as we're done with it, reducing the memory
-	// footprint significantly, while keeping the fd around for future
-	// openat() calls.
-
-	int dfd = dup_cloexec(fd);
-
-	if (dfd < 0 && errno == EMFILE) {
-		if (bftw_cache_shrink(cache, file) == 0) {
-			dfd = dup_cloexec(fd);
-		}
-	}
-
-	if (dfd < 0) {
-		return NULL;
-	}
-
-	struct bfs_dir *ret = bfs_opendir(dfd, NULL);
-	if (!ret) {
-		int error = errno;
-		close(dfd);
-		errno = error;
-	}
-
-	return ret;
+	return bfs_opendir(fd, NULL);
 }
 
 /** Free a bftw_file. */
@@ -1111,7 +1086,7 @@ static int bftw_readdir(struct bftw_state *state) {
 /**
  * Flags controlling which files get visited when done with a directory.
  */
-enum bftw_release_flags {
+enum bftw_gc_flags {
 	/** Don't visit anything. */
 	BFTW_VISIT_NONE = 0,
 	/** Visit the file itself. */
@@ -1125,12 +1100,26 @@ enum bftw_release_flags {
 /**
  * Close the current directory.
  */
-static enum bftw_action bftw_closedir(struct bftw_state *state, enum bftw_release_flags flags) {
+static enum bftw_action bftw_closedir(struct bftw_state *state, enum bftw_gc_flags flags) {
+	struct bftw_file *file = state->file;
 	enum bftw_action ret = BFTW_CONTINUE;
 
-	if (state->dir && bfs_closedir(state->dir) != 0) {
-		state->direrror = errno;
+	if (state->dir) {
+		assert(file->fd >= 0);
+
+		if (file->refcount > 1) {
+			// Keep the fd around if any subdirectories exist
+			file->fd = bfs_freedir(state->dir);
+		} else {
+			bfs_closedir(state->dir);
+			file->fd = -1;
+		}
+
+		if (file->fd < 0) {
+			bftw_cache_remove(&state->cache, file);
+		}
 	}
+
 	state->de = NULL;
 	state->dir = NULL;
 
@@ -1149,7 +1138,7 @@ static enum bftw_action bftw_closedir(struct bftw_state *state, enum bftw_releas
 /**
  * Finalize and free a file we're done with.
  */
-static enum bftw_action bftw_release_file(struct bftw_state *state, enum bftw_release_flags flags) {
+static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flags flags) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
 	if (!(state->flags & BFTW_POST_ORDER)) {
@@ -1186,7 +1175,7 @@ static enum bftw_action bftw_release_file(struct bftw_state *state, enum bftw_re
 static void bftw_drain_queue(struct bftw_state *state, struct bftw_queue *queue) {
 	while (queue->head) {
 		state->file = bftw_queue_pop(queue);
-		bftw_release_file(state, BFTW_VISIT_NONE);
+		bftw_gc_file(state, BFTW_VISIT_NONE);
 	}
 }
 
@@ -1201,7 +1190,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 
 	bftw_closedir(state, BFTW_VISIT_NONE);
 
-	bftw_release_file(state, BFTW_VISIT_NONE);
+	bftw_gc_file(state, BFTW_VISIT_NONE);
 	bftw_drain_queue(state, &state->queue);
 
 	bftw_cache_destroy(&state->cache);
@@ -1280,7 +1269,7 @@ static int bftw_stream(const struct bftw_args *args) {
 		if (bftw_closedir(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
 			goto done;
 		}
-		if (bftw_release_file(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
+		if (bftw_gc_file(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
 			goto done;
 		}
 	}
@@ -1307,13 +1296,13 @@ static int bftw_batch(const struct bftw_args *args) {
 	bftw_batch_finish(&state);
 
 	while (bftw_pop(&state) > 0) {
-		enum bftw_release_flags relflags = BFTW_VISIT_ALL;
+		enum bftw_gc_flags gcflags = BFTW_VISIT_ALL;
 
 		switch (bftw_visit(&state, NULL, BFTW_PRE)) {
 		case BFTW_CONTINUE:
 			break;
 		case BFTW_PRUNE:
-			relflags &= ~BFTW_VISIT_FILE;
+			gcflags &= ~BFTW_VISIT_FILE;
 			goto next;
 		case BFTW_STOP:
 			goto done;
@@ -1329,12 +1318,12 @@ static int bftw_batch(const struct bftw_args *args) {
 		}
 		bftw_batch_finish(&state);
 
-		if (bftw_closedir(&state, relflags) == BFTW_STOP) {
+		if (bftw_closedir(&state, gcflags) == BFTW_STOP) {
 			goto done;
 		}
 
 	next:
-		if (bftw_release_file(&state, relflags) == BFTW_STOP) {
+		if (bftw_gc_file(&state, gcflags) == BFTW_STOP) {
 			goto done;
 		}
 	}
