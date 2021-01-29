@@ -165,7 +165,7 @@ tests/trie: trie.o tests/trie.o
 tests/xtimegm: time.o tests/xtimegm.o
 
 $(BIN_GOALS):
-	$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
+	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
 %.o: %.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
