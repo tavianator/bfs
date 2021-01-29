@@ -291,6 +291,10 @@ int bfs_freedir(struct bfs_dir *dir) {
 	int ret = dir->fd;
 	free(dir);
 	return ret;
+#elif __FreeBSD__
+	int ret = fdclosedir(dir->dir);
+	free(dir);
+	return ret;
 #else
 	int ret = dup_cloexec(dirfd(dir->dir));
 	bfs_closedir(dir);
