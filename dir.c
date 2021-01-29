@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
