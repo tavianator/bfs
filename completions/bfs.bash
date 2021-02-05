@@ -20,15 +20,8 @@
 # bash completion script for bfs
 
 _bfs() {
-    local cword="$COMP_CWORD"
-    local cur="${COMP_WORDS[cword]}"
-    local prev prev2
-    if ((cword > 0)); then
-        prev="${COMP_WORDS[cword-1]}"
-    fi
-    if ((cword > 1)); then
-        prev2="${COMP_WORDS[cword-2]}"
-    fi
+    local cur prev words cword
+    _init_completion || return
 
     # Options with a special completion procedure
     local special=(
@@ -42,7 +35,6 @@ _bfs() {
         -group
         -ok
         -okdir
-        -perm
         -regextype
         -type
         -uid
@@ -67,6 +59,7 @@ _bfs() {
         -name
         -newer{a,B,c,m}t
         -path
+        -perm
         -printf
         -regex
         -since
@@ -176,46 +169,41 @@ _bfs() {
     )
 
     # Completing -exec requires matching the whole command line
-    local iscmd isarg word
-    for word in "${COMP_WORDS[@]::cword}"; do
-        case "$word" in
+    local i offset
+    for i in "${!words[@]}"; do
+        if ((i >= cword)); then
+            break
+        fi
+
+        case "${words[i]}" in
             -exec|-execdir|-ok|-okdir)
-                iscmd=y
+                offset=$((i + 1))
                 ;;
             \\\;|+)
-                if [[ -n "$iscmd" ]] || [[ -n "$isarg" ]]; then
-                    iscmd=
-                    isarg=
-                fi
-                ;;
-            *)
-                if [[ -n "$iscmd" ]]; then
-                    iscmd=
-                    isarg=y
-                fi
+                offset=
                 ;;
         esac
     done
 
-    if [[ -n "$iscmd" ]]; then
-        COMPREPLY=($(compgen -c -- "$cur"))
-        return
-    elif [[ -n "$isarg" ]]; then
-        COMPREPLY=($(compgen -o default -o bashdefault -W "{} + \\\\;" -- "$cur"))
+    if [[ -n "$offset" ]]; then
+        _command_offset "$offset"
+        COMPREPLY+=($(compgen -W "{} + '\\;'" -- "$cur"))
         return
     fi
 
     # Completions with 2-word lookbehind
-    case "$prev2" in
-        -fprintf)
-            # -fprintf FORMAT FILE
-            #     Like -ls/-print/-print0/-printf, but write to FILE instead of standard
-            #     output
-            # when -fprintf is prev2, current word is FILE; perform file completion
-            COMPREPLY=($(compgen -f -- "$cur"))
-            return
-            ;;
-    esac
+    if ((cword > 1)); then
+        case "${words[cword-2]}" in
+            -fprintf)
+                # -fprintf FORMAT FILE
+                #     Like -ls/-print/-print0/-printf, but write to FILE instead of standard
+                #     output
+                # when -fprintf is prev2, current word is FILE; perform file completion
+                _filedir
+                return
+                ;;
+        esac
+    fi
 
     # No completion for numbers, globs, regexes, times, etc.
     if [[ " ${nocomp[@]} " =~ " $prev " ]]; then
@@ -225,12 +213,61 @@ _bfs() {
 
     # Complete filenames
     if [[ " ${filecomp[@]} " =~ " $prev " ]]; then
-        COMPREPLY=($(compgen -o filenames -f -- "$cur"))
+        _filedir
         return
     fi
 
-    # Other completions with 1-word lookbehind
+    # Special completions with 1-word lookbehind
     case "$prev" in
+        -D)
+            # -D FLAG
+            #     Turn on a debugging flag (see -D help)
+            COMPREPLY=($(compgen -W 'help cost exec opt rates search stat tree all' -- "$cur"))
+            return
+            ;;
+        -S)
+            # -S bfs|dfs|ids|eds
+            #     Use breadth-first/depth-first/iterative/exponential deepening search
+            #     (default: -S bfs)
+            COMPREPLY=($(compgen -W 'bfs dfs ids eds' -- "$cur"))
+            return
+            ;;
+        -fstype)
+            # -fstype TYPE
+            #     Find files on file systems with the given TYPE
+            _fstypes
+            return
+            ;;
+        -gid)
+            # -gid [-+]N
+            #     Find files owned by group ID N
+            _gids
+            return
+            ;;
+        -group)
+            # -group NAME
+            #     Find files owned by the group NAME
+            COMPREPLY=($(compgen -g -- "$cur"))
+            return
+            ;;
+        -uid)
+            # -uid [-+]N
+            #     Find files owned by auser ID N
+            _uids
+            return
+            ;;
+        -user)
+            # -user  NAME
+            #     Find files owned by the user NAME
+            COMPREPLY=($(compgen -u -- "$cur"))
+            return
+            ;;
+        -regextype)
+            # -regextype TYPE
+            #     Use TYPE-flavored regexes (default: posix-basic; see -regextype help)
+            COMPREPLY=($(compgen -W 'help posix-basic posix-extended' -- "$cur"))
+            return
+            ;;
         -type|-xtype)
             # -type [bcdlpfswD]
             #     Find files of the given type
@@ -245,101 +282,16 @@ _bfs() {
             COMPREPLY+=("$cur"{b,c,d,l,p,f,s,w,D})
             return
             ;;
-        -gid|-uid)
-            # -gid [-+]N
-            # -uid [-+]N
-            #     Find files owned by group/user ID N
-            # TODO: list numeric uids/gids
-            COMPREPLY=()
-            return
-            ;;
-        -group)
-            # -group NAME
-            #     Find files owned by the group NAME
-            COMPREPLY=($(compgen -g -- "$cur"))
-            return
-            ;;
-        -user)
-            # -user  NAME
-            #     Find files owned by the user NAME
-            COMPREPLY=($(compgen -u -- "$cur"))
-            return
-            ;;
-        -S)
-            # -S bfs|dfs|ids|eds
-            #     Use breadth-first/depth-first/iterative/exponential deepening search
-            #     (default: -S bfs)
-            COMPREPLY=($(compgen -W 'bfs dfs ids eds' -- "$cur"))
-            return
-            ;;
-        -D)
-            # -D FLAG
-            #     Turn on a debugging flag (see -D help)
-            COMPREPLY=($(compgen -W 'help cost exec opt rates search stat tree all' -- "$cur"))
-            return
-            ;;
-        -regextype)
-            # -regextype TYPE
-            #     Use TYPE-flavored regexes (default: posix-basic; see -regextype help)
-            COMPREPLY=($(compgen -W 'help posix-basic posix-extended' -- "$cur"))
-            return
-            ;;
-        -fstype)
-            # -fstype TYPE
-            #     Find files on file systems with the given TYPE
-            #TODO: parse the mount table for a list of mounted filesystem types
-            COMPREPLY=()
-            return
-            ;;
-        (-perm)
-            # -perm [-]MODE
-            #     Find files with a matching mode
-            # sample syntax:
-            #   -perm 777
-            #   -perm 507
-            #   -perm u+rw
-            #   -perm og-rx
-            if [[ -z "$cur" ]]; then
-                # initial completion
-                COMPREPLY=(0 1 2 3 4 5 6 7 u g o)
-                return
-            elif [[ "$cur" =~ [rwx][rwx][rwx]$ ]] || [[ "$cur" =~ [0-7][0-7][0-7]$ ]]; then
-                # final completion (filled in all possible mode bits)
-                COMPREPLY=("$cur")
-                return
-            elif [[ "$cur" =~ [0-7]$ ]]; then
-                # intermediate completion, octal mode specifier
-                COMPREPLY=("$cur"{0,1,2,3,4,5,6,7})
-                return
-            elif [[ "$cur" =~ ^[ugo]*[+-][rwx]*$ ]]; then
-                # intermediate completion, symbolic mode specifier
-                COMPREPLY=()
-                [[ "$cur" =~ [rwx]$ ]] && COMPREPLY+=("${cur}")
-                [[ "$cur" =~ [+-][wx]*r ]] || COMPREPLY+=("${cur}r")
-                [[ "$cur" =~ [+-][rx]*w ]] || COMPREPLY+=("${cur}w")
-                [[ "$cur" =~ [+-][rw]*x ]] || COMPREPLY+=("${cur}x")
-                return 0
-            elif [[ "$cur" =~ ^[ugo] ]]; then
-                # intermediate completion, symbolic group specifier
-                COMPREPLY=(+ -)
-                [[ "$cur" =~ ^[go]*u ]] || COMPREPLY+=("${cur}u")
-                [[ "$cur" =~ ^[uo]*g ]] || COMPREPLY+=("${cur}g")
-                [[ "$cur" =~ ^[ug]*o ]] || COMPREPLY+=("${cur}o")
-                return 0
-            fi
-            COMPREPLY=()
-            return
-            ;;
     esac
 
     # Completions with no lookbehind
     if [[ "$cur" == -* ]]; then
         # complete all options
-        COMPREPLY=($(compgen -o default -o bashdefault -W "${everything[*]}" -- "$cur"))
+        COMPREPLY=($(compgen -W "${everything[*]}" -- "$cur"))
         return
     fi
 
     # default completion
-    COMPREPLY=($(compgen -o default -o bashdefault -f -W "${everything[*]} ! ," -- "$cur"))
-    return
+    _filedir
+    COMPREPLY+=($(compgen -W "- ! , '\\(' '\\)'" -- "$cur"))
 } && complete -F _bfs bfs
