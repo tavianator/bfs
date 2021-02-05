@@ -27,7 +27,6 @@
 
 #include "util.h"
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <time.h>
 
 #if BFS_HAS_SYS_PARAM

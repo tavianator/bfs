@@ -18,7 +18,6 @@
 #include "ctx.h"
 #include "color.h"
 #include "util.h"
-#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 

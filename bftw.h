@@ -24,7 +24,6 @@
 #include "dir.h"
 #include "stat.h"
 #include <stddef.h>
-#include <sys/types.h>
 
 /**
  * Possible visit occurrences.
