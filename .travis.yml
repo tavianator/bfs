@@ -30,7 +30,6 @@ jobs:
             - libcap2:i386
             - libacl1:i386
             - libattr1:i386
-          update: true
       before_script:
         # Ubuntu doesn't let you install the -dev packages for both amd64 and
         # i386 at once, so we make our own symlinks to fix -m32 -lacl -lcap
