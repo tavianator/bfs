@@ -8,7 +8,7 @@ script: make -j$TRAVIS_NUMCORES distcheck
 
 addons:
   apt:
-    packages: &packages
+    packages:
       - acl
       - libacl1-dev
       - attr
@@ -22,17 +22,11 @@ jobs:
       arch: amd64
       env: &linux_env
         - TMPDIR=/var/ramfs
-      addons:
-        apt:
-          packages:
-            - *packages
-            - gcc-multilib
-            - libcap2:i386
-            - libacl1:i386
-            - libattr1:i386
       before_script:
+        # Work around for https://salsa.debian.org/apt-team/apt/-/commit/998a17d7e6f834c341f198ca5b6df2f27e18df38
+        - sudo apt-get -y -o APT::Immediate-Configure=false install gcc-multilib libcap2:i386 libacl1:i386 libattr1:i386
         # Ubuntu doesn't let you install the -dev packages for both amd64 and
-        # i386 at once, so we make our own symlinks to fix -m32 -lacl -lcap
+        # i386 at once, so we make our own symlinks to fix -m32 -lacl -lattr -lcap
         - sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
         - sudo ln -s libattr.so.1 /lib/i386-linux-gnu/libattr.so
         - sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
