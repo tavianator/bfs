@@ -73,6 +73,9 @@ struct eval_state {
  */
 BFS_FORMATTER(2, 3)
 static void eval_error(struct eval_state *state, const char *format, ...) {
+	// By POSIX, any errors should be accompanied by a non-zero exit status
+	*state->ret = EXIT_FAILURE;
+
 	int error = errno;
 	const struct bfs_ctx *ctx = state->ctx;
 	CFILE *cerr = ctx->cerr;
@@ -101,7 +104,6 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
 static void eval_report_error(struct eval_state *state) {
 	if (!eval_should_ignore(state, errno)) {
 		eval_error(state, "%m.\n");
-		*state->ret = EXIT_FAILURE;
 	}
 }
 
@@ -196,7 +198,6 @@ static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enu
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
 	if (!ret) {
 		eval_error(state, "Couldn't get file %s: %m.\n", bfs_stat_field_name(field));
-		*state->ret = EXIT_FAILURE;
 	}
 	return ret;
 }
@@ -386,7 +387,6 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 	bool ret = bfs_exec(expr->execbuf, state->ftwbuf) == 0;
 	if (errno != 0) {
 		eval_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
-		*state->ret = EXIT_FAILURE;
 	}
 	return ret;
 }
@@ -1322,7 +1322,6 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 
 	if (ftwbuf->type == BFS_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
-			args->ret = EXIT_FAILURE;
 			eval_error(&state, "%s.\n", strerror(ftwbuf->error));
 		}
 		state.action = BFTW_PRUNE;
@@ -1341,7 +1340,6 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	}
 
 	if (ctx->xargs_safe && strpbrk(ftwbuf->path, " \t\n\'\"\\")) {
-		args->ret = EXIT_FAILURE;
 		eval_error(&state, "Path is not safe for xargs.\n");
 		state.action = BFTW_PRUNE;
 		goto done;
