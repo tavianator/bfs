@@ -1,6 +1,26 @@
 2.*
 ===
 
+2.2
+---
+
+**March 6, 2020**
+
+- Fixed `-hidden` on hidden start paths
+
+- Added a Bash completion script.
+  Thanks @bmundt6!
+
+- Fixed rounding in `-used`.
+  Corresponding fixes were made to GNU find in version 4.8.0.
+
+- Optimized the open directory representation.
+  On Linux, much libc overhead is bypassed by issuing syscalls directly.
+  On all platforms, a few fewer syscalls and open file descriptors will be used.
+
+- Implemented `-flags` from BSD find
+
+
 2.1
 ---
 
