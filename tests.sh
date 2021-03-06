@@ -327,6 +327,8 @@ bsd_tests=(
 
     test_exit
 
+    test_flags
+
     test_follow
 
     test_gid_name
@@ -2927,6 +2929,19 @@ function test_exclude_print() {
 
 function test_exclude_exclude() {
     ! quiet invoke_bfs basic -exclude -exclude -name foo
+}
+
+function test_flags() {
+    if ! quiet invoke_bfs scratch -quit -flags offline; then
+        return 0
+    fi
+
+    rm -rf scratch/*
+
+    touch scratch/{foo,bar}
+    quiet chflags offline scratch/bar
+
+    bfs_diff scratch -flags -offline,nohidden
 }
 
 

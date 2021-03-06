@@ -24,6 +24,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#if BFS_HAS_SYS_PARAM
+#	include <sys/param.h>
+#endif
+
 #ifdef STATX_BASIC_STATS
 #	define HAVE_STATX true
 #elif __linux__
@@ -65,6 +69,8 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 		return "block count";
 	case BFS_STAT_RDEV:
 		return "underlying device";
+	case BFS_STAT_ATTRS:
+		return "attributes";
 	case BFS_STAT_ATIME:
 		return "access time";
 	case BFS_STAT_BTIME:
@@ -120,6 +126,11 @@ static void bfs_stat_convert(const struct stat *statbuf, struct bfs_stat *buf) {
 
 	buf->rdev = statbuf->st_rdev;
 	buf->mask |= BFS_STAT_RDEV;
+
+#if BSD
+	buf->attrs = statbuf->st_flags;
+	buf->mask |= BFS_STAT_ATTRS;
+#endif
 
 	buf->atime = statbuf->st_atim;
 	buf->mask |= BFS_STAT_ATIME;
@@ -243,6 +254,9 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 
 	buf->rdev = bfs_makedev(xbuf.stx_rdev_major, xbuf.stx_rdev_minor);
 	buf->mask |= BFS_STAT_RDEV;
+
+	buf->attrs = xbuf.stx_attributes;
+	buf->mask |= BFS_STAT_ATTRS;
 
 	if (xbuf.stx_mask & STATX_ATIME) {
 		buf->atime.tv_sec = xbuf.stx_atime.tv_sec;

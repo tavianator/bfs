@@ -135,6 +135,11 @@ struct expr {
 	/** Mode to use for directories (different due to X). */
 	mode_t dir_mode;
 
+	/** Flags that should be set. */
+	unsigned long long set_flags;
+	/** Flags that should be cleared. */
+	unsigned long long clear_flags;
+
 	/** The optional stat field to look at. */
 	enum bfs_stat_field stat_field;
 	/** The optional reference time. */

@@ -442,6 +442,39 @@ done:
 }
 
 /**
+ * -flags test.
+ */
+bool eval_flags(const struct expr *expr, struct eval_state *state) {
+	const struct bfs_stat *statbuf = eval_stat(state);
+	if (!statbuf) {
+		return false;
+	}
+
+	if (!(statbuf->mask & BFS_STAT_ATTRS)) {
+		eval_error(state, "Couldn't get file %s.\n", bfs_stat_field_name(BFS_STAT_ATTRS));
+		return false;
+	}
+
+	unsigned long flags = statbuf->attrs;
+	unsigned long set = expr->set_flags;
+	unsigned long clear = expr->clear_flags;
+
+	switch (expr->mode_cmp) {
+	case MODE_EXACT:
+		return flags == set && !(flags & clear);
+
+	case MODE_ALL:
+		return (flags & set) == set && !(flags & clear);
+
+	case MODE_ANY:
+		return (flags & set) || (flags & clear) != clear;
+	}
+
+	assert(!"Invalid comparison mode");
+	return false;
+}
+
+/**
  * -fstype test.
  */
 bool eval_fstype(const struct expr *expr, struct eval_state *state) {
@@ -590,6 +623,7 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 		return !(mode & target) == !target;
 	}
 
+	assert(!"Invalid comparison mode");
 	return false;
 }
 

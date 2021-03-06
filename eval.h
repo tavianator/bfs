@@ -77,6 +77,7 @@ bool eval_nouser(const struct expr *expr, struct eval_state *state);
 
 bool eval_depth(const struct expr *expr, struct eval_state *state);
 bool eval_empty(const struct expr *expr, struct eval_state *state);
+bool eval_flags(const struct expr *expr, struct eval_state *state);
 bool eval_fstype(const struct expr *expr, struct eval_state *state);
 bool eval_hidden(const struct expr *expr, struct eval_state *state);
 bool eval_inum(const struct expr *expr, struct eval_state *state);

@@ -47,10 +47,11 @@ enum bfs_stat_field {
 	BFS_STAT_SIZE   = 1 << 7,
 	BFS_STAT_BLOCKS = 1 << 8,
 	BFS_STAT_RDEV   = 1 << 9,
-	BFS_STAT_ATIME  = 1 << 10,
-	BFS_STAT_BTIME  = 1 << 11,
-	BFS_STAT_CTIME  = 1 << 12,
-	BFS_STAT_MTIME  = 1 << 13,
+	BFS_STAT_ATTRS  = 1 << 10,
+	BFS_STAT_ATIME  = 1 << 11,
+	BFS_STAT_BTIME  = 1 << 12,
+	BFS_STAT_CTIME  = 1 << 13,
+	BFS_STAT_MTIME  = 1 << 14,
 };
 
 /**
@@ -105,6 +106,9 @@ struct bfs_stat {
 	blkcnt_t blocks;
 	/** The device ID represented by this file. */
 	dev_t rdev;
+
+	/** Attributes/flags set on the file. */
+	unsigned long long attrs;
 
 	/** Access time. */
 	struct timespec atime;

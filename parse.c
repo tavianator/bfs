@@ -1160,6 +1160,60 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 }
 
 /**
+ * Parse -flags FLAGS.
+ */
+static struct expr *parse_flags(struct parser_state *state, int arg1, int arg2) {
+#if __APPLE__ || __FreeBSD__
+	struct expr *expr = parse_unary_test(state, eval_flags);
+	if (!expr) {
+		return NULL;
+	}
+
+	// strtofflags() takes a non-const char *
+	char *copy = strdup(expr->sdata);
+	if (!copy) {
+		parse_perror(state, "strdup()");
+		goto err;
+	}
+
+	char *flags = copy;
+	switch (flags[0]) {
+	case '-':
+		expr->mode_cmp = MODE_ALL;
+		++flags;
+		break;
+	case '+':
+		expr->mode_cmp = MODE_ANY;
+		++flags;
+		break;
+	default:
+		expr->mode_cmp = MODE_EXACT;
+		break;
+	}
+
+	unsigned long set, clear;
+	if (strtofflags(&flags, &set, &clear) != 0) {
+		parse_error(state, "${blu}%s${rs}: Invalid flags ${bld}%s${rs}.\n", expr->argv[0], flags);
+		goto err;
+	}
+
+	expr->set_flags = set;
+	expr->clear_flags = clear;
+
+	free(copy);
+	return expr;
+
+err:
+	free(copy);
+	free_expr(expr);
+	return NULL;
+#else // !(__APPLE__ || __FreeBSD)
+	parse_error(state, "${blu}%s${rs} is missing platform support.\n", state->argv[0]);
+	return NULL;
+#endif
+}
+
+/**
  * Parse -fls FILE.
  */
 static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
@@ -2888,6 +2942,7 @@ static const struct table_entry parse_table[] = {
 	{"-exit", T_ACTION, parse_exit},
 	{"-f", T_FLAG, parse_f},
 	{"-false", T_TEST, parse_const, false},
+	{"-flags", T_TEST, parse_flags},
 	{"-fls", T_ACTION, parse_fls},
 	{"-follow", T_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
 	{"-fprint", T_ACTION, parse_fprint},
