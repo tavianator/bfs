@@ -73,6 +73,10 @@ else
 DISTCHECK_FLAGS := TEST_FLAGS="--verbose"
 endif
 
+ifeq ($(OS),NetBSD)
+LOCAL_LDLIBS += -lutil
+endif
+
 ifneq ($(filter asan,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += $(ASAN_CFLAGS)
 SANITIZE := y

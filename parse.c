@@ -1163,20 +1163,12 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
  * Parse -flags FLAGS.
  */
 static struct expr *parse_flags(struct parser_state *state, int arg1, int arg2) {
-#if __APPLE__ || __FreeBSD__
 	struct expr *expr = parse_unary_test(state, eval_flags);
 	if (!expr) {
 		return NULL;
 	}
 
-	// strtofflags() takes a non-const char *
-	char *copy = strdup(expr->sdata);
-	if (!copy) {
-		parse_perror(state, "strdup()");
-		goto err;
-	}
-
-	char *flags = copy;
+	const char *flags = expr->sdata;
 	switch (flags[0]) {
 	case '-':
 		expr->mode_cmp = MODE_ALL;
@@ -1191,26 +1183,17 @@ static struct expr *parse_flags(struct parser_state *state, int arg1, int arg2) 
 		break;
 	}
 
-	unsigned long set, clear;
-	if (strtofflags(&flags, &set, &clear) != 0) {
-		parse_error(state, "${blu}%s${rs}: Invalid flags ${bld}%s${rs}.\n", expr->argv[0], flags);
-		goto err;
+	if (xstrtofflags(&flags, &expr->set_flags, &expr->clear_flags) != 0) {
+		if (errno == ENOTSUP) {
+			parse_error(state, "${blu}%s${rs} is missing platform support.\n", expr->argv[0]);
+		} else {
+			parse_error(state, "${blu}%s${rs}: Invalid flags ${bld}%s${rs}.\n", expr->argv[0], flags);
+		}
+		free_expr(expr);
+		return NULL;
 	}
 
-	expr->set_flags = set;
-	expr->clear_flags = clear;
-
-	free(copy);
 	return expr;
-
-err:
-	free(copy);
-	free_expr(expr);
-	return NULL;
-#else // !(__APPLE__ || __FreeBSD)
-	parse_error(state, "${blu}%s${rs} is missing platform support.\n", state->argv[0]);
-	return NULL;
-#endif
 }
 
 /**

@@ -74,6 +74,10 @@
 #	define BFS_HAS_SYS_XATTR BFS_HAS_INCLUDE(<sys/xattr.h>, __linux__)
 #endif
 
+#ifndef BFS_HAS_UTIL
+#	define BFS_HAS_UTIL BFS_HAS_INCLUDE(<util.h>, __NetBSD__)
+#endif
+
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
 #endif
@@ -178,6 +182,21 @@ const char *xbasename(const char *path);
  * Wrapper for faccessat() that handles some portability issues.
  */
 int xfaccessat(int fd, const char *path, int amode);
+
+/**
+ * Portability wrapper for strtofflags().
+ *
+ * @param str
+ *         The string to parse.  The pointee will be advanced to the first
+ *         invalid position on error.
+ * @param set
+ *         The flags that are set in the string.
+ * @param clear
+ *         The flags that are cleared in the string.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear);
 
 /**
  * Return whether an error code is due to a path not existing.

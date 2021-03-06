@@ -39,6 +39,10 @@
 #	include <sys/mkdev.h>
 #endif
 
+#if BFS_HAS_UTIL
+#	include <util.h>
+#endif
+
 char *xreadlinkat(int fd, const char *path, size_t size) {
 	ssize_t len;
 	char *name = NULL;
@@ -230,6 +234,32 @@ int xfaccessat(int fd, const char *path, int amode) {
 #endif
 
 	return ret;
+}
+
+int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear) {
+#if BSD
+	char *str_arg = (char *)*str;
+	unsigned long set_arg = 0;
+	unsigned long clear_arg = 0;
+
+#if __NetBSD__
+	int ret = string_to_flags(&str_arg, &set_arg, &clear_arg);
+#else
+	int ret = strtofflags(&str_arg, &set_arg, &clear_arg);
+#endif
+
+	*str = str_arg;
+	*set = set_arg;
+	*clear = clear_arg;
+
+	if (ret != 0) {
+		errno = EINVAL;
+	}
+	return ret;
+#else // !BSD
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 bool is_nonexistence_error(int error) {
