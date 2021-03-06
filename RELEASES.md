@@ -4,7 +4,7 @@
 2.2
 ---
 
-**March 6, 2020**
+**March 6, 2021**
 
 - Fixed `-hidden` on hidden start paths
 
