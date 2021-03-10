@@ -850,24 +850,21 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 
 /** Print a link target with the appropriate colors. */
 static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
-	int ret = -1;
-
 	const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
 	size_t len = statbuf ? statbuf->size : 0;
 
 	char *target = xreadlinkat(ftwbuf->at_fd, ftwbuf->at_path, len);
 	if (!target) {
-		goto done;
+		return -1;
 	}
 
-	if (!cfile->colors) {
+	int ret;
+	if (cfile->colors) {
+		ret = print_path_colored(cfile, target, ftwbuf, BFS_STAT_FOLLOW);
+	} else {
 		ret = dstrcat(&cfile->buffer, target);
-		goto done;
 	}
 
-	ret = print_path_colored(cfile, target, ftwbuf, BFS_STAT_FOLLOW);
-
-done:
 	free(target);
 	return ret;
 }

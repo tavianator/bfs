@@ -698,12 +698,20 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
 }
 
 enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
-		if ((flags & BFS_STAT_NOFOLLOW) || ftwbuf->type != BFS_LNK) {
+	if (flags & BFS_STAT_NOFOLLOW) {
+		if (ftwbuf->type == BFS_LNK || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
 			return ftwbuf->type;
 		}
-	} else if ((flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW || ftwbuf->type == BFS_LNK) {
-		return ftwbuf->type;
+	} else if (flags & BFS_STAT_TRYFOLLOW) {
+		if (ftwbuf->type != BFS_LNK || (ftwbuf->stat_flags & BFS_STAT_TRYFOLLOW)) {
+			return ftwbuf->type;
+		}
+	} else {
+		if (ftwbuf->type != BFS_LNK) {
+			return ftwbuf->type;
+		} else if (ftwbuf->stat_flags & BFS_STAT_TRYFOLLOW) {
+			return BFS_ERROR;
+		}
 	}
 
 	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, flags);
