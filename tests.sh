@@ -34,10 +34,25 @@ if [ -t 1 ]; then
     RST="$(printf '\033[0m')"
 fi
 
-if [ "$EUID" -eq 0 ]; then
+if command -v capsh &>/dev/null; then
+    if capsh --has-p=CAP_DAC_OVERRIDE &>/dev/null || capsh --has-p=CAP_DAC_READ_SEARCH &>/dev/null; then
+        cat >&2 <<EOF
+${YLW}warning:${RST} Running as ${BLD}$(id -un)${RST} is not recommended.  Dropping ${BLD}CAP_DAC_OVERRIDE${RST} and
+${BLD}CAP_DAC_READ_SEARCH${RST}.
+
+EOF
+
+        exec capsh --drop=CAP_DAC_OVERRIDE,CAP_DAC_READ_SEARCH -- "$0" "$@"
+    fi
+elif [ "$EUID" -eq 0 ]; then
+    UNLESS=
+    if [ "$(uname)" = "Linux" ]; then
+	UNLESS=" unless ${GRN}capsh${RST} is installed"
+    fi
+
     cat >&2 <<EOF
 ${RED}error:${RST} These tests expect filesystem permissions to be enforced, and therefore
-will not work when run as ${BLD}$(id -un)${RST}.
+will not work when run as ${BLD}$(id -un)${RST}${UNLESS}.
 EOF
     exit 1
 fi
@@ -1209,11 +1224,15 @@ function test_gid() {
 }
 
 function test_gid_plus() {
-    bfs_diff basic -gid +0
+    if [ "$(id -g)" -ne 0 ]; then
+	bfs_diff basic -gid +0
+    fi
 }
 
 function test_gid_plus_plus() {
-    bfs_diff basic -gid +0
+    if [ "$(id -g)" -ne 0 ]; then
+	bfs_diff basic -gid ++0
+    fi
 }
 
 function test_gid_minus() {
@@ -1229,11 +1248,15 @@ function test_uid() {
 }
 
 function test_uid_plus() {
-    bfs_diff basic -uid +0
+    if [ "$(id -u)" -ne 0 ]; then
+	bfs_diff basic -uid +0
+    fi
 }
 
 function test_uid_plus_plus() {
-    bfs_diff basic -uid ++0
+    if [ "$(id -u)" -ne 0 ]; then
+	bfs_diff basic -uid ++0
+    fi
 }
 
 function test_uid_minus() {
