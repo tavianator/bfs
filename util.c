@@ -237,7 +237,7 @@ int xfaccessat(int fd, const char *path, int amode) {
 }
 
 int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear) {
-#if BSD
+#if BSD && !__GNU__
 	char *str_arg = (char *)*str;
 	unsigned long set_arg = 0;
 	unsigned long clear_arg = 0;
