@@ -36,13 +36,21 @@ fi
 
 if command -v capsh &>/dev/null; then
     if capsh --has-p=CAP_DAC_OVERRIDE &>/dev/null || capsh --has-p=CAP_DAC_READ_SEARCH &>/dev/null; then
+	if [ -n "$BFS_TRIED_DROP" ]; then
+            cat >&2 <<EOF
+${RED}error: ${RST} Failed to drop capabilities.
+EOF
+
+	    exit 1
+	fi
+
         cat >&2 <<EOF
 ${YLW}warning:${RST} Running as ${BLD}$(id -un)${RST} is not recommended.  Dropping ${BLD}CAP_DAC_OVERRIDE${RST} and
 ${BLD}CAP_DAC_READ_SEARCH${RST}.
 
 EOF
 
-        exec capsh --drop=CAP_DAC_OVERRIDE,CAP_DAC_READ_SEARCH -- "$0" "$@"
+        BFS_TRIED_DROP=y exec capsh --drop=CAP_DAC_OVERRIDE,CAP_DAC_READ_SEARCH -- "$0" "$@"
     fi
 elif [ "$EUID" -eq 0 ]; then
     UNLESS=
