@@ -3,7 +3,8 @@
 
 [![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/main/LICENSE)
 [![Version](https://img.shields.io/github/v/tag/tavianator/bfs?label=version)](https://github.com/tavianator/bfs/releases)
-[![Travis CI Status](https://api.travis-ci.com/tavianator/bfs.svg?branch=main)](https://travis-ci.com/tavianator/bfs)
+[![Linux CI Status](https://github.com/tavianator/bfs/actions/workflows/linux.yml/badge.svg?branch=main)](https://github.com/tavianator/bfs/actions/workflows/linux.yml)
+[![macOS CI Status](https://github.com/tavianator/bfs/actions/workflows/macos.yml/badge.svg?branch=main)](https://github.com/tavianator/bfs/actions/workflows/macos.yml)
 
 Breadth-first search for your files.
 
