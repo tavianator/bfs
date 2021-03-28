@@ -1,0 +1,32 @@
+name: FreeBSD
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          TAILSCALE_KEY: ${{ secrets.TAILSCALE_KEY }}
+          TAILSCALE_MACHINE_KEY: ${{ secrets.TAILSCALE_MACHINE_KEY }}
+        run: |
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | sudo apt-key add -
+          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | sudo tee /etc/apt/sources.list.d/tailscale.list
+          sudo apt-get update -y
+          sudo apt-get install -y tailscale
+          printf '%s' "TAILSCALE_MACHINE_KEY" | sudo tee /var/lib/tailscale/tailscaled.state >/dev/null
+          sudo tailscale up --authkey="$TAILSCALE_KEY"
+          mkdir ~/.ssh
+          printf '%s' "$SSH_KEY" >~/.ssh/github-actions
+          chmod 0600 ~/.ssh/github-actions
+          printf 'Host muon\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' >~/.ssh/config
+
+      - name: Run tests
+        run: |
+          rsync -rl --delete . muon:bfs
+          ssh muon 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck'
