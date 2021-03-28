@@ -171,6 +171,12 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 
 #if __FreeBSD__
 	int trivial;
+
+#if BFS_HAS_FEATURE(memory_sanitizer, false)
+        // msan seems to be missing an interceptor for acl_is_trivial_np()
+        trivial = 0;
+#endif
+
 	if (acl_is_trivial_np(acl, &trivial) < 0) {
 		return -1;
 	} else if (trivial) {
@@ -178,9 +184,9 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 	} else {
 		return 1;
 	}
-#endif
-
+#else // !__FreeBSD__
 	return bfs_check_posix1e_acl(acl, true);
+#endif
 }
 
 int bfs_check_acl(const struct BFTW *ftwbuf) {

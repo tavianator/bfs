@@ -229,8 +229,8 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 		char *buf = (char *)(dir + 1);
 
 		if (dir->pos >= dir->size) {
-			// Make sure msan knows the buffer is initialized
 #if BFS_HAS_FEATURE(memory_sanitizer, false)
+			// Make sure msan knows the buffer is initialized
 			memset(buf, 0, BUF_SIZE);
 #endif
 
