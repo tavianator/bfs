@@ -7,9 +7,11 @@ links/notdir
 links/skip
 links/symlink
 links/deeply/nested
+links/skip/broken
 links/skip/dir
 links/skip/file
 links/skip/link
+links/deeply/nested/broken
 links/deeply/nested/dir
 links/deeply/nested/file
 links/deeply/nested/link

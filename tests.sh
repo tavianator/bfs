@@ -274,6 +274,9 @@ posix_tests=(
 
     test_type_d
     test_type_f
+    test_type_l
+    test_H_type_l
+    test_L_type_l
 
     test_user_name
     test_user_id
@@ -886,6 +889,7 @@ function make_links() {
     mkdir -p "$1/deeply/nested/dir"
     touchp "$1/deeply/nested/file"
     ln -s file "$1/deeply/nested/link"
+    ln -s nowhere "$1/deeply/nested/broken"
     ln -s deeply/nested "$1/skip"
 }
 make_links "$TMP/links"
@@ -1122,6 +1126,18 @@ function test_type_d() {
 
 function test_type_f() {
     bfs_diff basic -type f
+}
+
+function test_type_l() {
+    bfs_diff links/skip -type l
+}
+
+function test_H_type_l() {
+    bfs_diff -H links/skip -type l
+}
+
+function test_L_type_l() {
+    bfs_diff -L links/skip -type l
 }
 
 function test_type_multi() {
@@ -2150,7 +2166,7 @@ function test_printf_u_g_ulimit() {
 }
 
 function test_printf_l_nonlink() {
-    bfs_diff links -printf '| %24p -> %-24l |\n'
+    bfs_diff links -printf '| %26p -> %-26l |\n'
 }
 
 function test_printf_incomplete_escape() {

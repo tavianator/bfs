@@ -2,5 +2,7 @@ links/broken
 links/notdir
 links/skip
 links/symlink
+links/skip/broken
 links/skip/link
+links/deeply/nested/broken
 links/deeply/nested/link

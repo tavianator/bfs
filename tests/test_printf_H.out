@@ -25,6 +25,7 @@
 %p(links/deeply/nested) %d(2) %f(nested) %h(links/deeply) %H(links) %P(deeply/nested) %y(d)
 %p(basic/k/foo/bar) %d(3) %f(bar) %h(basic/k/foo) %H(basic) %P(k/foo/bar) %y(f)
 %p(basic/l/foo/bar) %d(3) %f(bar) %h(basic/l/foo) %H(basic) %P(l/foo/bar) %y(d)
+%p(links/deeply/nested/broken) %d(3) %f(broken) %h(links/deeply/nested) %H(links) %P(deeply/nested/broken) %y(l)
 %p(links/deeply/nested/dir) %d(3) %f(dir) %h(links/deeply/nested) %H(links) %P(deeply/nested/dir) %y(d)
 %p(links/deeply/nested/file) %d(3) %f(file) %h(links/deeply/nested) %H(links) %P(deeply/nested/file) %y(f)
 %p(links/deeply/nested/link) %d(3) %f(link) %h(links/deeply/nested) %H(links) %P(deeply/nested/link) %y(l)
