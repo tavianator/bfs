@@ -15,12 +15,13 @@ jobs:
           TAILSCALE_KEY: ${{ secrets.TAILSCALE_KEY }}
           TAILSCALE_MACHINE_KEY: ${{ secrets.TAILSCALE_MACHINE_KEY }}
         run: |
+          sudo mkdir /var/lib/tailscale
+          printf '%s' "$TAILSCALE_MACHINE_KEY" | sudo tee /var/lib/tailscale/tailscaled.state >/dev/null
           curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | sudo apt-key add -
           curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | sudo tee /etc/apt/sources.list.d/tailscale.list
           sudo apt-get update -y
           sudo apt-get install -y tailscale
-          printf '%s' "TAILSCALE_MACHINE_KEY" | sudo tee /var/lib/tailscale/tailscaled.state >/dev/null
-          sudo tailscale up --authkey="$TAILSCALE_KEY"
+          sudo tailscale up --hostname=gh-runner --authkey="$TAILSCALE_KEY"
           mkdir ~/.ssh
           printf '%s' "$SSH_KEY" >~/.ssh/github-actions
           chmod 0600 ~/.ssh/github-actions
