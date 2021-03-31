@@ -107,8 +107,6 @@ vs.
 Try it!
 -------
 
-<a href="https://repology.org/metapackage/bfs"><img src="https://repology.org/badge/vertical-allrepos/bfs.svg" alt="Packaging status" align="right" /></a>
-
 `bfs` may already be packaged for your distribution of choice.
 For example:
 
