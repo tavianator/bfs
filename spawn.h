@@ -83,6 +83,13 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd);
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd);
 
 /**
+ * Add an putenv() action to a bfs_spawn() context.
+ *
+ * @return 0 on success, -1 on failure.
+ */
+int bfs_spawn_addputenv(struct bfs_spawn *ctx, const char *s);
+
+/**
  * Spawn a new process.
  *
  * @param exe

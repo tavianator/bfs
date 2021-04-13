@@ -18,6 +18,7 @@
 #include "util.h"
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -29,6 +30,7 @@ enum bfs_spawn_op {
 	BFS_SPAWN_CLOSE,
 	BFS_SPAWN_DUP2,
 	BFS_SPAWN_FCHDIR,
+	BFS_SPAWN_PUTENV,
 };
 
 /**
@@ -40,6 +42,7 @@ struct bfs_spawn_action {
 	enum bfs_spawn_op op;
 	int in_fd;
 	int out_fd;
+	char *s;
 };
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
@@ -53,6 +56,7 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 	struct bfs_spawn_action *action = ctx->actions;
 	while (action) {
 		struct bfs_spawn_action *next = action->next;
+		free(action->s);
 		free(action);
 		action = next;
 	}
@@ -72,6 +76,7 @@ static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_sp
 		action->op = op;
 		action->in_fd = -1;
 		action->out_fd = -1;
+		action->s = NULL;
 
 		*ctx->tail = action;
 		ctx->tail = &action->next;
@@ -125,6 +130,22 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	}
 }
 
+int bfs_spawn_addputenv(struct bfs_spawn *ctx, const char *s) {
+	char *p = strdup(s);
+	if (!p) {
+		return -1;
+	}
+
+	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_PUTENV);
+	if (action) {
+		action->s = p;
+		return 0;
+	} else {
+		free(p);
+		return -1;
+	}
+}
+
 /** Facade for execvpe() which is non-standard. */
 static int bfs_execvpe(const char *exe, char **argv, char **envp) {
 #if __GLIBC__ || __linux__ || __NetBSD__ || __OpenBSD__
@@ -174,6 +195,11 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 			break;
 		case BFS_SPAWN_FCHDIR:
 			if (fchdir(action->in_fd) != 0) {
+				goto fail;
+			}
+			break;
+		case BFS_SPAWN_PUTENV:
+			if (putenv(action->s) != 0) {
 				goto fail;
 			}
 			break;
