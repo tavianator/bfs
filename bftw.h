@@ -167,6 +167,10 @@ enum bftw_flags {
 	BFTW_PRUNE_MOUNTS  = 1 << 7,
 	/** Sort directory entries before processing them. */
 	BFTW_SORT          = 1 << 8,
+	/** Sort flags when using BFTW_SORT. */
+	BFTW_SORT_STRCMP   = 1 << 9, // sort using strcmp() instead of strcoll()
+	BFTW_SORT_DIRS_FIRST = 1 << 10, // directories sort first
+	BFTW_SORT_DIRS_LAST = 1 << 11, // directories sort last
 };
 
 /**

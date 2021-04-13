@@ -2163,7 +2163,8 @@ list_types:
  * Parse -s.
  */
 static struct expr *parse_s(struct parser_state *state, int arg1, int arg2) {
-	state->ctx->flags |= BFTW_SORT;
+	state->ctx->flags &= ~arg2;  // clear bits
+	state->ctx->flags |= BFTW_SORT | arg1; // and set bits
 	return parse_nullary_flag(state);
 }
 
@@ -2985,7 +2986,12 @@ static const struct table_entry parse_table[] = {
 	{"-regex", T_TEST, parse_regex, 0},
 	{"-regextype", T_OPTION, parse_regextype},
 	{"-rm", T_ACTION, parse_delete},
-	{"-s", T_FLAG, parse_s},
+	{"-s", T_FLAG, parse_s, 0, 0}, // defaults to strcoll()
+	{"-sort-strcmp", T_FLAG, parse_s, BFTW_SORT_STRCMP, 0}, // force strcmp()
+	{"-sort-strcoll", T_FLAG, parse_s, 0, BFTW_SORT_STRCMP}, // force strcoll()
+	{"-sort-df", T_FLAG, parse_s, BFTW_SORT_DIRS_FIRST, BFTW_SORT_DIRS_LAST},
+	{"-sort-dl", T_FLAG, parse_s, BFTW_SORT_DIRS_LAST, BFTW_SORT_DIRS_FIRST},
+	{"-sort-dn", T_FLAG, parse_s, 0, BFTW_SORT_DIRS_FIRST|BFTW_SORT_DIRS_LAST}, // DIRS_NONE, i.e. reset to default
 	{"-samefile", T_TEST, parse_samefile},
 	{"-since", T_TEST, parse_since, BFS_STAT_MTIME},
 	{"-size", T_TEST, parse_size},

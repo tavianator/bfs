@@ -514,15 +514,37 @@ static struct bftw_file **bftw_sort_split(struct bftw_file **head, struct bftw_f
 	return tortoise;
 }
 
+/** The actual sort comparision function. */
+static inline int sort_compare(const struct bftw_file *a, const struct bftw_file *b, int sort_flags) {
+	if (sort_flags & (BFTW_SORT_DIRS_FIRST | BFTW_SORT_DIRS_LAST)) {
+		assert(a->type != BFS_UNKNOWN);
+		assert(b->type != BFS_UNKNOWN);
+		bool ad = a->type == BFS_DIR;
+		bool bd = b->type == BFS_DIR;
+		if (ad != bd) {
+			if (sort_flags & BFTW_SORT_DIRS_FIRST) {
+				return ad ? -1 : 1;
+			} else {
+				return ad ? 1 : -1;
+			}
+		}
+	}
+	if (sort_flags & BFTW_SORT_STRCMP) {
+		return strcmp(a->name, b->name);
+	} else {
+		return strcoll(a->name, b->name);
+	}
+}
+
 /** The merge phase of mergesort. */
-static struct bftw_file **bftw_sort_merge(struct bftw_file **head, struct bftw_file **mid, struct bftw_file **tail) {
+static struct bftw_file **bftw_sort_merge(struct bftw_file **head, struct bftw_file **mid, struct bftw_file **tail, int sort_flags) {
 	struct bftw_file *left = *head, *right = *mid, *end = *tail;
 	*mid = NULL;
 	*tail = NULL;
 
 	while (left || right) {
 		struct bftw_file *next;
-		if (left && (!right || strcoll(left->name, right->name) <= 0)) {
+		if (left && (!right || sort_compare(left, right, sort_flags) <= 0)) {
 			next = left;
 			left = left->next;
 		} else {
@@ -548,16 +570,16 @@ static struct bftw_file **bftw_sort_merge(struct bftw_file **head, struct bftw_f
  * @return
  *         The new tail of the (sub-)list.
  */
-static struct bftw_file **bftw_sort_files(struct bftw_file **head, struct bftw_file **tail) {
+static struct bftw_file **bftw_sort_files(struct bftw_file **head, struct bftw_file **tail, int sort_flags) {
 	struct bftw_file **mid = bftw_sort_split(head, tail);
 	if (*mid == *head || *mid == *tail) {
 		return tail;
 	}
 
-	mid = bftw_sort_files(head, mid);
-	tail = bftw_sort_files(mid, tail);
+	mid = bftw_sort_files(head, mid, sort_flags);
+	tail = bftw_sort_files(mid, tail, sort_flags);
 
-	return bftw_sort_merge(head, mid, tail);
+	return bftw_sort_merge(head, mid, tail, sort_flags);
 }
 
 /**
@@ -1218,7 +1240,9 @@ static void bftw_batch_start(struct bftw_state *state) {
 /** Finish adding a batch of files. */
 static void bftw_batch_finish(struct bftw_state *state) {
 	if (state->flags & BFTW_SORT) {
-		state->queue.target = bftw_sort_files(state->batch, state->queue.target);
+		int sort_flags = state->flags;
+		sort_flags &= BFTW_SORT_STRCMP | BFTW_SORT_DIRS_FIRST | BFTW_SORT_DIRS_LAST;
+		state->queue.target = bftw_sort_files(state->batch, state->queue.target, sort_flags);
 	}
 }
 
