@@ -2535,6 +2535,9 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	if (bfs_spawn_addclose(&ctx, pipefd[0]) != 0) {
 		goto fail_ctx;
 	}
+	if (bfs_spawn_addputenv(&ctx, "LESS=FKRX") != 0) { // enable colors for less(1)
+		goto fail_ctx;
+	}
 
 	char *argv[] = {
 		pager,
@@ -2542,39 +2545,15 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	};
 
 	extern char **environ;
-	char **envp = environ;
-
-	if (!getenv("LESS")) {
-		size_t envc;
-		for (envc = 0; environ[envc]; ++envc);
-		++envc;
-
-		envp = malloc((envc + 1)*sizeof(*envp));
-		if (!envp) {
-			goto fail_ctx;
-		}
-
-		memcpy(envp, environ, (envc - 1)*sizeof(*envp));
-		envp[envc - 1] = "LESS=FKRX";
-		envp[envc] = NULL;
-	}
-
-	*pid = bfs_spawn(pager, &ctx, argv, envp);
+	*pid = bfs_spawn(pager, &ctx, argv, environ);
 	if (*pid < 0) {
-		goto fail_envp;
+		goto fail_ctx;
 	}
 
 	close(pipefd[0]);
-	if (envp != environ) {
-		free(envp);
-	}
 	bfs_spawn_destroy(&ctx);
 	return ret;
 
-fail_envp:
-	if (envp != environ) {
-		free(envp);
-	}
 fail_ctx:
 	bfs_spawn_destroy(&ctx);
 fail_ret:
