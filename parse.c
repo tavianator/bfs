@@ -2494,7 +2494,7 @@ static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
  */
 static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	char *pager = getenv("PAGER");
-	if (!pager) {
+	if (!pager || !pager[0]) {
 		pager = "more";
 	}
 
