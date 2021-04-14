@@ -2544,19 +2544,24 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	extern char **environ;
 	char **envp = environ;
 
-	if (!getenv("LESS")) {
+	const char *less = getenv("LESS");
+	if (!less || !less[0]) {
 		size_t envc;
-		for (envc = 0; environ[envc]; ++envc);
-		++envc;
+		for (envc = 0; environ[envc]; ++envc) { }
 
-		envp = malloc((envc + 1)*sizeof(*envp));
+		envp = malloc((envc + 2)*sizeof(*envp));
 		if (!envp) {
 			goto fail_ctx;
 		}
 
-		memcpy(envp, environ, (envc - 1)*sizeof(*envp));
-		envp[envc - 1] = "LESS=FKRX";
-		envp[envc] = NULL;
+		size_t j = 0;
+		for (size_t i = 0; i < envc; ++i) {
+			if (strncmp(environ[i], "LESS=", 5) != 0) {
+				envp[j++] = environ[i];
+			}
+		}
+		envp[j++] = "LESS=FKRX";
+		envp[j] = NULL;
 	}
 
 	*pid = bfs_spawn(pager, &ctx, argv, envp);
