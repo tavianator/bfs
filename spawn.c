@@ -191,7 +191,7 @@ fail:
 
 	// In case of write error parent will still see that we exited
 	// unsuccessfully, but won't know why.
-	safe_write(pipefd[1], &error, sizeof(error));
+	(void) safe_write_all(pipefd[1], &error, sizeof(error));
 
 	close(pipefd[1]);
 	_Exit(127);
@@ -221,7 +221,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	// Parent
 	close(pipefd[1]);
 
-	ssize_t nbytes = safe_read(pipefd[0], &error, sizeof(error));
+	ssize_t nbytes = safe_read_all(pipefd[0], &error, sizeof(error));
 	close(pipefd[0]);
 	if (nbytes == sizeof(error)) {
 		int wstatus;

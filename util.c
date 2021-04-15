@@ -379,6 +379,23 @@ ssize_t safe_read(int fd, void *buf, size_t nbytes) {
 	}
 }
 
+ssize_t safe_read_all(int fd, void *buf, size_t nbytes) {
+	size_t count = 0;
+	for (;;) {
+		ssize_t ret = read(fd, (char *)buf + count, nbytes - count);
+		if (ret < 0 && errno == EINTR) {
+			continue;
+		}
+		if (ret < 0) {
+			return ret; // always return error < 0
+		}
+		count += ret;
+		if (ret == 0 || count == nbytes) { // EOF or success
+			return count;
+		}
+	}
+}
+
 ssize_t safe_write(int fd, const void *buf, size_t nbytes) {
 	for (;;) {
 		ssize_t ret = write(fd, buf, nbytes);
@@ -386,5 +403,23 @@ ssize_t safe_write(int fd, const void *buf, size_t nbytes) {
 			continue;
 		}
 		return ret;
+	}
+}
+
+ssize_t safe_write_all(int fd, const void *buf, size_t nbytes)
+{
+	size_t count = 0;
+	for (;;) {
+		ssize_t ret = write(fd, (const char *)buf + count, nbytes - count);
+		if (ret < 0 && errno == EINTR) {
+			continue;
+		}
+		if (ret < 0) {
+			return ret; // always return error < 0
+		}
+		count += ret;
+		if (ret == 0 || count == nbytes) { // EOF (should never happen with write) or success
+			return count;
+		}
 	}
 }
