@@ -58,17 +58,7 @@ static int bfs_bar_getsize(struct bfs_bar *bar) {
 /** Async Signal Safe puts(). */
 static int ass_puts(int fd, const char *str) {
 	size_t len = strlen(str);
-
-	while (len > 0) {
-		ssize_t ret = write(fd, str, len);
-		if (ret <= 0) {
-			return -1;
-		}
-		str += ret;
-		len -= ret;
-	}
-
-	return 0;
+	return safe_write_all(fd, str, len) == (ssize_t)len ? 0 : -1;
 }
 
 /** Number of decimal digits needed for terminal sizes. */
