@@ -368,3 +368,23 @@ int bfs_minor(dev_t dev) {
 	return dev & 0xFF;
 #endif
 }
+
+ssize_t safe_read(int fd, void *buf, size_t nbytes) {
+	for (;;) {
+		ssize_t ret = read(fd, buf, nbytes);
+		if (ret < 0 && errno == EINTR) {
+			continue;
+		}
+		return ret;
+	}
+}
+
+ssize_t safe_write(int fd, const void *buf, size_t nbytes) {
+	for (;;) {
+		ssize_t ret = write(fd, buf, nbytes);
+		if (ret < 0 && errno == EINTR) {
+			continue;
+		}
+		return ret;
+	}
+}

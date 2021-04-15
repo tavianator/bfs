@@ -60,7 +60,7 @@ static int ass_puts(int fd, const char *str) {
 	size_t len = strlen(str);
 
 	while (len > 0) {
-		ssize_t ret = write(fd, str, len);
+		ssize_t ret = safe_write(fd, str, len);
 		if (ret <= 0) {
 			return -1;
 		}

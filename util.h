@@ -225,4 +225,14 @@ int bfs_major(dev_t dev);
  */
 int bfs_minor(dev_t dev);
 
+/**
+ * A safe version of read() that handles interrupted system calls.
+ */
+ssize_t safe_read(int fd, void *buf, size_t nbytes);
+
+/**
+ * A safe version of write() that handles interrupted system calls.
+ */
+ssize_t safe_write(int fd, const void *buf, size_t nbytes);
+
 #endif // BFS_UTIL_H
