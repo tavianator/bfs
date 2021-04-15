@@ -189,9 +189,9 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 fail:
 	error = errno;
 
-	// In case of write error parent will still see that we exited
-	// unsuccessfully, but won't know why.
-	(void) safe_write_all(pipefd[1], &error, sizeof(error));
+	// In case of a write error, the parent will still see that we exited
+	// unsuccessfully, but won't know why
+	(void) xwrite(pipefd[1], &error, sizeof(error));
 
 	close(pipefd[1]);
 	_Exit(127);
@@ -221,7 +221,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	// Parent
 	close(pipefd[1]);
 
-	ssize_t nbytes = safe_read_all(pipefd[0], &error, sizeof(error));
+	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
 	close(pipefd[0]);
 	if (nbytes == sizeof(error)) {
 		int wstatus;

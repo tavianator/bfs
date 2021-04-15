@@ -226,23 +226,22 @@ int bfs_major(dev_t dev);
 int bfs_minor(dev_t dev);
 
 /**
- * A safe version of read() that handles interrupted system calls.
+ * A safe version of read() that handles interrupted system calls and partial
+ * reads.
+ *
+ * @return
+ *         The number of bytes read.  A value != nbytes indicates an error
+ *         (errno != 0) or end of file (errno == 0).
  */
-ssize_t safe_read(int fd, void *buf, size_t nbytes);
+size_t xread(int fd, void *buf, size_t nbytes);
 
 /**
- * A safe version of read() that handles interrupted system calls and partial reads.
+ * A safe version of write() that handles interrupted system calls and partial
+ * writes.
+ *
+ * @return
+           The number of bytes written.  A value != nbytes indicates an error.
  */
-ssize_t safe_read_all(int fd, void *buf, size_t nbytes);
-
-/**
- * A safe version of write() that handles interrupted system calls.
- */
-ssize_t safe_write(int fd, const void *buf, size_t nbytes);
-
-/**
- * A safe version of write() that handles interrupted system calls and partial writes.
- */
-ssize_t safe_write_all(int fd, const void *buf, size_t nbytes);
+size_t xwrite(int fd, const void *buf, size_t nbytes);
 
 #endif // BFS_UTIL_H
