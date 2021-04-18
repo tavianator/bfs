@@ -1871,7 +1871,8 @@ function test_delete_many() {
     # Test for https://github.com/tavianator/bfs/issues/67
 
     rm -rf scratch/*
-    touchp scratch/foo/{1..256}
+    mkdir scratch/foo
+    touch scratch/foo/{1..256}
 
     invoke_bfs scratch/foo -delete
     bfs_diff scratch
