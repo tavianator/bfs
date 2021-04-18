@@ -331,6 +331,7 @@ bsd_tests=(
     test_asince
 
     test_delete
+    test_delete_many
 
     test_depth_maxdepth_1
     test_depth_maxdepth_2
@@ -473,6 +474,7 @@ gnu_tests=(
     test_daystart_twice
 
     test_delete
+    test_delete_many
     test_L_delete
 
     test_depth_mindepth_1
@@ -1862,6 +1864,16 @@ function test_delete() {
     # Don't try to delete '.'
     (cd scratch && invoke_bfs . -delete)
 
+    bfs_diff scratch
+}
+
+function test_delete_many() {
+    # Test for https://github.com/tavianator/bfs/issues/67
+
+    rm -rf scratch/*
+    touchp scratch/foo/{1..256}
+
+    invoke_bfs scratch/foo -delete
     bfs_diff scratch
 }
 
