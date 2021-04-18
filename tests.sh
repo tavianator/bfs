@@ -2982,14 +2982,12 @@ function test_exclude_exclude() {
 }
 
 function test_flags() {
-    if ! quiet invoke_bfs scratch -quit -flags offline; then
-        return 0
-    fi
+    quiet invoke_bfs scratch -quit -flags offline || return 0
 
     rm -rf scratch/*
 
     touch scratch/{foo,bar}
-    quiet chflags offline scratch/bar
+    chflags offline scratch/bar || return 0
 
     bfs_diff scratch -flags -offline,nohidden
 }
