@@ -2835,49 +2835,40 @@ function make_xattrs() {
 
     case "$UNAME" in
         Darwin)
-            xattr -w bfs_test true scratch/xattr
-            xattr -w bfs_test_2 true scratch/xattr_2
-            xattr -s -w bfs_test true scratch/xattr_link
+            xattr -w bfs_test true scratch/xattr \
+                && xattr -w bfs_test_2 true scratch/xattr_2 \
+                && xattr -s -w bfs_test true scratch/xattr_link
             ;;
         FreeBSD)
-            setextattr user bfs_test true scratch/xattr
-            setextattr user bfs_test_2 true scratch/xattr_2
-            setextattr -h user bfs_test true scratch/xattr_link
+            setextattr user bfs_test true scratch/xattr \
+                && setextattr user bfs_test_2 true scratch/xattr_2 \
+                && setextattr -h user bfs_test true scratch/xattr_link
             ;;
         *)
             # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
             # namespace, which is writable by root and readable by others
-            sudo setfattr -n security.bfs_test scratch/xattr
-            sudo setfattr -n security.bfs_test_2 scratch/xattr_2
-            sudo setfattr -h -n security.bfs_test scratch/xattr_link
+            sudo setfattr -n security.bfs_test scratch/xattr \
+                && sudo setfattr -n security.bfs_test_2 scratch/xattr_2 \
+                && sudo setfattr -h -n security.bfs_test scratch/xattr_link
             ;;
     esac
 }
 
 function test_xattr() {
-    if ! quiet invoke_bfs scratch -quit -xattr; then
-        return 0
-    fi
-
-    make_xattrs
+    quiet invoke_bfs scratch -quit -xattr || return 0
+    make_xattrs || return 0
     bfs_diff scratch -xattr
 }
 
 function test_L_xattr() {
-    if ! quiet invoke_bfs scratch -quit -xattr; then
-        return 0
-    fi
-
-    make_xattrs
+    quiet invoke_bfs scratch -quit -xattr || return 0
+    make_xattrs || return 0
     bfs_diff -L scratch -xattr
 }
 
 function test_xattrname() {
-    if ! quiet invoke_bfs scratch -quit -xattr; then
-        return 0
-    fi
-
-    make_xattrs
+    quiet invoke_bfs scratch -quit -xattr || return 0
+    make_xattrs || return 0
 
     case "$UNAME" in
         Darwin|FreeBSD)
@@ -2890,11 +2881,8 @@ function test_xattrname() {
 }
 
 function test_L_xattrname() {
-    if ! quiet invoke_bfs scratch -quit -xattr; then
-        return 0
-    fi
-
-    make_xattrs
+    quiet invoke_bfs scratch -quit -xattr || return 0
+    make_xattrs || return 0
 
     case "$UNAME" in
         Darwin|FreeBSD)
