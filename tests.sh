@@ -1814,11 +1814,11 @@ function test_permcopy() {
 }
 
 function test_perm_setid() {
-    bfs_diff rainbow -perm /ug+s
+    bfs_diff rainbow -perm -u+s -o -perm -g+s
 }
 
 function test_perm_sticky() {
-    bfs_diff rainbow -perm /+t
+    bfs_diff rainbow -perm -a+t
 }
 
 function test_prune() {
