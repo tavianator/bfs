@@ -237,10 +237,14 @@ struct parser_state {
 	bool stdout_tty;
 	/** Whether this session is interactive (stdin and stderr are each a terminal). */
 	bool interactive;
+	/** Whether stdin has been consumed by -files0-from -. */
+	bool stdin_consumed;
 	/** Whether -color or -nocolor has been passed. */
 	enum use_color use_color;
 	/** Whether a -print action is implied. */
 	bool implicit_print;
+	/** Whether the default root "." should be used. */
+	bool implicit_root;
 	/** Whether the expression has started. */
 	bool expr_started;
 	/** Whether any non-option arguments have been encountered. */
@@ -260,6 +264,8 @@ struct parser_state {
 	const char *mount_arg;
 	/** An "-xdev"-type argument if any. */
 	const char *xdev_arg;
+	/** An "-ok"-type argument if any. */
+	const char *ok_arg;
 
 	/** The current time. */
 	struct timespec now;
@@ -383,12 +389,21 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
  * Parse a root path.
  */
 static int parse_root(struct parser_state *state, const char *path) {
-	struct bfs_ctx *ctx = state->ctx;
-	int ret = DARRAY_PUSH(&ctx->paths, &path);
-	if (ret != 0) {
-		parse_perror(state, "DARRAY_PUSH()");
+	char *copy = strdup(path);
+	if (!copy) {
+		parse_perror(state, "strdup()");
+		return -1;
 	}
-	return ret;
+
+	struct bfs_ctx *ctx = state->ctx;
+	if (DARRAY_PUSH(&ctx->paths, &copy) != 0) {
+		parse_perror(state, "DARRAY_PUSH()");
+		free(copy);
+		return -1;
+	}
+
+	state->implicit_root = false;
+	return 0;
 }
 
 /**
@@ -1189,6 +1204,10 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 		}
 	}
 
+	if (execbuf->flags & BFS_EXEC_CONFIRM) {
+		state->ok_arg = expr->argv[0];
+	}
+
 	return expr;
 }
 
@@ -1230,6 +1249,58 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 
 	parser_advance(state, T_PATH, 1);
 	return &expr_true;
+}
+
+/**
+ * Parse -files0-from PATH.
+ */
+static struct expr *parse_files0_from(struct parser_state *state, int arg1, int arg2) {
+	const char *arg = state->argv[0];
+	const char *from = state->argv[1];
+	if (!from) {
+		parse_error(state, "${blu}%s${rs} requires a path.\n", arg);
+		return NULL;
+	}
+
+	FILE *file;
+	if (strcmp(from, "-") == 0) {
+		file = stdin;
+	} else {
+		file = fopen(from, "rb");
+	}
+	if (!file) {
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", arg, from);
+		return NULL;
+	}
+
+	struct expr *expr = parse_unary_positional_option(state);
+
+	while (true) {
+		char *path = xgetdelim(file, '\0');
+		if (!path) {
+			if (errno) {
+				parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", arg, from);
+				expr = NULL;
+			}
+			break;
+		}
+
+		int ret = parse_root(state, path);
+		free(path);
+		if (ret != 0) {
+			expr = NULL;
+			break;
+		}
+	}
+
+	if (file == stdin) {
+		state->stdin_consumed = true;
+	} else {
+		fclose(file);
+	}
+
+	state->implicit_root = false;
+	return expr;
 }
 
 /**
@@ -2736,6 +2807,8 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "      Measure times relative to the start of today\n");
 	cfprintf(cout, "  ${blu}-depth${rs}\n");
 	cfprintf(cout, "      Search in post-order (descendents first)\n");
+	cfprintf(cout, "  ${blu}-files0-from${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "      Search the NUL ('\\0')-separated paths from ${bld}FILE${rs} (${bld}-${rs} for standard input).\n");
 	cfprintf(cout, "  ${blu}-follow${rs}\n");
 	cfprintf(cout, "      Follow all symbolic links (same as ${cyn}-L${rs})\n");
 	cfprintf(cout, "  ${blu}-ignore_readdir_race${rs}\n");
@@ -2988,6 +3061,7 @@ static const struct table_entry parse_table[] = {
 	{"-exit", T_ACTION, parse_exit},
 	{"-f", T_FLAG, parse_f},
 	{"-false", T_TEST, parse_const, false},
+	{"-files0-from", T_OPTION, parse_files0_from},
 	{"-flags", T_TEST, parse_flags},
 	{"-fls", T_ACTION, parse_fls},
 	{"-follow", T_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
@@ -3408,6 +3482,11 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 		fprintf(stderr, "\n");
 	}
 
+	if (state->ok_arg && state->stdin_consumed) {
+		parse_error(state, "${blu}%s${rs} conflicts with ${blu}-files0-from${rs} ${bld}-${rs}.\n", state->ok_arg);
+		goto fail;
+	}
+
 	return expr;
 
 fail:
@@ -3627,8 +3706,10 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.regex_flags = 0,
 		.stdout_tty = stdout_tty,
 		.interactive = stdin_tty && stderr_tty,
+		.stdin_consumed = false,
 		.use_color = use_color,
 		.implicit_print = true,
+		.implicit_root = true,
 		.non_option_seen = false,
 		.just_info = false,
 		.excluding = false,
@@ -3637,6 +3718,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.prune_arg = NULL,
 		.mount_arg = NULL,
 		.xdev_arg = NULL,
+		.ok_arg = NULL,
 	};
 
 	if (strcmp(xbasename(state.command), "find") == 0) {
@@ -3663,7 +3745,10 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (darray_length(ctx->paths) == 0) {
-		if (parse_root(&state, ".") != 0) {
+		if (!state.implicit_root) {
+			parse_error(&state, "No root paths specified.\n");
+			goto fail;
+		} else if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}
 	}

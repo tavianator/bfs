@@ -256,7 +256,12 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		cfclose(cerr);
 
 		free_colors(ctx->colors);
+
+		for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+			free((char *)ctx->paths[i]);
+		}
 		darray_free(ctx->paths);
+
 		free(ctx->argv);
 		free(ctx);
 	}

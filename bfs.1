@@ -267,6 +267,15 @@ Search in post-order (descendents first).
 .B \-follow
 Follow all symbolic links (same as
 .BR \-L ).
+.TP
+\fB\-files0\-from \fIFILE\fR
+Treat the NUL ('\\0')-separated paths in
+.I FILE
+as starting points for the search.
+Pass
+.B \-files0\-from
+.I \-
+to read the paths from standard input.
 .PP
 \fB\-ignore_readdir_race\fR
 .br

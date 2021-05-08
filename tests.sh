@@ -503,6 +503,14 @@ gnu_tests=(
 
     test_false
 
+    test_files0_from_file
+    test_files0_from_stdin
+    test_files0_from_none
+    test_files0_from_empty
+    test_files0_from_nowhere
+    test_files0_from_nothing
+    test_files0_from_ok
+
     test_fls
 
     test_follow
@@ -2997,6 +3005,35 @@ function test_flags() {
     chflags offline scratch/bar || return 0
 
     bfs_diff scratch -flags -offline,nohidden
+}
+
+function test_files0_from_file() {
+    invoke_bfs basic -fprint0 scratch/files0.in
+    bfs_diff -files0-from scratch/files0.in
+}
+
+function test_files0_from_stdin() {
+    invoke_bfs basic -print0 | bfs_diff -files0-from -
+}
+
+function test_files0_from_none() {
+    ! printf "" | quiet invoke_bfs -files0-from -
+}
+
+function test_files0_from_empty() {
+    ! printf "\0" | quiet invoke_bfs -files0-from -
+}
+
+function test_files0_from_nowhere() {
+    ! quiet invoke_bfs -files0-from
+}
+
+function test_files0_from_nothing() {
+    ! quiet invoke_bfs -files0-from basic/nonexistent
+}
+
+function test_files0_from_ok() {
+    ! printf "basic\0" | quiet invoke_bfs -files0-from - -ok echo {} \;
 }
 
 
