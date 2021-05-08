@@ -266,31 +266,6 @@ bool is_nonexistence_error(int error) {
 	return error == ENOENT || errno == ENOTDIR;
 }
 
-/** Read a line from standard input. */
-static char *xgetline(void) {
-	char *line = dstralloc(0);
-	if (!line) {
-		return NULL;
-	}
-
-	while (true) {
-		int c = fgetc(stdin);
-		if (c == '\n' || c == EOF) {
-			break;
-		}
-
-		if (dstrapp(&line, c) != 0) {
-			goto error;
-		}
-	}
-
-	return line;
-
-error:
-	dstrfree(line);
-	return NULL;
-}
-
 /** Compile and execute a regular expression for xrpmatch(). */
 static int xrpregex(nl_item item, const char *response) {
 	const char *pattern = nl_langinfo(item);
@@ -339,9 +314,9 @@ static int xrpmatch(const char *response) {
 int ynprompt() {
 	fflush(stderr);
 
-	char *line = xgetline();
+	char *line = xgetdelim(stdin, '\n');
 	int ret = line ? xrpmatch(line) : -1;
-	dstrfree(line);
+	free(line);
 	return ret;
 }
 
@@ -432,4 +407,22 @@ char *xconfstr(int name) {
 	}
 
 	return str;
+}
+
+char *xgetdelim(FILE *file, char delim) {
+	char *chunk = NULL;
+	size_t n = 0;
+	ssize_t len = getdelim(&chunk, &n, delim, file);
+	if (len >= 0) {
+		if (chunk[len] == delim) {
+			chunk[len] = '\0';
+		}
+		return chunk;
+	} else {
+		free(chunk);
+		if (!ferror(file)) {
+			errno = 0;
+		}
+		return NULL;
+	}
 }

@@ -26,6 +26,7 @@
 #include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <sys/types.h>
 
 // Some portability concerns
@@ -273,5 +274,18 @@ size_t xwrite(int fd, const void *buf, size_t nbytes);
  *         The value of the confstr, or NULL on failure.
  */
 char *xconfstr(int name);
+
+/**
+ * Convenience wrapper for getdelim().
+ *
+ * @param file
+ *         The file to read.
+ * @param delim
+ *         The delimiter character to split on.
+ * @return
+ *         The read chunk (without the delimiter), allocated with malloc().
+ *         NULL is returned on error (errno != 0) or end of file (errno == 0).
+ */
+char *xgetdelim(FILE *file, char delim);
 
 #endif // BFS_UTIL_H
