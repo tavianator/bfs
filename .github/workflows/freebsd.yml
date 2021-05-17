@@ -8,6 +8,8 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    concurrency: muon
+
     steps:
       - uses: actions/checkout@v2
 
