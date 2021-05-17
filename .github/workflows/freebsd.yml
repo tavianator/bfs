@@ -23,6 +23,7 @@ jobs:
           TAILSCALE_KEY: ${{ secrets.TAILSCALE_KEY }}
         run: |
           sudo tailscale up --authkey="$TAILSCALE_KEY"
+          tailscale netcheck
 
       - name: Configure SSH
         env:
@@ -31,9 +32,9 @@ jobs:
           mkdir ~/.ssh
           printf '%s' "$SSH_KEY" >~/.ssh/github-actions
           chmod 0600 ~/.ssh/github-actions
-          printf 'Host muon\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' >~/.ssh/config
+          printf 'Host fd7a:115c:a1e0:ab12:4843:cd96:6265:b302\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' >~/.ssh/config
 
       - name: Run tests
         run: |
-          rsync -rl --delete . muon:bfs
-          ssh muon 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck'
+          rsync -rl --delete . '[fd7a:115c:a1e0:ab12:4843:cd96:6265:b302]':bfs
+          ssh fd7a:115c:a1e0:ab12:4843:cd96:6265:b302 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck'
