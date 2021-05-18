@@ -13,19 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Install dependencies
-        run: |
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | sudo apt-key add -
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | sudo tee /etc/apt/sources.list.d/tailscale.list
-          sudo apt-get update -y
-          sudo apt-get install -y tailscale
-
-      - name: Configure Tailscale
-        env:
-          TAILSCALE_KEY: ${{ secrets.TAILSCALE_KEY }}
-        run: |
-          sudo tailscale up --authkey="$TAILSCALE_KEY"
-          tailscale netcheck
+      - uses: tailscale/github-action@main
+        with:
+          authkey: ${{ secrets.TAILSCALE_KEY }}
+          version: 1.8.3
 
       - name: Configure SSH
         env:
