@@ -877,11 +877,11 @@ bool eval_size(const struct expr *expr, struct eval_state *state) {
 		[SIZE_BLOCKS] = 512,
 		[SIZE_BYTES] = 1,
 		[SIZE_WORDS] = 2,
-		[SIZE_KB] = 1024,
-		[SIZE_MB] = 1024LL*1024,
-		[SIZE_GB] = 1024LL*1024*1024,
-		[SIZE_TB] = 1024LL*1024*1024*1024,
-		[SIZE_PB] = 1024LL*1024*1024*1024*1024,
+		[SIZE_KB] = 1LL << 10,
+		[SIZE_MB] = 1LL << 20,
+		[SIZE_GB] = 1LL << 30,
+		[SIZE_TB] = 1LL << 40,
+		[SIZE_PB] = 1LL << 50,
 	};
 
 	off_t scale = scales[expr->size_unit];

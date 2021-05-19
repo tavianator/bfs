@@ -66,7 +66,7 @@ static size_t bfs_exec_arg_size(const char *arg) {
 }
 
 /** Even if we can pass a bigger argument list, cap it here. */
-#define BFS_EXEC_ARG_MAX (16*1024*1024)
+#define BFS_EXEC_ARG_MAX (16 << 20)
 
 /** Determine the maximum argv size. */
 static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
