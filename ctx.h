@@ -24,6 +24,7 @@
 #include "bftw.h"
 #include "trie.h"
 #include <stdbool.h>
+#include <sys/resource.h>
 
 /**
  * Various debugging flags.
@@ -117,6 +118,11 @@ struct bfs_ctx {
 	struct trie files;
 	/** The number of files owned by the context. */
 	int nfiles;
+
+	/** The initial RLIMIT_NOFILE soft limit. */
+	rlim_t nofile_soft;
+	/** The initial RLIMIT_NOFILE hard limit. */
+	rlim_t nofile_hard;
 };
 
 /**

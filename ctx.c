@@ -93,6 +93,15 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	trie_init(&ctx->files);
 	ctx->nfiles = 0;
 
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+		ctx->nofile_soft = rl.rlim_cur;
+		ctx->nofile_hard = rl.rlim_max;
+	} else {
+		ctx->nofile_soft = 1024;
+		ctx->nofile_hard = RLIM_INFINITY;
+	}
+
 	return ctx;
 }
 

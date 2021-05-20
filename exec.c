@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -355,6 +356,15 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 	}
 
 	if (bfs_spawn_setflags(&ctx, BFS_SPAWN_USEPATH) != 0) {
+		goto fail;
+	}
+
+	// Reset RLIMIT_NOFILE, to avoid breaking applications that use select()
+	struct rlimit rl = {
+		.rlim_cur = execbuf->ctx->nofile_soft,
+		.rlim_max = execbuf->ctx->nofile_hard,
+	};
+	if (bfs_spawn_addsetrlimit(&ctx, RLIMIT_NOFILE, &rl) != 0) {
 		goto fail;
 	}
 

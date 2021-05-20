@@ -1413,19 +1413,42 @@ done:
 	return state.action;
 }
 
-/**
- * Infer the number of open file descriptors we're allowed to have.
- */
-static int infer_fdlimit(const struct bfs_ctx *ctx) {
-	int ret = 4096;
+/** Compare two rlimit values, accounting for RLIM_INFINITY etc. */
+static int rlim_cmp(rlim_t a, rlim_t b) {
+	// Consider RLIM_{INFINITY,SAVED_{CUR,MAX}} all equally infinite
+	bool a_inf = a == RLIM_INFINITY || a == RLIM_SAVED_CUR || a == RLIM_SAVED_MAX;
+	bool b_inf = b == RLIM_INFINITY || b == RLIM_SAVED_CUR || b == RLIM_SAVED_MAX;
+	if (a_inf || b_inf) {
+		return a_inf - b_inf;
+	}
 
-	struct rlimit rl;
-	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-		if (rl.rlim_cur != RLIM_INFINITY) {
-			ret = rl.rlim_cur;
+	return (a > b) - (a < b);
+}
+
+/** Raise RLIMIT_NOFILE if possible, and return the new limit. */
+static int raise_fdlimit(const struct bfs_ctx *ctx) {
+	rlim_t target = 64 << 10;
+	if (rlim_cmp(target, ctx->nofile_hard) > 0) {
+		target = ctx->nofile_hard;
+	}
+
+	int ret = target;
+
+	if (rlim_cmp(target, ctx->nofile_soft) > 0) {
+		const struct rlimit rl = {
+			.rlim_cur = target,
+			.rlim_max = ctx->nofile_hard,
+		};
+		if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+			ret = ctx->nofile_soft;
 		}
 	}
 
+	return ret;
+}
+
+/** Infer the number of file descriptors available to bftw(). */
+static int infer_fdlimit(const struct bfs_ctx *ctx, int limit) {
 	// 3 for std{in,out,err}
 	int nopen = 3 + ctx->nfiles;
 
@@ -1446,7 +1469,7 @@ static int infer_fdlimit(const struct bfs_ctx *ctx) {
 		bfs_closedir(dir);
 	}
 
-	ret -= nopen;
+	int ret = limit - nopen;
 	ret -= ctx->expr->persistent_fds;
 	ret -= ctx->expr->ephemeral_fds;
 
@@ -1512,12 +1535,15 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 		args.seen = &seen;
 	}
 
+	int fdlimit = raise_fdlimit(ctx);
+	fdlimit = infer_fdlimit(ctx, fdlimit);
+
 	struct bftw_args bftw_args = {
 		.paths = ctx->paths,
 		.npaths = darray_length(ctx->paths),
 		.callback = eval_callback,
 		.ptr = &args,
-		.nopenfd = infer_fdlimit(ctx),
+		.nopenfd = fdlimit,
 		.flags = ctx->flags,
 		.strategy = ctx->strategy,
 		.mtab = bfs_ctx_mtab(ctx),
