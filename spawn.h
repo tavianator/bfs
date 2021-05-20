@@ -21,6 +21,7 @@
 #ifndef BFS_SPAWN_H
 #define BFS_SPAWN_H
 
+#include <sys/resource.h>
 #include <sys/types.h>
 
 /**
@@ -81,6 +82,13 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd);
  * @return 0 on success, -1 on failure.
  */
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd);
+
+/**
+ * Add a setrlimit() action to a bfs_spawn() context.
+ *
+ * @return 0 on success, -1 on failure.
+ */
+int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl);
 
 /**
  * Spawn a new process.

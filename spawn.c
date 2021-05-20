@@ -29,6 +29,7 @@ enum bfs_spawn_op {
 	BFS_SPAWN_CLOSE,
 	BFS_SPAWN_DUP2,
 	BFS_SPAWN_FCHDIR,
+	BFS_SPAWN_SETRLIMIT,
 };
 
 /**
@@ -40,6 +41,8 @@ struct bfs_spawn_action {
 	enum bfs_spawn_op op;
 	int in_fd;
 	int out_fd;
+	int resource;
+	struct rlimit rlimit;
 };
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
@@ -125,6 +128,17 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	}
 }
 
+int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
+	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_SETRLIMIT);
+	if (action) {
+		action->resource = resource;
+		action->rlimit = *rl;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
 /** Facade for execvpe() which is non-standard. */
 static int bfs_execvpe(const char *exe, char **argv, char **envp) {
 #if __GLIBC__ || __linux__ || __NetBSD__ || __OpenBSD__
@@ -174,6 +188,11 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 			break;
 		case BFS_SPAWN_FCHDIR:
 			if (fchdir(action->in_fd) != 0) {
+				goto fail;
+			}
+			break;
+		case BFS_SPAWN_SETRLIMIT:
+			if (setrlimit(action->resource, &action->rlimit) != 0) {
 				goto fail;
 			}
 			break;
