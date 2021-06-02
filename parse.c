@@ -1800,7 +1800,7 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 		case MODE_CLAUSE:
 			who = 0;
 			mstate = MODE_WHO;
-			// Fallthrough
+			fallthrough;
 
 		case MODE_WHO:
 			switch (*i) {
@@ -1827,7 +1827,7 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 			case MODE_EQUALS:
 				expr->file_mode &= ~who;
 				expr->dir_mode &= ~who;
-				// Fallthrough
+				fallthrough;
 			case MODE_PLUS:
 				expr->file_mode |= file_change;
 				expr->dir_mode |= dir_change;
@@ -1837,7 +1837,7 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 				expr->dir_mode &= ~dir_change;
 				break;
 			}
-			// Fallthrough
+			fallthrough;
 
 		case MODE_ACTION:
 			if (who == 0) {
@@ -1919,7 +1919,7 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 				break;
 			case 'x':
 				file_change |= who & 0111;
-				// Fallthrough
+				fallthrough;
 			case 'X':
 				dir_change |= who & 0111;
 				break;
@@ -1982,7 +1982,7 @@ static struct expr *parse_perm(struct parser_state *state, int field, int arg2) 
 			++mode;
 			break;
 		}
-		// Fallthrough
+		fallthrough;
 	default:
 		expr->mode_cmp = MODE_EXACT;
 		break;

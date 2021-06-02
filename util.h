@@ -42,6 +42,12 @@
 #	define BFS_HAS_INCLUDE(header, fallback) fallback
 #endif
 
+#ifdef __has_c_attribute
+#	define BFS_HAS_C_ATTRIBUTE(attr) __has_c_attribute(attr)
+#else
+#	define BFS_HAS_C_ATTRIBUTE(attr) false
+#endif
+
 #ifndef BFS_HAS_MNTENT
 #	define BFS_HAS_MNTENT BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
 #endif
@@ -84,6 +90,14 @@
 
 #ifndef O_DIRECTORY
 #	define O_DIRECTORY 0
+#endif
+
+#if BFS_HAS_C_ATTRIBUTE(fallthrough)
+#	define fallthrough [[fallthrough]]
+#elif __GNUC__
+#	define fallthrough __attribute__((fallthrough))
+#else
+#	define fallthrough
 #endif
 
 /**

@@ -33,7 +33,14 @@ INSTALL ?= install
 MKDIR ?= mkdir -p
 RM ?= rm -f
 
-DEFAULT_CFLAGS ?= -g -Wall -Wmissing-declarations -Wshadow -Wsign-compare -Wstrict-prototypes
+DEFAULT_CFLAGS := \
+    -g \
+    -Wall \
+    -Wmissing-declarations \
+    -Wshadow \
+    -Wsign-compare \
+    -Wstrict-prototypes \
+    -Wimplicit-fallthrough
 
 CFLAGS ?= $(DEFAULT_CFLAGS)
 LDFLAGS ?=
