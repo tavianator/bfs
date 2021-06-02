@@ -1,6 +1,27 @@
 2.*
 ===
 
+2.2.1
+-----
+
+**June 2, 2021**
+
+- Fixed some incorrect coloring of broken links when links are being followed (`-L`)
+
+- Made the tests work when run as root by dropping privileges.
+  This may be helpful for certain packaging or CI environments, but is not recommended.
+
+- Treat empty `PAGER` and `LESS` environment variables like they're unset, for `bfs -help` ([#71]).
+  Thanks @markus-oberhumer!
+
+- The soft `RLIMIT_NOFILE` is now raised automatically to a fairly large value when possible.
+  This provides a minor performance benefit for large directory trees.
+
+- Implemented time units for `-mtime` as found in FreeBSD find ([#75])
+
+[#71]: https://github.com/tavianator/bfs/issues/71
+[#75]: https://github.com/tavianator/bfs/issues/75
+
 2.2
 ---
 
