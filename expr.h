@@ -65,6 +65,8 @@ enum mode_cmp {
  * Possible time units.
  */
 enum time_unit {
+	/** Seconds. */
+	SECONDS,
 	/** Minutes. */
 	MINUTES,
 	/** Days. */

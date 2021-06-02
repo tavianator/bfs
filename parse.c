@@ -916,9 +916,9 @@ fail:
 }
 
 /**
- * Parse -[aBcm]{min,time}.
+ * Parse -[aBcm]min.
  */
-static struct expr *parse_time(struct parser_state *state, int field, int unit) {
+static struct expr *parse_min(struct parser_state *state, int field, int arg2) {
 	struct expr *expr = parse_test_icmp(state, eval_time);
 	if (!expr) {
 		return NULL;
@@ -927,8 +927,81 @@ static struct expr *parse_time(struct parser_state *state, int field, int unit) 
 	expr->cost = STAT_COST;
 	expr->reftime = state->now;
 	expr->stat_field = field;
-	expr->time_unit = unit;
+	expr->time_unit = MINUTES;
 	return expr;
+}
+
+/**
+ * Parse -[aBcm]time.
+ */
+static struct expr *parse_time(struct parser_state *state, int field, int arg2) {
+	struct expr *expr = parse_unary_test(state, eval_time);
+	if (!expr) {
+		return NULL;
+	}
+
+	expr->cost = STAT_COST;
+	expr->reftime = state->now;
+	expr->stat_field = field;
+
+	const char *tail = parse_icmp(state, expr->sdata, expr, IF_PARTIAL_OK);
+	if (!tail) {
+		goto fail;
+	}
+
+	if (!*tail) {
+		expr->time_unit = DAYS;
+		return expr;
+	}
+
+	unsigned long long time = expr->idata;
+	expr->idata = 0;
+
+	while (true) {
+		switch (*tail) {
+		case 'w':
+			time *= 7;
+			fallthrough;
+		case 'd':
+			time *= 24;
+			fallthrough;
+		case 'h':
+			time *= 60;
+			fallthrough;
+		case 'm':
+			time *= 60;
+			fallthrough;
+		case 's':
+			break;
+		default:
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Unknown time unit ${bld}%c${rs}.\n",
+			            expr->argv[0], expr->argv[1], *tail);
+			goto fail;
+		}
+
+		expr->idata += time;
+
+		if (!*++tail) {
+			break;
+		}
+
+		tail = parse_int(state, tail, &time, IF_PARTIAL_OK | IF_LONG_LONG | IF_UNSIGNED);
+		if (!tail) {
+			goto fail;
+		}
+		if (!*tail) {
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Missing time unit.\n",
+			            expr->argv[0], expr->argv[1]);
+			goto fail;
+		}
+	}
+
+	expr->time_unit = SECONDS;
+	return expr;
+
+fail:
+	free_expr(expr);
+	return NULL;
 }
 
 /**
@@ -2893,10 +2966,10 @@ static const struct table_entry parse_table[] = {
 	{"--", T_FLAG},
 	{"--help", T_ACTION, parse_help},
 	{"--version", T_ACTION, parse_version},
-	{"-Bmin", T_TEST, parse_time, BFS_STAT_BTIME, MINUTES},
+	{"-Bmin", T_TEST, parse_min, BFS_STAT_BTIME},
 	{"-Bnewer", T_TEST, parse_newer, BFS_STAT_BTIME},
 	{"-Bsince", T_TEST, parse_since, BFS_STAT_BTIME},
-	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME, DAYS},
+	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME},
 	{"-D", T_FLAG, parse_debug},
 	{"-E", T_FLAG, parse_regex_extended},
 	{"-H", T_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
@@ -2907,17 +2980,17 @@ static const struct table_entry parse_table[] = {
 	{"-X", T_FLAG, parse_xargs_safe},
 	{"-a", T_OPERATOR},
 	{"-acl", T_TEST, parse_acl},
-	{"-amin", T_TEST, parse_time, BFS_STAT_ATIME, MINUTES},
+	{"-amin", T_TEST, parse_min, BFS_STAT_ATIME},
 	{"-and", T_OPERATOR},
 	{"-anewer", T_TEST, parse_newer, BFS_STAT_ATIME},
 	{"-asince", T_TEST, parse_since, BFS_STAT_ATIME},
-	{"-atime", T_TEST, parse_time, BFS_STAT_ATIME, DAYS},
+	{"-atime", T_TEST, parse_time, BFS_STAT_ATIME},
 	{"-capable", T_TEST, parse_capable},
-	{"-cmin", T_TEST, parse_time, BFS_STAT_CTIME, MINUTES},
+	{"-cmin", T_TEST, parse_min, BFS_STAT_CTIME},
 	{"-cnewer", T_TEST, parse_newer, BFS_STAT_CTIME},
 	{"-color", T_OPTION, parse_color, true},
 	{"-csince", T_TEST, parse_since, BFS_STAT_CTIME},
-	{"-ctime", T_TEST, parse_time, BFS_STAT_CTIME, DAYS},
+	{"-ctime", T_TEST, parse_time, BFS_STAT_CTIME},
 	{"-d", T_FLAG, parse_depth},
 	{"-daystart", T_OPTION, parse_daystart},
 	{"-delete", T_ACTION, parse_delete},
@@ -2953,11 +3026,11 @@ static const struct table_entry parse_table[] = {
 	{"-ls", T_ACTION, parse_ls},
 	{"-maxdepth", T_OPTION, parse_depth_limit, false},
 	{"-mindepth", T_OPTION, parse_depth_limit, true},
-	{"-mmin", T_TEST, parse_time, BFS_STAT_MTIME, MINUTES},
+	{"-mmin", T_TEST, parse_min, BFS_STAT_MTIME},
 	{"-mnewer", T_TEST, parse_newer, BFS_STAT_MTIME},
 	{"-mount", T_OPTION, parse_mount},
 	{"-msince", T_TEST, parse_since, BFS_STAT_MTIME},
-	{"-mtime", T_TEST, parse_time, BFS_STAT_MTIME, DAYS},
+	{"-mtime", T_TEST, parse_time, BFS_STAT_MTIME},
 	{"-name", T_TEST, parse_name, false},
 	{"-newer", T_TEST, parse_newer, BFS_STAT_MTIME},
 	{"-newer", T_TEST, parse_newerxy, 0, 0, true},

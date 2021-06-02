@@ -389,6 +389,8 @@ bsd_tests=(
 
     test_msince
 
+    test_mtime_units
+
     test_name_slash
     test_name_slashes
 
@@ -2017,6 +2019,10 @@ function test_H_mnewer() {
 
 function test_msince() {
     bfs_diff times -msince 1991-12-14T00:01
+}
+
+function test_mtime_units() {
+    bfs_diff times -mtime +500w400d300h200m100s
 }
 
 function test_size_T() {

@@ -236,11 +236,13 @@ bool eval_time(const struct expr *expr, struct eval_state *state) {
 
 	time_t diff = timespec_diff(&expr->reftime, time);
 	switch (expr->time_unit) {
+	case DAYS:
+		diff /= 60*24;
+		fallthrough;
 	case MINUTES:
 		diff /= 60;
-		break;
-	case DAYS:
-		diff /= 60*60*24;
+		fallthrough;
+	case SECONDS:
 		break;
 	}
 
