@@ -48,6 +48,12 @@
 #	define BFS_HAS_C_ATTRIBUTE(attr) false
 #endif
 
+#if __GNUC__ && defined(__has_attribute)
+#	define BFS_HAS_GNU_ATTRIBUTE(attr) __has_attribute(attr)
+#else
+#	define BFS_HAS_GNU_ATTRIBUTE(attr) false
+#endif
+
 #ifndef BFS_HAS_MNTENT
 #	define BFS_HAS_MNTENT BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
 #endif
@@ -94,16 +100,16 @@
 
 #if BFS_HAS_C_ATTRIBUTE(fallthrough)
 #	define fallthrough [[fallthrough]]
-#elif __GNUC__
+#elif BFS_HAS_GNU_ATTRIBUTE(fallthrough)
 #	define fallthrough __attribute__((fallthrough))
 #else
-#	define fallthrough
+#	define fallthrough ((void)0)
 #endif
 
 /**
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
-#if __GNUC__
+#if BFS_HAS_GNU_ATTRIBUTE(format)
 #	define BFS_FORMATTER(fmt, args) __attribute__((format(printf, fmt, args)))
 #else
 #	define BFS_FORMATTER(fmt, args)
