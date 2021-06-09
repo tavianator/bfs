@@ -99,11 +99,11 @@
 #endif
 
 #if BFS_HAS_C_ATTRIBUTE(fallthrough)
-#	define fallthrough [[fallthrough]]
+#	define BFS_FALLTHROUGH [[fallthrough]]
 #elif BFS_HAS_GNU_ATTRIBUTE(fallthrough)
-#	define fallthrough __attribute__((fallthrough))
+#	define BFS_FALLTHROUGH __attribute__((fallthrough))
 #else
-#	define fallthrough ((void)0)
+#	define BFS_FALLTHROUGH ((void)0)
 #endif
 
 /**

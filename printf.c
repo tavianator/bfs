@@ -630,7 +630,7 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 				case '0':
 				case '+':
 					must_be_numeric = true;
-					fallthrough;
+					BFS_FALLTHROUGH;
 				case ' ':
 				case '-':
 					if (strchr(directive->str, c)) {
