@@ -217,6 +217,11 @@ fail:
 }
 
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+	extern char **environ;
+	if (!envp) {
+		envp = environ;
+	}
+
 	// Use a pipe to report errors from the child
 	int pipefd[2];
 	if (pipe_cloexec(pipefd) != 0) {

@@ -100,7 +100,8 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
  * @param argv
  *         The arguments for the new process.
  * @param envp
- *         The environment variables for the new process.
+ *         The environment variables for the new process (NULL for the current
+ *         environment.
  * @return
  *         The PID of the new process, or -1 on error.
  */

@@ -374,7 +374,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		}
 	}
 
-	pid = bfs_spawn(execbuf->argv[0], &ctx, execbuf->argv, environ);
+	pid = bfs_spawn(execbuf->argv[0], &ctx, execbuf->argv, NULL);
 fail:
 	error = errno;
 	bfs_spawn_destroy(&ctx);
