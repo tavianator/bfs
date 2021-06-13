@@ -2567,13 +2567,23 @@ static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
  */
 static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	char *pager = getenv("PAGER");
-	if (!pager || !pager[0]) {
-		pager = "more";
+
+	char *exe;
+	if (pager && pager[0]) {
+		exe = bfs_spawn_resolve(pager);
+	} else {
+		exe = bfs_spawn_resolve("less");
+		if (!exe) {
+			exe = bfs_spawn_resolve("more");
+		}
+	}
+	if (!exe) {
+		goto fail;
 	}
 
 	int pipefd[2];
 	if (pipe(pipefd) != 0) {
-		goto fail;
+		goto fail_exe;
 	}
 
 	FILE *file = fdopen(pipefd[1], "w");
@@ -2588,15 +2598,10 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	}
 	file = NULL;
 	ret->close = true;
-	ret->colors = cout->colors;
 
 	struct bfs_spawn ctx;
 	if (bfs_spawn_init(&ctx) != 0) {
 		goto fail_ret;
-	}
-
-	if (bfs_spawn_setflags(&ctx, BFS_SPAWN_USEPATH) != 0) {
-		goto fail_ctx;
 	}
 
 	if (bfs_spawn_addclose(&ctx, fileno(ret->file)) != 0) {
@@ -2610,49 +2615,27 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	}
 
 	char *argv[] = {
-		pager,
+		exe,
+		NULL,
 		NULL,
 	};
 
-	extern char **environ;
-	char **envp = environ;
-
-	const char *less = getenv("LESS");
-	if (!less || !less[0]) {
-		size_t envc;
-		for (envc = 0; environ[envc]; ++envc) { }
-
-		envp = malloc((envc + 2)*sizeof(*envp));
-		if (!envp) {
-			goto fail_ctx;
-		}
-
-		size_t j = 0;
-		for (size_t i = 0; i < envc; ++i) {
-			if (strncmp(environ[i], "LESS=", 5) != 0) {
-				envp[j++] = environ[i];
-			}
-		}
-		envp[j++] = "LESS=FKRX";
-		envp[j] = NULL;
+	if (strcmp(xbasename(exe), "less") == 0) {
+		// We know less supports colors, other pagers may not
+		ret->colors = cout->colors;
+		argv[1] = "-FKRX";
 	}
 
-	*pid = bfs_spawn(pager, &ctx, argv, envp);
+	*pid = bfs_spawn(exe, &ctx, argv, NULL);
 	if (*pid < 0) {
-		goto fail_envp;
+		goto fail_ctx;
 	}
 
 	close(pipefd[0]);
-	if (envp != environ) {
-		free(envp);
-	}
 	bfs_spawn_destroy(&ctx);
+	free(exe);
 	return ret;
 
-fail_envp:
-	if (envp != environ) {
-		free(envp);
-	}
 fail_ctx:
 	bfs_spawn_destroy(&ctx);
 fail_ret:
@@ -2668,6 +2651,8 @@ fail_pipe:
 	if (pipefd[0] >= 0) {
 		close(pipefd[0]);
 	}
+fail_exe:
+	free(exe);
 fail:
 	return cout;
 }
