@@ -264,4 +264,14 @@ size_t xread(int fd, void *buf, size_t nbytes);
  */
 size_t xwrite(int fd, const void *buf, size_t nbytes);
 
+/**
+ * Wrapper for confstr() that allocates with malloc().
+ *
+ * @param name
+ *         The ID of the confstr to look up.
+ * @return
+ *         The value of the confstr, or NULL on failure.
+ */
+char *xconfstr(int name);
+
 #endif // BFS_UTIL_H

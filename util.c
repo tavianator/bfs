@@ -414,3 +414,22 @@ size_t xwrite(int fd, const void *buf, size_t nbytes) {
 
 	return count;
 }
+
+char *xconfstr(int name) {
+	size_t len = confstr(name, NULL, 0);
+	if (len == 0) {
+		return NULL;
+	}
+
+	char *str = malloc(len);
+	if (!str) {
+		return NULL;
+	}
+
+	if (confstr(name, str, len) != len) {
+		free(str);
+		return NULL;
+	}
+
+	return str;
+}
