@@ -107,4 +107,17 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
  */
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp);
 
+/**
+ * Look up an executable in the current PATH, as BFS_SPAWN_USEPATH or execvp()
+ * would do.
+ *
+ * @param exe
+ *         The name of the binary to execute.  Bare names without a '/' will be
+ *         searched on the provided PATH.
+ * @return
+ *         The full path to the executable, which should be free()'d, or NULL on
+ *         failure.
+ */
+char *bfs_spawn_resolve(const char *exe);
+
 #endif // BFS_SPAWN_H

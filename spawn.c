@@ -17,7 +17,9 @@
 #include "spawn.h"
 #include "util.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -139,21 +141,9 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
 	}
 }
 
-/** Facade for execvpe() which is non-standard. */
-static int bfs_execvpe(const char *exe, char **argv, char **envp) {
-#if __GLIBC__ || __linux__ || __NetBSD__ || __OpenBSD__
-	return execvpe(exe, argv, envp);
-#else
-	extern char **environ;
-	environ = envp;
-	return execvp(exe, argv);
-#endif
-}
-
 /** Actually exec() the new process. */
 static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	int error;
-	enum bfs_spawn_flags flags = ctx ? ctx->flags : 0;
 	const struct bfs_spawn_action *actions = ctx ? ctx->actions : NULL;
 
 	close(pipefd[0]);
@@ -199,11 +189,7 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 		}
 	}
 
-	if (flags & BFS_SPAWN_USEPATH) {
-		bfs_execvpe(exe, argv, envp);
-	} else {
-		execve(exe, argv, envp);
-	}
+	execve(exe, argv, envp);
 
 fail:
 	error = errno;
@@ -220,6 +206,15 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	extern char **environ;
 	if (!envp) {
 		envp = environ;
+	}
+
+	enum bfs_spawn_flags flags = ctx ? ctx->flags : 0;
+	char *resolved = NULL;
+	if (flags & BFS_SPAWN_USEPATH) {
+		exe = resolved = bfs_spawn_resolve(exe);
+		if (!resolved) {
+			return -1;
+		}
 	}
 
 	// Use a pipe to report errors from the child
@@ -244,6 +239,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 
 	// Parent
 	close(pipefd[1]);
+	free(resolved);
 
 	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
 	close(pipefd[0]);
@@ -255,4 +251,69 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	}
 
 	return pid;
+}
+
+char *bfs_spawn_resolve(const char *exe) {
+	if (strchr(exe, '/')) {
+		return strdup(exe);
+	}
+
+	const char *path = getenv("PATH");
+
+	char *confpath = NULL;
+	if (!path) {
+		path = confpath = xconfstr(_CS_PATH);
+		if (!path) {
+			return NULL;
+		}
+	}
+
+	size_t cap = 0;
+	char *ret = NULL;
+	while (true) {
+		const char *end = strchr(path, ':');
+		size_t len = end ? (size_t)(end - path) : strlen(path);
+
+		// POSIX 8.3: "A zero-length prefix is a legacy feature that
+		// indicates the current working directory."
+		if (len == 0) {
+			path = ".";
+			len = 1;
+		}
+
+		size_t total = len + 1 + strlen(exe) + 1;
+		if (cap < total) {
+			char *grown = realloc(ret, total);
+			if (!grown) {
+				goto fail;
+			}
+			ret = grown;
+			cap = total;
+		}
+
+		memcpy(ret, path, len);
+		if (ret[len - 1] != '/') {
+			ret[len++] = '/';
+		}
+		strcpy(ret + len, exe);
+
+		if (xfaccessat(AT_FDCWD, ret, X_OK) == 0) {
+			break;
+		}
+
+		if (!end) {
+			errno = ENOENT;
+			goto fail;
+		}
+
+		path = end + 1;
+	}
+
+	free(confpath);
+	return ret;
+
+fail:
+	free(confpath);
+	free(ret);
+	return NULL;
 }
