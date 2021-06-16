@@ -120,11 +120,14 @@ static char **get_color(const struct colors *colors, const char *name) {
 }
 
 /** Set the value of a color. */
-static void set_color(struct colors *colors, const char *name, char *value) {
+static int set_color(struct colors *colors, const char *name, char *value) {
 	char **color = get_color(colors, name);
 	if (color) {
 		dstrfree(*color);
 		*color = value;
+		return 0;
+	} else {
+		return -1;
 	}
 }
 
@@ -462,7 +465,9 @@ struct colors *parse_colors(const char *ls_colors) {
 				value = NULL;
 			}
 
-			set_color(colors, key, value);
+			if (set_color(colors, key, value) != 0) {
+				dstrfree(value);
+			}
 			free(key);
 		}
 	}
