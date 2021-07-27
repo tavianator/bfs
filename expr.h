@@ -33,11 +33,6 @@
 #include <time.h>
 
 /**
- * A command line expression.
- */
-struct expr;
-
-/**
  * Possible types of numeric comparison.
  */
 enum cmp_flag {
@@ -95,6 +90,9 @@ enum size_unit {
 	SIZE_PB,
 };
 
+/**
+ * A command line expression.
+ */
 struct expr {
 	/** The function that evaluates this expression. */
 	eval_fn *eval;
