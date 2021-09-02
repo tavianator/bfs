@@ -3614,7 +3614,9 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	bool stdout_tty = isatty(STDOUT_FILENO);
 	bool stderr_tty = isatty(STDERR_FILENO);
 
-	if (!getenv("POSIXLY_CORRECT")) {
+	if (getenv("POSIXLY_CORRECT")) {
+		ctx->posixly_correct = true;
+	} else {
 		ctx->warn = stdin_tty;
 	}
 

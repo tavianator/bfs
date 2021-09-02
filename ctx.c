@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -72,6 +72,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->optlevel = 3;
 	ctx->debug = 0;
 	ctx->ignore_races = false;
+	ctx->posixly_correct = false;
 	ctx->status = false;
 	ctx->unique = false;
 	ctx->warn = false;

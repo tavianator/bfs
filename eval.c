@@ -644,7 +644,8 @@ bool eval_fls(const struct expr *expr, struct eval_state *state) {
 	}
 
 	uintmax_t ino = statbuf->ino;
-	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 1023)/1024;
+	uintmax_t block_size = state->ctx->posixly_correct ? 512 : 1024;
+	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + block_size - 1)/block_size;
 	char mode[11];
 	xstrmode(statbuf->mode, mode);
 	char acl = bfs_check_acl(ftwbuf) > 0 ? '+' : ' ';

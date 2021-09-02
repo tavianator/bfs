@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -82,6 +82,8 @@ struct bfs_ctx {
 	enum debug_flags debug;
 	/** Whether to ignore deletions that race with bfs (-ignore_readdir_race). */
 	bool ignore_races;
+	/** Whether to follow POSIXisms more closely ($POSIXLY_CORRECT). */
+	bool posixly_correct;
 	/** Whether to show a status bar (-status). */
 	bool status;
 	/** Whether to only return unique files (-unique). */
