@@ -21,7 +21,7 @@
 #ifndef BFS_PRINTF_H
 #define BFS_PRINTF_H
 
-#include <stdio.h>
+#include "color.h"
 
 struct BFTW;
 struct bfs_ctx;
@@ -46,8 +46,8 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 /**
  * Evaluate a parsed format string.
  *
- * @param file
- *         The FILE to print to.
+ * @param cfile
+ *         The CFILE to print to.
  * @param format
  *         The parsed printf format.
  * @param ftwbuf
@@ -55,7 +55,7 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
  * @return
  *         0 on success, -1 on failure.
  */
-int bfs_printf(FILE *file, const struct bfs_printf *format, const struct BFTW *ftwbuf);
+int bfs_printf(CFILE *cfile, const struct bfs_printf *format, const struct BFTW *ftwbuf);
 
 /**
  * Free a parsed format string.

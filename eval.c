@@ -760,7 +760,7 @@ bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
  * -f?printf action.
  */
 bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
-	if (bfs_printf(expr->cfile->file, expr->printf, state->ftwbuf) != 0) {
+	if (bfs_printf(expr->cfile, expr->printf, state->ftwbuf) != 0) {
 		eval_report_error(state);
 	}
 
