@@ -2955,7 +2955,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(cout, "  ${blu}-fls${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "  ${blu}-fprint${rs} ${bld}FILE${rs}\n");
 	cfprintf(cout, "  ${blu}-fprint0${rs} ${bld}FILE${rs}\n");
-	cfprintf(cout, "  ${blu}-fprintf${rs} ${bld}FORMAT${rs} ${bld}FILE${rs}\n");
+	cfprintf(cout, "  ${blu}-fprintf${rs} ${bld}FILE${rs} ${bld}FORMAT${rs}\n");
 	cfprintf(cout, "      Like ${blu}-ls${rs}/${blu}-print${rs}/${blu}-print0${rs}/${blu}-printf${rs}, but write to ${bld}FILE${rs} instead of standard\n"
 	               "      output\n");
 	cfprintf(cout, "  ${blu}-ls${rs}\n");
