@@ -220,6 +220,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	// Use a pipe to report errors from the child
 	int pipefd[2];
 	if (pipe_cloexec(pipefd) != 0) {
+		free(resolved);
 		return -1;
 	}
 
@@ -230,6 +231,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 		error = errno;
 		close(pipefd[1]);
 		close(pipefd[0]);
+		free(resolved);
 		errno = error;
 		return -1;
 	} else if (pid == 0) {
