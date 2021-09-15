@@ -3008,12 +3008,14 @@ function test_flags() {
 }
 
 function test_files0_from_file() {
-    invoke_bfs basic -fprint0 scratch/files0.in
-    bfs_diff -files0-from scratch/files0.in
+    cd weirdnames
+    invoke_bfs -mindepth 1 -fprintf ../scratch/files0.in "%P\0"
+    bfs_diff -files0-from ../scratch/files0.in
 }
 
 function test_files0_from_stdin() {
-    invoke_bfs basic -print0 | bfs_diff -files0-from -
+    cd weirdnames
+    invoke_bfs -mindepth 1 -printf "%P\0" | bfs_diff -files0-from -
 }
 
 function test_files0_from_none() {
