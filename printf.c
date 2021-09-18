@@ -69,6 +69,11 @@ static int bfs_printf_flush(CFILE *cfile, const struct bfs_printf *directive, co
 	return fflush(cfile->file);
 }
 
+/** Check if we can safely colorize this directive. */
+static bool should_color(CFILE *cfile, const struct bfs_printf *directive) {
+	return cfile->colors && strcmp(directive->str, "%s") == 0;
+}
+
 /**
  * Print a value to a temporary buffer before formatting it.
  */
@@ -210,7 +215,11 @@ static int bfs_printf_D(CFILE *cfile, const struct bfs_printf *directive, const 
 
 /** %f: file name */
 static int bfs_printf_f(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	return fprintf(cfile->file, directive->str, ftwbuf->path + ftwbuf->nameoff);
+	if (should_color(cfile, directive)) {
+		return cfprintf(cfile, "%pF", ftwbuf);
+	} else {
+		return fprintf(cfile->file, directive->str, ftwbuf->path + ftwbuf->nameoff);
+	}
 }
 
 /** %F: file system type */
@@ -273,14 +282,28 @@ static int bfs_printf_h(CFILE *cfile, const struct bfs_printf *directive, const 
 		return -1;
 	}
 
-	int ret = fprintf(cfile->file, directive->str, buf);
+	int ret;
+	if (should_color(cfile, directive)) {
+		ret = cfprintf(cfile, "${di}%s${rs}", buf);
+	} else {
+		ret = fprintf(cfile->file, directive->str, buf);
+	}
+
 	free(copy);
 	return ret;
 }
 
 /** %H: current root */
 static int bfs_printf_H(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	return fprintf(cfile->file, directive->str, ftwbuf->root);
+	if (should_color(cfile, directive)) {
+		if (ftwbuf->depth == 0) {
+			return cfprintf(cfile, "%pP", ftwbuf);
+		} else {
+			return cfprintf(cfile, "${di}%s${rs}", ftwbuf->root);
+		}
+	} else {
+		return fprintf(cfile->file, directive->str, ftwbuf->root);
+	}
 }
 
 /** %i: inode */
@@ -312,6 +335,10 @@ static int bfs_printf_l(CFILE *cfile, const struct bfs_printf *directive, const 
 	const char *target = "";
 
 	if (ftwbuf->type == BFS_LNK) {
+		if (should_color(cfile, directive)) {
+			return cfprintf(cfile, "%pL", ftwbuf);
+		}
+
 		const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
 		size_t len = statbuf ? statbuf->size : 0;
 
@@ -361,16 +388,32 @@ static int bfs_printf_n(CFILE *cfile, const struct bfs_printf *directive, const 
 
 /** %p: full path */
 static int bfs_printf_p(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	return fprintf(cfile->file, directive->str, ftwbuf->path);
+	if (should_color(cfile, directive)) {
+		return cfprintf(cfile, "%pP", ftwbuf);
+	} else {
+		return fprintf(cfile->file, directive->str, ftwbuf->path);
+	}
 }
 
 /** %P: path after root */
 static int bfs_printf_P(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	const char *path = ftwbuf->path + strlen(ftwbuf->root);
-	if (path[0] == '/') {
-		++path;
+	size_t offset = strlen(ftwbuf->root);
+	if (ftwbuf->path[offset] == '/') {
+		++offset;
 	}
-	return fprintf(cfile->file, directive->str, path);
+
+	if (should_color(cfile, directive)) {
+		if (ftwbuf->depth == 0) {
+			return 0;
+		}
+
+		struct BFTW copybuf = *ftwbuf;
+		copybuf.path += offset;
+		copybuf.nameoff -= offset;
+		return cfprintf(cfile, "%pP", &copybuf);
+	} else {
+		return fprintf(cfile->file, directive->str, ftwbuf->path + offset);
+	}
 }
 
 /** %s: size */

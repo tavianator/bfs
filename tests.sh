@@ -765,6 +765,7 @@ bfs_tests=(
     test_printf_invalid_format
     test_printf_duplicate_flag
     test_printf_must_be_numeric
+    test_printf_color
 
     test_type_multi
 
@@ -2303,6 +2304,10 @@ function test_printf_duplicate_flag() {
 
 function test_printf_must_be_numeric() {
     ! quiet invoke_bfs basic -printf '%+p'
+}
+
+function test_printf_color() {
+    LS_COLORS= bfs_diff -color -path './rainbow*' -printf '%H %h %f %p %P %l\n'
 }
 
 function test_fprintf() {
