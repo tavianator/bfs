@@ -703,6 +703,7 @@ static int print_colored(CFILE *cfile, const char *esc, const char *str, size_t 
 /** Find the offset of the first broken path component. */
 static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t max) {
 	ssize_t ret = max;
+	assert(ret >= 0);
 
 	if (bftw_type(ftwbuf, flags) != BFS_ERROR) {
 		goto out;
@@ -787,6 +788,12 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 	return 0;
 }
 
+/** Print a file name with colors. */
+static int print_name_colored(CFILE *cfile, const char *name, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+	const char *color = file_color(cfile->colors, name, ftwbuf, flags);
+	return print_colored(cfile, color, name, strlen(name));
+}
+
 /** Print a path with colors. */
 static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	size_t nameoff;
@@ -796,11 +803,28 @@ static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW 
 		nameoff = xbasename(path) - path;
 	}
 
-	print_dirs_colored(cfile, path, ftwbuf, flags, nameoff);
+	if (print_dirs_colored(cfile, path, ftwbuf, flags, nameoff) != 0) {
+		return -1;
+	}
 
-	const char *filename = path + nameoff;
-	const char *color = file_color(cfile->colors, filename, ftwbuf, flags);
-	return print_colored(cfile, color, filename, strlen(filename));
+	return print_name_colored(cfile, path + nameoff, ftwbuf, flags);
+}
+
+/** Print the name of a file with the appropriate colors. */
+static int print_name(CFILE *cfile, const struct BFTW *ftwbuf) {
+	const char *name = ftwbuf->path + ftwbuf->nameoff;
+
+	const struct colors *colors = cfile->colors;
+	if (!colors) {
+		return dstrcat(&cfile->buffer, name);
+	}
+
+	enum bfs_stat_flags flags = ftwbuf->stat_flags;
+	if (colors->link_as_target && ftwbuf->type == BFS_LNK) {
+		flags = BFS_STAT_TRYFOLLOW;
+	}
+
+	return print_name_colored(cfile, name, ftwbuf, flags);
 }
 
 /** Print the path to a file with the appropriate colors. */
@@ -811,7 +835,7 @@ static int print_path(CFILE *cfile, const struct BFTW *ftwbuf) {
 	}
 
 	enum bfs_stat_flags flags = ftwbuf->stat_flags;
-	if (colors && colors->link_as_target && ftwbuf->type == BFS_LNK) {
+	if (colors->link_as_target && ftwbuf->type == BFS_LNK) {
 		flags = BFS_STAT_TRYFOLLOW;
 	}
 
@@ -964,6 +988,12 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 
 			case 'p':
 				switch (*++i) {
+				case 'F':
+					if (print_name(cfile, va_arg(args, const struct BFTW *)) != 0) {
+						return -1;
+					}
+					break;
+
 				case 'P':
 					if (print_path(cfile, va_arg(args, const struct BFTW *)) != 0) {
 						return -1;
