@@ -1,4 +1,4 @@
-#!/hint/bash
+# bash completion script for bfs
 
 ############################################################################
 # bfs                                                                      #
@@ -16,8 +16,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  #
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
 ############################################################################
-
-# bash completion script for bfs
 
 _bfs() {
     local cur prev words cword
