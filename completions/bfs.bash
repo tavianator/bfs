@@ -255,7 +255,7 @@ _bfs() {
             return
             ;;
         -user)
-            # -user  NAME
+            # -user NAME
             #     Find files owned by the user NAME
             COMPREPLY=($(compgen -u -- "$cur"))
             return
