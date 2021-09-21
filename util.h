@@ -288,4 +288,14 @@ char *xconfstr(int name);
  */
 char *xgetdelim(FILE *file, char delim);
 
+/**
+ * fopen() variant that takes open() style flags.
+ *
+ * @param path
+ *         The path to open.
+ * @param flags
+ *         Flags to pass to open().
+ */
+FILE *xfopen(const char *path, int flags);
+
 #endif // BFS_UTIL_H

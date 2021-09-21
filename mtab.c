@@ -162,7 +162,7 @@ struct bfs_mtab *bfs_mtab_parse() {
 
 #elif BFS_MNTTAB
 
-	FILE *file = fopen(MNTTAB, "r");
+	FILE *file = xfopen(MNTTAB, O_RDONLY | O_CLOEXEC);
 	if (!file) {
 		error = errno;
 		goto fail;

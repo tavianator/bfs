@@ -526,7 +526,7 @@ CFILE *cfopen(const char *path, const struct colors *colors) {
 		return NULL;
 	}
 
-	cfile->file = fopen(path, "wb");
+	cfile->file = xfopen(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC);
 	if (!cfile->file) {
 		cfclose(cfile);
 		return NULL;

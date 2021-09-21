@@ -1278,7 +1278,7 @@ static struct expr *parse_files0_from(struct parser_state *state, int arg1, int 
 	if (strcmp(from, "-") == 0) {
 		file = stdin;
 	} else {
-		file = fopen(from, "rb");
+		file = xfopen(from, O_RDONLY | O_CLOEXEC);
 	}
 	if (!file) {
 		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", arg, from);

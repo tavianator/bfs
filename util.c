@@ -16,6 +16,7 @@
 
 #include "util.h"
 #include "dstring.h"
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
@@ -425,4 +426,48 @@ char *xgetdelim(FILE *file, char delim) {
 		}
 		return NULL;
 	}
+}
+
+FILE *xfopen(const char *path, int flags) {
+	char mode[4];
+
+	switch (flags & O_ACCMODE) {
+	case O_RDONLY:
+		strcpy(mode, "rb");
+		break;
+	case O_WRONLY:
+		strcpy(mode, "wb");
+		break;
+	case O_RDWR:
+		strcpy(mode, "r+b");
+		break;
+	default:
+		assert(!"Invalid access mode");
+		return NULL;
+	}
+
+	if (flags & O_APPEND) {
+		mode[0] = 'a';
+	}
+
+	int fd;
+	if (flags & O_CREAT) {
+		fd = open(path, flags, 0666);
+	} else {
+		fd = open(path, flags);
+	}
+
+	if (fd < 0) {
+		return NULL;
+	}
+
+	FILE *ret = fdopen(fd, mode);
+	if (!ret) {
+		int error = errno;
+		close(fd);
+		errno = error;
+		return NULL;
+	}
+
+	return ret;
 }
