@@ -334,12 +334,24 @@ static void init_print_expr(struct parser_state *state, struct expr *expr) {
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
 	struct bfs_ctx *ctx = state->ctx;
 
-	expr->cfile = bfs_ctx_open(ctx, path, state->use_color);
-	if (!expr->cfile) {
+	CFILE *cfile = cfopen(path, state->use_color ? ctx->colors : NULL);
+	if (!cfile) {
 		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
 		return -1;
 	}
 
+	CFILE *dedup = bfs_ctx_dedup(ctx, cfile, path);
+	if (!dedup) {
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
+		cfclose(cfile);
+		return -1;
+	}
+
+	expr->cfile = dedup;
+
+	if (dedup != cfile) {
+		cfclose(cfile);
+	}
 	return 0;
 }
 
@@ -3686,6 +3698,11 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
 	if (!ctx->cout) {
 		bfs_perror(ctx, "cfdup()");
+		goto fail;
+	}
+
+	if (!bfs_ctx_dedup(ctx, ctx->cout, NULL) || !bfs_ctx_dedup(ctx, ctx->cerr, NULL)) {
+		bfs_perror(ctx, "bfs_ctx_dedup()");
 		goto fail;
 	}
 

@@ -723,6 +723,10 @@ bfs_tests=(
 
     test_execdir_plus
 
+    test_fprint_duplicate_stdout
+    test_fprint_error_stdout
+    test_fprint_error_stderr
+
     test_help
 
     test_hidden
@@ -768,6 +772,10 @@ bfs_tests=(
 
     # PATH_MAX handling
     test_deep_strict
+
+    # Error handling
+    test_stderr_fails_silently
+    test_stderr_fails_loudly
 )
 
 sudo_tests=(
@@ -1683,9 +1691,9 @@ function test_fprint() {
     sort -o scratch/test_fprint.out scratch/test_fprint.out
 
     if [ "$UPDATE" ]; then
-        cp scratch/test_fprint.out "$TESTS/test_fprint.out"
+        cp {scratch,"$TESTS"}/test_fprint.out
     else
-        diff -u scratch/test_fprint.out "$TESTS/test_fprint.out"
+        diff -u {"$TESTS",scratch}/test_fprint.out
     fi
 }
 
@@ -1698,9 +1706,22 @@ function test_fprint_duplicate() {
     sort -o scratch/test_fprint_duplicate.out scratch/test_fprint_duplicate.out
 
     if [ "$UPDATE" ]; then
-        cp scratch/test_fprint_duplicate.out "$TESTS/test_fprint_duplicate.out"
+        cp {scratch,"$TESTS"}/test_fprint_duplicate.out
     else
-        diff -u scratch/test_fprint_duplicate.out "$TESTS/test_fprint_duplicate.out"
+        diff -u {"$TESTS",scratch}/test_fprint_duplicate.out
+    fi
+}
+
+function test_fprint_duplicate_stdout() {
+    touchp scratch/test_fprint_duplicate_stdout.out
+
+    invoke_bfs basic -fprint scratch/test_fprint_duplicate_stdout.out -print >scratch/test_fprint_duplicate_stdout.out
+    sort -o scratch/test_fprint_duplicate_stdout.out{,}
+
+    if [ "$UPDATE" ]; then
+        cp {scratch,"$TESTS"}/test_fprint_duplicate_stdout.out
+    else
+        diff -u {"$TESTS",scratch}/test_fprint_duplicate_stdout.out
     fi
 }
 
@@ -2227,7 +2248,7 @@ function test_fprintf() {
     if [ "$UPDATE" ]; then
         cp scratch/test_fprintf.out "$TESTS/test_fprintf.out"
     else
-        diff -u scratch/test_fprintf.out "$TESTS/test_fprintf.out"
+        diff -u "$TESTS/test_fprintf.out" scratch/test_fprintf.out
     fi
 }
 
@@ -2603,6 +2624,18 @@ function test_print_error() {
 function test_fprint_error() {
     if [ -e /dev/full ]; then
         ! quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
+    fi
+}
+
+function test_fprint_error_stdout() {
+    if [ -e /dev/full ]; then
+        ! quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
+    fi
+}
+
+function test_fprint_error_stderr() {
+    if [ -e /dev/full ]; then
+        ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/full
     fi
 }
 
@@ -3036,6 +3069,18 @@ function test_files0_from_nothing() {
 
 function test_files0_from_ok() {
     ! printf "basic\0" | quiet invoke_bfs -files0-from - -ok echo {} \;
+}
+
+function test_stderr_fails_silently() {
+    if [ -e /dev/full ]; then
+        bfs_diff -D all basic 2>/dev/full
+    fi
+}
+
+function test_stderr_fails_loudly() {
+    if [ -e /dev/full ]; then
+        ! invoke_bfs -D all basic -false -fprint /dev/full 2>/dev/full
+    fi
 }
 
 

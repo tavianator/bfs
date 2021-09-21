@@ -161,19 +161,10 @@ struct bfs_ctx_file {
 	const char *path;
 };
 
-CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color) {
-	int error = 0;
-
-	CFILE *cfile = cfopen(path, use_color ? ctx->colors : NULL);
-	if (!cfile) {
-		error = errno;
-		goto out;
-	}
-
+struct CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 	struct bfs_stat sb;
 	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
-		error = errno;
-		goto out_close;
+		return NULL;
 	}
 
 	bfs_file_id id;
@@ -181,37 +172,60 @@ CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color) {
 
 	struct trie_leaf *leaf = trie_insert_mem(&ctx->files, id, sizeof(id));
 	if (!leaf) {
-		error = errno;
-		goto out_close;
+		return NULL;
 	}
 
-	if (leaf->value) {
-		struct bfs_ctx_file *ctx_file = leaf->value;
-		cfclose(cfile);
-		cfile = ctx_file->cfile;
-		goto out;
+	struct bfs_ctx_file *ctx_file = leaf->value;
+	if (ctx_file) {
+		ctx_file->path = path;
+		return ctx_file->cfile;
 	}
 
-	struct bfs_ctx_file *ctx_file = malloc(sizeof(*ctx_file));
+	leaf->value = ctx_file = malloc(sizeof(*ctx_file));
 	if (!ctx_file) {
-		error = errno;
 		trie_remove(&ctx->files, leaf);
-		goto out_close;
+		return NULL;
 	}
 
 	ctx_file->cfile = cfile;
 	ctx_file->path = path;
-	leaf->value = ctx_file;
 	++ctx->nfiles;
-
-	goto out;
-
-out_close:
-	cfclose(cfile);
-	cfile = NULL;
-out:
-	errno = error;
 	return cfile;
+}
+
+/** Close a file tracked by the bfs context. */
+static int bfs_ctx_close(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
+	CFILE *cfile = ctx_file->cfile;
+
+	if (cfile == ctx->cout) {
+		// Will be checked later
+		return 0;
+	} else if (cfile == ctx->cerr && !ctx_file->path) {
+		// Writes to stderr are allowed to fail silently, unless the same file was used by
+		// -fprint, -fls, etc.
+		return 0;
+	}
+
+	int ret = 0, error = 0;
+	if (ferror(cfile->file)) {
+		ret = -1;
+		error = EIO;
+	}
+
+	if (cfile == ctx->cerr) {
+		if (fflush(cfile->file) != 0) {
+			ret = -1;
+			error = errno;
+		}
+	} else {
+		if (cfclose(cfile) != 0) {
+			ret = -1;
+			error = errno;
+		}
+	}
+
+	errno = error;
+	return ret;
 }
 
 int bfs_ctx_free(struct bfs_ctx *ctx) {
@@ -233,7 +247,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		while ((leaf = trie_first_leaf(&ctx->files))) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
 
-			if (cfclose(ctx_file->cfile) != 0) {
+			if (bfs_ctx_close(ctx, ctx_file) != 0) {
 				if (cerr) {
 					bfs_error(ctx, "'%s': %m.\n", ctx_file->path);
 				}

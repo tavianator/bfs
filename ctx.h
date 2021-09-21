@@ -164,16 +164,19 @@ const struct bfs_groups *bfs_ctx_groups(const struct bfs_ctx *ctx);
 const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx);
 
 /**
- * Open a file for the bfs context.
+ * Deduplicate an opened file.
  *
  * @param ctx
  *         The bfs context.
- * @param use_color
- *         Whether to use colors if the file is a TTY.
+ * @param cfile
+ *         The opened file.
+ * @param path
+ *         The path to the opened file (or NULL for standard streams).
  * @return
- *         The opened file, or NULL on failure.
+ *         If the same file was opened previously, that file is returned.  If cfile is a new file,
+ *         cfile itself is returned.  If an error occurs, NULL is returned.
  */
-struct CFILE *bfs_ctx_open(struct bfs_ctx *ctx, const char *path, bool use_color);
+struct CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, struct CFILE *cfile, const char *path);
 
 /**
  * Dump the parsed command line.
