@@ -443,6 +443,7 @@ FILE *xfopen(const char *path, int flags) {
 		break;
 	default:
 		assert(!"Invalid access mode");
+		errno = EINVAL;
 		return NULL;
 	}
 

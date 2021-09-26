@@ -518,6 +518,7 @@ gnu_tests=(
     test_fprint
     test_fprint_duplicate
     test_fprint_error
+    test_fprint_truncate
 
     test_fprint0
 
@@ -723,6 +724,7 @@ bfs_tests=(
 
     test_execdir_plus
 
+    test_fprint_append
     test_fprint_duplicate_stdout
     test_fprint_error_stdout
     test_fprint_error_stderr
@@ -1722,6 +1724,33 @@ function test_fprint_duplicate_stdout() {
         cp {scratch,"$TESTS"}/test_fprint_duplicate_stdout.out
     else
         diff -u {"$TESTS",scratch}/test_fprint_duplicate_stdout.out
+    fi
+}
+
+function test_fprint_truncate() {
+    printf "basic\nbasic\n" >scratch/test_fprint_truncate.out
+
+    invoke_bfs basic -maxdepth 0 -fprint scratch/test_fprint_truncate.out
+    sort -o scratch/test_fprint_truncate.out scratch/test_fprint_truncate.out
+
+    if [ "$UPDATE" ]; then
+        cp {scratch,"$TESTS"}/test_fprint_truncate.out
+    else
+        diff -u {"$TESTS",scratch}/test_fprint_truncate.out
+    fi
+}
+
+function test_fprint_append() {
+    rm -f scratch/test_fprint_append.out
+
+    invoke_bfs basic -fprint scratch/test_fprint_append.out >>scratch/test_fprint_append.out
+    invoke_bfs basic -fprint scratch/test_fprint_append.out >>scratch/test_fprint_append.out
+    sort -o scratch/test_fprint_append.out scratch/test_fprint_append.out
+
+    if [ "$UPDATE" ]; then
+        cp {scratch,"$TESTS"}/test_fprint_append.out
+    else
+        diff -u {"$TESTS",scratch}/test_fprint_append.out
     fi
 }
 

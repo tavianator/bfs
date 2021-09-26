@@ -161,7 +161,7 @@ struct bfs_ctx_file {
 	const char *path;
 };
 
-struct CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
+CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 	struct bfs_stat sb;
 	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
 		return NULL;

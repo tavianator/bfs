@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -63,33 +63,26 @@ typedef struct CFILE {
 } CFILE;
 
 /**
- * Open a file for colored output.
- *
- * @param path
- *         The path to the file to open.
- * @param colors
- *         The color table to use if file is a TTY.
- * @return A colored file stream.
- */
-CFILE *cfopen(const char *path, const struct colors *colors);
-
-/**
- * Make a colored copy of an open file.
+ * Wrap an existing file into a colored stream.
  *
  * @param file
  *         The underlying file.
  * @param colors
  *         The color table to use if file is a TTY.
- * @return A colored wrapper around file.
+ * @param close
+ *         Whether to close the underlying stream when this stream is closed.
+ * @return
+ *         A colored wrapper around file.
  */
-CFILE *cfdup(FILE *file, const struct colors *colors);
+CFILE *cfwrap(FILE *file, const struct colors *colors, bool close);
 
 /**
  * Close a colored file.
  *
  * @param cfile
  *         The colored file to close.
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int cfclose(CFILE *cfile);
 
@@ -114,7 +107,8 @@ int cfclose(CFILE *cfile);
  *         %%: A literal '%'
  *         ${cc}: Change the color to 'cc'
  *         $$: A literal '$'
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 BFS_FORMATTER(2, 3)
 int cfprintf(CFILE *cfile, const char *format, ...);

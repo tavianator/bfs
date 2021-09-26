@@ -334,25 +334,45 @@ static void init_print_expr(struct parser_state *state, struct expr *expr) {
 static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
 	struct bfs_ctx *ctx = state->ctx;
 
-	CFILE *cfile = cfopen(path, state->use_color ? ctx->colors : NULL);
+	FILE *file = NULL;
+	CFILE *cfile = NULL;
+
+	file = xfopen(path, O_WRONLY | O_CREAT | O_CLOEXEC);
+	if (!file) {
+		goto fail;
+	}
+
+	cfile = cfwrap(file, state->use_color ? ctx->colors : NULL, true);
 	if (!cfile) {
-		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
-		return -1;
+		goto fail;
 	}
 
 	CFILE *dedup = bfs_ctx_dedup(ctx, cfile, path);
 	if (!dedup) {
-		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
+		goto fail;
+	}
+
+	if (dedup == cfile) {
+		// O_TRUNC was omitted above to avoid repeatedly truncating the same file, so do it
+		// manually here
+		if (ftruncate(fileno(file), 0) != 0) {
+			goto fail;
+		}
+	} else {
 		cfclose(cfile);
-		return -1;
 	}
 
 	expr->cfile = dedup;
-
-	if (dedup != cfile) {
-		cfclose(cfile);
-	}
 	return 0;
+
+fail:
+	parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
+	if (cfile) {
+		cfclose(cfile);
+	} else if (file) {
+		fclose(file);
+	}
+	return -1;
 }
 
 /**
@@ -2675,12 +2695,11 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 	}
 	pipefd[1] = -1;
 
-	CFILE *ret = cfdup(file, NULL);
+	CFILE *ret = cfwrap(file, NULL, true);
 	if (!ret) {
 		goto fail_file;
 	}
 	file = NULL;
-	ret->close = true;
 
 	struct bfs_spawn ctx;
 	if (bfs_spawn_init(&ctx) != 0) {
@@ -3689,15 +3708,15 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		ctx->colors_error = errno;
 	}
 
-	ctx->cerr = cfdup(stderr, use_color ? ctx->colors : NULL);
+	ctx->cerr = cfwrap(stderr, use_color ? ctx->colors : NULL, false);
 	if (!ctx->cerr) {
-		perror("cfdup()");
+		perror("cfwrap()");
 		goto fail;
 	}
 
-	ctx->cout = cfdup(stdout, use_color ? ctx->colors : NULL);
+	ctx->cout = cfwrap(stdout, use_color ? ctx->colors : NULL, false);
 	if (!ctx->cout) {
-		bfs_perror(ctx, "cfdup()");
+		bfs_perror(ctx, "cfwrap()");
 		goto fail;
 	}
 

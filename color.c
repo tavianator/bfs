@@ -501,7 +501,7 @@ void free_colors(struct colors *colors) {
 	}
 }
 
-static CFILE *cfalloc(void) {
+CFILE *cfwrap(FILE *file, const struct colors *colors, bool close) {
 	CFILE *cfile = malloc(sizeof(*cfile));
 	if (!cfile) {
 		return NULL;
@@ -513,43 +513,8 @@ static CFILE *cfalloc(void) {
 		return NULL;
 	}
 
-	cfile->file = NULL;
-	cfile->colors = NULL;
-	cfile->close = false;
-
-	return cfile;
-}
-
-CFILE *cfopen(const char *path, const struct colors *colors) {
-	CFILE *cfile = cfalloc();
-	if (!cfile) {
-		return NULL;
-	}
-
-	cfile->file = xfopen(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC);
-	if (!cfile->file) {
-		cfclose(cfile);
-		return NULL;
-	}
-	cfile->close = true;
-
-	if (isatty(fileno(cfile->file))) {
-		cfile->colors = colors;
-	} else {
-		cfile->colors = NULL;
-	}
-
-	return cfile;
-}
-
-CFILE *cfdup(FILE *file, const struct colors *colors) {
-	CFILE *cfile = cfalloc();
-	if (!cfile) {
-		return NULL;
-	}
-
-	cfile->close = false;
 	cfile->file = file;
+	cfile->close = close;
 
 	if (isatty(fileno(file))) {
 		cfile->colors = colors;
