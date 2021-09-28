@@ -1,0 +1,31 @@
+name: codecov.io
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+              gcc \
+              acl \
+              libacl1-dev \
+              attr \
+              libattr1-dev \
+              libcap2-bin \
+              libcap-dev \
+
+      - name: Generate coverage
+        run: |
+          make -j$(nproc) gcov check
+          gcov -abcfu *.c tests/*.c
+
+      - uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true
