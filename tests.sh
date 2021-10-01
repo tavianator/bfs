@@ -664,6 +664,8 @@ bfs_tests=(
     test_expr_flag_path
     test_expr_path_flag
 
+    test_unexpected_operator
+
     test_typo
 
     # Flags
@@ -3153,6 +3155,9 @@ function test_stderr_fails_loudly() {
     fi
 }
 
+function test_unexpected_operator() {
+    ! quiet invoke_bfs \! -o -print
+}
 
 BOL=
 EOL='\n'
