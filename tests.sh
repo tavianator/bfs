@@ -738,6 +738,11 @@ bfs_tests=(
     test_hidden
     test_hidden_root
 
+    test_links_noarg
+    test_links_empty
+    test_links_negative
+    test_links_invalid
+
     test_newerma_nonexistent
     test_newermt_invalid
     test_newermq
@@ -1346,6 +1351,22 @@ function test_links_plus() {
 
 function test_links_minus() {
     bfs_diff links -type f -links -2
+}
+
+function test_links_noarg() {
+    ! quiet invoke_bfs links -links
+}
+
+function test_links_empty() {
+    ! quiet invoke_bfs links -links ''
+}
+
+function test_links_negative() {
+    ! quiet invoke_bfs links -links +-1
+}
+
+function test_links_invalid() {
+    ! quiet invoke_bfs links -links ASDF
 }
 
 function test_P() {

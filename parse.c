@@ -510,7 +510,11 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 	errno = 0;
 	long long value = strtoll(str, &endptr, base);
 	if (errno != 0) {
-		goto bad;
+		if (errno == ERANGE) {
+			goto range;
+		} else {
+			goto bad;
+		}
 	}
 
 	if (endptr == str) {
@@ -522,20 +526,20 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 	}
 
 	if ((flags & IF_UNSIGNED) && value < 0) {
-		goto bad;
+		goto negative;
 	}
 
 	switch (flags & IF_SIZE_MASK) {
 	case IF_INT:
 		if (value < INT_MIN || value > INT_MAX) {
-			goto bad;
+			goto range;
 		}
 		*(int *)result = value;
 		break;
 
 	case IF_LONG:
 		if (value < LONG_MIN || value > LONG_MAX) {
-			goto bad;
+			goto range;
 		}
 		*(long *)result = value;
 		break;
@@ -554,6 +558,18 @@ static const char *parse_int(const struct parser_state *state, const char *str, 
 bad:
 	if (!(flags & IF_QUIET)) {
 		parse_error(state, "${bld}%s${rs} is not a valid integer.\n", str);
+	}
+	return NULL;
+
+negative:
+	if (!(flags & IF_QUIET)) {
+		parse_error(state, "Negative integer ${bld}%s${rs} is not allowed here.\n", str);
+	}
+	return NULL;
+
+range:
+	if (!(flags & IF_QUIET)) {
+		parse_error(state, "${bld}%s${rs} is too large an integer.\n", str);
 	}
 	return NULL;
 }
