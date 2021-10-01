@@ -518,11 +518,15 @@ gnu_tests=(
     test_fprint
     test_fprint_duplicate
     test_fprint_error
+    test_fprint_noarg
+    test_fprint_nonexistent
     test_fprint_truncate
 
     test_fprint0
 
     test_fprintf
+    test_fprintf_nofile
+    test_fprintf_noformat
 
     test_fstype
 
@@ -1727,6 +1731,14 @@ function test_fprint_duplicate_stdout() {
     fi
 }
 
+function test_fprint_noarg() {
+    ! quiet invoke_bfs basic -fprint
+}
+
+function test_fprint_nonexistent() {
+    ! quiet invoke_bfs basic -fprint scratch/nonexistent/path
+}
+
 function test_fprint_truncate() {
     printf "basic\nbasic\n" >scratch/test_fprint_truncate.out
 
@@ -2279,6 +2291,14 @@ function test_fprintf() {
     else
         diff -u "$TESTS/test_fprintf.out" scratch/test_fprintf.out
     fi
+}
+
+function test_fprintf_nofile() {
+    ! quiet invoke_bfs basic -fprintf
+}
+
+function test_fprintf_noformat() {
+    ! quiet invoke_bfs basic -fprintf /dev/null
 }
 
 function test_fstype() {
