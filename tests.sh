@@ -23,6 +23,12 @@ umask 022
 export LC_ALL=C
 export TZ=UTC
 
+export ASAN_OPTIONS="abort_on_error=1"
+export LSAN_OPTIONS="abort_on_error=1"
+export MSAN_OPTIONS="abort_on_error=1"
+export TSAN_OPTIONS="abort_on_error=1"
+export UBSAN_OPTIONS="abort_on_error=1"
+
 if [ -t 1 ]; then
     BLD="$(printf '\033[01m')"
     RED="$(printf '\033[01;31m')"
