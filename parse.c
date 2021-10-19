@@ -336,9 +336,8 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 
 	FILE *file = NULL;
 	CFILE *cfile = NULL;
-	CFILE *dedup = NULL;
 
-	file = xfopen(path, O_WRONLY | O_CREAT | O_CLOEXEC);
+	file = xfopen(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC);
 	if (!file) {
 		goto fail;
 	}
@@ -348,18 +347,12 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 		goto fail;
 	}
 
-	dedup = bfs_ctx_dedup(ctx, cfile, path);
+	CFILE *dedup = bfs_ctx_dedup(ctx, cfile, path);
 	if (!dedup) {
 		goto fail;
 	}
 
-	if (dedup == cfile) {
-		// O_TRUNC was omitted above to avoid repeatedly truncating the same file, so do it
-		// manually here
-		if (ftruncate(fileno(file), 0) != 0) {
-			goto fail;
-		}
-	} else {
+	if (dedup != cfile) {
 		cfclose(cfile);
 	}
 
@@ -368,12 +361,10 @@ static int expr_open(struct parser_state *state, struct expr *expr, const char *
 
 fail:
 	parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
-	if (!dedup) {
-		if (cfile) {
-			cfclose(cfile);
-		} else if (file) {
-			fclose(file);
-		}
+	if (cfile) {
+		cfclose(cfile);
+	} else if (file) {
+		fclose(file);
 	}
 	return -1;
 }

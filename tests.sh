@@ -524,6 +524,7 @@ gnu_tests=(
     test_fprint
     test_fprint_duplicate
     test_fprint_error
+    test_fprint_noerror
     test_fprint_noarg
     test_fprint_nonexistent
     test_fprint_truncate
@@ -736,7 +737,6 @@ bfs_tests=(
 
     test_execdir_plus
 
-    test_fprint_append
     test_fprint_duplicate_stdout
     test_fprint_error_stdout
     test_fprint_error_stderr
@@ -1796,20 +1796,6 @@ function test_fprint_truncate() {
     fi
 }
 
-function test_fprint_append() {
-    rm -f scratch/test_fprint_append.out
-
-    invoke_bfs basic -fprint scratch/test_fprint_append.out >>scratch/test_fprint_append.out
-    invoke_bfs basic -fprint scratch/test_fprint_append.out >>scratch/test_fprint_append.out
-    sort -o scratch/test_fprint_append.out scratch/test_fprint_append.out
-
-    if [ "$UPDATE" ]; then
-        cp {scratch,"$TESTS"}/test_fprint_append.out
-    else
-        diff -u {"$TESTS",scratch}/test_fprint_append.out
-    fi
-}
-
 function test_double_dash() {
     cd basic
     bfs_diff -- . -type f
@@ -2721,6 +2707,14 @@ function test_print_error() {
 function test_fprint_error() {
     if [ -e /dev/full ]; then
         fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
+    fi
+}
+
+function test_fprint_noerror() {
+    # Regression test: /dev/full should not fail until actually written to
+
+    if [ -e /dev/full ]; then
+        invoke_bfs basic -false -fprint /dev/full
     fi
 }
 
