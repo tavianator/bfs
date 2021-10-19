@@ -1087,6 +1087,20 @@ function quiet() {
     fi
 }
 
+# Expect a command to fail, but not crash
+function fail() {
+    "$@"
+    local STATUS="$?"
+
+    if ((STATUS > 125)); then
+        return "$STATUS"
+    elif ((STATUS)); then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Return value when bfs fails
 EX_BFS=10
 # Return value when a difference is detected
@@ -1363,19 +1377,19 @@ function test_links_minus() {
 }
 
 function test_links_noarg() {
-    ! quiet invoke_bfs links -links
+    fail quiet invoke_bfs links -links
 }
 
 function test_links_empty() {
-    ! quiet invoke_bfs links -links ''
+    fail quiet invoke_bfs links -links ''
 }
 
 function test_links_negative() {
-    ! quiet invoke_bfs links -links +-1
+    fail quiet invoke_bfs links -links +-1
 }
 
 function test_links_invalid() {
-    ! quiet invoke_bfs links -links ASDF
+    fail quiet invoke_bfs links -links ASDF
 }
 
 function test_P() {
@@ -1516,7 +1530,7 @@ function test_xtype_reorder() {
 
 function test_xtype_depth() {
     # Make sure -xtype is considered side-effecting for facts_when_impure
-    ! quiet invoke_bfs loops -xtype l -depth 100
+    fail quiet invoke_bfs loops -xtype l -depth 100
 }
 
 function test_iname() {
@@ -1590,19 +1604,19 @@ function test_newermt_epoch_minus_one() {
 }
 
 function test_newermt_invalid() {
-    ! quiet invoke_bfs times -newermt not_a_date_time
+    fail quiet invoke_bfs times -newermt not_a_date_time
 }
 
 function test_newerma_nonexistent() {
-    ! quiet invoke_bfs times -newerma basic/nonexistent
+    fail quiet invoke_bfs times -newerma basic/nonexistent
 }
 
 function test_newermq() {
-    ! quiet invoke_bfs times -newermq times/a
+    fail quiet invoke_bfs times -newermq times/a
 }
 
 function test_newerqm() {
-    ! quiet invoke_bfs times -newerqm times/a
+    fail quiet invoke_bfs times -newerqm times/a
 }
 
 function test_size() {
@@ -1627,7 +1641,7 @@ function test_exec() {
 
 function test_exec_nothing() {
     # Regression test: don't segfault on missing command
-    ! quiet invoke_bfs basic -exec \;
+    fail quiet invoke_bfs basic -exec \;
 }
 
 function test_exec_plus() {
@@ -1638,7 +1652,7 @@ function test_exec_plus_status() {
     # -exec ... {} + should always return true, but if the command fails, bfs
     # should exit with a non-zero status
     bfs_diff basic -exec false '{}' + -print
-    ! invoke_bfs basic -exec false '{}' +
+    (($? == EX_BFS))
 }
 
 function test_exec_plus_semicolon() {
@@ -1762,11 +1776,11 @@ function test_fprint_duplicate_stdout() {
 }
 
 function test_fprint_noarg() {
-    ! quiet invoke_bfs basic -fprint
+    fail quiet invoke_bfs basic -fprint
 }
 
 function test_fprint_nonexistent() {
-    ! quiet invoke_bfs basic -fprint scratch/nonexistent/path
+    fail quiet invoke_bfs basic -fprint scratch/nonexistent/path
 }
 
 function test_fprint_truncate() {
@@ -1816,7 +1830,7 @@ function test_ignore_readdir_race() {
 
 function test_ignore_readdir_race_root() {
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
-    ! quiet invoke_bfs basic/nonexistent -ignore_readdir_race
+    fail quiet invoke_bfs basic/nonexistent -ignore_readdir_race
 }
 
 function test_ignore_readdir_race_notdir() {
@@ -1888,15 +1902,15 @@ function test_perm_symbolic_slash() {
 }
 
 function test_perm_symbolic_trailing_comma() {
-    ! quiet invoke_bfs perms -perm a+r,
+    fail quiet invoke_bfs perms -perm a+r,
 }
 
 function test_perm_symbolic_double_comma() {
-    ! quiet invoke_bfs perms -perm a+r,,u+w
+    fail quiet invoke_bfs perms -perm a+r,,u+w
 }
 
 function test_perm_symbolic_missing_action() {
-    ! quiet invoke_bfs perms -perm a
+    fail quiet invoke_bfs perms -perm a
 }
 
 function test_perm_leading_plus_symbolic() {
@@ -1937,7 +1951,7 @@ function test_not_prune() {
 
 function test_ok_nothing() {
     # Regression test: don't segfault on missing command
-    ! quiet invoke_bfs basic -ok \;
+    fail quiet invoke_bfs basic -ok \;
 }
 
 function test_ok_stdin() {
@@ -2015,7 +2029,7 @@ function test_regex_parens() {
 }
 
 function test_regex_error() {
-    ! quiet invoke_bfs basic -regex '['
+    fail quiet invoke_bfs basic -regex '['
 }
 
 function test_E() {
@@ -2289,27 +2303,27 @@ function test_printf_l_nonlink() {
 }
 
 function test_printf_incomplete_escape() {
-    ! quiet invoke_bfs basic -printf '\'
+    fail quiet invoke_bfs basic -printf '\'
 }
 
 function test_printf_invalid_escape() {
-    ! quiet invoke_bfs basic -printf '\!'
+    fail quiet invoke_bfs basic -printf '\!'
 }
 
 function test_printf_incomplete_format() {
-    ! quiet invoke_bfs basic -printf '%'
+    fail quiet invoke_bfs basic -printf '%'
 }
 
 function test_printf_invalid_format() {
-    ! quiet invoke_bfs basic -printf '%!'
+    fail quiet invoke_bfs basic -printf '%!'
 }
 
 function test_printf_duplicate_flag() {
-    ! quiet invoke_bfs basic -printf '%--p'
+    fail quiet invoke_bfs basic -printf '%--p'
 }
 
 function test_printf_must_be_numeric() {
-    ! quiet invoke_bfs basic -printf '%+p'
+    fail quiet invoke_bfs basic -printf '%+p'
 }
 
 function test_printf_color() {
@@ -2328,11 +2342,11 @@ function test_fprintf() {
 }
 
 function test_fprintf_nofile() {
-    ! quiet invoke_bfs basic -fprintf
+    fail quiet invoke_bfs basic -fprintf
 }
 
 function test_fprintf_noformat() {
-    ! quiet invoke_bfs basic -fprintf /dev/null
+    fail quiet invoke_bfs basic -fprintf /dev/null
 }
 
 function test_fstype() {
@@ -2401,15 +2415,15 @@ function test_precedence() {
 }
 
 function test_incomplete() {
-    ! quiet invoke_bfs basic \(
+    fail quiet invoke_bfs basic \(
 }
 
 function test_missing_paren() {
-    ! quiet invoke_bfs basic \( -print
+    fail quiet invoke_bfs basic \( -print
 }
 
 function test_extra_paren() {
-    ! quiet invoke_bfs basic -print \)
+    fail quiet invoke_bfs basic -print \)
 }
 
 function test_color() {
@@ -2700,25 +2714,25 @@ function test_data_flow_or_swap() {
 
 function test_print_error() {
     if [ -e /dev/full ]; then
-        ! quiet invoke_bfs basic -maxdepth 0 >/dev/full
+        fail quiet invoke_bfs basic -maxdepth 0 >/dev/full
     fi
 }
 
 function test_fprint_error() {
     if [ -e /dev/full ]; then
-        ! quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
+        fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
     fi
 }
 
 function test_fprint_error_stdout() {
     if [ -e /dev/full ]; then
-        ! quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
+        fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
     fi
 }
 
 function test_fprint_error_stderr() {
     if [ -e /dev/full ]; then
-        ! invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/full
+        fail invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/full
     fi
 }
 
@@ -2755,11 +2769,11 @@ function test_okdir_closed_stdin() {
 }
 
 function test_closed_stdout() {
-    ! quiet invoke_bfs basic >&-
+    fail quiet invoke_bfs basic >&-
 }
 
 function test_closed_stderr() {
-    ! invoke_bfs basic >&- 2>&-
+    fail invoke_bfs basic >&- 2>&-
 }
 
 function test_unique() {
@@ -2932,7 +2946,7 @@ function test_L_acl() {
 function test_capable() {
     rm -rf scratch/*
 
-    if ! quiet invoke_bfs scratch -quit -capable; then
+    if fail quiet invoke_bfs scratch -quit -capable; then
         return 0
     fi
 
@@ -2946,7 +2960,7 @@ function test_capable() {
 function test_L_capable() {
     rm -rf scratch/*
 
-    if ! quiet invoke_bfs scratch -quit -capable; then
+    if fail quiet invoke_bfs scratch -quit -capable; then
         return 0
     fi
 
@@ -3105,11 +3119,11 @@ function test_exclude_mindepth() {
 }
 
 function test_exclude_print() {
-    ! quiet invoke_bfs basic -exclude -print
+    fail quiet invoke_bfs basic -exclude -print
 }
 
 function test_exclude_exclude() {
-    ! quiet invoke_bfs basic -exclude -exclude -name foo
+    fail quiet invoke_bfs basic -exclude -exclude -name foo
 }
 
 function test_flags() {
@@ -3135,23 +3149,23 @@ function test_files0_from_stdin() {
 }
 
 function test_files0_from_none() {
-    ! printf "" | quiet invoke_bfs -files0-from -
+    printf "" | fail quiet invoke_bfs -files0-from -
 }
 
 function test_files0_from_empty() {
-    ! printf "\0" | quiet invoke_bfs -files0-from -
+    printf "\0" | fail quiet invoke_bfs -files0-from -
 }
 
 function test_files0_from_nowhere() {
-    ! quiet invoke_bfs -files0-from
+    fail quiet invoke_bfs -files0-from
 }
 
 function test_files0_from_nothing() {
-    ! quiet invoke_bfs -files0-from basic/nonexistent
+    fail quiet invoke_bfs -files0-from basic/nonexistent
 }
 
 function test_files0_from_ok() {
-    ! printf "basic\0" | quiet invoke_bfs -files0-from - -ok echo {} \;
+    printf "basic\0" | fail quiet invoke_bfs -files0-from - -ok echo {} \;
 }
 
 function test_stderr_fails_silently() {
@@ -3162,12 +3176,12 @@ function test_stderr_fails_silently() {
 
 function test_stderr_fails_loudly() {
     if [ -e /dev/full ]; then
-        ! invoke_bfs -D all basic -false -fprint /dev/full 2>/dev/full
+        fail invoke_bfs -D all basic -false -fprint /dev/full 2>/dev/full
     fi
 }
 
 function test_unexpected_operator() {
-    ! quiet invoke_bfs \! -o -print
+    fail quiet invoke_bfs \! -o -print
 }
 
 BOL=
