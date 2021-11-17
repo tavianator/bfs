@@ -63,6 +63,8 @@ struct bfs_exec {
 	size_t arg_size;
 	/** Maximum arg_size before E2BIG. */
 	size_t arg_max;
+	/** Lower bound for arg_max. */
+	size_t arg_min;
 
 	/** A file descriptor for the working directory, for BFS_EXEC_CHDIR. */
 	int wd_fd;

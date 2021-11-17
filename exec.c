@@ -59,8 +59,6 @@ static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, .
 	va_end(args);
 }
 
-extern char **environ;
-
 /** Determine the size of a single argument, for comparison to arg_max. */
 static size_t bfs_exec_arg_size(const char *arg) {
 	return sizeof(arg) + strlen(arg) + 1;
@@ -79,6 +77,7 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	}
 
 	// We have to share space with the environment variables
+	extern char **environ;
 	for (char **envp = environ; *envp; ++envp) {
 		arg_max -= bfs_exec_arg_size(*envp);
 	}
@@ -131,6 +130,7 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 	execbuf->argv_cap = 0;
 	execbuf->arg_size = 0;
 	execbuf->arg_max = 0;
+	execbuf->arg_min = 0;
 	execbuf->wd_fd = -1;
 	execbuf->wd_path = NULL;
 	execbuf->wd_len = 0;
@@ -183,6 +183,7 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 		execbuf->argc = execbuf->tmpl_argc - 1;
 
 		execbuf->arg_max = bfs_exec_arg_max(execbuf);
+		execbuf->arg_min = execbuf->arg_max;
 	}
 
 	return execbuf;
@@ -461,6 +462,54 @@ static bool bfs_exec_args_remain(const struct bfs_exec *execbuf) {
 	return execbuf->argc >= execbuf->tmpl_argc;
 }
 
+/** Compute the current ARG_MAX estimate for binary search. */
+static size_t bfs_exec_estimate_max(const struct bfs_exec *execbuf) {
+	size_t min = execbuf->arg_min;
+	size_t max = execbuf->arg_max;
+	return min + (max - min)/2;
+}
+
+/** Update the ARG_MAX lower bound from a successful execution. */
+static void bfs_exec_update_min(struct bfs_exec *execbuf) {
+	if (execbuf->arg_size > execbuf->arg_min) {
+		execbuf->arg_min = execbuf->arg_size;
+
+		// Don't let min exceed max
+		if (execbuf->arg_min > execbuf->arg_max) {
+			execbuf->arg_min = execbuf->arg_max;
+		}
+
+		size_t estimate = bfs_exec_estimate_max(execbuf);
+		bfs_exec_debug(execbuf, "ARG_MAX between [%zu, %zu], trying %zu\n",
+		               execbuf->arg_min, execbuf->arg_max, estimate);
+	}
+}
+
+/** Update the ARG_MAX upper bound from a failed execution. */
+static size_t bfs_exec_update_max(struct bfs_exec *execbuf) {
+	bfs_exec_debug(execbuf, "Got E2BIG, shrinking argument list...\n");
+
+	if (execbuf->arg_size < execbuf->arg_max) {
+		execbuf->arg_max = execbuf->arg_size;
+
+		// Don't let min exceed max
+		if (execbuf->arg_min > execbuf->arg_max) {
+			execbuf->arg_min = execbuf->arg_max;
+		}
+	}
+
+	if (execbuf->arg_size <= execbuf->arg_min) {
+		// Lower bound was wrong, restart binary search.
+		execbuf->arg_min = 0;
+	}
+
+	// Binary search for a more precise bound
+	size_t estimate = bfs_exec_estimate_max(execbuf);
+	bfs_exec_debug(execbuf, "ARG_MAX between [%zu, %zu], trying %zu\n",
+	               execbuf->arg_min, execbuf->arg_max, estimate);
+	return estimate;
+}
+
 /** Execute the pending command from a BFS_EXEC_MULTI execbuf. */
 static int bfs_exec_flush(struct bfs_exec *execbuf) {
 	int ret = 0, error = 0;
@@ -470,20 +519,24 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 		execbuf->argv[execbuf->argc] = NULL;
 		ret = bfs_exec_spawn(execbuf);
 		error = errno;
-		if (ret == 0 || error != E2BIG) {
+		if (ret == 0) {
+			bfs_exec_update_min(execbuf);
+			break;
+		} else if (error != E2BIG) {
 			break;
 		}
 
 		// Try to recover from E2BIG by trying fewer and fewer arguments
 		// until they fit
-		bfs_exec_debug(execbuf, "Got E2BIG, shrinking argument list...\n");
-		execbuf->argv[execbuf->argc] = execbuf->argv[execbuf->argc - 1];
-		execbuf->arg_size -= bfs_exec_arg_size(execbuf->argv[execbuf->argc]);
-		--execbuf->argc;
+		size_t new_max = bfs_exec_update_max(execbuf);
+		while (execbuf->arg_size > new_max) {
+			execbuf->argv[execbuf->argc] = execbuf->argv[execbuf->argc - 1];
+			execbuf->arg_size -= bfs_exec_arg_size(execbuf->argv[execbuf->argc]);
+			--execbuf->argc;
+		}
 	}
-	size_t new_argc = execbuf->argc;
-	size_t new_size = execbuf->arg_size;
 
+	size_t new_argc = execbuf->argc;
 	for (size_t i = execbuf->tmpl_argc - 1; i < new_argc; ++i) {
 		free(execbuf->argv[i]);
 	}
@@ -491,9 +544,6 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 	execbuf->arg_size = 0;
 
 	if (new_argc < orig_argc) {
-		execbuf->arg_max = new_size;
-		bfs_exec_debug(execbuf, "ARG_MAX: %zu\n", execbuf->arg_max);
-
 		// If we recovered from E2BIG, there are unused arguments at the
 		// end of the list
 		for (size_t i = new_argc + 1; i <= orig_argc; ++i) {
@@ -526,10 +576,11 @@ static bool bfs_exec_changed_dirs(const struct bfs_exec *execbuf, const struct B
 
 /** Check if we need to flush the execbuf because we're too big. */
 static bool bfs_exec_would_overflow(const struct bfs_exec *execbuf, const char *arg) {
+	size_t arg_max = bfs_exec_estimate_max(execbuf);
 	size_t next_size = execbuf->arg_size + bfs_exec_arg_size(arg);
-	if (next_size > execbuf->arg_max) {
+	if (next_size > arg_max) {
 		bfs_exec_debug(execbuf, "Command size (%zu) would exceed maximum (%zu), executing buffered command\n",
-		               next_size, execbuf->arg_max);
+		               next_size, arg_max);
 		return true;
 	}
 
