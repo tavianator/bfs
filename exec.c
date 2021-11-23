@@ -489,18 +489,22 @@ static void bfs_exec_update_min(struct bfs_exec *execbuf) {
 static size_t bfs_exec_update_max(struct bfs_exec *execbuf) {
 	bfs_exec_debug(execbuf, "Got E2BIG, shrinking argument list...\n");
 
-	if (execbuf->arg_size < execbuf->arg_max) {
-		execbuf->arg_max = execbuf->arg_size;
+	size_t size = execbuf->arg_size;
+	if (size <= execbuf->arg_min) {
+		// Lower bound was wrong, restart binary search.
+		execbuf->arg_min = 0;
+	}
+
+	// Trim a fraction off the max size to avoid repeated failures near the
+	// top end of the working range
+	size -= size/16;
+	if (size < execbuf->arg_max) {
+		execbuf->arg_max = size;
 
 		// Don't let min exceed max
 		if (execbuf->arg_min > execbuf->arg_max) {
 			execbuf->arg_min = execbuf->arg_max;
 		}
-	}
-
-	if (execbuf->arg_size <= execbuf->arg_min) {
-		// Lower bound was wrong, restart binary search.
-		execbuf->arg_min = 0;
 	}
 
 	// Binary search for a more precise bound
