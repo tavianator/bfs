@@ -1,6 +1,27 @@
 2.*
 ===
 
+2.3
+---
+
+**November 25, 2021**
+
+- More tweaks to `PAGER` and `LESS` handling for `bfs -help` ([#76])
+
+- Use 512-byte blocks for `-ls` when `POSIXLY_CORRECT` is set ([#77])
+
+- Implemented `-files0-from FILE` to take a list of `'\0'`-separated starting paths.
+  GNU find will implement the same feature in an upcoming release.
+
+- Added colors to `-printf` output ([#62])
+
+- Faster recovery from `E2BIG` during `-exec`
+
+[#76]: https://github.com/tavianator/bfs/issues/76
+[#77]: https://github.com/tavianator/bfs/issues/77
+[#62]: https://github.com/tavianator/bfs/issues/62
+
+
 2.2.1
 -----
 
@@ -21,6 +42,7 @@
 
 [#71]: https://github.com/tavianator/bfs/issues/71
 [#75]: https://github.com/tavianator/bfs/issues/75
+
 
 2.2
 ---

@@ -22,7 +22,7 @@
 #define BFS_H
 
 #ifndef BFS_VERSION
-#	define BFS_VERSION "2.2.1"
+#	define BFS_VERSION "2.3"
 #endif
 
 #ifndef BFS_HOMEPAGE
