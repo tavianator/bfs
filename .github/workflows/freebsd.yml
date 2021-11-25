@@ -16,7 +16,6 @@ jobs:
       - uses: tailscale/github-action@main
         with:
           authkey: ${{ secrets.TAILSCALE_KEY }}
-          version: 1.8.3
 
       - name: Configure SSH
         env:
