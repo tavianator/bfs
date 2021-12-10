@@ -325,7 +325,8 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 		return bfs_stat_explicit(at_fd, at_path, at_flags, flags, buf);
 	}
 
-#ifdef AT_EMPTY_PATH
+	// Check __GNU__ to work around https://lists.gnu.org/archive/html/bug-hurd/2021-12/msg00001.html
+#if defined(AT_EMPTY_PATH) && !__GNU__
 	static bool has_at_ep = true;
 	if (has_at_ep) {
 		at_flags |= AT_EMPTY_PATH;
