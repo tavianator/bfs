@@ -21,7 +21,7 @@ set -o physical
 umask 022
 
 export LC_ALL=C
-export TZ=UTC
+export TZ=UTC0
 
 export ASAN_OPTIONS="abort_on_error=1"
 export LSAN_OPTIONS="abort_on_error=1"
