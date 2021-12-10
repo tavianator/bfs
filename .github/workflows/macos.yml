@@ -4,7 +4,8 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: macos-latest
+    # macOS 11 is broken due to https://apple.stackexchange.com/a/425730/397839
+    runs-on: macOS-10.15
 
     steps:
       - uses: actions/checkout@v2
