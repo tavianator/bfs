@@ -885,6 +885,13 @@ function installp() {
     install "$@"
 }
 
+# Prefer GNU touch to work around https://apple.stackexchange.com/a/425730/397839
+if command -v gtouch &>/dev/null; then
+    TOUCH=gtouch
+else
+    TOUCH=touch
+fi
+
 # Like a mythical touch -p
 function touchp() {
     for arg; do
@@ -950,12 +957,12 @@ make_loops "$TMP/loops"
 # Creates a file+directory structure with varying timestamps
 function make_times() {
     mkdir -p "$1"
-    touch -t 199112140000 "$1/a"
-    touch -t 199112140001 "$1/b"
-    touch -t 199112140002 "$1/c"
+    $TOUCH -t 199112140000 "$1/a"
+    $TOUCH -t 199112140001 "$1/b"
+    $TOUCH -t 199112140002 "$1/c"
     ln -s a "$1/l"
-    touch -h -t 199112140003 "$1/l"
-    touch -t 199112140004 "$1"
+    $TOUCH -h -t 199112140003 "$1/l"
+    $TOUCH -t 199112140004 "$1"
 }
 make_times "$TMP/times"
 
@@ -995,7 +1002,7 @@ function make_deep() {
                 cd "$name" 2>/dev/null
             done
 
-            touch "$name"
+            $TOUCH "$name"
         )
     done
 }
@@ -1808,7 +1815,7 @@ function test_flag_double_dash() {
 
 function test_ignore_readdir_race() {
     rm -rf scratch/*
-    touch scratch/{foo,bar}
+    $TOUCH scratch/{foo,bar}
 
     # -links 1 forces a stat() call, which will fail for the second file
     invoke_bfs scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
@@ -1824,7 +1831,7 @@ function test_ignore_readdir_race_notdir() {
     rm -rf scratch/*
     touchp scratch/foo/bar
 
-    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir touch '{}' \;
+    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir $TOUCH '{}' \;
 }
 
 function test_perm_000() {
@@ -1974,7 +1981,7 @@ function test_delete_many() {
 
     rm -rf scratch/*
     mkdir scratch/foo
-    touch scratch/foo/{1..256}
+    $TOUCH scratch/foo/{1..256}
 
     invoke_bfs scratch/foo -delete
     bfs_diff scratch
@@ -2794,7 +2801,7 @@ function test_mount() {
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
-    touch scratch/foo/bar scratch/mnt/baz
+    $TOUCH scratch/foo/bar scratch/mnt/baz
 
     bfs_diff scratch -mount
     local ret=$?
@@ -2808,7 +2815,7 @@ function test_L_mount() {
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
     ln -s ../mnt scratch/foo/bar
-    touch scratch/mnt/baz
+    $TOUCH scratch/mnt/baz
     ln -s ../mnt/baz scratch/foo/qux
 
     bfs_diff -L scratch -mount
@@ -2822,7 +2829,7 @@ function test_xdev() {
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
-    touch scratch/foo/bar scratch/mnt/baz
+    $TOUCH scratch/foo/bar scratch/mnt/baz
 
     bfs_diff scratch -xdev
     local ret=$?
@@ -2836,7 +2843,7 @@ function test_L_xdev() {
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
     ln -s ../mnt scratch/foo/bar
-    touch scratch/mnt/baz
+    $TOUCH scratch/mnt/baz
     ln -s ../mnt/baz scratch/foo/qux
 
     bfs_diff -L scratch -xdev
@@ -2860,7 +2867,7 @@ function test_inum_mount() {
 
 function test_inum_bind_mount() {
     rm -rf scratch/*
-    touch scratch/{foo,bar}
+    $TOUCH scratch/{foo,bar}
     sudo mount --bind scratch/{foo,bar}
 
     bfs_diff scratch -inum "$(inum scratch/bar)"
@@ -2872,7 +2879,7 @@ function test_inum_bind_mount() {
 
 function test_type_bind_mount() {
     rm -rf scratch/*
-    touch scratch/{file,null}
+    $TOUCH scratch/{file,null}
     sudo mount --bind /dev/null scratch/null
 
     bfs_diff scratch -type c
@@ -2884,7 +2891,7 @@ function test_type_bind_mount() {
 
 function test_xtype_bind_mount() {
     rm -rf scratch/*
-    touch scratch/{file,null}
+    $TOUCH scratch/{file,null}
     sudo mount --bind /dev/null scratch/null
     ln -s /dev/null scratch/link
 
@@ -2918,7 +2925,7 @@ function test_acl() {
 
     quiet invoke_bfs scratch -quit -acl || return 0
 
-    touch scratch/{normal,acl}
+    $TOUCH scratch/{normal,acl}
     set_acl scratch/acl || return 0
     ln -s acl scratch/link
 
@@ -2930,7 +2937,7 @@ function test_L_acl() {
 
     quiet invoke_bfs scratch -quit -acl || return 0
 
-    touch scratch/{normal,acl}
+    $TOUCH scratch/{normal,acl}
     set_acl scratch/acl || return 0
     ln -s acl scratch/link
 
@@ -2944,7 +2951,7 @@ function test_capable() {
         return 0
     fi
 
-    touch scratch/{normal,capable}
+    $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
     ln -s capable scratch/link
 
@@ -2958,7 +2965,7 @@ function test_L_capable() {
         return 0
     fi
 
-    touch scratch/{normal,capable}
+    $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
     ln -s capable scratch/link
 
@@ -2968,7 +2975,7 @@ function test_L_capable() {
 function make_xattrs() {
     rm -rf scratch/*
 
-    touch scratch/{normal,xattr,xattr_2}
+    $TOUCH scratch/{normal,xattr,xattr_2}
     ln -s xattr scratch/link
     ln -s normal scratch/xattr_link
 
@@ -3125,7 +3132,7 @@ function test_flags() {
 
     rm -rf scratch/*
 
-    touch scratch/{foo,bar}
+    $TOUCH scratch/{foo,bar}
     chflags offline scratch/bar || return 0
 
     bfs_diff scratch -flags -offline,nohidden

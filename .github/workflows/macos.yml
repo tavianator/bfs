@@ -4,11 +4,14 @@ on: [push, pull_request]
 
 jobs:
   build:
-    # macOS 11 is broken due to https://apple.stackexchange.com/a/425730/397839
-    runs-on: macOS-10.15
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          brew install coreutils
 
       - name: Run tests
         run: |
