@@ -312,7 +312,7 @@ static int xrpmatch(const char *response) {
 	}
 }
 
-int ynprompt() {
+int ynprompt(void) {
 	fflush(stderr);
 
 	char *line = xgetdelim(stdin, '\n');

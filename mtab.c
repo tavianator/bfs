@@ -102,7 +102,7 @@ fail:
 	return -1;
 }
 
-struct bfs_mtab *bfs_mtab_parse() {
+struct bfs_mtab *bfs_mtab_parse(void) {
 	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
 	if (!mtab) {
 		return NULL;
