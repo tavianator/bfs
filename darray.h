@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -87,6 +87,18 @@ void *darray_push(void *da, const void *item, size_t size);
 int darray_check(void *da);
 
 /**
+ * @internal Use DARRAY_POP().
+ *
+ * Pop an element from an array.
+ *
+ * @param da
+ *         The array in question.
+ * @return
+ *         The (new) length of the array.
+ */
+size_t darray_pop(void *da);
+
+/**
  * Free a darray.
  *
  * @param da
@@ -106,5 +118,16 @@ void darray_free(void *da);
  */
 #define DARRAY_PUSH(da, item) \
 	(darray_check(*(da) = darray_push(*(da), (item), sizeof(**(da) = *(item)))))
+
+/**
+ * Pop an item from a darray.
+ *
+ * @param da
+ *         The array to pop from.
+ * @return
+ *         The popped item.
+ */
+#define DARRAY_POP(da) \
+	((da)[darray_pop((da))])
 
 #endif // BFS_DARRAY_H
