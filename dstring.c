@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -42,6 +42,11 @@ static size_t dstrsize(size_t capacity) {
 
 /** Allocate a dstring with the given contents. */
 static char *dstralloc_impl(size_t capacity, size_t length, const char *data) {
+	// Avoid reallocations for small strings
+	if (capacity < 7) {
+		capacity = 7;
+	}
+
 	struct dstring *header = malloc(dstrsize(capacity));
 	if (!header) {
 		return NULL;
