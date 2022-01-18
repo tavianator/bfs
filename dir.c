@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2021 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2021-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -139,7 +139,9 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 	dir->dir = fdopendir(fd);
 	if (!dir->dir) {
 		int error = errno;
-		close(fd);
+		if (at_path) {
+			close(fd);
+		}
 		free(dir);
 		errno = error;
 		return NULL;
