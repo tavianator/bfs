@@ -94,7 +94,7 @@ int main(void) {
 		}
 	}
 
-	// This tests the "jump" node handline on 32-bit platforms
+	// This tests the "jump" node handling on 32-bit platforms
 	size_t longsize = 1 << 20;
 	char *longstr = malloc(longsize);
 	assert(longstr);
