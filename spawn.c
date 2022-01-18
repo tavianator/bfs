@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2018-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -146,7 +146,7 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 	int error;
 	const struct bfs_spawn_action *actions = ctx ? ctx->actions : NULL;
 
-	close(pipefd[0]);
+	xclose(pipefd[0]);
 
 	for (const struct bfs_spawn_action *action = actions; action; action = action->next) {
 		// Move the error-reporting pipe out of the way if necessary...
@@ -155,7 +155,7 @@ static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **
 			if (fd < 0) {
 				goto fail;
 			}
-			close(pipefd[1]);
+			xclose(pipefd[1]);
 			pipefd[1] = fd;
 		}
 
@@ -198,7 +198,7 @@ fail:
 	// unsuccessfully, but won't know why
 	(void) xwrite(pipefd[1], &error, sizeof(error));
 
-	close(pipefd[1]);
+	xclose(pipefd[1]);
 	_Exit(127);
 }
 
@@ -224,15 +224,11 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 		return -1;
 	}
 
-	int error;
 	pid_t pid = fork();
-
 	if (pid < 0) {
-		error = errno;
-		close(pipefd[1]);
-		close(pipefd[0]);
+		close_quietly(pipefd[1]);
+		close_quietly(pipefd[0]);
 		free(resolved);
-		errno = error;
 		return -1;
 	} else if (pid == 0) {
 		// Child
@@ -240,11 +236,12 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	}
 
 	// Parent
-	close(pipefd[1]);
+	xclose(pipefd[1]);
 	free(resolved);
 
+	int error;
 	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
-	close(pipefd[0]);
+	xclose(pipefd[0]);
 	if (nbytes == sizeof(error)) {
 		int wstatus;
 		waitpid(pid, &wstatus, 0);

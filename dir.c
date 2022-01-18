@@ -138,12 +138,10 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 #else
 	dir->dir = fdopendir(fd);
 	if (!dir->dir) {
-		int error = errno;
 		if (at_path) {
-			close(fd);
+			close_quietly(fd);
 		}
 		free(dir);
-		errno = error;
 		return NULL;
 	}
 
@@ -280,7 +278,7 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 
 int bfs_closedir(struct bfs_dir *dir) {
 #if __linux__
-	int ret = close(dir->fd);
+	int ret = xclose(dir->fd);
 #else
 	int ret = closedir(dir->dir);
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -308,12 +308,10 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 }
 
 /** Close the working directory. */
-static int bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
-	int ret = 0;
-
+static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	if (execbuf->wd_fd >= 0) {
 		if (!ftwbuf || execbuf->wd_fd != ftwbuf->at_fd) {
-			ret = close(execbuf->wd_fd);
+			xclose(execbuf->wd_fd);
 		}
 		execbuf->wd_fd = -1;
 	}
@@ -323,8 +321,6 @@ static int bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf)
 		execbuf->wd_path = NULL;
 		execbuf->wd_len = 0;
 	}
-
-	return ret;
 }
 
 /** Actually spawn the process. */

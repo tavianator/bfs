@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -54,6 +54,7 @@
 #include "ctx.h"
 #include "eval.h"
 #include "parse.h"
+#include "util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <locale.h>
@@ -79,9 +80,7 @@ static int redirect(int fd, const char *path, int flags) {
 	}
 
 	int ret = dup2(newfd, fd);
-	int err = errno;
-	close(newfd);
-	errno = err;
+	close_quietly(newfd);
 	return ret;
 }
 

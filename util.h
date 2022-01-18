@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -297,5 +297,23 @@ char *xgetdelim(FILE *file, char delim);
  *         Flags to pass to open().
  */
 FILE *xfopen(const char *path, int flags);
+
+/**
+ * close() wrapper that asserts the file descriptor is valid.
+ *
+ * @param fd
+ *         The file descriptor to close.
+ * @return
+ *         0 on success, or -1 on error.
+ */
+int xclose(int fd);
+
+/**
+ * close() variant that preserves errno.
+ *
+ * @param fd
+ *         The file descriptor to close.
+ */
+void close_quietly(int fd);
 
 #endif // BFS_UTIL_H

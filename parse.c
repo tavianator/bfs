@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -2743,7 +2743,7 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 		goto fail_ctx;
 	}
 
-	close(pipefd[0]);
+	xclose(pipefd[0]);
 	bfs_spawn_destroy(&ctx);
 	free(exe);
 	return ret;
@@ -2758,10 +2758,10 @@ fail_file:
 	}
 fail_pipe:
 	if (pipefd[1] >= 0) {
-		close(pipefd[1]);
+		xclose(pipefd[1]);
 	}
 	if (pipefd[0] >= 0) {
-		close(pipefd[0]);
+		xclose(pipefd[0]);
 	}
 fail_exe:
 	free(exe);

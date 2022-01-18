@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -244,7 +244,7 @@ static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 
 	bftw_cache_remove(cache, file);
 
-	close(file->fd);
+	xclose(file->fd);
 	file->fd = -1;
 }
 

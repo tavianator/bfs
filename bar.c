@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2020 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -155,28 +155,24 @@ static int bfs_bar_printf(struct bfs_bar *bar, const char *format, ...) {
 }
 
 struct bfs_bar *bfs_bar_show(void) {
-	int error;
-
 	if (the_bar.fd >= 0) {
-		error = EBUSY;
+		errno = EBUSY;
 		goto fail;
 	}
 
 	char term[L_ctermid];
 	ctermid(term);
 	if (strlen(term) == 0) {
-		error = ENOTTY;
+		errno = ENOTTY;
 		goto fail;
 	}
 
 	the_bar.fd = open(term, O_RDWR | O_CLOEXEC);
 	if (the_bar.fd < 0) {
-		error = errno;
 		goto fail;
 	}
 
 	if (bfs_bar_getsize(&the_bar) != 0) {
-		error = errno;
 		goto fail_close;
 	}
 
@@ -207,10 +203,9 @@ struct bfs_bar *bfs_bar_show(void) {
 	return &the_bar;
 
 fail_close:
-	close(the_bar.fd);
+	close_quietly(the_bar.fd);
 	the_bar.fd = -1;
 fail:
-	errno = error;
 	return NULL;
 }
 
@@ -248,6 +243,6 @@ void bfs_bar_hide(struct bfs_bar *bar) {
 
 	bfs_bar_reset(bar);
 
-	close(bar->fd);
+	xclose(bar->fd);
 	bar->fd = -1;
 }

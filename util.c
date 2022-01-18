@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2016-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -89,7 +89,7 @@ int dup_cloexec(int fd) {
 	}
 
 	if (fcntl(ret, F_SETFD, FD_CLOEXEC) == -1) {
-		close(ret);
+		close_quietly(ret);
 		return -1;
 	}
 
@@ -106,10 +106,8 @@ int pipe_cloexec(int pipefd[2]) {
 	}
 
 	if (fcntl(pipefd[0], F_SETFD, FD_CLOEXEC) == -1 || fcntl(pipefd[1], F_SETFD, FD_CLOEXEC) == -1) {
-		int error = errno;
-		close(pipefd[1]);
-		close(pipefd[0]);
-		errno = error;
+		close_quietly(pipefd[1]);
+		close_quietly(pipefd[0]);
 		return -1;
 	}
 
@@ -464,11 +462,23 @@ FILE *xfopen(const char *path, int flags) {
 
 	FILE *ret = fdopen(fd, mode);
 	if (!ret) {
-		int error = errno;
-		close(fd);
-		errno = error;
+		close_quietly(fd);
 		return NULL;
 	}
 
 	return ret;
+}
+
+int xclose(int fd) {
+	int ret = close(fd);
+	if (ret != 0) {
+		assert(errno != EBADF);
+	}
+	return ret;
+}
+
+void close_quietly(int fd) {
+	int error = errno;
+	xclose(fd);
+	errno = error;
 }
