@@ -34,6 +34,7 @@
 
 #include "bftw.h"
 #include "dir.h"
+#include "darray.h"
 #include "dstring.h"
 #include "mtab.h"
 #include "stat.h"
@@ -90,28 +91,20 @@ struct bftw_file {
 struct bftw_cache {
 	/** A min-heap of open directories. */
 	struct bftw_file **heap;
-	/** Current heap size. */
-	size_t size;
 	/** Maximum heap size. */
 	size_t capacity;
 };
 
 /** Initialize a cache. */
-static int bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
-	cache->heap = malloc(capacity*sizeof(*cache->heap));
-	if (!cache->heap) {
-		return -1;
-	}
-
-	cache->size = 0;
+static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
+	cache->heap = NULL;
 	cache->capacity = capacity;
-	return 0;
 }
 
 /** Destroy a cache. */
 static void bftw_cache_destroy(struct bftw_cache *cache) {
-	assert(cache->size == 0);
-	free(cache->heap);
+	assert(darray_length(cache->heap) == 0);
+	darray_free(cache->heap);
 }
 
 /** Check if two heap entries are in heap order. */
@@ -152,17 +145,18 @@ static void bftw_heap_bubble_up(struct bftw_cache *cache, struct bftw_file *file
 /** Bubble an entry down the heap. */
 static void bftw_heap_bubble_down(struct bftw_cache *cache, struct bftw_file *file) {
 	size_t i = file->heap_index;
+	size_t size = darray_length(cache->heap);
 
 	while (true) {
 		size_t ci = 2*i + 1;
-		if (ci >= cache->size) {
+		if (ci >= size) {
 			break;
 		}
 
 		struct bftw_file *child = cache->heap[ci];
 
 		size_t ri = ci + 1;
-		if (ri < cache->size) {
+		if (ri < size) {
 			struct bftw_file *right = cache->heap[ri];
 			if (!bftw_heap_check(child, right)) {
 				ci = ri;
@@ -215,26 +209,33 @@ static size_t bftw_file_decref(struct bftw_cache *cache, struct bftw_file *file)
 	return ret;
 }
 
+/** Check if the cache is full. */
+static bool bftw_cache_full(const struct bftw_cache *cache) {
+	return darray_length(cache->heap) == cache->capacity;
+}
+
 /** Add a bftw_file to the cache. */
-static void bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(cache->size < cache->capacity);
+static int bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
+	assert(!bftw_cache_full(cache));
 	assert(file->fd >= 0);
 
-	size_t size = cache->size++;
+	size_t size = darray_length(cache->heap);
+	if (DARRAY_PUSH(&cache->heap, &file) != 0) {
+		return -1;
+	}
+
 	file->heap_index = size;
 	bftw_heap_bubble_up(cache, file);
+
+	return 0;
 }
 
 /** Remove a bftw_file from the cache. */
 static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(cache->size > 0);
-
-	size_t size = --cache->size;
-	size_t i = file->heap_index;
-	if (i != size) {
-		struct bftw_file *end = cache->heap[size];
-		end->heap_index = i;
-		bftw_heap_bubble(cache, end);
+	struct bftw_file *last = DARRAY_POP(cache->heap);
+	if (last != file) {
+		last->heap_index = file->heap_index;
+		bftw_heap_bubble(cache, last);
 	}
 }
 
@@ -250,7 +251,6 @@ static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 
 /** Pop a directory from the cache. */
 static void bftw_cache_pop(struct bftw_cache *cache) {
-	assert(cache->size > 0);
 	bftw_file_close(cache, cache->heap[0]);
 }
 
@@ -267,10 +267,11 @@ static void bftw_cache_pop(struct bftw_cache *cache) {
 static int bftw_cache_shrink(struct bftw_cache *cache, const struct bftw_file *saved) {
 	int ret = -1;
 	struct bftw_file *file = NULL;
+	size_t size = darray_length(cache->heap);
 
-	if (cache->size >= 1) {
+	if (size >= 1) {
 		file = cache->heap[0];
-		if (file == saved && cache->size >= 2) {
+		if (file == saved && size >= 2) {
 			file = cache->heap[1];
 		}
 	}
@@ -280,7 +281,7 @@ static int bftw_cache_shrink(struct bftw_cache *cache, const struct bftw_file *s
 		ret = 0;
 	}
 
-	cache->capacity = cache->size;
+	cache->capacity = darray_length(cache->heap);
 	return ret;
 }
 
@@ -366,12 +367,16 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, co
 	}
 
 	if (fd >= 0) {
-		if (cache->size == cache->capacity) {
+		if (bftw_cache_full(cache)) {
 			bftw_cache_pop(cache);
 		}
 
 		file->fd = fd;
-		bftw_cache_add(cache, file);
+		if (bftw_cache_add(cache, file) != 0) {
+			close_quietly(fd);
+			file->fd = -1;
+			return -1;
+		}
 	}
 
 	return fd;
@@ -619,21 +624,18 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	if (args->nopenfd < 2) {
 		errno = EMFILE;
-		goto err;
+		return -1;
 	}
-
-	// Reserve 1 fd for the open bfs_dir
-	if (bftw_cache_init(&state->cache, args->nopenfd - 1) != 0) {
-		goto err;
-	}
-
-	bftw_queue_init(&state->queue);
-	state->batch = NULL;
 
 	state->path = dstralloc(0);
 	if (!state->path) {
-		goto err_cache;
+		return -1;
 	}
+
+	// Reserve 1 fd for the open bfs_dir
+	bftw_cache_init(&state->cache, args->nopenfd - 1);
+	bftw_queue_init(&state->queue);
+	state->batch = NULL;
 
 	state->file = NULL;
 	state->previous = NULL;
@@ -643,11 +645,6 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	state->direrror = 0;
 
 	return 0;
-
-err_cache:
-	bftw_cache_destroy(&state->cache);
-err:
-	return -1;
 }
 
 /** Cached bfs_stat(). */
