@@ -1,6 +1,20 @@
 2.*
 ===
 
+2.3.1
+-----
+
+**January 21, 2022**
+
+- Fixed the build on Debian kFreeBSD
+
+- Fixed a crash on GNU Hurd when piping bfs's output
+
+- Fixed a double-`close()` on non-Linux platforms if `fdopendir()` fails
+
+- Reduced memory allocations on startup
+
+
 2.3
 ---
 
