@@ -21,7 +21,6 @@
 #include <fcntl.h>
 #include <langinfo.h>
 #include <nl_types.h>
-#include <regex.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +28,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#ifdef USE_ONIGURUMA
+	#include <onigposix.h>
+#else
+	#include <regex.h>
+#endif
 
 #if BFS_HAS_SYS_PARAM
 #	include <sys/param.h>

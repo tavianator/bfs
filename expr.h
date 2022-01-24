@@ -26,11 +26,16 @@
 #include "exec.h"
 #include "printf.h"
 #include "stat.h"
-#include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <time.h>
+
+#ifdef USE_ONIGURUMA
+	#include <onigposix.h>
+#else
+	#include <regex.h>
+#endif
 
 /**
  * Possible types of numeric comparison.

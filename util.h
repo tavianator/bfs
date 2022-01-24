@@ -23,11 +23,16 @@
 
 #include <fcntl.h>
 #include <fnmatch.h>
-#include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <sys/types.h>
+
+#ifdef USE_ONIGURUMA
+	#include <onigposix.h>
+#else
+	#include <regex.h>
+#endif
 
 // Some portability concerns
 

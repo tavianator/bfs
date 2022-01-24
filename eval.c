@@ -43,7 +43,6 @@
 #include <fnmatch.h>
 #include <grp.h>
 #include <pwd.h>
-#include <regex.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -54,6 +53,12 @@
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>
+
+#ifdef USE_ONIGURUMA
+	#include <onigposix.h>
+#else
+	#include <regex.h>
+#endif
 
 struct eval_state {
 	/** Data about the current file. */
