@@ -16,6 +16,7 @@
 
 #include "util.h"
 #include "dstring.h"
+#include "regexp.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -28,12 +29,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#ifdef USE_ONIGURUMA
-	#include <onigposix.h>
-#else
-	#include <regex.h>
-#endif
 
 #if BFS_HAS_SYS_PARAM
 #	include <sys/param.h>

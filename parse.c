@@ -41,6 +41,7 @@
 #include "time.h"
 #include "typo.h"
 #include "util.h"
+#include "regexp.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -58,12 +59,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-
-#ifdef USE_ONIGURUMA
-	#include <onigposix.h>
-#else
-	#include <regex.h>
-#endif
 
 // Strings printed by -D tree for "fake" expressions
 static char *fake_and_arg = "-a";

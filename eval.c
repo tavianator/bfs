@@ -37,6 +37,7 @@
 #include "time.h"
 #include "trie.h"
 #include "util.h"
+#include "regexp.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -53,12 +54,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>
-
-#ifdef USE_ONIGURUMA
-	#include <onigposix.h>
-#else
-	#include <regex.h>
-#endif
 
 struct eval_state {
 	/** Data about the current file. */
