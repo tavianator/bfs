@@ -72,11 +72,6 @@ ifeq ($(OS),Linux)
 LOCAL_LDFLAGS += -Wl,--as-needed
 LOCAL_LDLIBS += -lacl -lcap -lattr -lrt
 
-ifdef USE_ONIGURUMA
-LOCAL_LDLIBS += -lonig
-LOCAL_CFLAGS += -DUSE_ONIGURUMA
-endif
-
 # These libraries are not built with msan, so disable them
 MSAN_CFLAGS += -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTR=0
 
@@ -87,11 +82,6 @@ endif
 
 ifeq ($(OS),NetBSD)
 LOCAL_LDLIBS += -lutil
-
-ifdef USE_ONIGURUMA
-LOCAL_LDLIBS += -lonig
-LOCAL_CFLAGS += -DUSE_ONIGURUMA
-endif
 endif
 
 ifneq ($(filter asan,$(MAKECMDGOALS)),)
@@ -119,6 +109,11 @@ endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
 CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto -DNDEBUG
+endif
+
+ifeq ($(USE_ONIGURUMA),1)
+LOCAL_LDLIBS += -lonig
+LOCAL_CFLAGS += -DBFS_USE_ONIGURUMA=1
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)

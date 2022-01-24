@@ -1,6 +1,7 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2016-2022 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2022 Tavian Barnes <tavianator@tavianator.com> and         *
+ *                    BFS contributors                                      *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -17,7 +18,7 @@
 #ifndef BFS_REGEXP_H
 #define BFS_REGEXP_H
 
-#ifdef USE_ONIGURUMA
+#if BFS_USE_ONIGURUMA == 1
 	#include <onigposix.h>
 #else
 	#include <regex.h>
