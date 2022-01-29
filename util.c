@@ -16,12 +16,12 @@
 
 #include "util.h"
 #include "dstring.h"
+#include "regexp.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
 #include <nl_types.h>
-#include <regex.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>

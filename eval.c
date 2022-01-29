@@ -37,13 +37,13 @@
 #include "time.h"
 #include "trie.h"
 #include "util.h"
+#include "regexp.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <grp.h>
 #include <pwd.h>
-#include <regex.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>

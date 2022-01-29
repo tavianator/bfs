@@ -41,6 +41,7 @@
 #include "time.h"
 #include "typo.h"
 #include "util.h"
+#include "regexp.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -48,7 +49,6 @@
 #include <grp.h>
 #include <limits.h>
 #include <pwd.h>
-#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>

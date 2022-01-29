@@ -20,10 +20,9 @@
 
 #ifndef BFS_UTIL_H
 #define BFS_UTIL_H
-
+#include "regexp.h"
 #include <fcntl.h>
 #include <fnmatch.h>
-#include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
