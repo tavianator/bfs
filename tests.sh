@@ -622,6 +622,7 @@ gnu_tests=(
     test_regex
     test_regex_parens
     test_regex_error
+    test_regex_alternation
 
     test_regextype_posix_basic
     test_regextype_posix_extended
@@ -2033,6 +2034,10 @@ function test_E() {
 function test_regextype_posix_basic() {
     cd weirdnames
     bfs_diff -regextype posix-basic -regex '\./\((\)'
+}
+
+function test_regex_alternation() {
+    bfs_diff basic -regextype posix-basic -regex 'basic/\(a\|b\)'
 }
 
 function test_regextype_posix_extended() {
