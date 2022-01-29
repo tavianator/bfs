@@ -64,38 +64,64 @@ LOCAL_CFLAGS := -std=c99
 LOCAL_LDFLAGS :=
 LOCAL_LDLIBS :=
 
-ASAN_CFLAGS := -fsanitize=address
-MSAN_CFLAGS := -fsanitize=memory -fsanitize-memory-track-origins
-UBSAN_CFLAGS := -fsanitize=undefined
+ASAN := $(filter asan,$(MAKECMDGOALS))
+MSAN := $(filter msan,$(MAKECMDGOALS))
+UBSAN := $(filter ubsan,$(MAKECMDGOALS))
 
 ifeq ($(OS),Linux)
-LOCAL_LDFLAGS += -Wl,--as-needed
-LOCAL_LDLIBS += -lacl -lcap -lattr -lrt
+ifndef MSAN # These libraries are not built with msan
+WITH_ACL := y
+WITH_ATTR := y
+WITH_LIBCAP := y
+endif
 
-# These libraries are not built with msan, so disable them
-MSAN_CFLAGS += -DBFS_HAS_SYS_ACL=0 -DBFS_HAS_SYS_CAPABILITY=0 -DBFS_HAS_SYS_XATTR=0
+ifdef WITH_ACL
+LOCAL_LDLIBS += -lacl
+else
+LOCAL_CFLAGS += -DBFS_HAS_SYS_ACL=0
+endif
+
+ifdef WITH_ATTR
+LOCAL_LDLIBS += -lattr
+else
+LOCAL_CFLAGS += -DBFS_HAS_SYS_XATTR=0
+endif
+
+ifdef WITH_LIBCAP
+LOCAL_LDLIBS += -lcap
+else
+LOCAL_CFLAGS += -DBFS_HAS_SYS_CAPABILITY=0
+endif
+
+LOCAL_LDFLAGS += -Wl,--as-needed
+LOCAL_LDLIBS += -lrt
 
 DISTCHECK_FLAGS := TEST_FLAGS="--verbose --all --sudo"
-else
+else # Linux
 DISTCHECK_FLAGS := TEST_FLAGS="--verbose"
+endif
+
+ifdef WITH_ONIGURUMA
+LOCAL_LDLIBS += -lonig
+LOCAL_CFLAGS += -DBFS_WITH_ONIGURUMA=1
 endif
 
 ifeq ($(OS),NetBSD)
 LOCAL_LDLIBS += -lutil
 endif
 
-ifneq ($(filter asan,$(MAKECMDGOALS)),)
-LOCAL_CFLAGS += $(ASAN_CFLAGS)
+ifdef ASAN
+LOCAL_CFLAGS += -fsanitize=address
 SANITIZE := y
 endif
 
-ifneq ($(filter msan,$(MAKECMDGOALS)),)
-LOCAL_CFLAGS += $(MSAN_CFLAGS)
+ifdef MSAN
+LOCAL_CFLAGS += -fsanitize=memory -fsanitize-memory-track-origins
 SANITIZE := y
 endif
 
-ifneq ($(filter ubsan,$(MAKECMDGOALS)),)
-LOCAL_CFLAGS += $(UBSAN_CFLAGS)
+ifdef UBSAN
+LOCAL_CFLAGS += -fsanitize=undefined
 SANITIZE := y
 endif
 
@@ -109,11 +135,6 @@ endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
 CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto -DNDEBUG
-endif
-
-ifeq ($(USE_ONIGURUMA),1)
-LOCAL_LDLIBS += -lonig
-LOCAL_CFLAGS += -DBFS_USE_ONIGURUMA=1
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS)

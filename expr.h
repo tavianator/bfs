@@ -25,7 +25,7 @@
 #include "eval.h"
 #include "exec.h"
 #include "printf.h"
-#include "regexp.h"
+#include "regex.h"
 #include "stat.h"
 #include <stdbool.h>
 #include <stddef.h>

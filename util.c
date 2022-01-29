@@ -16,7 +16,7 @@
 
 #include "util.h"
 #include "dstring.h"
-#include "regexp.h"
+#include "regex.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
