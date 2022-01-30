@@ -625,6 +625,8 @@ gnu_tests=(
 
     test_regextype_posix_basic
     test_regextype_posix_extended
+    test_regextype_ed
+    test_regextype_sed
 
     test_samefile
     test_samefile_symlink
@@ -2038,6 +2040,16 @@ function test_regextype_posix_basic() {
 function test_regextype_posix_extended() {
     cd weirdnames
     bfs_diff -regextype posix-extended -regex '\./(\()'
+}
+
+function test_regextype_ed() {
+    cd weirdnames
+    bfs_diff -regextype ed -regex '\./\((\)'
+}
+
+function test_regextype_sed() {
+    cd weirdnames
+    bfs_diff -regextype sed -regex '\./\((\)'
 }
 
 function test_d_path() {

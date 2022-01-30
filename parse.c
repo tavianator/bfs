@@ -2323,7 +2323,10 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 		goto list_types;
 	}
 
-	if (strcmp(type, "posix-basic") == 0) {
+	// See https://www.gnu.org/software/gnulib/manual/html_node/Predefined-Syntaxes.html
+	if (strcmp(type, "posix-basic") == 0
+	    || strcmp(type, "ed") == 0
+	    || strcmp(type, "sed") == 0) {
 		state->regex_flags = 0;
 	} else if (strcmp(type, "posix-extended") == 0) {
 		state->regex_flags = REG_EXTENDED;
@@ -2342,6 +2345,8 @@ list_types:
 	cfprintf(cfile, "Supported types are:\n\n");
 	cfprintf(cfile, "  ${bld}posix-basic${rs}:    POSIX basic regular expressions (BRE)\n");
 	cfprintf(cfile, "  ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n");
+	cfprintf(cfile, "  ${bld}ed${rs}:             Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
+	cfprintf(cfile, "  ${bld}sed${rs}:            Like ${grn}sed${rs} (same as ${bld}posix-basic${rs})\n");
 	return NULL;
 }
 
