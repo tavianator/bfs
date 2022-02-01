@@ -232,6 +232,7 @@ posix_tests=(
     test_name_root
     test_name_root_depth
     test_name_trailing_slash
+    test_name_star_star
 
     test_newer
     test_newer_link
@@ -1290,6 +1291,10 @@ function test_name_slash() {
 
 function test_name_slashes() {
     bfs_diff /// -maxdepth 0 -name /
+}
+
+function test_name_star_star() {
+    bfs_diff basic -name '**f**'
 }
 
 function test_path() {
