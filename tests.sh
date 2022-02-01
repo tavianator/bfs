@@ -1117,6 +1117,13 @@ function fail() {
     fi
 }
 
+# Detect colored diff support
+if diff --color /dev/null /dev/null 2>/dev/null; then
+    DIFF="diff --color"
+else
+    DIFF="diff"
+fi
+
 # Return value when bfs fails
 EX_BFS=10
 # Return value when a difference is detected
@@ -1147,7 +1154,7 @@ function bfs_diff() (
     local STATUS="${PIPESTATUS[0]}"
 
     if [ ! "$UPDATE" ]; then
-        diff -u "$EXPECTED" "$ACTUAL" || return $EX_DIFF
+        $DIFF -u "$EXPECTED" "$ACTUAL" || return $EX_DIFF
     fi
 
     if [ "$STATUS" -eq 0 ]; then
@@ -1759,7 +1766,7 @@ function test_fprint() {
     if [ "$UPDATE" ]; then
         cp {scratch,"$TESTS"}/test_fprint.out
     else
-        diff -u {"$TESTS",scratch}/test_fprint.out
+        $DIFF -u {"$TESTS",scratch}/test_fprint.out
     fi
 }
 
@@ -1774,7 +1781,7 @@ function test_fprint_duplicate() {
     if [ "$UPDATE" ]; then
         cp {scratch,"$TESTS"}/test_fprint_duplicate.out
     else
-        diff -u {"$TESTS",scratch}/test_fprint_duplicate.out
+        $DIFF -u {"$TESTS",scratch}/test_fprint_duplicate.out
     fi
 }
 
@@ -1787,7 +1794,7 @@ function test_fprint_duplicate_stdout() {
     if [ "$UPDATE" ]; then
         cp {scratch,"$TESTS"}/test_fprint_duplicate_stdout.out
     else
-        diff -u {"$TESTS",scratch}/test_fprint_duplicate_stdout.out
+        $DIFF -u {"$TESTS",scratch}/test_fprint_duplicate_stdout.out
     fi
 }
 
@@ -1808,7 +1815,7 @@ function test_fprint_truncate() {
     if [ "$UPDATE" ]; then
         cp {scratch,"$TESTS"}/test_fprint_truncate.out
     else
-        diff -u {"$TESTS",scratch}/test_fprint_truncate.out
+        $DIFF -u {"$TESTS",scratch}/test_fprint_truncate.out
     fi
 }
 
@@ -2078,7 +2085,7 @@ function test_s() {
     if [ "$UPDATE" ]; then
         cp {"$TMP","$TESTS"}/test_s.out
     else
-        diff -u {"$TESTS","$TMP"}/test_s.out
+        $DIFF -u {"$TESTS","$TMP"}/test_s.out
     fi
 }
 
@@ -2276,7 +2283,7 @@ function test_printf_nul() {
     invoke_bfs basic -maxdepth 0 -printf '%h\0%f\n' >"$ACTUAL"
 
     if [ ! "$UPDATE" ]; then
-        diff -u "$EXPECTED" "$ACTUAL"
+        $DIFF -u "$EXPECTED" "$ACTUAL"
     fi
 }
 
@@ -2349,7 +2356,7 @@ function test_fprintf() {
     if [ "$UPDATE" ]; then
         cp scratch/test_fprintf.out "$TESTS/test_fprintf.out"
     else
-        diff -u "$TESTS/test_fprintf.out" scratch/test_fprintf.out
+        $DIFF -u "$TESTS/test_fprintf.out" scratch/test_fprintf.out
     fi
 }
 
@@ -2465,7 +2472,7 @@ function test_color_nul() {
     LS_COLORS="ec=\33[m\0:" invoke_bfs rainbow -color -maxdepth 0 >"$ACTUAL"
 
     if [ ! "$UPDATE" ]; then
-        diff -u "$EXPECTED" "$ACTUAL"
+        $DIFF -u "$EXPECTED" "$ACTUAL"
     fi
 }
 
@@ -2605,7 +2612,7 @@ function test_color_ls() {
         | sort -o "$ACTUAL"
 
     if [ ! "$UPDATE" ]; then
-        diff -u "$EXPECTED" "$ACTUAL"
+        $DIFF -u "$EXPECTED" "$ACTUAL"
     fi
 }
 
@@ -3110,7 +3117,7 @@ function test_S() {
     if [ "$UPDATE" ]; then
         cp {"$TMP","$TESTS"}/"test_S_$1.out"
     else
-        diff -u {"$TESTS","$TMP"}/"test_S_$1.out"
+        $DIFF -u {"$TESTS","$TMP"}/"test_S_$1.out"
     fi
 }
 
