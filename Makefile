@@ -218,7 +218,7 @@ $(FLAG_GOALS): $(FLAG_PREREQS)
 check: $(CHECKS)
 
 $(STRATEGY_CHECKS): check-%: bfs tests/mksock
-	./tests.sh --bfs="$(CURDIR)/bfs -S $*" $(TEST_FLAGS)
+	./tests.sh --bfs="./bfs -S $*" $(TEST_FLAGS)
 
 check-trie check-xtimegm: check-%: tests/%
 	$<

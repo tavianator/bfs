@@ -17,7 +17,6 @@
 ############################################################################
 
 set -e
-set -o physical
 umask 022
 
 export LC_ALL=C
@@ -39,6 +38,8 @@ if [ -t 1 ]; then
     CYN="$(printf '\033[01;36m')"
     RST="$(printf '\033[0m')"
 fi
+
+UNAME="$(uname)"
 
 if command -v capsh &>/dev/null; then
     if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
@@ -63,7 +64,7 @@ EOF
     fi
 elif [ "$EUID" -eq 0 ]; then
     UNLESS=
-    if [ "$(uname)" = "Linux" ]; then
+    if [ "$UNAME" = "Linux" ]; then
 	UNLESS=" unless ${GRN}capsh${RST} is installed"
     fi
 
@@ -106,17 +107,6 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
       Select individual test cases to run
 EOF
 }
-
-function _realpath() {
-    (
-        cd "${1%/*}"
-        echo "$PWD/${1##*/}"
-    )
-}
-
-BFS="$(_realpath ./bfs)"
-TESTS="$(_realpath ./tests)"
-UNAME="$(uname)"
 
 DEFAULT=yes
 POSIX=
@@ -852,6 +842,24 @@ if [ ! "$EXPLICIT" ]; then
 fi
 
 eval enabled_tests=($(printf '%q\n' "${enabled_tests[@]}" | sort -u))
+
+function _realpath() {
+    (
+        set -P
+        cd "$(dirname -- "$1")"
+        echo "$PWD/$(basename -- "$1")"
+    )
+}
+
+ROOT="$(dirname -- "${BASH_SOURCE[0]}")"
+
+# Try to resolve the path to $BFS before we cd, while also supporting
+# --bfs="./bfs -S ids"
+BFS=(${BFS:-$ROOT/bfs})
+BFS[0]="$(_realpath "$(command -v "${BFS[0]}")")"
+BFS="${BFS[*]}"
+
+TESTS="$(_realpath "$ROOT/tests")"
 
 # The temporary directory that will hold our test data
 TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
