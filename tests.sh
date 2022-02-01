@@ -16,7 +16,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
 ############################################################################
 
-set -e
+set -eP
 umask 022
 
 export LC_ALL=C
@@ -845,7 +845,6 @@ eval enabled_tests=($(printf '%q\n' "${enabled_tests[@]}" | sort -u))
 
 function _realpath() {
     (
-        set -P
         cd "$(dirname -- "$1")"
         echo "$PWD/$(basename -- "$1")"
     )
