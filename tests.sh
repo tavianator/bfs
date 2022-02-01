@@ -550,6 +550,8 @@ gnu_tests=(
 
     test_iregex
 
+    test_iwholename
+
     test_lname
     test_L_lname
 
@@ -640,6 +642,8 @@ gnu_tests=(
     test_uid_plus_plus
     test_uid_minus
     test_uid_minus_plus
+
+    test_wholename
 
     test_writable
 
@@ -1301,6 +1305,10 @@ function test_path() {
     bfs_diff basic -path 'basic/*f*'
 }
 
+function test_wholename() {
+    bfs_diff basic -wholename 'basic/*f*'
+}
+
 function test_true() {
     bfs_diff basic -true
 }
@@ -1568,6 +1576,10 @@ function test_iname() {
 
 function test_ipath() {
     bfs_diff basic -ipath 'basic/*F*'
+}
+
+function test_iwholename() {
+    bfs_diff basic -iwholename 'basic/*F*'
 }
 
 function test_lname() {
