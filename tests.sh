@@ -261,6 +261,7 @@ posix_tests=(
     test_perm_sticky
 
     test_prune
+    test_prune_file
     test_prune_or_print
     test_not_prune
 
@@ -1948,6 +1949,10 @@ function test_perm_sticky() {
 
 function test_prune() {
     bfs_diff basic -name foo -prune
+}
+
+function test_prune_file() {
+    bfs_diff basic -print -name '?' -prune
 }
 
 function test_prune_or_print() {
