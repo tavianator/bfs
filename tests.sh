@@ -233,6 +233,10 @@ posix_tests=(
     test_name_root_depth
     test_name_trailing_slash
     test_name_star_star
+    test_name_character_class
+    test_name_bracket
+    test_name_backslash
+    test_name_double_backslash
 
     test_newer
     test_newer_link
@@ -993,6 +997,7 @@ function make_weirdnames() {
     touchp "$1/.../h"
     touchp "$1/\\/i"
     touchp "$1/ /j"
+    touchp "$1/[/k"
 }
 make_weirdnames "$TMP/weirdnames"
 
@@ -1299,6 +1304,25 @@ function test_name_slashes() {
 
 function test_name_star_star() {
     bfs_diff basic -name '**f**'
+}
+
+function test_name_character_class() {
+    bfs_diff basic -name '[e-g][!a-n][!p-z]'
+}
+
+function test_name_bracket() {
+    # An unclosed [ should be matched literally
+    bfs_diff weirdnames -name '['
+}
+
+function test_name_backslash() {
+    # An unescaped \ doesn't match
+    bfs_diff weirdnames -name '\'
+}
+
+function test_name_double_backslash() {
+    # An escaped \\ matches
+    bfs_diff weirdnames -name '\\'
 }
 
 function test_path() {

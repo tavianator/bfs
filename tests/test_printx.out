@@ -7,6 +7,7 @@ weirdnames/)
 weirdnames/,
 weirdnames/-
 weirdnames/...
+weirdnames/[
 weirdnames/\ 
 weirdnames/\\
 weirdnames/!-/e
@@ -17,5 +18,6 @@ weirdnames/)/g
 weirdnames/,/f
 weirdnames/-/a
 weirdnames/.../h
+weirdnames/[/k
 weirdnames/\ /j
 weirdnames/\\/i
