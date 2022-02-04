@@ -68,6 +68,15 @@ ASAN := $(filter asan,$(MAKECMDGOALS))
 MSAN := $(filter msan,$(MAKECMDGOALS))
 UBSAN := $(filter ubsan,$(MAKECMDGOALS))
 
+ifndef MSAN
+WITH_ONIGURUMA := y
+endif
+
+ifdef WITH_ONIGURUMA
+LOCAL_LDLIBS += -lonig
+LOCAL_CFLAGS += -DBFS_WITH_ONIGURUMA=1
+endif
+
 ifeq ($(OS),Linux)
 ifndef MSAN # These libraries are not built with msan
 WITH_ACL := y
@@ -99,11 +108,6 @@ LOCAL_LDLIBS += -lrt
 DISTCHECK_FLAGS := TEST_FLAGS="--verbose --all --sudo"
 else # Linux
 DISTCHECK_FLAGS := TEST_FLAGS="--verbose"
-endif
-
-ifdef WITH_ONIGURUMA
-LOCAL_LDLIBS += -lonig
-LOCAL_CFLAGS += -DBFS_WITH_ONIGURUMA=1
 endif
 
 ifeq ($(OS),NetBSD)
