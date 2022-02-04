@@ -1313,11 +1313,21 @@ function test_name_character_class() {
 }
 
 function test_name_bracket() {
+    if [ "$UNAME" = "Darwin" ]; then
+        # fnmatch() is broken on macOS
+        return 0
+    fi
+
     # An unclosed [ should be matched literally
     bfs_diff weirdnames -name '['
 }
 
 function test_name_backslash() {
+    if [ "$UNAME" = "Darwin" ]; then
+        # fnmatch() is broken on macOS
+        return 0
+    fi
+
     # An unescaped \ doesn't match
     bfs_diff weirdnames -name '\'
 }
