@@ -190,6 +190,7 @@ bfs: \
     parse.o \
     printf.o \
     pwcache.o \
+    regex.o \
     spawn.o \
     stat.o \
     time.o \

@@ -231,7 +231,7 @@ struct parser_state {
 	const char *command;
 
 	/** The current regex flags to use. */
-	int regex_flags;
+	enum bfs_regex_type regex_type;
 
 	/** Whether stdout is a terminal. */
 	bool stdout_tty;
@@ -2279,14 +2279,14 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 		goto fail;
 	}
 
-	int err = regcomp(expr->regex, expr->sdata, state->regex_flags | flags);
+	int err = bfs_regcomp(expr->regex, expr->sdata, flags, state->regex_type);
 	if (err != 0) {
-		char *str = xregerror(err, NULL);
+		char *str = bfs_regerror(err, NULL);
 		if (str) {
 			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
 			free(str);
 		} else {
-			parse_perror(state, "xregerror()");
+			parse_perror(state, "bfs_regerror()");
 		}
 		goto fail_regex;
 	}
@@ -2305,7 +2305,7 @@ fail:
  * Parse -E.
  */
 static struct expr *parse_regex_extended(struct parser_state *state, int arg1, int arg2) {
-	state->regex_flags = REG_EXTENDED;
+	state->regex_type = BFS_REGEX_POSIX_EXTENDED;
 	return parse_nullary_flag(state);
 }
 
@@ -2327,9 +2327,15 @@ static struct expr *parse_regextype(struct parser_state *state, int arg1, int ar
 	if (strcmp(type, "posix-basic") == 0
 	    || strcmp(type, "ed") == 0
 	    || strcmp(type, "sed") == 0) {
-		state->regex_flags = 0;
+		state->regex_type = BFS_REGEX_POSIX_BASIC;
 	} else if (strcmp(type, "posix-extended") == 0) {
-		state->regex_flags = REG_EXTENDED;
+		state->regex_type = BFS_REGEX_POSIX_EXTENDED;
+#if BFS_WITH_ONIGURUMA
+	} else if (strcmp(type, "emacs") == 0) {
+		state->regex_type = BFS_REGEX_EMACS;
+	} else if (strcmp(type, "grep") == 0) {
+		state->regex_type = BFS_REGEX_GREP;
+#endif
 	} else if (strcmp(type, "help") == 0) {
 		state->just_info = true;
 		cfile = ctx->cout;
@@ -2346,6 +2352,10 @@ list_types:
 	cfprintf(cfile, "  ${bld}posix-basic${rs}:    POSIX basic regular expressions (BRE)\n");
 	cfprintf(cfile, "  ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n");
 	cfprintf(cfile, "  ${bld}ed${rs}:             Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
+#if BFS_WITH_ONIGURUMA
+	cfprintf(cfile, "  ${bld}emacs${rs}:          Like ${grn}emacs${rs}\n");
+	cfprintf(cfile, "  ${bld}grep${rs}:           Like ${grn}grep${rs}\n");
+#endif
 	cfprintf(cfile, "  ${bld}sed${rs}:            Like ${grn}sed${rs} (same as ${bld}posix-basic${rs})\n");
 	return NULL;
 }
@@ -3754,7 +3764,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.ctx = ctx,
 		.argv = ctx->argv + 1,
 		.command = ctx->argv[0],
-		.regex_flags = 0,
+		.regex_type = BFS_REGEX_POSIX_BASIC,
 		.stdout_tty = stdout_tty,
 		.interactive = stdin_tty && stderr_tty,
 		.stdin_consumed = false,

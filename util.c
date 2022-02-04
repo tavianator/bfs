@@ -115,15 +115,6 @@ int pipe_cloexec(int pipefd[2]) {
 #endif
 }
 
-char *xregerror(int err, const regex_t *regex) {
-	size_t len = regerror(err, regex, NULL, 0);
-	char *str = malloc(len);
-	if (str) {
-		regerror(err, regex, str, len);
-	}
-	return str;
-}
-
 /** Get the single character describing the given file type. */
 static char type_char(mode_t mode) {
 	switch (mode & S_IFMT) {
@@ -273,7 +264,7 @@ static int xrpregex(nl_item item, const char *response) {
 	}
 
 	regex_t regex;
-	int ret = regcomp(&regex, pattern, REG_EXTENDED);
+	int ret = bfs_regcomp(&regex, pattern, 0, BFS_REGEX_POSIX_EXTENDED);
 	if (ret != 0) {
 		return ret;
 	}

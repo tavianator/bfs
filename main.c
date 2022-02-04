@@ -43,6 +43,7 @@
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
  *     - mtab.[ch]     (parses the system's mount table)
  *     - pwcache.[ch]  (a cache for the user/group tables)
+ *     - regex.[ch]    (regular expression support)
  *     - spawn.[ch]    (spawns processes)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
  *     - time.[ch]     (date/time handling utilities)

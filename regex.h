@@ -24,4 +24,42 @@
 #	include <regex.h>
 #endif
 
+/**
+ * Regex syntax flavors.
+ */
+enum bfs_regex_type {
+	BFS_REGEX_POSIX_BASIC,
+	BFS_REGEX_POSIX_EXTENDED,
+	BFS_REGEX_EMACS,
+	BFS_REGEX_GREP,
+};
+
+/**
+ * Wrapper for regcomp() that supports additional regex types.
+ *
+ * @param preg
+ *         The compiled regex.
+ * @param regex
+ *         The regular expression to compile.
+ * @param cflags
+ *         Regex compilation flags.
+ * @param type
+ *         The regular expression syntax to use.
+ * @return
+ *         0 on success, or an error code on failure.
+ */
+int bfs_regcomp(regex_t *preg, const char *regex, int cflags, enum bfs_regex_type type);
+
+/**
+ * Dynamically allocate a regex error message.
+ *
+ * @param err
+ *         The error code to stringify.
+ * @param regex
+ *         The compiled regex, or NULL if compilation failed.
+ * @return
+ *         A human-readable description of the error, allocated with malloc().
+ */
+char *bfs_regerror(int err, const regex_t *regex);
+
 #endif // BFS_REGEX_H

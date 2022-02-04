@@ -624,6 +624,8 @@ gnu_tests=(
     test_regextype_posix_basic
     test_regextype_posix_extended
     test_regextype_ed
+    test_regextype_emacs
+    test_regextype_grep
     test_regextype_sed
 
     test_samefile
@@ -2105,6 +2107,22 @@ function test_regextype_posix_extended() {
 function test_regextype_ed() {
     cd weirdnames
     bfs_diff -regextype ed -regex '\./\((\)'
+}
+
+function test_regextype_emacs() {
+    if fail quiet invoke_bfs -regextype emacs -quit; then
+        return 0
+    fi
+
+    bfs_diff basic -regextype emacs -regex '.*/\(f+o?o?\|bar\)'
+}
+
+function test_regextype_grep() {
+    if fail quiet invoke_bfs -regextype grep -quit; then
+        return 0
+    fi
+
+    bfs_diff basic -regextype grep -regex '.*/f\+o\?o\?'
 }
 
 function test_regextype_sed() {

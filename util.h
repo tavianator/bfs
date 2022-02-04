@@ -170,17 +170,6 @@ int dup_cloexec(int fd);
 int pipe_cloexec(int pipefd[2]);
 
 /**
- * Dynamically allocate a regex error message.
- *
- * @param err
- *         The error code to stringify.
- * @param regex
- *         The (partially) compiled regex.
- * @return A human-readable description of the error, allocated with malloc().
- */
-char *xregerror(int err, const regex_t *regex);
-
-/**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
  * @param mode

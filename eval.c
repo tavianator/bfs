@@ -841,12 +841,12 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	if (err == 0) {
 		return match.rm_so == 0 && (size_t)match.rm_eo == len;
 	} else if (err != REG_NOMATCH) {
-		char *str = xregerror(err, expr->regex);
+		char *str = bfs_regerror(err, expr->regex);
 		if (str) {
 			eval_error(state, "%s.\n", str);
 			free(str);
 		} else {
-			eval_error(state, "xregerror(): %m.\n");
+			eval_error(state, "bfs_regerror(): %m.\n");
 		}
 
 		*state->ret = EXIT_FAILURE;
