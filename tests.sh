@@ -1611,14 +1611,17 @@ function test_xtype_depth() {
 }
 
 function test_iname() {
+    skip_if fail quiet invoke_bfs -quit -iname PATTERN
     bfs_diff basic -iname '*F*'
 }
 
 function test_ipath() {
+    skip_if fail quiet invoke_bfs -quit -ipath PATTERN
     bfs_diff basic -ipath 'basic/*F*'
 }
 
 function test_iwholename() {
+    skip_if fail quiet invoke_bfs -quit -iwholename PATTERN
     bfs_diff basic -iwholename 'basic/*F*'
 }
 
@@ -1627,6 +1630,7 @@ function test_lname() {
 }
 
 function test_ilname() {
+    skip_if fail quiet invoke_bfs -quit -ilname PATTERN
     bfs_diff links -ilname '[AQ]'
 }
 
@@ -1635,6 +1639,7 @@ function test_L_lname() {
 }
 
 function test_L_ilname() {
+    skip_if fail quiet invoke_bfs -quit -ilname PATTERN
     bfs_diff -L links -ilname '[AQ]'
 }
 
