@@ -1141,6 +1141,8 @@ fi
 EX_BFS=10
 # Return value when a difference is detected
 EX_DIFF=20
+# Return value when a test is skipped
+EX_SKIP=77
 
 function bfs_diff() (
     bfs_verbose "$@"
@@ -1176,6 +1178,12 @@ function bfs_diff() (
         return $EX_BFS
     fi
 )
+
+function skip_if() {
+    if "$@"; then
+        exit $EX_SKIP
+    fi
+}
 
 function closefrom() {
     if [ -d /proc/self/fd ]; then
@@ -1313,20 +1321,16 @@ function test_name_character_class() {
 }
 
 function test_name_bracket() {
-    if [ "$UNAME" = "Darwin" ]; then
-        # fnmatch() is broken on macOS
-        return 0
-    fi
+    # fnmatch() is broken on macOS
+    skip_if test "$UNAME" = "Darwin"
 
     # An unclosed [ should be matched literally
     bfs_diff weirdnames -name '['
 }
 
 function test_name_backslash() {
-    if [ "$UNAME" = "Darwin" ]; then
-        # fnmatch() is broken on macOS
-        return 0
-    fi
+    # fnmatch() is broken on macOS
+    skip_if test "$UNAME" = "Darwin"
 
     # An unescaped \ doesn't match
     bfs_diff weirdnames -name '\'
@@ -2120,17 +2124,13 @@ function test_regextype_ed() {
 }
 
 function test_regextype_emacs() {
-    if fail quiet invoke_bfs -regextype emacs -quit; then
-        return 0
-    fi
+    skip_if fail quiet invoke_bfs -regextype emacs -quit
 
     bfs_diff basic -regextype emacs -regex '.*/\(f+o?o?\|bar\)'
 }
 
 function test_regextype_grep() {
-    if fail quiet invoke_bfs -regextype grep -quit; then
-        return 0
-    fi
+    skip_if fail quiet invoke_bfs -regextype grep -quit
 
     bfs_diff basic -regextype grep -regex '.*/f\+o\?o\?'
 }
@@ -3023,10 +3023,10 @@ function set_acl() {
 function test_acl() {
     rm -rf scratch/*
 
-    quiet invoke_bfs scratch -quit -acl || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -acl
 
     $TOUCH scratch/{normal,acl}
-    set_acl scratch/acl || return 0
+    skip_if fail set_acl scratch/acl
     ln -s acl scratch/link
 
     bfs_diff scratch -acl
@@ -3035,10 +3035,10 @@ function test_acl() {
 function test_L_acl() {
     rm -rf scratch/*
 
-    quiet invoke_bfs scratch -quit -acl || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -acl
 
     $TOUCH scratch/{normal,acl}
-    set_acl scratch/acl || return 0
+    skip_if fail set_acl scratch/acl
     ln -s acl scratch/link
 
     bfs_diff -L scratch -acl
@@ -3047,9 +3047,7 @@ function test_L_acl() {
 function test_capable() {
     rm -rf scratch/*
 
-    if fail quiet invoke_bfs scratch -quit -capable; then
-        return 0
-    fi
+    skip_if fail quiet invoke_bfs scratch -quit -capable
 
     $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
@@ -3061,9 +3059,7 @@ function test_capable() {
 function test_L_capable() {
     rm -rf scratch/*
 
-    if fail quiet invoke_bfs scratch -quit -capable; then
-        return 0
-    fi
+    skip_if fail quiet invoke_bfs scratch -quit -capable
 
     $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
@@ -3101,20 +3097,20 @@ function make_xattrs() {
 }
 
 function test_xattr() {
-    quiet invoke_bfs scratch -quit -xattr || return 0
-    make_xattrs || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -xattr
+    skip_if fail make_xattrs
     bfs_diff scratch -xattr
 }
 
 function test_L_xattr() {
-    quiet invoke_bfs scratch -quit -xattr || return 0
-    make_xattrs || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -xattr
+    skip_if fail make_xattrs
     bfs_diff -L scratch -xattr
 }
 
 function test_xattrname() {
-    quiet invoke_bfs scratch -quit -xattr || return 0
-    make_xattrs || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -xattr
+    skip_if fail make_xattrs
 
     case "$UNAME" in
         Darwin|FreeBSD)
@@ -3127,8 +3123,8 @@ function test_xattrname() {
 }
 
 function test_L_xattrname() {
-    quiet invoke_bfs scratch -quit -xattr || return 0
-    make_xattrs || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -xattr
+    skip_if fail make_xattrs
 
     case "$UNAME" in
         Darwin|FreeBSD)
@@ -3228,12 +3224,12 @@ function test_exclude_exclude() {
 }
 
 function test_flags() {
-    quiet invoke_bfs scratch -quit -flags offline || return 0
+    skip_if fail quiet invoke_bfs scratch -quit -flags offline
 
     rm -rf scratch/*
 
     $TOUCH scratch/{foo,bar}
-    chflags offline scratch/bar || return 0
+    skip_if fail chflags offline scratch/bar
 
     bfs_diff scratch -flags -offline,nohidden
 }
@@ -3309,6 +3305,7 @@ fi
 
 passed=0
 failed=0
+skipped=0
 
 for test in "${enabled_tests[@]}"; do
     printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
@@ -3318,6 +3315,11 @@ for test in "${enabled_tests[@]}"; do
 
     if [ $status -eq 0 ]; then
         ((++passed))
+    elif [ $status -eq $EX_SKIP ]; then
+        ((++skipped))
+        if [ "$VERBOSE" ]; then
+            printf "${BOL}${CYN}%s skipped!${RST}\n" "$test"
+        fi
     else
         ((++failed))
         printf "${BOL}${RED}%s failed!${RST}\n" "$test"
@@ -3326,6 +3328,9 @@ done
 
 if [ $passed -gt 0 ]; then
     printf "${BOL}${GRN}tests passed: %d${RST}\n" "$passed"
+fi
+if [ $skipped -gt 0 ]; then
+    printf "${BOL}${CYN}tests skipped: %s${RST}\n" "$skipped"
 fi
 if [ $failed -gt 0 ]; then
     printf "${BOL}${RED}tests failed: %s${RST}\n" "$failed"
