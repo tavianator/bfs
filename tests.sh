@@ -358,6 +358,7 @@ bsd_tests=(
     test_execdir_ulimit
 
     test_exit
+    test_exit_no_implicit_print
 
     test_flags
 
@@ -2722,6 +2723,10 @@ function test_exit() {
     fi
 
     bfs_diff basic/g -print -name g -exit
+}
+
+function test_exit_no_implicit_print() {
+    bfs_diff basic -not -name foo -o -exit
 }
 
 function test_printx() {
