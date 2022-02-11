@@ -2,7 +2,7 @@
 
 ############################################################################
 # bfs                                                                      #
-# Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        #
+# Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        #
 #                                                                          #
 # Permission to use, copy, modify, and/or distribute this software for any #
 # purpose with or without fee is hereby granted.                           #
@@ -492,6 +492,12 @@ gnu_tests=(
 
     test_exec_nothing
     test_exec_substring
+    test_exec_flush
+    test_exec_flush_fail
+    test_exec_flush_fprint
+    test_exec_flush_fprint_fail
+    test_exec_plus_flush
+    test_exec_plus_flush_fail
 
     test_execdir
     test_execdir_substring
@@ -1752,6 +1758,36 @@ function test_exec_plus_semicolon() {
 
 function test_exec_substring() {
     bfs_diff basic -exec echo '-{}-' ';'
+}
+
+function test_exec_flush() {
+    # IO streams should be flushed before executing programs
+    bfs_diff basic -printf '%p ' -exec echo found \;
+}
+
+function test_exec_flush_fail() {
+    # Failure to flush streams before exec should be caught
+    skip_if test ! -e /dev/full
+    fail quiet invoke_bfs basic -printf '%p ' -exec true \; >/dev/full
+}
+
+function test_exec_flush_fprint() {
+    # Even non-stdstreams should be flushed
+    bfs_diff basic/a -fprint scratch/foo -exec cat scratch/foo \;
+}
+
+function test_exec_flush_fprint_fail() {
+    skip_if test ! -e /dev/full
+    fail quiet invoke_bfs basic/a -fprint /dev/full -exec true \;
+}
+
+function test_exec_plus_flush() {
+    bfs_diff basic/a -printf '%p ' -exec echo found {} +
+}
+
+function test_exec_plus_flush_fail() {
+    skip_if test ! -e /dev/full
+    fail quiet invoke_bfs basic/a -printf '%p ' -exec echo found {} + >/dev/full
 }
 
 function test_execdir() {
