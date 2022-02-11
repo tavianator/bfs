@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -193,6 +193,22 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 	return cfile;
 }
 
+/** Flush a file and report any errors. */
+static int bfs_ctx_flush(CFILE *cfile) {
+	int ret = 0, error = 0;
+	if (ferror(cfile->file)) {
+		ret = -1;
+		error = EIO;
+	}
+	if (fflush(cfile->file) != 0) {
+		ret = -1;
+		error = errno;
+	}
+
+	errno = error;
+	return ret;
+}
+
 /** Close a file tracked by the bfs context. */
 static int bfs_ctx_close(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 	CFILE *cfile = ctx_file->cfile;
@@ -200,10 +216,14 @@ static int bfs_ctx_close(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 	if (cfile == ctx->cout) {
 		// Will be checked later
 		return 0;
-	} else if (cfile == ctx->cerr && !ctx_file->path) {
+	} else if (cfile == ctx->cerr) {
 		// Writes to stderr are allowed to fail silently, unless the same file was used by
 		// -fprint, -fls, etc.
-		return 0;
+		if (ctx_file->path) {
+			return bfs_ctx_flush(cfile);
+		} else {
+			return 0;
+		}
 	}
 
 	int ret = 0, error = 0;
@@ -211,17 +231,9 @@ static int bfs_ctx_close(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 		ret = -1;
 		error = EIO;
 	}
-
-	if (cfile == ctx->cerr) {
-		if (fflush(cfile->file) != 0) {
-			ret = -1;
-			error = errno;
-		}
-	} else {
-		if (cfclose(cfile) != 0) {
-			ret = -1;
-			error = errno;
-		}
+	if (cfclose(cfile) != 0) {
+		ret = -1;
+		error = errno;
 	}
 
 	errno = error;
@@ -259,7 +271,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		}
 		trie_destroy(&ctx->files);
 
-		if (cout && fflush(cout->file) != 0) {
+		if (cout && bfs_ctx_flush(cout) != 0) {
 			if (cerr) {
 				bfs_error(ctx, "standard output: %m.\n");
 			}
