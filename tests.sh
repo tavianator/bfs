@@ -2816,35 +2816,29 @@ function test_data_flow_or_swap() {
 }
 
 function test_print_error() {
-    if [ -e /dev/full ]; then
-        fail quiet invoke_bfs basic -maxdepth 0 >/dev/full
-    fi
+    skip_if test ! -e /dev/full
+    fail quiet invoke_bfs basic -maxdepth 0 >/dev/full
 }
 
 function test_fprint_error() {
-    if [ -e /dev/full ]; then
-        fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
-    fi
+    skip_if test ! -e /dev/full
+    fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
 }
 
 function test_fprint_noerror() {
     # Regression test: /dev/full should not fail until actually written to
-
-    if [ -e /dev/full ]; then
-        invoke_bfs basic -false -fprint /dev/full
-    fi
+    skip_if test ! -e /dev/full
+    invoke_bfs basic -false -fprint /dev/full
 }
 
 function test_fprint_error_stdout() {
-    if [ -e /dev/full ]; then
-        fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
-    fi
+    skip_if test ! -e /dev/full
+    fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
 }
 
 function test_fprint_error_stderr() {
-    if [ -e /dev/full ]; then
-        fail invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/full
-    fi
+    skip_if test ! -e /dev/full
+    fail invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/full
 }
 
 function test_print0() {
@@ -3276,15 +3270,13 @@ function test_files0_from_ok() {
 }
 
 function test_stderr_fails_silently() {
-    if [ -e /dev/full ]; then
-        bfs_diff -D all basic 2>/dev/full
-    fi
+    skip_if test ! -e /dev/full
+    bfs_diff -D all basic 2>/dev/full
 }
 
 function test_stderr_fails_loudly() {
-    if [ -e /dev/full ]; then
-        fail invoke_bfs -D all basic -false -fprint /dev/full 2>/dev/full
-    fi
+    skip_if test ! -e /dev/full
+    fail invoke_bfs -D all basic -false -fprint /dev/full 2>/dev/full
 }
 
 function test_unexpected_operator() {
