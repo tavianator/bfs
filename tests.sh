@@ -494,8 +494,6 @@ gnu_tests=(
     test_exec_substring
     test_exec_flush
     test_exec_flush_fail
-    test_exec_flush_fprint
-    test_exec_flush_fprint_fail
     test_exec_plus_flush
     test_exec_plus_flush_fail
 
@@ -745,6 +743,9 @@ bfs_tests=(
     test_color_L_no_stat
     test_color_star
     test_color_ls
+
+    test_exec_flush_fprint
+    test_exec_flush_fprint_fail
 
     test_execdir_plus
 
