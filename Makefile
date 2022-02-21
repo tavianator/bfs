@@ -233,7 +233,7 @@ distcheck:
 ifneq ($(OS),Darwin)
 	+$(MAKE) -B msan check CC=clang $(DISTCHECK_FLAGS)
 ifeq ($(ARCH),x86_64)
-	+$(MAKE) -B check CFLAGS="-m32" $(DISTCHECK_FLAGS)
+	+$(MAKE) -B check EXTRA_CFLAGS="-m32" $(DISTCHECK_FLAGS)
 endif
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
