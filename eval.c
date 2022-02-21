@@ -827,20 +827,10 @@ bool eval_quit(const struct expr *expr, struct eval_state *state) {
  */
 bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
-	size_t len = strlen(path);
-	regmatch_t match = {
-		.rm_so = 0,
-		.rm_eo = len,
-	};
 
-	int flags = 0;
-#ifdef REG_STARTEND
-	flags |= REG_STARTEND;
-#endif
-	int err = regexec(expr->regex, path, 1, &match, flags);
-	if (err == 0) {
-		return match.rm_so == 0 && (size_t)match.rm_eo == len;
-	} else if (err != REG_NOMATCH) {
+	int err;
+	bool ret = bfs_regexec(expr->regex, path, BFS_REGEX_ANCHOR, &err);
+	if (err) {
 		char *str = bfs_regerror(err, expr->regex);
 		if (str) {
 			eval_error(state, "%s.\n", str);
@@ -848,11 +838,9 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 		} else {
 			eval_error(state, "bfs_regerror(): %m.\n");
 		}
-
-		*state->ret = EXIT_FAILURE;
 	}
 
-	return false;
+	return ret;
 }
 
 /**

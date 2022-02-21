@@ -260,33 +260,33 @@ bool is_nonexistence_error(int error) {
 static int xrpregex(nl_item item, const char *response) {
 	const char *pattern = nl_langinfo(item);
 	if (!pattern) {
-		return REG_BADPAT;
+		return -1;
 	}
 
-	regex_t regex;
-	int ret = bfs_regcomp(&regex, pattern, 0, BFS_REGEX_POSIX_EXTENDED);
-	if (ret != 0) {
-		return ret;
+	int err;
+	struct bfs_regex *regex = bfs_regcomp(pattern, BFS_REGEX_POSIX_EXTENDED, 0, &err);
+	if (!regex) {
+		return -1;
 	}
 
-	ret = regexec(&regex, response, 0, NULL, 0);
-	regfree(&regex);
-	return ret;
+	int ret = bfs_regexec(regex, response, 0, &err);
+	bfs_regfree(regex);
+	return err ? -1 : ret;
 }
 
 /** Check if a response is affirmative or negative. */
 static int xrpmatch(const char *response) {
 	int ret = xrpregex(NOEXPR, response);
-	if (ret == 0) {
+	if (ret > 0) {
 		return 0;
-	} else if (ret != REG_NOMATCH) {
+	} else if (ret < 0) {
 		return -1;
 	}
 
 	ret = xrpregex(YESEXPR, response);
-	if (ret == 0) {
+	if (ret > 0) {
 		return 1;
-	} else if (ret != REG_NOMATCH) {
+	} else if (ret < 0) {
 		return -1;
 	}
 

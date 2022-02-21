@@ -105,11 +105,7 @@ void free_expr(struct expr *expr) {
 		return;
 	}
 
-	if (expr->regex) {
-		regfree(expr->regex);
-		free(expr->regex);
-	}
-
+	bfs_regfree(expr->regex);
 	bfs_printf_free(expr->printf);
 	bfs_exec_free(expr->execbuf);
 
@@ -2273,14 +2269,9 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 		goto fail;
 	}
 
-	expr->regex = malloc(sizeof(regex_t));
+	int err;
+	expr->regex = bfs_regcomp(expr->sdata, state->regex_type, flags, &err);
 	if (!expr->regex) {
-		parse_perror(state, "malloc()");
-		goto fail;
-	}
-
-	int err = bfs_regcomp(expr->regex, expr->sdata, flags, state->regex_type);
-	if (err != 0) {
 		char *str = bfs_regerror(err, NULL);
 		if (str) {
 			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
@@ -3134,7 +3125,7 @@ static const struct table_entry parse_table[] = {
 	{"-iname", T_TEST, parse_name, true},
 	{"-inum", T_TEST, parse_inum},
 	{"-ipath", T_TEST, parse_path, true},
-	{"-iregex", T_TEST, parse_regex, REG_ICASE},
+	{"-iregex", T_TEST, parse_regex, BFS_REGEX_ICASE},
 	{"-iwholename", T_TEST, parse_path, true},
 	{"-links", T_TEST, parse_links},
 	{"-lname", T_TEST, parse_lname, false},

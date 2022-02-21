@@ -159,7 +159,7 @@ struct expr {
 	CFILE *cfile;
 
 	/** Optional compiled regex. */
-	regex_t *regex;
+	struct bfs_regex *regex;
 
 	/** Optional exec command. */
 	struct bfs_exec *execbuf;

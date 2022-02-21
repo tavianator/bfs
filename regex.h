@@ -18,11 +18,12 @@
 #ifndef BFS_REGEX_H
 #define BFS_REGEX_H
 
-#if BFS_WITH_ONIGURUMA
-#	include <onigposix.h>
-#else
-#	include <regex.h>
-#endif
+#include <stdbool.h>
+
+/**
+ * A compiled regular expression.
+ */
+struct bfs_regex;
 
 /**
  * Regex syntax flavors.
@@ -35,20 +36,57 @@ enum bfs_regex_type {
 };
 
 /**
+ * Regex compilation flags.
+ */
+enum bfs_regcomp_flags {
+	/** Treat the regex case-insensitively. */
+	BFS_REGEX_ICASE = 1 << 0,
+};
+
+/**
+ * Regex execution flags.
+ */
+enum bfs_regexec_flags {
+	/** Only treat matches of the entire string as successful. */
+	BFS_REGEX_ANCHOR = 1 << 0,
+};
+
+/**
  * Wrapper for regcomp() that supports additional regex types.
  *
- * @param preg
- *         The compiled regex.
- * @param regex
+ * @param expr
  *         The regular expression to compile.
- * @param cflags
- *         Regex compilation flags.
  * @param type
  *         The regular expression syntax to use.
+ * @param flags
+ *         Regex compilation flags.
+ * @param[out] err
+ *         Will hold the error code if compilation fails.
  * @return
- *         0 on success, or an error code on failure.
+ *         The compiled regular expression, or NULL on error.
  */
-int bfs_regcomp(regex_t *preg, const char *regex, int cflags, enum bfs_regex_type type);
+struct bfs_regex *bfs_regcomp(const char *expr, enum bfs_regex_type type, enum bfs_regcomp_flags flags, int *err);
+
+/**
+ * Wrapper for regexec().
+ *
+ * @param expr
+ *         The regular expression to execute.
+ * @param str
+ *         The string to match against.
+ * @param flags
+ *         Regex execution flags.
+ * @param[out] err
+ *         Will hold the error code if execution fails.
+ * @return
+ *         Whether the regex matched.
+ */
+bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags, int *err);
+
+/**
+ * Free a compiled regex.
+ */
+void bfs_regfree(struct bfs_regex *regex);
 
 /**
  * Dynamically allocate a regex error message.
@@ -60,6 +98,6 @@ int bfs_regcomp(regex_t *preg, const char *regex, int cflags, enum bfs_regex_typ
  * @return
  *         A human-readable description of the error, allocated with malloc().
  */
-char *bfs_regerror(int err, const regex_t *regex);
+char *bfs_regerror(int err, const struct bfs_regex *regex);
 
 #endif // BFS_REGEX_H
