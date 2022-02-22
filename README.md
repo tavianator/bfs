@@ -22,10 +22,12 @@ It is otherwise compatible with many versions of `find`, including
 If you're not familiar with `find`, the [GNU find manual](https://www.gnu.org/software/findutils/manual/html_mono/find.html) provides a good introduction.
 
 
-Breadth vs. depth
------------------
+Features
+--------
 
-The advantage of breadth-first over depth first search is that it usually finds the file(s) you're looking for faster.
+<details>
+<summary><code>bfs</code> operates breadth-first, which typically finds the file(s) you're looking for faster.</summary>
+
 Imagine the following directory tree:
 
 <pre>
@@ -69,46 +71,78 @@ haystack/deep/1/2/3
 haystack/deep/1/2/3/4
 ...
 </pre>
+</details>
 
+<details>
+<summary><code>bfs</code> tries to be easier to use than <code>find</code>, while remaining compatible.</summary>
 
-Easy
-----
-
-`bfs` tries to be easier to use than `find`, while remaining compatible.
 For example, `bfs` is less picky about where you put its arguments:
 
 <pre>
-$ <strong>find</strong> -L -name 'needle' <em>haystack</em>
-find: paths must precede expression: haystack
-$ <strong>bfs</strong> -L -name 'needle' <em>haystack</em>
-<strong>haystack/needle</strong>
-
-$ <strong>find</strong> <em>haystack</em> -L -name 'needle'
-find: unknown predicate `-L'
-$ <strong>bfs</strong> <em>haystack</em> -L -name 'needle'
-<strong>haystack/needle</strong>
-
-$ <strong>find</strong> -L <em>haystack</em> -name 'needle'
-<strong>haystack/needle</strong>
-$ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'
-<strong>haystack/needle</strong>
+$ <strong>bfs</strong> -L -name 'needle' <em>haystack</em>    │ $ <strong>find</strong> -L -name 'needle' <em>haystack</em>
+<strong>haystack/needle</strong>                     │ find: paths must precede expression: haystack
+                                    │
+$ <strong>bfs</strong> <em>haystack</em> -L -name 'needle'    │ $ <strong>find</strong> <em>haystack</em> -L -name 'needle'
+<strong>haystack/needle</strong>                     │ find: unknown predicate `-L'
+                                    │
+$ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'    │ $ <strong>find</strong> -L <em>haystack</em> -name 'needle'
+<strong>haystack/needle</strong>                     │ <strong>haystack/needle</strong>
 </pre>
+</details>
 
-`bfs` also adds some extra options that make some common tasks easier.
-Compare
+<details>
+<summary><code>bfs</code> adds some options that make common tasks easier.</summary>
+
+### `-exclude`
+
+The `-exclude` operator skips an entire subtree whenever an expression matches.
+For example, `-exclude -name .git` will exclude any files or directories named `.git` from the search results.
+`-exclude` is easier to use than the standard `-prune` action; compare
 
     bfs -name config -exclude -name .git
 
-vs.
+to the equivalent
 
     find ! \( -name .git -prune \) -name config
 
+Unlike `-prune`, `-exclude` even works in combination with `-depth`/`-delete`.
 
-Try it!
--------
+---
 
-`bfs` may already be packaged for your distribution of choice.
-For example:
+### `-hidden`/`-nohidden`
+
+`-hidden` matches "hidden" files (dotfiles).
+`bfs -hidden` is effectively shorthand for
+
+    find \( -name '.*' -not -name . -not -name ..` \)
+
+`-nohidden` is equivalent to `-exclude -hidden`.
+
+---
+
+### `-unique`
+
+This option ensures that `bfs` only visits each file once, even if it's reachable through multiple hard or symbolic links.
+It's particularly useful when following symbolic links (`-L`).
+
+---
+
+### `-color`/`-nocolor`
+
+When printing to a terminal, `bfs` automatically colors paths like GNU `ls`, according to the `LS_COLORS` environment variable.
+The `-color` and `-nocolor` options override the automatic behavior, which may be handy when you want to preserve colors through a pipe:
+
+    bfs -color | less -R
+
+If the [`NO_COLOR`](https://no-color.org/) environment variable is set, colors will be disabled by default.
+</details>
+
+
+Installation
+------------
+
+<details>
+<summary><code>bfs</code> may already be packaged for your operating system.</summary>
 
 <pre>
 <strong>Alpine Linux</strong>
@@ -132,8 +166,55 @@ For example:
 <strong>Homebrew</strong>
 $ brew install tavianator/tap/bfs
 </pre>
+</details>
 
-To install `bfs` from source, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
+<details>
+<summary>To build <code>bfs</code> from source, you may need to install some dependencies.</summary>
+
+The only absolute requirements for building `bfs` are a C compiler and GNU make.
+These are installed by default on many systems, and easy to install on most others.
+Refer to your operating system's documentation on building software.
+
+`bfs` also depends on some system libraries for some of its features.
+These dependencies are optional, and can be turned off at build time if necessary by setting the appropriate variable to the empty string (e.g. `make WITH_ONIGURUMA=`).
+
+| Dependency                                            | Platforms  | `make` flag      |
+|-------------------------------------------------------|------------|------------------|
+| [acl](https://savannah.nongnu.org/projects/acl)       | Linux only | `WITH_ACL`       |
+| [attr](https://savannah.nongnu.org/projects/attr)     | Linux only | `WITH_ATTR`      |
+| [libcap](https://sites.google.com/site/fullycapable/) | Linux only | `WITH_LIBCAP`    |
+| [Oniguruma](https://github.com/kkos/oniguruma)        | All        | `WITH_ONIGURUMA` |
+
+Here's how to install them on some common platforms:
+
+<pre>
+<strong>Alpine Linux</strong>
+# apk add acl-dev attr-dev libcap-dev oniguruma-dev
+
+<strong>Arch Linux</strong>
+# pacman -S acl attr libcap oniguruma
+
+<strong>Debian/Ubuntu</strong>
+# apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev libonig-dev
+
+<strong>NixOS</strong>
+# nix-env -i acl attr libcap oniguruma
+
+<strong>Void Linux</strong>
+# xbps-install -S acl-devel attr-devel libcap-devel oniguruma-devel
+
+<strong>FreeBSD</strong>
+# pkg install oniguruma
+
+<strong>MacPorts</strong>
+# port install oniguruma6
+
+<strong>Homebrew</strong>
+$ brew install oniguruma
+</pre>
+</details>
+
+Once the dependencies are installed, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
 Then run
 
     $ make
@@ -149,4 +230,4 @@ If you're interested in speed, you may want to build the release version instead
 
 Finally, if you want to install it globally, run
 
-    $ sudo make install
+    # make install
