@@ -1,6 +1,25 @@
 2.*
 ===
 
+2.4
+---
+
+**February 22, 2022**
+
+- Added the Oniguruma regular expression library as an (optional, but enabled by default) dependency ([#81]).
+  Oniguruma supports more regular expression syntax types than the POSIX regex API, and often performs better.
+  To build `bfs` without this new dependency, do `make WITH_ONIGURUMA=` to disable it.
+  Thanks @data-man!
+
+- Added support for the `ed`, `emacs`, `grep`, and `sed` regular expression types ([#21])
+
+- Before executing a process with `-exec[dir]`/`-ok[dir]`, `bfs` now ensures all output streams are flushed.
+  Previously, I/O from subprocesses could be interleaved unpredictably with buffered I/O from `bfs` itself.
+
+[#81]: https://github.com/tavianator/bfs/pull/81
+[#21]: https://github.com/tavianator/bfs/issues/21
+
+
 2.3.1
 -----
 
