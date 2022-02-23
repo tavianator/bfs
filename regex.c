@@ -152,9 +152,7 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 
 	int eflags = 0;
 #ifdef REG_STARTEND
-	if (flags & BFS_REGEX_ANCHOR) {
-		eflags |= REG_STARTEND;
-	}
+	eflags |= REG_STARTEND;
 #endif
 
 	int ret = regexec(&regex->impl, str, 1, &match, eflags);
@@ -167,11 +165,11 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 		}
 	} else if (ret == REG_NOMATCH) {
 		*err = 0;
-		return false;
 	} else {
 		*err = ret;
-		return false;
 	}
+
+	return false;
 #endif
 }
 
