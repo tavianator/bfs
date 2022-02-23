@@ -123,20 +123,19 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 	const unsigned char *ustr = (const unsigned char *)str;
 	const unsigned char *end = ustr + len;
 
-	OnigRegion *region = onig_region_new();
-	if (!region) {
-		*err = ONIGERR_MEMORY;
-		return false;
+	int ret;
+	if (flags & BFS_REGEX_ANCHOR) {
+		ret = onig_match(regex->impl, ustr, end, ustr, NULL, ONIG_OPTION_DEFAULT);
+	} else {
+		ret = onig_search(regex->impl, ustr, end, ustr, end, NULL, ONIG_OPTION_DEFAULT);
 	}
 
-	bool match = false;
-	int ret = onig_search(regex->impl, ustr, end, ustr, end, region, ONIG_OPTION_DEFAULT);
 	if (ret >= 0) {
 		*err = 0;
 		if (flags & BFS_REGEX_ANCHOR) {
-			match = region->beg[0] == 0 && (size_t)region->end[0] == len;
+			return (size_t)ret == len;
 		} else {
-			match = true;
+			return true;
 		}
 	} else if (ret == ONIG_MISMATCH) {
 		*err = 0;
@@ -144,8 +143,7 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 		*err = ret;
 	}
 
-	onig_region_free(region, 1);
-	return match;
+	return false;
 #else
 	regmatch_t match = {
 		.rm_so = 0,
