@@ -1,4 +1,4 @@
-name: distcheck
+name: CI
 
 on: [push, pull_request]
 
