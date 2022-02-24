@@ -1,0 +1,87 @@
+name: distcheck
+
+on: [push, pull_request]
+
+jobs:
+  linux:
+    name: Linux
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -y
+          sudo apt-get install -y \
+              gcc-multilib \
+              acl \
+              libacl1-dev \
+              libacl1:i386 \
+              attr \
+              libattr1-dev \
+              libattr1:i386 \
+              libcap2-bin \
+              libcap-dev \
+              libcap2:i386 \
+              libonig-dev \
+              libonig5:i386
+          # Ubuntu doesn't let you install the -dev packages for both amd64 and
+          # i386 at once, so we make our own symlinks to fix -m32 -lacl -lattr -lcap
+          sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
+          sudo ln -s libattr.so.1 /lib/i386-linux-gnu/libattr.so
+          sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
+          sudo ln -s libonig.so.5 /lib/i386-linux-gnu/libonig.so
+
+      - name: Run tests
+        run: |
+          make -j$(nproc) distcheck
+
+  macos:
+    name: macOS
+
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          brew install coreutils
+
+      - name: Run tests
+        run: |
+          make -j$(sysctl -n hw.ncpu) distcheck
+
+  freebsd:
+    name: FreeBSD
+
+    if: ${{ github.repository_owner == 'tavianator' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+
+    runs-on: ubuntu-latest
+
+    concurrency: muon
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: tailscale/github-action@main
+        with:
+          authkey: ${{ secrets.TAILSCALE_KEY }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          mkdir ~/.ssh
+          printf '%s' "$SSH_KEY" >~/.ssh/github-actions
+          chmod 0600 ~/.ssh/github-actions
+          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' "$(tailscale ip -6 muon)" >~/.ssh/config
+
+      - name: Run tests
+        run: |
+          muon=$(tailscale ip -6 muon)
+          rsync -rl --delete . "[$muon]:bfs"
+          ssh "$muon" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck'
