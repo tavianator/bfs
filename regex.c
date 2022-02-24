@@ -123,6 +123,14 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 	const unsigned char *ustr = (const unsigned char *)str;
 	const unsigned char *end = ustr + len;
 
+	// The docs for onig_{match,search}() say
+	//
+	//     Do not pass invalid byte string in the regex character encoding.
+	if (!onigenc_is_valid_mbc_string(onig_get_encoding(regex->impl), ustr, end)) {
+		*err = 0;
+		return false;
+	}
+
 	int ret;
 	if (flags & BFS_REGEX_ANCHOR) {
 		ret = onig_match(regex->impl, ustr, end, ustr, NULL, ONIG_OPTION_DEFAULT);
