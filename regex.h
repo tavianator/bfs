@@ -18,8 +18,6 @@
 #ifndef BFS_REGEX_H
 #define BFS_REGEX_H
 
-#include <stdbool.h>
-
 /**
  * A compiled regular expression.
  */
@@ -54,34 +52,32 @@ enum bfs_regexec_flags {
 /**
  * Wrapper for regcomp() that supports additional regex types.
  *
- * @param expr
+ * @param[out] preg
+ *         Will hold the compiled regex.
+ * @param pattern
  *         The regular expression to compile.
  * @param type
  *         The regular expression syntax to use.
  * @param flags
  *         Regex compilation flags.
- * @param[out] err
- *         Will hold the error code if compilation fails.
  * @return
- *         The compiled regular expression, or NULL on error.
+ *         0 on success, -1 on failure.
  */
-struct bfs_regex *bfs_regcomp(const char *expr, enum bfs_regex_type type, enum bfs_regcomp_flags flags, int *err);
+int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_type type, enum bfs_regcomp_flags flags);
 
 /**
  * Wrapper for regexec().
  *
- * @param expr
+ * @param regex
  *         The regular expression to execute.
  * @param str
  *         The string to match against.
  * @param flags
  *         Regex execution flags.
- * @param[out] err
- *         Will hold the error code if execution fails.
  * @return
- *         Whether the regex matched.
+ *         1 for a match, 0 for no match, -1 on failure.
  */
-bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags, int *err);
+int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags);
 
 /**
  * Free a compiled regex.
@@ -89,15 +85,13 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 void bfs_regfree(struct bfs_regex *regex);
 
 /**
- * Dynamically allocate a regex error message.
+ * Get a human-readable regex error message.
  *
- * @param err
- *         The error code to stringify.
  * @param regex
- *         The compiled regex, or NULL if compilation failed.
+ *         The compiled regex.
  * @return
- *         A human-readable description of the error, allocated with malloc().
+ *         A human-readable description of the error, which should be free()'d.
  */
-char *bfs_regerror(int err, const struct bfs_regex *regex);
+char *bfs_regerror(const struct bfs_regex *regex);
 
 #endif // BFS_REGEX_H

@@ -828,10 +828,9 @@ bool eval_quit(const struct expr *expr, struct eval_state *state) {
 bool eval_regex(const struct expr *expr, struct eval_state *state) {
 	const char *path = state->ftwbuf->path;
 
-	int err;
-	bool ret = bfs_regexec(expr->regex, path, BFS_REGEX_ANCHOR, &err);
-	if (err) {
-		char *str = bfs_regerror(err, expr->regex);
+	int ret = bfs_regexec(expr->regex, path, BFS_REGEX_ANCHOR);
+	if (ret < 0) {
+		char *str = bfs_regerror(expr->regex);
 		if (str) {
 			eval_error(state, "%s.\n", str);
 			free(str);
@@ -840,7 +839,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	return ret;
+	return ret > 0;
 }
 
 /**

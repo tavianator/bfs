@@ -263,15 +263,14 @@ static int xrpregex(nl_item item, const char *response) {
 		return -1;
 	}
 
-	int err;
-	struct bfs_regex *regex = bfs_regcomp(pattern, BFS_REGEX_POSIX_EXTENDED, 0, &err);
-	if (!regex) {
-		return -1;
+	struct bfs_regex *regex;
+	int ret = bfs_regcomp(&regex, pattern, BFS_REGEX_POSIX_EXTENDED, 0);
+	if (ret == 0) {
+		ret = bfs_regexec(regex, response, 0);
 	}
 
-	int ret = bfs_regexec(regex, response, 0, &err);
 	bfs_regfree(regex);
-	return err ? -1 : ret;
+	return ret;
 }
 
 /** Check if a response is affirmative or negative. */

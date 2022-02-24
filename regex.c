@@ -15,8 +15,9 @@
  ****************************************************************************/
 
 #include "regex.h"
+#include "util.h"
 #include <assert.h>
-#include <stdbool.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,18 +30,23 @@
 
 struct bfs_regex {
 #if BFS_WITH_ONIGURUMA
+	unsigned char *pattern;
 	OnigRegex impl;
+	int err;
+	OnigErrorInfo einfo;
 #else
 	regex_t impl;
+	int err;
 #endif
 };
 
 #if BFS_WITH_ONIGURUMA
 /** Get (and initialize) the appropriate encoding for the current locale. */
-static OnigEncoding bfs_onig_encoding(int *err) {
+static int bfs_onig_encoding(OnigEncoding *penc) {
 	static OnigEncoding enc = NULL;
 	if (enc) {
-		return enc;
+		*penc = enc;
+		return ONIG_NORMAL;
 	}
 
 	// Fall back to ASCII by default
@@ -103,27 +109,35 @@ static OnigEncoding bfs_onig_encoding(int *err) {
 		BFS_MAP_ENCODING("GB18030", ONIG_ENCODING_BIG5);
 	}
 
-	*err = onig_initialize(&enc, 1);
-	if (*err != ONIG_NORMAL) {
+	int ret = onig_initialize(&enc, 1);
+	if (ret != ONIG_NORMAL) {
 		enc = NULL;
 	}
-
-	return enc;
+	*penc = enc;
+	return ret;
 }
 #endif
 
-struct bfs_regex *bfs_regcomp(const char *expr, enum bfs_regex_type type, enum bfs_regcomp_flags flags, int *err) {
-	struct bfs_regex *regex = malloc(sizeof(*regex));
+int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_type type, enum bfs_regcomp_flags flags) {
+	struct bfs_regex *regex = *preg = malloc(sizeof(*regex));
 	if (!regex) {
-#if BFS_WITH_ONIGURUMA
-		*err = ONIGERR_MEMORY;
-#else
-		*err = REG_ESPACE;
-#endif
-		return NULL;
+		return -1;
 	}
 
 #if BFS_WITH_ONIGURUMA
+	// onig_error_code_to_str() says
+	//
+	//     don't call this after the pattern argument of onig_new() is freed
+	//
+	// so make a defensive copy.
+	regex->pattern = (unsigned char *)strdup(pattern);
+	if (!regex->pattern) {
+		goto fail;
+	}
+
+	regex->impl = NULL;
+	regex->err = ONIG_NORMAL;
+
 	OnigSyntaxType *syntax = NULL;
 	switch (type) {
 	case BFS_REGEX_POSIX_BASIC:
@@ -146,16 +160,16 @@ struct bfs_regex *bfs_regcomp(const char *expr, enum bfs_regex_type type, enum b
 		options |= ONIG_OPTION_IGNORECASE;
 	}
 
-	OnigEncoding enc = bfs_onig_encoding(err);
-	if (!enc) {
-		goto fail;
+	OnigEncoding enc;
+	regex->err = bfs_onig_encoding(&enc);
+	if (regex->err != ONIG_NORMAL) {
+		return -1;
 	}
 
-	const unsigned char *uexpr = (const unsigned char *)expr;
-	const unsigned char *end = uexpr + strlen(expr);
-	*err = onig_new(&regex->impl, uexpr, end, options, enc, syntax, NULL);
-	if (*err != ONIG_NORMAL) {
-		goto fail;
+	const unsigned char *end = regex->pattern + strlen(pattern);
+	regex->err = onig_new(&regex->impl, regex->pattern, end, options, enc, syntax, &regex->einfo);
+	if (regex->err != ONIG_NORMAL) {
+		return -1;
 	}
 #else
 	int cflags = 0;
@@ -166,7 +180,7 @@ struct bfs_regex *bfs_regcomp(const char *expr, enum bfs_regex_type type, enum b
 		cflags |= REG_EXTENDED;
 		break;
 	default:
-		*err = REG_BADPAT;
+		errno = EINVAL;
 		goto fail;
 	}
 
@@ -174,20 +188,26 @@ struct bfs_regex *bfs_regcomp(const char *expr, enum bfs_regex_type type, enum b
 		cflags |= REG_ICASE;
 	}
 
-	*err = regcomp(&regex->impl, expr, cflags);
-	if (*err != 0) {
-		goto fail;
+#if BFS_HAS_FEATURE(memory_sanitizer, false)
+	// https://github.com/google/sanitizers/issues/1496
+	memset(&regex->impl, 0, sizeof(regex->impl));
+#endif
+
+	regex->err = regcomp(&regex->impl, pattern, cflags);
+	if (regex->err != 0) {
+		return -1;
 	}
 #endif
 
-	return regex;
+	return 0;
 
 fail:
 	free(regex);
-	return NULL;
+	*preg = NULL;
+	return -1;
 }
 
-bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags, int *err) {
+int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags) {
 	size_t len = strlen(str);
 
 #if BFS_WITH_ONIGURUMA
@@ -198,8 +218,7 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 	//
 	//     Do not pass invalid byte string in the regex character encoding.
 	if (!onigenc_is_valid_mbc_string(onig_get_encoding(regex->impl), ustr, end)) {
-		*err = 0;
-		return false;
+		return 0;
 	}
 
 	int ret;
@@ -210,19 +229,17 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 	}
 
 	if (ret >= 0) {
-		*err = 0;
 		if (flags & BFS_REGEX_ANCHOR) {
 			return (size_t)ret == len;
 		} else {
-			return true;
+			return 1;
 		}
 	} else if (ret == ONIG_MISMATCH) {
-		*err = 0;
+		return 0;
 	} else {
-		*err = ret;
+		regex->err = ret;
+		return -1;
 	}
-
-	return false;
 #else
 	regmatch_t match = {
 		.rm_so = 0,
@@ -236,19 +253,17 @@ bool bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flag
 
 	int ret = regexec(&regex->impl, str, 1, &match, eflags);
 	if (ret == 0) {
-		*err = 0;
 		if (flags & BFS_REGEX_ANCHOR) {
 			return match.rm_so == 0 && (size_t)match.rm_eo == len;
 		} else {
-			return true;
+			return 1;
 		}
 	} else if (ret == REG_NOMATCH) {
-		*err = 0;
+		return 0;
 	} else {
-		*err = ret;
+		regex->err = ret;
+		return -1;
 	}
-
-	return false;
 #endif
 }
 
@@ -256,6 +271,7 @@ void bfs_regfree(struct bfs_regex *regex) {
 	if (regex) {
 #if BFS_WITH_ONIGURUMA
 		onig_free(regex->impl);
+		free(regex->pattern);
 #else
 		regfree(&regex->impl);
 #endif
@@ -263,20 +279,22 @@ void bfs_regfree(struct bfs_regex *regex) {
 	}
 }
 
-char *bfs_regerror(int err, const struct bfs_regex *regex) {
+char *bfs_regerror(const struct bfs_regex *regex) {
+	if (!regex) {
+		return strdup(strerror(ENOMEM));
+	}
+
 #if BFS_WITH_ONIGURUMA
 	unsigned char *str = malloc(ONIG_MAX_ERROR_MESSAGE_LEN);
 	if (str) {
-		onig_error_code_to_str(str, err);
+		onig_error_code_to_str(str, regex->err, &regex->einfo);
 	}
 	return (char *)str;
 #else
-	const regex_t *impl = regex ? &regex->impl : NULL;
-
-	size_t len = regerror(err, impl, NULL, 0);
+	size_t len = regerror(regex->err, &regex->impl, NULL, 0);
 	char *str = malloc(len);
 	if (str) {
-		regerror(err, impl, str, len);
+		regerror(regex->err, &regex->impl, str, len);
 	}
 	return str;
 #endif

@@ -2269,24 +2269,25 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 		goto fail;
 	}
 
-	int err;
-	expr->regex = bfs_regcomp(expr->sdata, state->regex_type, flags, &err);
-	if (!expr->regex) {
-		char *str = bfs_regerror(err, NULL);
-		if (str) {
-			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
-			free(str);
-		} else {
-			parse_perror(state, "bfs_regerror()");
+	if (bfs_regcomp(&expr->regex, expr->sdata, state->regex_type, flags) != 0) {
+		if (!expr->regex) {
+			parse_perror(state, "bfs_regcomp()");
+			goto fail;
 		}
-		goto fail_regex;
+
+		char *str = bfs_regerror(expr->regex);
+		if (!str) {
+			parse_perror(state, "bfs_regerror()");
+			goto fail;
+		}
+
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %s.\n", expr->argv[0], expr->argv[1], str);
+		free(str);
+		goto fail;
 	}
 
 	return expr;
 
-fail_regex:
-	free(expr->regex);
-	expr->regex = NULL;
 fail:
 	free_expr(expr);
 	return NULL;
