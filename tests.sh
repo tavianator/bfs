@@ -625,6 +625,7 @@ gnu_tests=(
     test_regex
     test_regex_parens
     test_regex_error
+    test_regex_invalid_utf8
 
     test_regextype_posix_basic
     test_regextype_posix_extended
@@ -2144,6 +2145,17 @@ function test_regex_parens() {
 
 function test_regex_error() {
     fail quiet invoke_bfs basic -regex '['
+}
+
+function test_regex_invalid_utf8() {
+    rm -rf scratch/*
+
+    # Incomplete UTF-8 sequences
+    skip_if fail quiet touch scratch/$'\xC3'
+    skip_if fail quiet touch scratch/$'\xE2\x84'
+    skip_if fail quiet touch scratch/$'\xF0\x9F\x92'
+
+    bfs_diff scratch -regex 'scratch/..'
 }
 
 function test_E() {
