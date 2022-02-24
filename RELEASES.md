@@ -1,6 +1,20 @@
 2.*
 ===
 
+2.4.1
+-----
+
+**February 24, 2022**
+
+- Fixed the build when Oniguruma is not installed in the default search paths ([#82])
+
+- Fixed string encoding bugs with Oniguruma enabled
+
+- Fixed regex error reporting bugs
+
+[#82]: https://github.com/tavianator/bfs/issues/82
+
+
 2.4
 ---
 
