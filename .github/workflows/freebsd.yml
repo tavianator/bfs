@@ -30,4 +30,4 @@ jobs:
         run: |
           muon=$(tailscale ip -6 muon)
           rsync -rl --delete . "[$muon]:bfs"
-          ssh "$muon" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck EXTRA_CPPFLAGS="-I/usr/local/include" EXTRA_LDFLAGS="-L/usr/local/lib"'
+          ssh "$muon" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck

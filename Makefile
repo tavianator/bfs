@@ -73,8 +73,15 @@ WITH_ONIGURUMA := y
 endif
 
 ifdef WITH_ONIGURUMA
+LOCAL_CPPFLAGS += -DBFS_WITH_ONIGURUMA=1
+
+ONIG_CONFIG := $(shell command -v onig-config 2>/dev/null)
+ifdef ONIG_CONFIG
+LOCAL_CFLAGS += $(shell $(ONIG_CONFIG) --cflags)
+LOCAL_LDLIBS += $(shell $(ONIG_CONFIG) --libs)
+else
 LOCAL_LDLIBS += -lonig
-LOCAL_CFLAGS += -DBFS_WITH_ONIGURUMA=1
+endif
 endif
 
 ifeq ($(OS),Linux)
@@ -87,19 +94,19 @@ endif
 ifdef WITH_ACL
 LOCAL_LDLIBS += -lacl
 else
-LOCAL_CFLAGS += -DBFS_HAS_SYS_ACL=0
+LOCAL_CPPFLAGS += -DBFS_HAS_SYS_ACL=0
 endif
 
 ifdef WITH_ATTR
 LOCAL_LDLIBS += -lattr
 else
-LOCAL_CFLAGS += -DBFS_HAS_SYS_XATTR=0
+LOCAL_CPPFLAGS += -DBFS_HAS_SYS_XATTR=0
 endif
 
 ifdef WITH_LIBCAP
 LOCAL_LDLIBS += -lcap
 else
-LOCAL_CFLAGS += -DBFS_HAS_SYS_CAPABILITY=0
+LOCAL_CPPFLAGS += -DBFS_HAS_SYS_CAPABILITY=0
 endif
 
 LOCAL_LDFLAGS += -Wl,--as-needed
