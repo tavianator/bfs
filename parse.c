@@ -1686,11 +1686,14 @@ static struct expr *parse_fnmatch(const struct parser_state *state, struct expr 
 		return NULL;
 	}
 
+	const char *arg = expr->argv[0];
+	const char *pattern = expr->sdata;
+
 	if (casefold) {
 #ifdef FNM_CASEFOLD
 		expr->idata = FNM_CASEFOLD;
 #else
-		parse_error(state, "${blu}%s${rs} is missing platform support.\n", expr->argv[0]);
+		parse_error(state, "${blu}%s${rs} is missing platform support.\n", arg);
 		free_expr(expr);
 		return NULL;
 #endif
@@ -1698,9 +1701,27 @@ static struct expr *parse_fnmatch(const struct parser_state *state, struct expr 
 		expr->idata = 0;
 	}
 
+	// POSIX says, about fnmatch():
+	//
+	//     If pattern ends with an unescaped <backslash>, fnmatch() shall
+	//     return a non-zero value (indicating either no match or an error).
+	//
+	// But not all implementations obey this, so check for it ourselves.
+	size_t i, len = strlen(pattern);
+	for (i = 0; i < len; ++i) {
+		if (pattern[len - i - 1] != '\\') {
+			break;
+		}
+	}
+	if (i % 2 != 0) {
+		parse_warning(state, "${blu}%s${rs} ${bld}%s${rs}: Unescaped trailing backslash.\n\n", arg, pattern);
+		free_expr(expr);
+		return &expr_false;
+	}
+
 	expr->cost = 400.0;
 
-	if (strchr(expr->sdata, '*')) {
+	if (strchr(pattern, '*')) {
 		expr->probability = 0.5;
 	} else {
 		expr->probability = 0.1;

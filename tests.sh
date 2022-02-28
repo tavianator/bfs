@@ -1338,9 +1338,6 @@ function test_name_bracket() {
 }
 
 function test_name_backslash() {
-    # fnmatch() is broken on macOS
-    skip_if test "$UNAME" = "Darwin"
-
     # An unescaped \ doesn't match
     bfs_diff weirdnames -name '\'
 }
