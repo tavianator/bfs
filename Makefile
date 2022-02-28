@@ -77,11 +77,14 @@ LOCAL_CPPFLAGS += -DBFS_WITH_ONIGURUMA=1
 
 ONIG_CONFIG := $(shell command -v onig-config 2>/dev/null)
 ifdef ONIG_CONFIG
-LOCAL_CFLAGS += $(shell $(ONIG_CONFIG) --cflags)
-LOCAL_LDLIBS += $(shell $(ONIG_CONFIG) --libs)
+ONIG_CFLAGS := $(shell $(ONIG_CONFIG) --cflags)
+ONIG_LDLIBS := $(shell $(ONIG_CONFIG) --libs)
 else
-LOCAL_LDLIBS += -lonig
+ONIG_LDLIBS := -lonig
 endif
+
+LOCAL_CFLAGS += $(ONIG_CFLAGS)
+LOCAL_LDLIBS += $(ONIG_LDLIBS)
 endif
 
 ifeq ($(OS),Linux)
