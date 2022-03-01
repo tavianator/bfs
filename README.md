@@ -112,7 +112,7 @@ Unlike `-prune`, `-exclude` even works in combination with `-depth`/`-delete`.
 `-hidden` matches "hidden" files (dotfiles).
 `bfs -hidden` is effectively shorthand for
 
-    find \( -name '.*' -not -name . -not -name ..` \)
+    find \( -name '.*' -not -name . -not -name .. \)
 
 `-nohidden` is equivalent to `-exclude -hidden`.
 
