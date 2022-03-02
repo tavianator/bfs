@@ -65,7 +65,9 @@ LOCAL_LDFLAGS :=
 LOCAL_LDLIBS :=
 
 ASAN := $(filter asan,$(MAKECMDGOALS))
+LSAN := $(filter lsan,$(MAKECMDGOALS))
 MSAN := $(filter msan,$(MAKECMDGOALS))
+TSAN := $(filter tsan,$(MAKECMDGOALS))
 UBSAN := $(filter ubsan,$(MAKECMDGOALS))
 
 ifndef MSAN
@@ -129,8 +131,18 @@ LOCAL_CFLAGS += -fsanitize=address
 SANITIZE := y
 endif
 
+ifdef LSAN
+LOCAL_CFLAGS += -fsanitize=leak
+SANITIZE := y
+endif
+
 ifdef MSAN
 LOCAL_CFLAGS += -fsanitize=memory -fsanitize-memory-track-origins
+SANITIZE := y
+endif
+
+ifdef TSAN
+LOCAL_CFLAGS += -fsanitize=thread
 SANITIZE := y
 endif
 
@@ -164,7 +176,7 @@ $(shell ./flags.sh $(ALL_FLAGS))
 BIN_GOALS := bfs tests/mksock tests/trie tests/xtimegm
 
 # Goals that are treated like flags by this Makefile
-FLAG_GOALS := asan msan ubsan gcov release
+FLAG_GOALS := asan lsan msan tsan ubsan gcov release
 
 # These are the remaining non-flag goals
 GOALS := $(filter-out $(FLAG_GOALS),$(MAKECMDGOALS))
