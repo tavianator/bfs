@@ -20,10 +20,8 @@
  * - struct bftw_file: A file that has been encountered during the traversal.
  *   They have reference-counted links to their parents in the directory tree.
  *
- * - struct bftw_cache: Holds bftw_file's with open file descriptors, used for
- *   openat() to minimize the amount of path re-traversals that need to happen.
- *   Currently implemented as a priority queue based on depth and reference
- *   count.
+ * - struct bftw_cache: An LRU list of bftw_file's with open file descriptors,
+ *   used for openat() to minimize the amount of path re-traversals.
  *
  * - struct bftw_queue: The queue of bftw_file's left to explore.  Implemented
  *   as a simple circular buffer.
@@ -60,12 +58,15 @@ struct bftw_file {
 	/** The next file in the queue, if any. */
 	struct bftw_file *next;
 
+	/** The previous file in the LRU list. */
+	struct bftw_file *lru_prev;
+	/** The next file in the LRU list. */
+	struct bftw_file *lru_next;
+
 	/** This file's depth in the walk. */
 	size_t depth;
 	/** Reference count. */
 	size_t refcount;
-	/** Index in the bftw_cache priority queue. */
-	size_t heap_index;
 
 	/** An open descriptor to this file, or -1. */
 	int fd;
@@ -89,154 +90,75 @@ struct bftw_file {
  * A cache of open directories.
  */
 struct bftw_cache {
-	/** A min-heap of open directories. */
-	struct bftw_file **heap;
-	/** Maximum heap size. */
+	/** The head of the LRU list. */
+	struct bftw_file *head;
+	/** The tail of the LRU list. */
+	struct bftw_file *tail;
+	/** The remaining capacity of the LRU list. */
 	size_t capacity;
 };
 
 /** Initialize a cache. */
 static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
-	cache->heap = NULL;
+	cache->head = NULL;
+	cache->tail = NULL;
 	cache->capacity = capacity;
 }
 
 /** Destroy a cache. */
 static void bftw_cache_destroy(struct bftw_cache *cache) {
-	assert(darray_length(cache->heap) == 0);
-	darray_free(cache->heap);
-}
-
-/** Check if two heap entries are in heap order. */
-static bool bftw_heap_check(const struct bftw_file *parent, const struct bftw_file *child) {
-	if (parent->depth > child->depth) {
-		return true;
-	} else if (parent->depth < child->depth) {
-		return false;
-	} else {
-		return parent->refcount <= child->refcount;
-	}
-}
-
-/** Move a bftw_file to a particular place in the heap. */
-static void bftw_heap_move(struct bftw_cache *cache, struct bftw_file *file, size_t i) {
-	cache->heap[i] = file;
-	file->heap_index = i;
-}
-
-/** Bubble an entry up the heap. */
-static void bftw_heap_bubble_up(struct bftw_cache *cache, struct bftw_file *file) {
-	size_t i = file->heap_index;
-
-	while (i > 0) {
-		size_t pi = (i - 1)/2;
-		struct bftw_file *parent = cache->heap[pi];
-		if (bftw_heap_check(parent, file)) {
-			break;
-		}
-
-		bftw_heap_move(cache, parent, i);
-		i = pi;
-	}
-
-	bftw_heap_move(cache, file, i);
-}
-
-/** Bubble an entry down the heap. */
-static void bftw_heap_bubble_down(struct bftw_cache *cache, struct bftw_file *file) {
-	size_t i = file->heap_index;
-	size_t size = darray_length(cache->heap);
-
-	while (true) {
-		size_t ci = 2*i + 1;
-		if (ci >= size) {
-			break;
-		}
-
-		struct bftw_file *child = cache->heap[ci];
-
-		size_t ri = ci + 1;
-		if (ri < size) {
-			struct bftw_file *right = cache->heap[ri];
-			if (!bftw_heap_check(child, right)) {
-				ci = ri;
-				child = right;
-			}
-		}
-
-		if (bftw_heap_check(file, child)) {
-			break;
-		}
-
-		bftw_heap_move(cache, child, i);
-		i = ci;
-	}
-
-	bftw_heap_move(cache, file, i);
-}
-
-/** Bubble an entry up or down the heap. */
-static void bftw_heap_bubble(struct bftw_cache *cache, struct bftw_file *file) {
-	size_t i = file->heap_index;
-
-	if (i > 0) {
-		size_t pi = (i - 1)/2;
-		struct bftw_file *parent = cache->heap[pi];
-		if (!bftw_heap_check(parent, file)) {
-			bftw_heap_bubble_up(cache, file);
-			return;
-		}
-	}
-
-	bftw_heap_bubble_down(cache, file);
-}
-
-/** Increment a bftw_file's reference count. */
-static size_t bftw_file_incref(struct bftw_cache *cache, struct bftw_file *file) {
-	size_t ret = ++file->refcount;
-	if (file->fd >= 0) {
-		bftw_heap_bubble_down(cache, file);
-	}
-	return ret;
-}
-
-/** Decrement a bftw_file's reference count. */
-static size_t bftw_file_decref(struct bftw_cache *cache, struct bftw_file *file) {
-	size_t ret = --file->refcount;
-	if (file->fd >= 0) {
-		bftw_heap_bubble_up(cache, file);
-	}
-	return ret;
-}
-
-/** Check if the cache is full. */
-static bool bftw_cache_full(const struct bftw_cache *cache) {
-	return darray_length(cache->heap) == cache->capacity;
+	assert(!cache->tail);
+	assert(!cache->head);
 }
 
 /** Add a bftw_file to the cache. */
-static int bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(!bftw_cache_full(cache));
+static void bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
+	assert(cache->capacity > 0);
 	assert(file->fd >= 0);
+	assert(!file->lru_prev);
+	assert(!file->lru_next);
 
-	size_t size = darray_length(cache->heap);
-	if (DARRAY_PUSH(&cache->heap, &file) != 0) {
-		return -1;
+	file->lru_next = cache->head;
+	cache->head = file;
+
+	if (file->lru_next) {
+		file->lru_next->lru_prev = file;
 	}
 
-	file->heap_index = size;
-	bftw_heap_bubble_up(cache, file);
+	if (!cache->tail) {
+		cache->tail = file;
+	}
 
-	return 0;
+	--cache->capacity;
 }
 
 /** Remove a bftw_file from the cache. */
 static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
-	struct bftw_file *last = DARRAY_POP(cache->heap);
-	if (last != file) {
-		last->heap_index = file->heap_index;
-		bftw_heap_bubble(cache, last);
+	if (file->lru_prev) {
+		assert(cache->head != file);
+		file->lru_prev->lru_next = file->lru_next;
+	} else {
+		assert(cache->head == file);
+		cache->head = file->lru_next;
 	}
+
+	if (file->lru_next) {
+		assert(cache->tail != file);
+		file->lru_next->lru_prev = file->lru_prev;
+	} else {
+		assert(cache->tail == file);
+		cache->tail = file->lru_prev;
+	}
+
+	file->lru_prev = NULL;
+	file->lru_next = NULL;
+	++cache->capacity;
+}
+
+/** Mark a cache entry as recently used. */
+static void bftw_cache_use(struct bftw_cache *cache, struct bftw_file *file) {
+	bftw_cache_remove(cache, file);
+	bftw_cache_add(cache, file);
 }
 
 /** Close a bftw_file. */
@@ -251,7 +173,8 @@ static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 
 /** Pop a directory from the cache. */
 static void bftw_cache_pop(struct bftw_cache *cache) {
-	bftw_file_close(cache, cache->heap[0]);
+	assert(cache->tail);
+	bftw_file_close(cache, cache->tail);
 }
 
 /**
@@ -265,24 +188,21 @@ static void bftw_cache_pop(struct bftw_cache *cache) {
  *         0 if successfully shrunk, otherwise -1.
  */
 static int bftw_cache_shrink(struct bftw_cache *cache, const struct bftw_file *saved) {
-	int ret = -1;
-	struct bftw_file *file = NULL;
-	size_t size = darray_length(cache->heap);
+	struct bftw_file *file = cache->tail;
+	if (!file) {
+		return -1;
+	}
 
-	if (size >= 1) {
-		file = cache->heap[0];
-		if (file == saved && size >= 2) {
-			file = cache->heap[1];
+	if (file == saved) {
+		file = file->lru_prev;
+		if (!file) {
+			return -1;
 		}
 	}
 
-	if (file && file != saved) {
-		bftw_file_close(cache, file);
-		ret = 0;
-	}
-
-	cache->capacity = darray_length(cache->heap);
-	return ret;
+	bftw_file_close(cache, file);
+	cache->capacity = 0;
+	return 0;
 }
 
 /** Compute the name offset of a child path. */
@@ -295,7 +215,7 @@ static size_t bftw_child_nameoff(const struct bftw_file *parent) {
 }
 
 /** Create a new bftw_file. */
-static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_file *parent, const char *name) {
+static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *name) {
 	size_t namelen = strlen(name);
 	size_t size = BFS_FLEX_SIZEOF(struct bftw_file, name, namelen + 1);
 
@@ -310,7 +230,7 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 		file->root = parent->root;
 		file->depth = parent->depth + 1;
 		file->nameoff = bftw_child_nameoff(parent);
-		bftw_file_incref(cache, parent);
+		++parent->refcount;
 	} else {
 		file->root = file;
 		file->depth = 0;
@@ -318,6 +238,9 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 	}
 
 	file->next = NULL;
+
+	file->lru_prev = NULL;
+	file->lru_next = NULL;
 
 	file->refcount = 1;
 	file->fd = -1;
@@ -348,13 +271,13 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
  * @return
  *         The opened file descriptor, or negative on error.
  */
-static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, const struct bftw_file *base, const char *at_path) {
+static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, struct bftw_file *base, const char *at_path) {
 	assert(file->fd < 0);
 
 	int at_fd = AT_FDCWD;
 	if (base) {
+		bftw_cache_use(cache, base);
 		at_fd = base->fd;
-		assert(at_fd >= 0);
 	}
 
 	int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
@@ -367,16 +290,12 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, co
 	}
 
 	if (fd >= 0) {
-		if (bftw_cache_full(cache)) {
+		if (cache->capacity == 0) {
 			bftw_cache_pop(cache);
 		}
 
 		file->fd = fd;
-		if (bftw_cache_add(cache, file) != 0) {
-			close_quietly(fd);
-			file->fd = -1;
-			return -1;
-		}
+		bftw_cache_add(cache, file);
 	}
 
 	return fd;
@@ -981,7 +900,7 @@ done:
  */
 static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 	struct bftw_file *parent = state->file;
-	struct bftw_file *file = bftw_file_new(&state->cache, parent, name);
+	struct bftw_file *file = bftw_file_new(parent, name);
 	if (!file) {
 		state->error = errno;
 		return -1;
@@ -1152,7 +1071,8 @@ static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flag
 	bool visit = flags & BFTW_VISIT_FILE;
 
 	while (state->file) {
-		if (bftw_file_decref(&state->cache, state->file) > 0) {
+		struct bftw_file *file = state->file;
+		if (--file->refcount > 0) {
 			state->file = NULL;
 			break;
 		}
@@ -1163,11 +1083,11 @@ static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flag
 		}
 		visit = flags & BFTW_VISIT_PARENTS;
 
-		struct bftw_file *parent = state->file->parent;
-		if (state->previous == state->file) {
+		struct bftw_file *parent = file->parent;
+		if (state->previous == file) {
 			state->previous = parent;
 		}
-		bftw_file_free(&state->cache, state->file);
+		bftw_file_free(&state->cache, file);
 		state->file = parent;
 	}
 
