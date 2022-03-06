@@ -15,7 +15,6 @@
  ****************************************************************************/
 
 #include "darray.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -95,14 +94,6 @@ int darray_check(void *da) {
 		header->length = header->capacity;
 		return -1;
 	}
-}
-
-size_t darray_pop(void *da) {
-	assert(da);
-
-	struct darray *header = darray_header(da);
-	assert(header->length > 0);
-	return --header->length;
 }
 
 void darray_free(void *da) {
