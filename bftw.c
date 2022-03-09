@@ -562,7 +562,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	state->error = 0;
 
-	if (args->nopenfd < 2) {
+	if (args->nopenfd < 1) {
 		errno = EMFILE;
 		return -1;
 	}
@@ -572,8 +572,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 		return -1;
 	}
 
-	// Reserve 1 fd for the open bfs_dir
-	bftw_cache_init(&state->cache, args->nopenfd - 1);
+	bftw_cache_init(&state->cache, args->nopenfd);
 	bftw_queue_init(&state->queue);
 	state->batch = NULL;
 
