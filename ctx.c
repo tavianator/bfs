@@ -189,7 +189,11 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 
 	ctx_file->cfile = cfile;
 	ctx_file->path = path;
-	++ctx->nfiles;
+
+	if (cfile != ctx->cout && cfile != ctx->cerr) {
+		++ctx->nfiles;
+	}
+
 	return cfile;
 }
 
