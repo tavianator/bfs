@@ -92,6 +92,8 @@ struct bftw_file {
 struct bftw_cache {
 	/** The head of the LRU list. */
 	struct bftw_file *head;
+	/** The insertion target for the LRU list. */
+	struct bftw_file *target;
 	/** The tail of the LRU list. */
 	struct bftw_file *tail;
 	/** The remaining capacity of the LRU list. */
@@ -101,6 +103,7 @@ struct bftw_cache {
 /** Initialize a cache. */
 static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	cache->head = NULL;
+	cache->target = NULL;
 	cache->tail = NULL;
 	cache->capacity = capacity;
 }
@@ -108,6 +111,7 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 /** Destroy a cache. */
 static void bftw_cache_destroy(struct bftw_cache *cache) {
 	assert(!cache->tail);
+	assert(!cache->target);
 	assert(!cache->head);
 }
 
@@ -118,15 +122,28 @@ static void bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
 	assert(!file->lru_prev);
 	assert(!file->lru_next);
 
-	file->lru_next = cache->head;
-	cache->head = file;
+	if (cache->target) {
+		file->lru_prev = cache->target;
+		file->lru_next = cache->target->lru_next;
+	} else {
+		file->lru_next = cache->head;
+	}
+
+	if (file->lru_prev) {
+		file->lru_prev->lru_next = file;
+	} else {
+		cache->head = file;
+	}
 
 	if (file->lru_next) {
 		file->lru_next->lru_prev = file;
+	} else {
+		cache->tail = file;
 	}
 
-	if (!cache->tail) {
-		cache->tail = file;
+	// Prefer to keep the root paths open by keeping them at the head of the list
+	if (file->depth == 0) {
+		cache->target = file;
 	}
 
 	--cache->capacity;
@@ -134,6 +151,10 @@ static void bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
 
 /** Remove a bftw_file from the cache. */
 static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
+	if (cache->target == file) {
+		cache->target = file->lru_prev;
+	}
+
 	if (file->lru_prev) {
 		assert(cache->head != file);
 		file->lru_prev->lru_next = file->lru_next;
