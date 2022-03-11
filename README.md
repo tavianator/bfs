@@ -169,7 +169,7 @@ $ brew install tavianator/tap/bfs
 <details>
 <summary>To build <code>bfs</code> from source, you may need to install some dependencies.</summary>
 
-The only absolute requirements for building `bfs` are a C compiler and GNU make.
+The only absolute requirements for building `bfs` are a C compiler, [GNU make](https://www.gnu.org/software/make/), and [Bash](https://www.gnu.org/software/bash/).
 These are installed by default on many systems, and easy to install on most others.
 Refer to your operating system's documentation on building software.
 
@@ -187,7 +187,7 @@ Here's how to install them on some common platforms:
 
 <pre>
 <strong>Alpine Linux</strong>
-# apk add acl-dev attr-dev libcap-dev oniguruma-dev
+# apk add acl{,-dev} attr{,-dev} libcap{,-dev} oniguruma-dev
 
 <strong>Arch Linux</strong>
 # pacman -S acl attr libcap oniguruma
@@ -202,7 +202,7 @@ Here's how to install them on some common platforms:
 # nix-env -i acl attr libcap oniguruma
 
 <strong>Void Linux</strong>
-# xbps-install -S acl-devel attr-devel libcap-devel oniguruma-devel
+# xbps-install -S acl-{devel,progs} attr-{devel,progs} libcap-{devel,progs} oniguruma-devel
 
 <strong>FreeBSD</strong>
 # pkg install oniguruma
@@ -221,9 +221,9 @@ Then run
     $ make
 
 This will build the `bfs` binary in the current directory.
-You can test it out:
+Run the test suite to make sure it works correctly:
 
-    $ ./bfs -nohidden
+    $ make check
 
 If you're interested in speed, you may want to build the release version instead:
 
