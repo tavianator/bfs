@@ -255,9 +255,9 @@ distcheck:
 	+$(MAKE) -B asan ubsan check $(DISTCHECK_FLAGS)
 ifneq ($(OS),Darwin)
 	+$(MAKE) -B msan check CC=clang $(DISTCHECK_FLAGS)
-ifeq ($(ARCH),x86_64)
-	+$(MAKE) -B check EXTRA_CFLAGS="-m32" $(DISTCHECK_FLAGS)
 endif
+ifeq ($(OS) $(ARCH),Linux x86_64)
+	+$(MAKE) -B check EXTRA_CFLAGS="-m32" ONIG_CONFIG= $(DISTCHECK_FLAGS)
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
