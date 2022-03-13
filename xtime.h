@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2020 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -18,8 +18,8 @@
  * Date/time handling.
  */
 
-#ifndef BFS_TIME_H
-#define BFS_TIME_H
+#ifndef BFS_XTIME_H
+#define BFS_XTIME_H
 
 #include <time.h>
 
@@ -83,4 +83,4 @@ int xtimegm(struct tm *tm, time_t *timep);
  */
 int parse_timestamp(const char *str, struct timespec *result);
 
-#endif // BFS_TIME_H
+#endif // BFS_XTIME_H

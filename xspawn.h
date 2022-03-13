@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2018-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -18,8 +18,8 @@
  * A process-spawning library inspired by posix_spawn().
  */
 
-#ifndef BFS_SPAWN_H
-#define BFS_SPAWN_H
+#ifndef BFS_XSPAWN_H
+#define BFS_XSPAWN_H
 
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -120,4 +120,4 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
  */
 char *bfs_spawn_resolve(const char *exe);
 
-#endif // BFS_SPAWN_H
+#endif // BFS_XSPAWN_H

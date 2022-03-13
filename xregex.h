@@ -15,8 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#ifndef BFS_REGEX_H
-#define BFS_REGEX_H
+#ifndef BFS_XREGEX_H
+#define BFS_XREGEX_H
 
 /**
  * A compiled regular expression.
@@ -94,4 +94,4 @@ void bfs_regfree(struct bfs_regex *regex);
  */
 char *bfs_regerror(const struct bfs_regex *regex);
 
-#endif // BFS_REGEX_H
+#endif // BFS_XREGEX_H
