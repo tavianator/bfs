@@ -1753,13 +1753,13 @@ function test_exec_substring() {
 
 function test_exec_flush() {
     # IO streams should be flushed before executing programs
-    bfs_diff basic -printf '%p ' -exec echo found \;
+    bfs_diff basic -print0 -exec echo found \;
 }
 
 function test_exec_flush_fail() {
     # Failure to flush streams before exec should be caught
     skip_if test ! -e /dev/full
-    fail quiet invoke_bfs basic -printf '%p ' -exec true \; >/dev/full
+    fail quiet invoke_bfs basic -print0 -exec true \; >/dev/full
 }
 
 function test_exec_flush_fprint() {
@@ -1773,12 +1773,12 @@ function test_exec_flush_fprint_fail() {
 }
 
 function test_exec_plus_flush() {
-    bfs_diff basic/a -printf '%p ' -exec echo found {} +
+    bfs_diff basic/a -print0 -exec echo found {} +
 }
 
 function test_exec_plus_flush_fail() {
     skip_if test ! -e /dev/full
-    fail quiet invoke_bfs basic/a -printf '%p ' -exec echo found {} + >/dev/full
+    fail quiet invoke_bfs basic/a -print0 -exec echo found {} + >/dev/full
 }
 
 function test_execdir() {
