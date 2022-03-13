@@ -325,9 +325,6 @@ static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf
 
 /** Actually spawn the process. */
 static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
-	// Flush the context state for consistency with the external process
-	bfs_ctx_flush(execbuf->ctx);
-
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
 		for (size_t i = 0; i < execbuf->argc; ++i) {
 			fprintf(stderr, "%s ", execbuf->argv[i]);
@@ -339,6 +336,9 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 			return -1;
 		}
 	}
+
+	// Flush cached state for consistency with the external process
+	bfs_ctx_flush(execbuf->ctx);
 
 	if (execbuf->flags & BFS_EXEC_MULTI) {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments] (size %zu)\n",
