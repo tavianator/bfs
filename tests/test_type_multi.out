@@ -1,7 +1,7 @@
 links
 links/deeply
-links/file
-links/hardlink
 links/deeply/nested
 links/deeply/nested/dir
 links/deeply/nested/file
+links/file
+links/hardlink

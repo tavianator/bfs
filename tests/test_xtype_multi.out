@@ -1,10 +1,10 @@
 links
 links/deeply
-links/file
-links/hardlink
-links/skip
-links/symlink
 links/deeply/nested
 links/deeply/nested/dir
 links/deeply/nested/file
 links/deeply/nested/link
+links/file
+links/hardlink
+links/skip
+links/symlink

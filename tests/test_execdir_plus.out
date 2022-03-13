@@ -1,3 +1,4 @@
+./a ./b ./c ./e ./g ./i ./j ./k ./l
 ./bar
 ./bar
 ./basic
@@ -8,4 +9,3 @@
 ./foo
 ./foo
 ./h
-./a ./b ./c ./e ./g ./i ./j ./k ./l

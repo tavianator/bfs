@@ -1069,10 +1069,6 @@ function make_scratch() {
 }
 make_scratch "$TMP/scratch"
 
-function bfs_sort() {
-    awk -F/ '{ print NF - 1 " " $0 }' | sort -n | cut -d' ' -f2-
-}
-
 # Close stdin so bfs doesn't think we're interactive
 exec </dev/null
 
@@ -1174,7 +1170,7 @@ function bfs_diff() (
         local ACTUAL="$TMP/$CALLER.out"
     fi
 
-    $BFS "$@" | bfs_sort >"$ACTUAL"
+    $BFS "$@" | sort >"$ACTUAL"
     local STATUS="${PIPESTATUS[0]}"
 
     if [ ! "$UPDATE" ]; then
@@ -2395,18 +2391,7 @@ function test_printf_leak() {
 
 function test_printf_nul() {
     # NUL byte regression test
-    local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
-    if [ "$UPDATE" ]; then
-        local ACTUAL="$EXPECTED"
-    else
-        local ACTUAL="$TMP/${FUNCNAME[0]}.out"
-    fi
-
-    invoke_bfs basic -maxdepth 0 -printf '%h\0%f\n' >"$ACTUAL"
-
-    if [ ! "$UPDATE" ]; then
-        $DIFF -u "$EXPECTED" "$ACTUAL"
-    fi
+    bfs_diff basic -maxdepth 0 -printf '%h\0%f\n'
 }
 
 function test_printf_w() {
