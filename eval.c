@@ -34,10 +34,10 @@
 #include "printf.h"
 #include "pwcache.h"
 #include "stat.h"
-#include "time.h"
 #include "trie.h"
 #include "util.h"
-#include "regex.h"
+#include "xregex.h"
+#include "xtime.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

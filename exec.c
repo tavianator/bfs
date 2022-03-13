@@ -20,8 +20,8 @@
 #include "color.h"
 #include "diag.h"
 #include "dstring.h"
-#include "spawn.h"
 #include "util.h"
+#include "xspawn.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

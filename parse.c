@@ -36,12 +36,12 @@
 #include "opt.h"
 #include "printf.h"
 #include "pwcache.h"
-#include "spawn.h"
 #include "stat.h"
-#include "time.h"
 #include "typo.h"
 #include "util.h"
-#include "regex.h"
+#include "xregex.h"
+#include "xspawn.h"
+#include "xtime.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

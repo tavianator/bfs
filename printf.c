@@ -24,8 +24,8 @@
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
-#include "time.h"
 #include "util.h"
+#include "xtime.h"
 #include <assert.h>
 #include <errno.h>
 #include <grp.h>

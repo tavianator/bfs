@@ -217,17 +217,17 @@ bfs: \
     parse.o \
     printf.o \
     pwcache.o \
-    regex.o \
-    spawn.o \
     stat.o \
-    time.o \
     trie.o \
     typo.o \
-    util.o
+    util.o \
+    xregex.o \
+    xspawn.o \
+    xtime.o
 
 tests/mksock: tests/mksock.o
 tests/trie: trie.o tests/trie.o
-tests/xtimegm: time.o tests/xtimegm.o
+tests/xtimegm: xtime.o tests/xtimegm.o
 
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@

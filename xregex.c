@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#include "regex.h"
+#include "xregex.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
