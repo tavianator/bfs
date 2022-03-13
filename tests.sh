@@ -1388,15 +1388,13 @@ function test_gid() {
 }
 
 function test_gid_plus() {
-    if [ "$(id -g)" -ne 0 ]; then
-	bfs_diff basic -gid +0
-    fi
+    skip_if test "$(id -g)" -eq 0
+    bfs_diff basic -gid +0
 }
 
 function test_gid_plus_plus() {
-    if [ "$(id -g)" -ne 0 ]; then
-	bfs_diff basic -gid ++0
-    fi
+    skip_if test "$(id -g)" -eq 0
+    bfs_diff basic -gid ++0
 }
 
 function test_gid_minus() {
@@ -1412,15 +1410,13 @@ function test_uid() {
 }
 
 function test_uid_plus() {
-    if [ "$(id -u)" -ne 0 ]; then
-	bfs_diff basic -uid +0
-    fi
+    skip_if test "$(id -u)" -eq 0
+    bfs_diff basic -uid +0
 }
 
 function test_uid_plus_plus() {
-    if [ "$(id -u)" -ne 0 ]; then
-	bfs_diff basic -uid ++0
-    fi
+    skip_if test "$(id -u)" -eq 0
+    bfs_diff basic -uid ++0
 }
 
 function test_uid_minus() {
@@ -1794,9 +1790,9 @@ function test_execdir() {
 }
 
 function test_execdir_plus() {
-    if [[ "$BFS" != *"-S dfs"* ]]; then
-        bfs_diff basic -execdir "$TESTS/sort-args.sh" '{}' +
-    fi
+    local tree=$(invoke_bfs -D tree 2>&1 -quit)
+    skip_if eval '[[ "$tree" == *"-S dfs"* ]]'
+    bfs_diff basic -execdir "$TESTS/sort-args.sh" '{}' +
 }
 
 function test_execdir_substring() {
