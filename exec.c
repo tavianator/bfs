@@ -327,9 +327,13 @@ static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf
 static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
 		for (size_t i = 0; i < execbuf->argc; ++i) {
-			fprintf(stderr, "%s ", execbuf->argv[i]);
+			if (fprintf(stderr, "%s ", execbuf->argv[i]) < 0) {
+				return -1;
+			}
 		}
-		fprintf(stderr, "? ");
+		if (fprintf(stderr, "? ") < 0) {
+			return -1;
+		}
 
 		if (ynprompt() <= 0) {
 			errno = 0;
