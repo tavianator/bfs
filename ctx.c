@@ -197,8 +197,19 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 	return cfile;
 }
 
+void bfs_ctx_flush(const struct bfs_ctx *ctx) {
+	// Before executing anything, flush all open streams.  This ensures that
+	// - the user sees everything relevant before an -ok[dir] prompt
+	// - output from commands is interleaved consistently with bfs
+	// - executed commands can rely on I/O from other bfs actions
+	//
+	// We do not check errors here, but they will be caught at cleanup time
+	// with ferror().
+	fflush(NULL);
+}
+
 /** Flush a file and report any errors. */
-static int bfs_ctx_flush(CFILE *cfile) {
+static int bfs_ctx_fflush(CFILE *cfile) {
 	int ret = 0, error = 0;
 	if (ferror(cfile->file)) {
 		ret = -1;
@@ -214,7 +225,7 @@ static int bfs_ctx_flush(CFILE *cfile) {
 }
 
 /** Close a file tracked by the bfs context. */
-static int bfs_ctx_close(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
+static int bfs_ctx_fclose(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 	CFILE *cfile = ctx_file->cfile;
 
 	if (cfile == ctx->cout) {
@@ -224,7 +235,7 @@ static int bfs_ctx_close(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 		// Writes to stderr are allowed to fail silently, unless the same file was used by
 		// -fprint, -fls, etc.
 		if (ctx_file->path) {
-			return bfs_ctx_flush(cfile);
+			return bfs_ctx_fflush(cfile);
 		} else {
 			return 0;
 		}
@@ -263,7 +274,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		while ((leaf = trie_first_leaf(&ctx->files))) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
 
-			if (bfs_ctx_close(ctx, ctx_file) != 0) {
+			if (bfs_ctx_fclose(ctx, ctx_file) != 0) {
 				if (cerr) {
 					bfs_error(ctx, "'%s': %m.\n", ctx_file->path);
 				}
@@ -275,7 +286,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		}
 		trie_destroy(&ctx->files);
 
-		if (cout && bfs_ctx_flush(cout) != 0) {
+		if (cout && bfs_ctx_fflush(cout) != 0) {
 			if (cerr) {
 				bfs_error(ctx, "standard output: %m.\n");
 			}

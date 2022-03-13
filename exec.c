@@ -325,14 +325,8 @@ static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf
 
 /** Actually spawn the process. */
 static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
-	// Before executing anything, flush all open streams.  This ensures that
-	// - the user sees everything relevant before an -ok[dir] prompt
-	// - output from commands is interleaved consistently with bfs
-	// - executed commands can rely on I/O from other bfs actions
-	//
-	// We do not check errors here, but they will be caught at cleanup time
-	// with ferror().
-	fflush(NULL);
+	// Flush the context state for consistency with the external process
+	bfs_ctx_flush(execbuf->ctx);
 
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
 		for (size_t i = 0; i < execbuf->argc; ++i) {

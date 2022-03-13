@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -177,6 +177,14 @@ const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx);
  *         cfile itself is returned.  If an error occurs, NULL is returned.
  */
 struct CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, struct CFILE *cfile, const char *path);
+
+/**
+ * Flush any caches for consistency with external processes.
+ *
+ * @param ctx
+ *         The bfs context.
+ */
+void bfs_ctx_flush(const struct bfs_ctx *ctx);
 
 /**
  * Dump the parsed command line.
