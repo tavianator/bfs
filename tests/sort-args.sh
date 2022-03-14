@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
-args=($({ for arg; do echo "$arg"; done } | sort))
+IFS=$'\n' read -rd '' -a args < <(printf '%s\n' "$@" | sort)
 echo "${args[@]}"

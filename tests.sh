@@ -29,17 +29,17 @@ export TSAN_OPTIONS="abort_on_error=1"
 export UBSAN_OPTIONS="abort_on_error=1"
 
 if [ -t 1 ]; then
-    BLD="$(printf '\033[01m')"
-    RED="$(printf '\033[01;31m')"
-    GRN="$(printf '\033[01;32m')"
-    YLW="$(printf '\033[01;33m')"
-    BLU="$(printf '\033[01;34m')"
-    MAG="$(printf '\033[01;35m')"
-    CYN="$(printf '\033[01;36m')"
-    RST="$(printf '\033[0m')"
+    BLD=$(printf '\033[01m')
+    RED=$(printf '\033[01;31m')
+    GRN=$(printf '\033[01;32m')
+    YLW=$(printf '\033[01;33m')
+    BLU=$(printf '\033[01;34m')
+    MAG=$(printf '\033[01;35m')
+    CYN=$(printf '\033[01;36m')
+    RST=$(printf '\033[0m')
 fi
 
-UNAME="$(uname)"
+UNAME=$(uname)
 
 if command -v capsh &>/dev/null; then
     if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
@@ -862,7 +862,7 @@ if [ ! "$EXPLICIT" ]; then
     [ "$SUDO" ] && enabled_tests+=("${sudo_tests[@]}")
 fi
 
-eval enabled_tests=($(printf '%q\n' "${enabled_tests[@]}" | sort -u))
+eval "enabled_tests=($(printf '%q\n' "${enabled_tests[@]}" | sort -u))"
 
 function _realpath() {
     (
@@ -871,18 +871,17 @@ function _realpath() {
     )
 }
 
-ROOT="$(dirname -- "${BASH_SOURCE[0]}")"
+ROOT=$(dirname -- "${BASH_SOURCE[0]}")
 
 # Try to resolve the path to $BFS before we cd, while also supporting
 # --bfs="./bfs -S ids"
-BFS=(${BFS:-$ROOT/bfs})
-BFS[0]="$(_realpath "$(command -v "${BFS[0]}")")"
-BFS="${BFS[*]}"
+read -a BFS <<<"${BFS:-$ROOT/bfs}"
+BFS[0]=$(_realpath "$(command -v "${BFS[0]}")")
 
-TESTS="$(_realpath "$ROOT/tests")"
+TESTS=$(_realpath "$ROOT/tests")
 
 # The temporary directory that will hold our test data
-TMP="$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)"
+TMP=$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)
 chown "$(id -u):$(id -g)" "$TMP"
 
 # Clean up temporary directories on exit
@@ -1028,7 +1027,7 @@ function make_deep() {
             cd "$1/$i"
 
             # 16 * 256 == 4096 == PATH_MAX
-            for j in {1..16}; do
+            for _ in {1..16}; do
                 mkdir "$name"
                 cd "$name" 2>/dev/null
             done
@@ -1080,7 +1079,7 @@ fi
 function bfs_verbose() {
     if [ "$VERBOSE" ]; then
         if [ -t 3 ]; then
-            printf "${GRN}%q${RST} " $BFS >&3
+            printf "${GRN}%q${RST} " "${BFS[@]}" >&3
 
             local expr_started=
             for arg; do
@@ -1101,7 +1100,7 @@ function bfs_verbose() {
                 fi
             done
         else
-            printf '%q ' $BFS "$@" >&3
+            printf '%q ' "${BFS[@]}" "$@" >&3
         fi
         printf '\n' >&3
     fi
@@ -1109,7 +1108,7 @@ function bfs_verbose() {
 
 function invoke_bfs() {
     bfs_verbose "$@"
-    $BFS "$@"
+    "${BFS[@]}" "$@"
 }
 
 # Silence stderr unless --verbose is set
@@ -1170,7 +1169,7 @@ function bfs_diff() (
         local ACTUAL="$TMP/$CALLER.out"
     fi
 
-    $BFS "$@" | sort >"$ACTUAL"
+    "${BFS[@]}" "$@" | sort >"$ACTUAL"
     local STATUS="${PIPESTATUS[0]}"
 
     if [ ! "$UPDATE" ]; then
@@ -1282,7 +1281,7 @@ function test_depth_maxdepth_2() {
 function test_depth_error() {
     rm -rf scratch/*
     touchp scratch/foo/bar
-    chmod -r scratch/foo
+    chmod a-r scratch/foo
 
     quiet bfs_diff scratch -depth
     local ret=$?
@@ -1514,7 +1513,7 @@ function test_L_notdir() {
 function test_L_loops() {
     # POSIX says it's okay to either stop or keep going on seeing a filesystem
     # loop, as long as a diagnostic is printed
-    local errors="$(invoke_bfs -L loops 2>&1 >/dev/null)"
+    local errors=$(invoke_bfs -L loops 2>&1 >/dev/null)
     [ -n "$errors" ]
 }
 
@@ -1720,7 +1719,7 @@ function test_size_big() {
 }
 
 function test_exec() {
-    bfs_diff basic -exec echo '{}' \;
+    bfs_diff basic -exec echo {} \;
 }
 
 function test_exec_nothing() {
@@ -1729,13 +1728,13 @@ function test_exec_nothing() {
 }
 
 function test_exec_plus() {
-    bfs_diff basic -exec "$TESTS/sort-args.sh" '{}' +
+    bfs_diff basic -exec "$TESTS/sort-args.sh" {} +
 }
 
 function test_exec_plus_status() {
     # -exec ... {} + should always return true, but if the command fails, bfs
     # should exit with a non-zero status
-    bfs_diff basic -exec false '{}' + -print
+    bfs_diff basic -exec false {} + -print
     (($? == EX_BFS))
 }
 
@@ -1744,11 +1743,11 @@ function test_exec_plus_semicolon() {
     #     Only a <plus-sign> that immediately follows an argument containing only the two characters "{}"
     #     shall punctuate the end of the primary expression. Other uses of the <plus-sign> shall not be
     #     treated as special.
-    bfs_diff basic -exec echo foo '{}' bar + baz \;
+    bfs_diff basic -exec echo foo {} bar + baz \;
 }
 
 function test_exec_substring() {
-    bfs_diff basic -exec echo '-{}-' ';'
+    bfs_diff basic -exec echo '-{}-' \;
 }
 
 function test_exec_flush() {
@@ -1782,40 +1781,40 @@ function test_exec_plus_flush_fail() {
 }
 
 function test_execdir() {
-    bfs_diff basic -execdir echo '{}' ';'
+    bfs_diff basic -execdir echo {} \;
 }
 
 function test_execdir_plus() {
     local tree=$(invoke_bfs -D tree 2>&1 -quit)
     skip_if eval '[[ "$tree" == *"-S dfs"* ]]'
-    bfs_diff basic -execdir "$TESTS/sort-args.sh" '{}' +
+    bfs_diff basic -execdir "$TESTS/sort-args.sh" {} +
 }
 
 function test_execdir_substring() {
-    bfs_diff basic -execdir echo '-{}-' ';'
+    bfs_diff basic -execdir echo '-{}-' \;
 }
 
 function test_execdir_plus_semicolon() {
-    bfs_diff basic -execdir echo foo '{}' bar + baz \;
+    bfs_diff basic -execdir echo foo {} bar + baz \;
 }
 
 function test_execdir_pwd() {
-    local TMP_REAL="$(cd "$TMP" && pwd)"
-    local OFFSET="$((${#TMP_REAL} + 2))"
-    bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" ';'
+    local TMP_REAL=$(cd "$TMP" && pwd)
+    local OFFSET=$((${#TMP_REAL} + 2))
+    bfs_diff basic -execdir bash -c "pwd | cut -b$OFFSET-" \;
 }
 
 function test_execdir_slash() {
     # Don't prepend ./ for absolute paths in -execdir
-    bfs_diff / -maxdepth 0 -execdir echo '{}' ';'
+    bfs_diff / -maxdepth 0 -execdir echo {} \;
 }
 
 function test_execdir_slash_pwd() {
-    bfs_diff / -maxdepth 0 -execdir pwd ';'
+    bfs_diff / -maxdepth 0 -execdir pwd \;
 }
 
 function test_execdir_slashes() {
-    bfs_diff /// -maxdepth 0 -execdir echo '{}' ';'
+    bfs_diff /// -maxdepth 0 -execdir echo {} \;
 }
 
 function test_execdir_ulimit() {
@@ -1825,7 +1824,7 @@ function test_execdir_ulimit() {
 
     closefrom 4
     ulimit -n 13
-    bfs_diff scratch -execdir echo '{}' ';'
+    bfs_diff scratch -execdir echo {} \;
 }
 
 function test_weird_names() {
@@ -1925,7 +1924,7 @@ function test_ignore_readdir_race() {
     $TOUCH scratch/{foo,bar}
 
     # -links 1 forces a stat() call, which will fail for the second file
-    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" '{}' ';'
+    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -links 1 -exec "$TESTS/remove-sibling.sh" {} \;
 }
 
 function test_ignore_readdir_race_root() {
@@ -1938,7 +1937,7 @@ function test_ignore_readdir_race_notdir() {
     rm -rf scratch/*
     touchp scratch/foo/bar
 
-    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r '{}' \; -execdir $TOUCH '{}' \;
+    invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r {} \; -execdir $TOUCH {} \;
 }
 
 function test_perm_000() {
@@ -2061,20 +2060,20 @@ function test_ok_nothing() {
 function test_ok_stdin() {
     # -ok should *not* close stdin
     # See https://savannah.gnu.org/bugs/?24561
-    yes | quiet bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \;
+    yes | quiet bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash {} \;
 }
 
 function test_okdir_stdin() {
     # -okdir should *not* close stdin
-    yes | quiet bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash '{}' \;
+    yes | quiet bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash {} \;
 }
 
 function test_ok_plus_semicolon() {
-    yes | quiet bfs_diff basic -ok echo '{}' + \;
+    yes | quiet bfs_diff basic -ok echo {} + \;
 }
 
 function test_okdir_plus_semicolon() {
-    yes | quiet bfs_diff basic -okdir echo '{}' + \;
+    yes | quiet bfs_diff basic -okdir echo {} + \;
 }
 
 function test_delete() {
@@ -2453,7 +2452,7 @@ function test_printf_must_be_numeric() {
 }
 
 function test_printf_color() {
-    LS_COLORS= bfs_diff -color -path './rainbow*' -printf '%H %h %f %p %P %l\n'
+    LS_COLORS="" bfs_diff -color -path './rainbow*' -printf '%H %h %f %p %P %l\n'
 }
 
 function test_fprintf() {
@@ -2476,7 +2475,7 @@ function test_fprintf_noformat() {
 }
 
 function test_fstype() {
-    fstype="$(invoke_bfs basic -maxdepth 0 -printf '%F\n')"
+    fstype=$(invoke_bfs basic -maxdepth 0 -printf '%F\n')
     bfs_diff basic -fstype "$fstype"
 }
 
@@ -2553,11 +2552,11 @@ function test_extra_paren() {
 }
 
 function test_color() {
-    LS_COLORS= bfs_diff rainbow -color
+    LS_COLORS="" bfs_diff rainbow -color
 }
 
 function test_color_L() {
-    LS_COLORS= bfs_diff -L rainbow -color
+    LS_COLORS="" bfs_diff -L rainbow -color
 }
 
 function test_color_rs_lc_rc_ec() {
@@ -2727,7 +2726,7 @@ function test_deep() {
     closefrom 4
 
     ulimit -n 16
-    bfs_diff deep -type f -exec bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' bash '{}' \;
+    bfs_diff deep -type f -exec bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' bash {} \;
 }
 
 function test_deep_strict() {
@@ -2735,7 +2734,7 @@ function test_deep_strict() {
 
     # Not even enough fds to keep the root open
     ulimit -n 7
-    bfs_diff deep -type f -exec bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' bash '{}' \;
+    bfs_diff deep -type f -exec bash -c 'echo "${1:0:6}/.../${1##*/} (${#1})"' bash {} \;
 }
 
 function test_exit() {
@@ -3319,7 +3318,7 @@ function update_eol() {
     EOL="\\033[${COLUMNS}G "
 }
 
-if [ -t 1 -a ! "$VERBOSE" ]; then
+if [[ -t 1 && ! "$VERBOSE" ]]; then
     BOL='\r\033[K'
 
     # Workaround for bash 4: checkwinsize is off by default.  We can turn it on,
@@ -3342,9 +3341,9 @@ for test in "${enabled_tests[@]}"; do
     ("$test")
     status=$?
 
-    if [ $status -eq 0 ]; then
+    if ((status == 0)); then
         ((++passed))
-    elif [ $status -eq $EX_SKIP ]; then
+    elif ((status == EX_SKIP)); then
         ((++skipped))
         if [ "$VERBOSE" ]; then
             printf "${BOL}${CYN}%s skipped!${RST}\n" "$test"
@@ -3355,13 +3354,13 @@ for test in "${enabled_tests[@]}"; do
     fi
 done
 
-if [ $passed -gt 0 ]; then
+if ((passed > 0)); then
     printf "${BOL}${GRN}tests passed: %d${RST}\n" "$passed"
 fi
-if [ $skipped -gt 0 ]; then
+if ((skipped > 0)); then
     printf "${BOL}${CYN}tests skipped: %s${RST}\n" "$skipped"
 fi
-if [ $failed -gt 0 ]; then
+if ((failed > 0)); then
     printf "${BOL}${RED}tests failed: %s${RST}\n" "$failed"
     exit 1
 fi
