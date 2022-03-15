@@ -2568,18 +2568,7 @@ function test_color_escapes() {
 }
 
 function test_color_nul() {
-    local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
-    if [ "$UPDATE" ]; then
-        local ACTUAL="$EXPECTED"
-    else
-        local ACTUAL="$TMP/${FUNCNAME[0]}.out"
-    fi
-
-    LS_COLORS="ec=\33[m\0:" invoke_bfs rainbow -color -maxdepth 0 >"$ACTUAL"
-
-    if [ ! "$UPDATE" ]; then
-        $DIFF -u "$EXPECTED" "$ACTUAL"
-    fi
+    LS_COLORS="ec=\33[m\0:" bfs_diff rainbow -color -maxdepth 0
 }
 
 function test_color_ln_target() {
@@ -2868,13 +2857,7 @@ function test_fprint_error_stderr() {
 }
 
 function test_print0() {
-    invoke_bfs basic/a basic/b -print0 >scratch/test_print0.out
-
-    if [ "$UPDATE" ]; then
-        cp scratch/test_print0.out "$TESTS/test_print0.out"
-    else
-        cmp -s scratch/test_print0.out "$TESTS/test_print0.out"
-    fi
+    bfs_diff basic/a basic/b -print0
 }
 
 function test_fprint0() {
@@ -3212,12 +3195,12 @@ function test_Ofast() {
 }
 
 function test_S() {
-    invoke_bfs -S "$1" -s basic >"$TMP/test_S_$1.out"
+    invoke_bfs -S "$1" -s basic >"scratch/test_S_$1.out"
 
     if [ "$UPDATE" ]; then
-        cp {"$TMP","$TESTS"}/"test_S_$1.out"
+        cp {scratch,"$TESTS"}/"test_S_$1.out"
     else
-        $DIFF -u {"$TESTS","$TMP"}/"test_S_$1.out"
+        $DIFF -u {"$TESTS",scratch}/"test_S_$1.out"
     fi
 }
 
