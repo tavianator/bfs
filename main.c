@@ -47,8 +47,8 @@
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
  *     - util.[ch]     (everything else)
- *     - xregex.[ch]    (regular expression support)
- *     - xspawn.[ch]    (spawns processes)
+ *     - xregex.[ch]   (regular expression support)
+ *     - xspawn.[ch]   (spawns processes)
  *     - xtime.[ch]    (date/time handling utilities)
  */
 
