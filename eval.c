@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -55,7 +55,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
-struct eval_state {
+struct bfs_eval {
 	/** Data about the current file. */
 	const struct BFTW *ftwbuf;
 	/** The bfs context. */
@@ -72,7 +72,7 @@ struct eval_state {
  * Print an error message.
  */
 BFS_FORMATTER(2, 3)
-static void eval_error(struct eval_state *state, const char *format, ...) {
+static void eval_error(struct bfs_eval *state, const char *format, ...) {
 	// By POSIX, any errors should be accompanied by a non-zero exit status
 	*state->ret = EXIT_FAILURE;
 
@@ -92,7 +92,7 @@ static void eval_error(struct eval_state *state, const char *format, ...) {
 /**
  * Check if an error should be ignored.
  */
-static bool eval_should_ignore(const struct eval_state *state, int error) {
+static bool eval_should_ignore(const struct bfs_eval *state, int error) {
 	return state->ctx->ignore_races
 		&& is_nonexistence_error(error)
 		&& state->ftwbuf->depth > 0;
@@ -101,7 +101,7 @@ static bool eval_should_ignore(const struct eval_state *state, int error) {
 /**
  * Report an error that occurs during evaluation.
  */
-static void eval_report_error(struct eval_state *state) {
+static void eval_report_error(struct bfs_eval *state) {
 	if (!eval_should_ignore(state, errno)) {
 		eval_error(state, "%m.\n");
 	}
@@ -110,7 +110,7 @@ static void eval_report_error(struct eval_state *state) {
 /**
  * Perform a bfs_stat() call if necessary.
  */
-static const struct bfs_stat *eval_stat(struct eval_state *state) {
+static const struct bfs_stat *eval_stat(struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	const struct bfs_stat *ret = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 	if (!ret) {
@@ -130,45 +130,46 @@ static time_t timespec_diff(const struct timespec *lhs, const struct timespec *r
 	return ret;
 }
 
-bool expr_cmp(const struct expr *expr, long long n) {
-	switch (expr->cmp_flag) {
-	case CMP_EXACT:
-		return n == expr->idata;
-	case CMP_LESS:
-		return n < expr->idata;
-	case CMP_GREATER:
-		return n > expr->idata;
+bool bfs_expr_cmp(const struct bfs_expr *expr, long long n) {
+	switch (expr->int_cmp) {
+	case BFS_INT_EQUAL:
+		return n == expr->num;
+	case BFS_INT_LESS:
+		return n < expr->num;
+	case BFS_INT_GREATER:
+		return n > expr->num;
 	}
 
+	assert(!"Invalid comparison mode");
 	return false;
 }
 
 /**
  * -true test.
  */
-bool eval_true(const struct expr *expr, struct eval_state *state) {
+bool eval_true(const struct bfs_expr *expr, struct bfs_eval *state) {
 	return true;
 }
 
 /**
  * -false test.
  */
-bool eval_false(const struct expr *expr, struct eval_state *state) {
+bool eval_false(const struct bfs_expr *expr, struct bfs_eval *state) {
 	return false;
 }
 
 /**
  * -executable, -readable, -writable tests.
  */
-bool eval_access(const struct expr *expr, struct eval_state *state) {
+bool eval_access(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->idata) == 0;
+	return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, expr->num) == 0;
 }
 
 /**
  * -acl test.
  */
-bool eval_acl(const struct expr *expr, struct eval_state *state) {
+bool eval_acl(const struct bfs_expr *expr, struct bfs_eval *state) {
 	int ret = bfs_check_acl(state->ftwbuf);
 	if (ret >= 0) {
 		return ret;
@@ -181,7 +182,7 @@ bool eval_acl(const struct expr *expr, struct eval_state *state) {
 /**
  * -capable test.
  */
-bool eval_capable(const struct expr *expr, struct eval_state *state) {
+bool eval_capable(const struct bfs_expr *expr, struct bfs_eval *state) {
 	int ret = bfs_check_capabilities(state->ftwbuf);
 	if (ret >= 0) {
 		return ret;
@@ -194,7 +195,7 @@ bool eval_capable(const struct expr *expr, struct eval_state *state) {
 /**
  * Get the given timespec field out of a stat buffer.
  */
-static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, struct eval_state *state) {
+static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, struct bfs_eval *state) {
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
 	if (!ret) {
 		eval_error(state, "Couldn't get file %s: %m.\n", bfs_stat_field_name(field));
@@ -205,7 +206,7 @@ static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enu
 /**
  * -[aBcm]?newer tests.
  */
-bool eval_newer(const struct expr *expr, struct eval_state *state) {
+bool eval_newer(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -223,7 +224,7 @@ bool eval_newer(const struct expr *expr, struct eval_state *state) {
 /**
  * -[aBcm]{min,time} tests.
  */
-bool eval_time(const struct expr *expr, struct eval_state *state) {
+bool eval_time(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -236,23 +237,23 @@ bool eval_time(const struct expr *expr, struct eval_state *state) {
 
 	time_t diff = timespec_diff(&expr->reftime, time);
 	switch (expr->time_unit) {
-	case DAYS:
+	case BFS_DAYS:
 		diff /= 60*24;
 		BFS_FALLTHROUGH;
-	case MINUTES:
+	case BFS_MINUTES:
 		diff /= 60;
 		BFS_FALLTHROUGH;
-	case SECONDS:
+	case BFS_SECONDS:
 		break;
 	}
 
-	return expr_cmp(expr, diff);
+	return bfs_expr_cmp(expr, diff);
 }
 
 /**
  * -used test.
  */
-bool eval_used(const struct expr *expr, struct eval_state *state) {
+bool eval_used(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -271,37 +272,37 @@ bool eval_used(const struct expr *expr, struct eval_state *state) {
 
 	long long day_seconds = 60*60*24;
 	diff = (diff + day_seconds - 1) / day_seconds;
-	return expr_cmp(expr, diff);
+	return bfs_expr_cmp(expr, diff);
 }
 
 /**
  * -gid test.
  */
-bool eval_gid(const struct expr *expr, struct eval_state *state) {
+bool eval_gid(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->gid);
+	return bfs_expr_cmp(expr, statbuf->gid);
 }
 
 /**
  * -uid test.
  */
-bool eval_uid(const struct expr *expr, struct eval_state *state) {
+bool eval_uid(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->uid);
+	return bfs_expr_cmp(expr, statbuf->uid);
 }
 
 /**
  * -nogroup test.
  */
-bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
+bool eval_nogroup(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -319,7 +320,7 @@ bool eval_nogroup(const struct expr *expr, struct eval_state *state) {
 /**
  * -nouser test.
  */
-bool eval_nouser(const struct expr *expr, struct eval_state *state) {
+bool eval_nouser(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -337,7 +338,7 @@ bool eval_nouser(const struct expr *expr, struct eval_state *state) {
 /**
  * -delete action.
  */
-bool eval_delete(const struct expr *expr, struct eval_state *state) {
+bool eval_delete(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	// Don't try to delete the current directory
@@ -365,28 +366,33 @@ bool eval_delete(const struct expr *expr, struct eval_state *state) {
 }
 
 /** Finish any pending -exec ... + operations. */
-static int eval_exec_finish(const struct expr *expr, const struct bfs_ctx *ctx) {
+static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *ctx) {
 	int ret = 0;
-	if (expr->execbuf && bfs_exec_finish(expr->execbuf) != 0) {
-		if (errno != 0) {
-			bfs_error(ctx, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+
+	if (expr->eval_fn == eval_exec) {
+		if (bfs_exec_finish(expr->exec) != 0) {
+			if (errno != 0) {
+				bfs_error(ctx, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+			}
+			ret = -1;
 		}
-		ret = -1;
+	} else if (bfs_expr_has_children(expr)) {
+		if (expr->lhs && eval_exec_finish(expr->lhs, ctx) != 0) {
+			ret = -1;
+		}
+		if (expr->rhs && eval_exec_finish(expr->rhs, ctx) != 0) {
+			ret = -1;
+		}
 	}
-	if (expr->lhs && eval_exec_finish(expr->lhs, ctx) != 0) {
-		ret = -1;
-	}
-	if (expr->rhs && eval_exec_finish(expr->rhs, ctx) != 0) {
-		ret = -1;
-	}
+
 	return ret;
 }
 
 /**
  * -exec[dir]/-ok[dir] actions.
  */
-bool eval_exec(const struct expr *expr, struct eval_state *state) {
-	bool ret = bfs_exec(expr->execbuf, state->ftwbuf) == 0;
+bool eval_exec(const struct bfs_expr *expr, struct bfs_eval *state) {
+	bool ret = bfs_exec(expr->exec, state->ftwbuf) == 0;
 	if (errno != 0) {
 		eval_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
 	}
@@ -396,9 +402,9 @@ bool eval_exec(const struct expr *expr, struct eval_state *state) {
 /**
  * -exit action.
  */
-bool eval_exit(const struct expr *expr, struct eval_state *state) {
+bool eval_exit(const struct bfs_expr *expr, struct bfs_eval *state) {
 	state->action = BFTW_STOP;
-	*state->ret = expr->idata;
+	*state->ret = expr->num;
 	state->quit = true;
 	return true;
 }
@@ -406,14 +412,14 @@ bool eval_exit(const struct expr *expr, struct eval_state *state) {
 /**
  * -depth N test.
  */
-bool eval_depth(const struct expr *expr, struct eval_state *state) {
-	return expr_cmp(expr, state->ftwbuf->depth);
+bool eval_depth(const struct bfs_expr *expr, struct bfs_eval *state) {
+	return bfs_expr_cmp(expr, state->ftwbuf->depth);
 }
 
 /**
  * -empty test.
  */
-bool eval_empty(const struct expr *expr, struct eval_state *state) {
+bool eval_empty(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret = false;
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
@@ -446,7 +452,7 @@ done:
 /**
  * -flags test.
  */
-bool eval_flags(const struct expr *expr, struct eval_state *state) {
+bool eval_flags(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -461,14 +467,14 @@ bool eval_flags(const struct expr *expr, struct eval_state *state) {
 	unsigned long set = expr->set_flags;
 	unsigned long clear = expr->clear_flags;
 
-	switch (expr->mode_cmp) {
-	case MODE_EXACT:
+	switch (expr->flags_cmp) {
+	case BFS_MODE_EQUAL:
 		return flags == set && !(flags & clear);
 
-	case MODE_ALL:
+	case BFS_MODE_ALL:
 		return (flags & set) == set && !(flags & clear);
 
-	case MODE_ANY:
+	case BFS_MODE_ANY:
 		return (flags & set) || (flags & clear) != clear;
 	}
 
@@ -479,7 +485,7 @@ bool eval_flags(const struct expr *expr, struct eval_state *state) {
 /**
  * -fstype test.
  */
-bool eval_fstype(const struct expr *expr, struct eval_state *state) {
+bool eval_fstype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -492,13 +498,13 @@ bool eval_fstype(const struct expr *expr, struct eval_state *state) {
 	}
 
 	const char *type = bfs_fstype(mtab, statbuf);
-	return strcmp(type, expr->sdata) == 0;
+	return strcmp(type, expr->argv[1]) == 0;
 }
 
 /**
  * -hidden test.
  */
-bool eval_hidden(const struct expr *expr, struct eval_state *state) {
+bool eval_hidden(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
 
@@ -513,31 +519,31 @@ bool eval_hidden(const struct expr *expr, struct eval_state *state) {
 /**
  * -inum test.
  */
-bool eval_inum(const struct expr *expr, struct eval_state *state) {
+bool eval_inum(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->ino);
+	return bfs_expr_cmp(expr, statbuf->ino);
 }
 
 /**
  * -links test.
  */
-bool eval_links(const struct expr *expr, struct eval_state *state) {
+bool eval_links(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
-	return expr_cmp(expr, statbuf->nlink);
+	return bfs_expr_cmp(expr, statbuf->nlink);
 }
 
 /**
  * -i?lname test.
  */
-bool eval_lname(const struct expr *expr, struct eval_state *state) {
+bool eval_lname(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret = false;
 	char *name = NULL;
 
@@ -555,7 +561,7 @@ bool eval_lname(const struct expr *expr, struct eval_state *state) {
 		goto done;
 	}
 
-	ret = fnmatch(expr->sdata, name, expr->idata) == 0;
+	ret = fnmatch(expr->argv[1], name, expr->num) == 0;
 
 done:
 	free(name);
@@ -565,7 +571,7 @@ done:
 /**
  * -i?name test.
  */
-bool eval_name(const struct expr *expr, struct eval_state *state) {
+bool eval_name(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
@@ -584,7 +590,7 @@ bool eval_name(const struct expr *expr, struct eval_state *state) {
 		}
 	}
 
-	bool ret = fnmatch(expr->sdata, name, expr->idata) == 0;
+	bool ret = fnmatch(expr->argv[1], name, expr->num) == 0;
 	free(copy);
 	return ret;
 }
@@ -592,15 +598,15 @@ bool eval_name(const struct expr *expr, struct eval_state *state) {
 /**
  * -i?path test.
  */
-bool eval_path(const struct expr *expr, struct eval_state *state) {
+bool eval_path(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
-	return fnmatch(expr->sdata, ftwbuf->path, expr->idata) == 0;
+	return fnmatch(expr->argv[1], ftwbuf->path, expr->num) == 0;
 }
 
 /**
  * -perm test.
  */
-bool eval_perm(const struct expr *expr, struct eval_state *state) {
+bool eval_perm(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -615,13 +621,13 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 	}
 
 	switch (expr->mode_cmp) {
-	case MODE_EXACT:
+	case BFS_MODE_EQUAL:
 		return (mode & 07777) == target;
 
-	case MODE_ALL:
+	case BFS_MODE_ALL:
 		return (mode & target) == target;
 
-	case MODE_ANY:
+	case BFS_MODE_ANY:
 		return !(mode & target) == !target;
 	}
 
@@ -632,7 +638,7 @@ bool eval_perm(const struct expr *expr, struct eval_state *state) {
 /**
  * -f?ls action.
  */
-bool eval_fls(const struct expr *expr, struct eval_state *state) {
+bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
 	const struct bfs_users *users = bfs_ctx_users(state->ctx);
@@ -737,7 +743,7 @@ error:
 /**
  * -f?print action.
  */
-bool eval_fprint(const struct expr *expr, struct eval_state *state) {
+bool eval_fprint(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (cfprintf(expr->cfile, "%pP\n", state->ftwbuf) < 0) {
 		eval_report_error(state);
 	}
@@ -747,7 +753,7 @@ bool eval_fprint(const struct expr *expr, struct eval_state *state) {
 /**
  * -f?print0 action.
  */
-bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
+bool eval_fprint0(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const char *path = state->ftwbuf->path;
 	size_t length = strlen(path) + 1;
 	if (fwrite(path, 1, length, expr->cfile->file) != length) {
@@ -759,7 +765,7 @@ bool eval_fprint0(const struct expr *expr, struct eval_state *state) {
 /**
  * -f?printf action.
  */
-bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
+bool eval_fprintf(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (bfs_printf(expr->cfile, expr->printf, state->ftwbuf) != 0) {
 		eval_report_error(state);
 	}
@@ -770,7 +776,7 @@ bool eval_fprintf(const struct expr *expr, struct eval_state *state) {
 /**
  * -printx action.
  */
-bool eval_fprintx(const struct expr *expr, struct eval_state *state) {
+bool eval_fprintx(const struct bfs_expr *expr, struct bfs_eval *state) {
 	FILE *file = expr->cfile->file;
 	const char *path = state->ftwbuf->path;
 
@@ -808,7 +814,7 @@ error:
 /**
  * -prune action.
  */
-bool eval_prune(const struct expr *expr, struct eval_state *state) {
+bool eval_prune(const struct bfs_expr *expr, struct bfs_eval *state) {
 	state->action = BFTW_PRUNE;
 	return true;
 }
@@ -816,7 +822,7 @@ bool eval_prune(const struct expr *expr, struct eval_state *state) {
 /**
  * -quit action.
  */
-bool eval_quit(const struct expr *expr, struct eval_state *state) {
+bool eval_quit(const struct bfs_expr *expr, struct bfs_eval *state) {
 	state->action = BFTW_STOP;
 	state->quit = true;
 	return true;
@@ -825,7 +831,7 @@ bool eval_quit(const struct expr *expr, struct eval_state *state) {
 /**
  * -i?regex test.
  */
-bool eval_regex(const struct expr *expr, struct eval_state *state) {
+bool eval_regex(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const char *path = state->ftwbuf->path;
 
 	int ret = bfs_regexec(expr->regex, path, BFS_REGEX_ANCHOR);
@@ -845,7 +851,7 @@ bool eval_regex(const struct expr *expr, struct eval_state *state) {
 /**
  * -samefile test.
  */
-bool eval_samefile(const struct expr *expr, struct eval_state *state) {
+bool eval_samefile(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -857,32 +863,32 @@ bool eval_samefile(const struct expr *expr, struct eval_state *state) {
 /**
  * -size test.
  */
-bool eval_size(const struct expr *expr, struct eval_state *state) {
+bool eval_size(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
 	}
 
 	static const off_t scales[] = {
-		[SIZE_BLOCKS] = 512,
-		[SIZE_BYTES] = 1,
-		[SIZE_WORDS] = 2,
-		[SIZE_KB] = 1LL << 10,
-		[SIZE_MB] = 1LL << 20,
-		[SIZE_GB] = 1LL << 30,
-		[SIZE_TB] = 1LL << 40,
-		[SIZE_PB] = 1LL << 50,
+		[BFS_BLOCKS] = 512,
+		[BFS_BYTES] = 1,
+		[BFS_WORDS] = 2,
+		[BFS_KB] = 1LL << 10,
+		[BFS_MB] = 1LL << 20,
+		[BFS_GB] = 1LL << 30,
+		[BFS_TB] = 1LL << 40,
+		[BFS_PB] = 1LL << 50,
 	};
 
 	off_t scale = scales[expr->size_unit];
 	off_t size = (statbuf->size + scale - 1)/scale; // Round up
-	return expr_cmp(expr, size);
+	return bfs_expr_cmp(expr, size);
 }
 
 /**
  * -sparse test.
  */
-bool eval_sparse(const struct expr *expr, struct eval_state *state) {
+bool eval_sparse(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -895,14 +901,14 @@ bool eval_sparse(const struct expr *expr, struct eval_state *state) {
 /**
  * -type test.
  */
-bool eval_type(const struct expr *expr, struct eval_state *state) {
-	return (1 << state->ftwbuf->type) & expr->idata;
+bool eval_type(const struct bfs_expr *expr, struct bfs_eval *state) {
+	return (1 << state->ftwbuf->type) & expr->num;
 }
 
 /**
  * -xattr test.
  */
-bool eval_xattr(const struct expr *expr, struct eval_state *state) {
+bool eval_xattr(const struct bfs_expr *expr, struct bfs_eval *state) {
 	int ret = bfs_check_xattrs(state->ftwbuf);
 	if (ret >= 0) {
 		return ret;
@@ -913,10 +919,10 @@ bool eval_xattr(const struct expr *expr, struct eval_state *state) {
 }
 
 /**
- * -xattr test.
+ * -xattrname test.
  */
-bool eval_xattrname(const struct expr *expr, struct eval_state *state) {
-	int ret = bfs_check_xattr_named(state->ftwbuf, expr->sdata);
+bool eval_xattrname(const struct bfs_expr *expr, struct bfs_eval *state) {
+	int ret = bfs_check_xattr_named(state->ftwbuf, expr->argv[1]);
 	if (ret >= 0) {
 		return ret;
 	} else {
@@ -928,7 +934,7 @@ bool eval_xattrname(const struct expr *expr, struct eval_state *state) {
 /**
  * -xtype test.
  */
-bool eval_xtype(const struct expr *expr, struct eval_state *state) {
+bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	enum bfs_stat_flags flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
 	enum bfs_type type = bftw_type(ftwbuf, flags);
@@ -936,7 +942,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 		eval_report_error(state);
 		return false;
 	} else {
-		return (1 << type) & expr->idata;
+		return (1 << type) & expr->num;
 	}
 }
 
@@ -949,7 +955,7 @@ bool eval_xtype(const struct expr *expr, struct eval_state *state) {
 /**
  * Call clock_gettime(), if available.
  */
-static int eval_gettime(struct eval_state *state, struct timespec *ts) {
+static int eval_gettime(struct bfs_eval *state, struct timespec *ts) {
 #ifdef BFS_CLOCK
 	int ret = clock_gettime(BFS_CLOCK, ts);
 	if (ret != 0) {
@@ -979,7 +985,7 @@ static void timespec_elapsed(struct timespec *elapsed, const struct timespec *st
 /**
  * Evaluate an expression.
  */
-static bool eval_expr(struct expr *expr, struct eval_state *state) {
+static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
 	struct timespec start, end;
 	bool time = state->ctx->debug & DEBUG_RATES;
 	if (time) {
@@ -990,7 +996,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 
 	assert(!state->quit);
 
-	bool ret = expr->eval(expr, state);
+	bool ret = expr->eval_fn(expr, state);
 
 	if (time) {
 		if (eval_gettime(state, &end) == 0) {
@@ -1003,7 +1009,7 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 		++expr->successes;
 	}
 
-	if (expr_never_returns(expr)) {
+	if (bfs_expr_never_returns(expr)) {
 		assert(state->quit);
 	} else if (!state->quit) {
 		assert(!expr->always_true || ret);
@@ -1016,14 +1022,14 @@ static bool eval_expr(struct expr *expr, struct eval_state *state) {
 /**
  * Evaluate a negation.
  */
-bool eval_not(const struct expr *expr, struct eval_state *state) {
+bool eval_not(const struct bfs_expr *expr, struct bfs_eval *state) {
 	return !eval_expr(expr->rhs, state);
 }
 
 /**
  * Evaluate a conjunction.
  */
-bool eval_and(const struct expr *expr, struct eval_state *state) {
+bool eval_and(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (!eval_expr(expr->lhs, state)) {
 		return false;
 	}
@@ -1038,7 +1044,7 @@ bool eval_and(const struct expr *expr, struct eval_state *state) {
 /**
  * Evaluate a disjunction.
  */
-bool eval_or(const struct expr *expr, struct eval_state *state) {
+bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (eval_expr(expr->lhs, state)) {
 		return true;
 	}
@@ -1053,7 +1059,7 @@ bool eval_or(const struct expr *expr, struct eval_state *state) {
 /**
  * Evaluate the comma operator.
  */
-bool eval_comma(const struct expr *expr, struct eval_state *state) {
+bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
 	eval_expr(expr->lhs, state);
 
 	if (state->quit) {
@@ -1064,7 +1070,7 @@ bool eval_comma(const struct expr *expr, struct eval_state *state) {
 }
 
 /** Update the status bar. */
-static void eval_status(struct eval_state *state, struct bfs_bar *bar, struct timespec *last_status, size_t count) {
+static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct timespec *last_status, size_t count) {
 	struct timespec now;
 	if (eval_gettime(state, &now) == 0) {
 		struct timespec elapsed = {0};
@@ -1168,7 +1174,7 @@ out_rhs:
 }
 
 /** Check if we've seen a file before. */
-static bool eval_file_unique(struct eval_state *state, struct trie *seen) {
+static bool eval_file_unique(struct bfs_eval *state, struct trie *seen) {
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
 		return false;
@@ -1333,7 +1339,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 
 	const struct bfs_ctx *ctx = args->ctx;
 
-	struct eval_state state;
+	struct bfs_eval state;
 	state.ftwbuf = ftwbuf;
 	state.ctx = ctx;
 	state.action = BFTW_CONTINUE;

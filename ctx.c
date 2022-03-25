@@ -262,8 +262,8 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		CFILE *cout = ctx->cout;
 		CFILE *cerr = ctx->cerr;
 
-		free_expr(ctx->expr);
-		free_expr(ctx->exclude);
+		bfs_expr_free(ctx->exclude);
+		bfs_expr_free(ctx->expr);
 
 		bfs_mtab_free(ctx->mtab);
 

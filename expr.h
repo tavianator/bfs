@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2018 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -23,84 +23,86 @@
 
 #include "color.h"
 #include "eval.h"
-#include "exec.h"
-#include "printf.h"
 #include "stat.h"
-#include "xregex.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <time.h>
 
 /**
- * Possible types of numeric comparison.
+ * Integer comparison modes.
  */
-enum cmp_flag {
-	/** Exactly n. */
-	CMP_EXACT,
-	/** Less than n. */
-	CMP_LESS,
-	/** Greater than n. */
-	CMP_GREATER,
+enum bfs_int_cmp {
+	/** Exactly N. */
+	BFS_INT_EQUAL,
+	/** Less than N (-N). */
+	BFS_INT_LESS,
+	/** Greater than N (+N). */
+	BFS_INT_GREATER,
 };
 
 /**
- * Possible types of mode comparison.
+ * Permission comparison modes.
  */
-enum mode_cmp {
+enum bfs_mode_cmp {
 	/** Mode is an exact match (MODE). */
-	MODE_EXACT,
+	BFS_MODE_EQUAL,
 	/** Mode has all these bits (-MODE). */
-	MODE_ALL,
+	BFS_MODE_ALL,
 	/** Mode has any of these bits (/MODE). */
-	MODE_ANY,
+	BFS_MODE_ANY,
 };
 
 /**
  * Possible time units.
  */
-enum time_unit {
+enum bfs_time_unit {
 	/** Seconds. */
-	SECONDS,
+	BFS_SECONDS,
 	/** Minutes. */
-	MINUTES,
+	BFS_MINUTES,
 	/** Days. */
-	DAYS,
+	BFS_DAYS,
 };
 
 /**
  * Possible file size units.
  */
-enum size_unit {
+enum bfs_size_unit {
 	/** 512-byte blocks. */
-	SIZE_BLOCKS,
+	BFS_BLOCKS,
 	/** Single bytes. */
-	SIZE_BYTES,
+	BFS_BYTES,
 	/** Two-byte words. */
-	SIZE_WORDS,
+	BFS_WORDS,
 	/** Kibibytes. */
-	SIZE_KB,
+	BFS_KB,
 	/** Mebibytes. */
-	SIZE_MB,
+	BFS_MB,
 	/** Gibibytes. */
-	SIZE_GB,
+	BFS_GB,
 	/** Tebibytes. */
-	SIZE_TB,
+	BFS_TB,
 	/** Pebibytes. */
-	SIZE_PB,
+	BFS_PB,
 };
 
 /**
  * A command line expression.
  */
-struct expr {
+struct bfs_expr {
 	/** The function that evaluates this expression. */
-	eval_fn *eval;
+	bfs_eval_fn *eval_fn;
 
-	/** The left hand side of the expression. */
-	struct expr *lhs;
-	/** The right hand side of the expression. */
-	struct expr *rhs;
+	/** The number of command line arguments for this expression. */
+	size_t argc;
+	/** The command line arguments comprising this expression. */
+	char **argv;
+
+	/** The number of files this expression keeps open between evaluations. */
+	int persistent_fds;
+	/** The number of files this expression opens during evaluation. */
+	int ephemeral_fds;
 
 	/** Whether this expression has no side effects. */
 	bool pure;
@@ -110,98 +112,122 @@ struct expr {
 	bool always_false;
 
 	/** Estimated cost. */
-	double cost;
+	float cost;
 	/** Estimated probability of success. */
-	double probability;
-	/** Number of times this predicate was executed. */
+	float probability;
+	/** Number of times this predicate was evaluated. */
 	size_t evaluations;
 	/** Number of times this predicate succeeded. */
 	size_t successes;
 	/** Total time spent running this predicate. */
 	struct timespec elapsed;
 
-	/** The number of command line arguments for this expression. */
-	size_t argc;
-	/** The command line arguments comprising this expression. */
-	char **argv;
+	/** Auxilliary data for the evaluation function. */
+	union {
+		/** Child expressions. */
+		struct {
+			/** The left hand side of the expression. */
+			struct bfs_expr *lhs;
+			/** The right hand side of the expression. */
+			struct bfs_expr *rhs;
+		};
 
-	/** The optional comparison flag. */
-	enum cmp_flag cmp_flag;
+		/** Integer comparisons. */
+		struct {
+			/** Integer for this comparison. */
+			long long num;
+			/** The comparison mode. */
+			enum bfs_int_cmp int_cmp;
 
-	/** The mode comparison flag. */
-	enum mode_cmp mode_cmp;
-	/** Mode to use for files. */
-	mode_t file_mode;
-	/** Mode to use for directories (different due to X). */
-	mode_t dir_mode;
+			/** Optional extra data. */
+			union {
+				/** -size data. */
+				enum bfs_size_unit size_unit;
 
-	/** Flags that should be set. */
-	unsigned long long set_flags;
-	/** Flags that should be cleared. */
-	unsigned long long clear_flags;
+				/** Timestamp comparison data. */
+				struct {
+					/** The stat field to look at. */
+					enum bfs_stat_field stat_field;
+					/** The reference time. */
+					struct timespec reftime;
+					/** The time unit. */
+					enum bfs_time_unit time_unit;
+				};
+			};
+		};
 
-	/** The optional stat field to look at. */
-	enum bfs_stat_field stat_field;
-	/** The optional reference time. */
-	struct timespec reftime;
-	/** The optional time unit. */
-	enum time_unit time_unit;
+		/** Printing actions. */
+		struct {
+			/** The output stream. */
+			CFILE *cfile;
+			/** Optional -printf format. */
+			struct bfs_printf *printf;
+		};
 
-	/** The optional size unit. */
-	enum size_unit size_unit;
+		/** -exec data. */
+		struct bfs_exec *exec;
 
-	/** Optional device number for a target file. */
-	dev_t dev;
-	/** Optional inode number for a target file. */
-	ino_t ino;
+		/** -flags data. */
+		struct {
+			/** The comparison mode. */
+			enum bfs_mode_cmp flags_cmp;
+			/** Flags that should be set. */
+			unsigned long long set_flags;
+			/** Flags that should be cleared. */
+			unsigned long long clear_flags;
+		};
 
-	/** File to output to. */
-	CFILE *cfile;
+		/** -perm data. */
+		struct {
+			/** The comparison mode. */
+			enum bfs_mode_cmp mode_cmp;
+			/** Mode to use for files. */
+			mode_t file_mode;
+			/** Mode to use for directories (different due to X). */
+			mode_t dir_mode;
+		};
 
-	/** Optional compiled regex. */
-	struct bfs_regex *regex;
+		/** -regex data. */
+		struct bfs_regex *regex;
 
-	/** Optional exec command. */
-	struct bfs_exec *execbuf;
-
-	/** Optional printf command. */
-	struct bfs_printf *printf;
-
-	/** Optional integer data for this expression. */
-	long long idata;
-
-	/** Optional string data for this expression. */
-	const char *sdata;
-
-	/** The number of files this expression keeps open between evaluations. */
-	int persistent_fds;
-	/** The number of files this expression opens during evaluation. */
-	int ephemeral_fds;
+		/** -samefile data. */
+		struct {
+			/** Device number of the target file. */
+			dev_t dev;
+			/** Inode number of the target file. */
+			ino_t ino;
+		};
+	};
 };
 
 /** Singleton true expression instance. */
-extern struct expr expr_true;
+extern struct bfs_expr bfs_true;
 /** Singleton false expression instance. */
-extern struct expr expr_false;
+extern struct bfs_expr bfs_false;
 
 /**
  * Create a new expression.
  */
-struct expr *new_expr(eval_fn *eval, size_t argc, char **argv);
+struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval, size_t argc, char **argv);
+
+/**
+ * @return Whether the expression has child expressions.
+ */
+bool bfs_expr_has_children(const struct bfs_expr *expr);
 
 /**
  * @return Whether expr is known to always quit.
  */
-bool expr_never_returns(const struct expr *expr);
+bool bfs_expr_never_returns(const struct bfs_expr *expr);
 
 /**
- * @return The result of the comparison for this expression.
+ * @return The result of the integer comparison for this expression.
  */
-bool expr_cmp(const struct expr *expr, long long n);
+bool bfs_expr_cmp(const struct bfs_expr *expr, long long n);
 
 /**
  * Free an expression tree.
  */
-void free_expr(struct expr *expr);
+void bfs_expr_free(struct bfs_expr *expr);
 
 #endif // BFS_EXPR_H

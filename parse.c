@@ -73,58 +73,57 @@ static char *fake_true_arg = "-true";
 #define STAT_COST   1000.0
 #define PRINT_COST 20000.0
 
-struct expr expr_true = {
-	.eval = eval_true,
-	.lhs = NULL,
-	.rhs = NULL,
+struct bfs_expr bfs_true = {
+	.eval_fn = eval_true,
+	.argc = 1,
+	.argv = &fake_true_arg,
 	.pure = true,
 	.always_true = true,
 	.cost = FAST_COST,
 	.probability = 1.0,
-	.argc = 1,
-	.argv = &fake_true_arg,
 };
 
-struct expr expr_false = {
-	.eval = eval_false,
-	.lhs = NULL,
-	.rhs = NULL,
+struct bfs_expr bfs_false = {
+	.eval_fn = eval_false,
+	.argc = 1,
+	.argv = &fake_false_arg,
 	.pure = true,
 	.always_false = true,
 	.cost = FAST_COST,
 	.probability = 0.0,
-	.argc = 1,
-	.argv = &fake_false_arg,
 };
 
-/**
- * Free an expression.
- */
-void free_expr(struct expr *expr) {
-	if (!expr || expr == &expr_true || expr == &expr_false) {
+void bfs_expr_free(struct bfs_expr *expr) {
+	if (!expr || expr == &bfs_true || expr == &bfs_false) {
 		return;
 	}
 
-	bfs_regfree(expr->regex);
-	bfs_printf_free(expr->printf);
-	bfs_exec_free(expr->execbuf);
-
-	free_expr(expr->lhs);
-	free_expr(expr->rhs);
+	if (bfs_expr_has_children(expr)) {
+		bfs_expr_free(expr->rhs);
+		bfs_expr_free(expr->lhs);
+	} else if (expr->eval_fn == eval_exec) {
+		bfs_exec_free(expr->exec);
+	} else if (expr->eval_fn == eval_fprintf) {
+		bfs_printf_free(expr->printf);
+	} else if (expr->eval_fn == eval_regex) {
+		bfs_regfree(expr->regex);
+	}
 
 	free(expr);
 }
 
-struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
-	struct expr *expr = malloc(sizeof(*expr));
+struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
+	struct bfs_expr *expr = malloc(sizeof(*expr));
 	if (!expr) {
 		perror("malloc()");
 		return NULL;
 	}
 
-	expr->eval = eval;
-	expr->lhs = NULL;
-	expr->rhs = NULL;
+	expr->eval_fn = eval_fn;
+	expr->argc = argc;
+	expr->argv = argv;
+	expr->persistent_fds = 0;
+	expr->ephemeral_fds = 0;
 	expr->pure = false;
 	expr->always_true = false;
 	expr->always_false = false;
@@ -134,28 +133,23 @@ struct expr *new_expr(eval_fn *eval, size_t argc, char **argv) {
 	expr->successes = 0;
 	expr->elapsed.tv_sec = 0;
 	expr->elapsed.tv_nsec = 0;
-	expr->argc = argc;
-	expr->argv = argv;
-	expr->cfile = NULL;
-	expr->regex = NULL;
-	expr->execbuf = NULL;
-	expr->printf = NULL;
-	expr->persistent_fds = 0;
-	expr->ephemeral_fds = 0;
 	return expr;
 }
 
 /**
  * Create a new unary expression.
  */
-static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **argv) {
-	struct expr *expr = new_expr(eval, 1, argv);
+static struct bfs_expr *new_unary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *rhs, char **argv) {
+	struct bfs_expr *expr = bfs_expr_new(eval_fn, 1, argv);
 	if (!expr) {
-		free_expr(rhs);
+		bfs_expr_free(rhs);
 		return NULL;
 	}
 
+	expr->lhs = NULL;
 	expr->rhs = rhs;
+	assert(bfs_expr_has_children(expr));
+
 	expr->persistent_fds = rhs->persistent_fds;
 	expr->ephemeral_fds = rhs->ephemeral_fds;
 	return expr;
@@ -164,29 +158,36 @@ static struct expr *new_unary_expr(eval_fn *eval, struct expr *rhs, char **argv)
 /**
  * Create a new binary expression.
  */
-static struct expr *new_binary_expr(eval_fn *eval, struct expr *lhs, struct expr *rhs, char **argv) {
-	struct expr *expr = new_expr(eval, 1, argv);
+static struct bfs_expr *new_binary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *lhs, struct bfs_expr *rhs, char **argv) {
+	struct bfs_expr *expr = bfs_expr_new(eval_fn, 1, argv);
 	if (!expr) {
-		free_expr(rhs);
-		free_expr(lhs);
+		bfs_expr_free(rhs);
+		bfs_expr_free(lhs);
 		return NULL;
 	}
 
 	expr->lhs = lhs;
 	expr->rhs = rhs;
+	assert(bfs_expr_has_children(expr));
+
 	expr->persistent_fds = lhs->persistent_fds + rhs->persistent_fds;
 	if (lhs->ephemeral_fds > rhs->ephemeral_fds) {
 		expr->ephemeral_fds = lhs->ephemeral_fds;
 	} else {
 		expr->ephemeral_fds = rhs->ephemeral_fds;
 	}
+
 	return expr;
 }
 
-/**
- * Check if an expression never returns.
- */
-bool expr_never_returns(const struct expr *expr) {
+bool bfs_expr_has_children(const struct bfs_expr *expr) {
+	return expr->eval_fn == eval_and
+		|| expr->eval_fn == eval_or
+		|| expr->eval_fn == eval_not
+		|| expr->eval_fn == eval_comma;
+}
+
+bool bfs_expr_never_returns(const struct bfs_expr *expr) {
 	// Expressions that never return are vacuously both always true and always false
 	return expr->always_true && expr->always_false;
 }
@@ -194,7 +195,7 @@ bool expr_never_returns(const struct expr *expr) {
 /**
  * Set an expression to always return true.
  */
-static void expr_set_always_true(struct expr *expr) {
+static void expr_set_always_true(struct bfs_expr *expr) {
 	expr->always_true = true;
 	expr->probability = 1.0;
 }
@@ -202,7 +203,7 @@ static void expr_set_always_true(struct expr *expr) {
 /**
  * Set an expression to never return.
  */
-static void expr_set_never_returns(struct expr *expr) {
+static void expr_set_never_returns(struct bfs_expr *expr) {
 	expr->always_true = expr->always_false = true;
 }
 
@@ -318,7 +319,7 @@ static bool parse_warning(const struct parser_state *state, const char *format, 
 /**
  * Fill in a "-print"-type expression.
  */
-static void init_print_expr(struct parser_state *state, struct expr *expr) {
+static void init_print_expr(struct parser_state *state, struct bfs_expr *expr) {
 	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
 	expr->cfile = state->ctx->cout;
@@ -327,7 +328,7 @@ static void init_print_expr(struct parser_state *state, struct expr *expr) {
 /**
  * Open a file for an expression.
  */
-static int expr_open(struct parser_state *state, struct expr *expr, const char *path) {
+static int expr_open(struct parser_state *state, struct bfs_expr *expr, const char *path) {
 	struct bfs_ctx *ctx = state->ctx;
 
 	FILE *file = NULL;
@@ -368,15 +369,15 @@ fail:
 /**
  * Invoke bfs_stat() on an argument.
  */
-static int stat_arg(const struct parser_state *state, struct expr *expr, struct bfs_stat *sb) {
+static int stat_arg(const struct parser_state *state, struct bfs_expr *expr, const char *path, struct bfs_stat *sb) {
 	const struct bfs_ctx *ctx = state->ctx;
 
 	bool follow = ctx->flags & (BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
 	enum bfs_stat_flags flags = follow ? BFS_STAT_TRYFOLLOW : BFS_STAT_NOFOLLOW;
 
-	int ret = bfs_stat(AT_FDCWD, expr->sdata, flags, sb);
+	int ret = bfs_stat(AT_FDCWD, path, flags, sb);
 	if (ret != 0) {
-		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], expr->sdata);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], path);
 	}
 	return ret;
 }
@@ -384,7 +385,7 @@ static int stat_arg(const struct parser_state *state, struct expr *expr, struct 
 /**
  * Parse the expression specified on the command line.
  */
-static struct expr *parse_expr(struct parser_state *state);
+static struct bfs_expr *parse_expr(struct parser_state *state);
 
 /**
  * Advance by a single token.
@@ -567,22 +568,22 @@ range:
 /**
  * Parse an integer and a comparison flag.
  */
-static const char *parse_icmp(const struct parser_state *state, const char *str, struct expr *expr, enum int_flags flags) {
+static const char *parse_icmp(const struct parser_state *state, const char *str, struct bfs_expr *expr, enum int_flags flags) {
 	switch (str[0]) {
 	case '-':
-		expr->cmp_flag = CMP_LESS;
+		expr->int_cmp = BFS_INT_LESS;
 		++str;
 		break;
 	case '+':
-		expr->cmp_flag = CMP_GREATER;
+		expr->int_cmp = BFS_INT_GREATER;
 		++str;
 		break;
 	default:
-		expr->cmp_flag = CMP_EXACT;
+		expr->int_cmp = BFS_INT_EQUAL;
 		break;
 	}
 
-	return parse_int(state, str, &expr->idata, flags | IF_LONG_LONG | IF_UNSIGNED);
+	return parse_int(state, str, &expr->num, flags | IF_LONG_LONG | IF_UNSIGNED);
 }
 
 /**
@@ -604,29 +605,29 @@ static bool looks_like_icmp(const char *str) {
 /**
  * Parse a single flag.
  */
-static struct expr *parse_flag(struct parser_state *state, size_t argc) {
+static struct bfs_expr *parse_flag(struct parser_state *state, size_t argc) {
 	parser_advance(state, T_FLAG, argc);
-	return &expr_true;
+	return &bfs_true;
 }
 
 /**
  * Parse a flag that doesn't take a value.
  */
-static struct expr *parse_nullary_flag(struct parser_state *state) {
+static struct bfs_expr *parse_nullary_flag(struct parser_state *state) {
 	return parse_flag(state, 1);
 }
 
 /**
  * Parse a flag that takes a single value.
  */
-static struct expr *parse_unary_flag(struct parser_state *state) {
+static struct bfs_expr *parse_unary_flag(struct parser_state *state) {
 	return parse_flag(state, 2);
 }
 
 /**
  * Parse a single option.
  */
-static struct expr *parse_option(struct parser_state *state, size_t argc) {
+static struct bfs_expr *parse_option(struct parser_state *state, size_t argc) {
 	const char *arg = *parser_advance(state, T_OPTION, argc);
 
 	if (state->non_option_seen) {
@@ -636,51 +637,51 @@ static struct expr *parse_option(struct parser_state *state, size_t argc) {
 		              arg);
 	}
 
-	return &expr_true;
+	return &bfs_true;
 }
 
 /**
  * Parse an option that doesn't take a value.
  */
-static struct expr *parse_nullary_option(struct parser_state *state) {
+static struct bfs_expr *parse_nullary_option(struct parser_state *state) {
 	return parse_option(state, 1);
 }
 
 /**
  * Parse an option that takes a value.
  */
-static struct expr *parse_unary_option(struct parser_state *state) {
+static struct bfs_expr *parse_unary_option(struct parser_state *state) {
 	return parse_option(state, 2);
 }
 
 /**
  * Parse a single positional option.
  */
-static struct expr *parse_positional_option(struct parser_state *state, size_t argc) {
+static struct bfs_expr *parse_positional_option(struct parser_state *state, size_t argc) {
 	parser_advance(state, T_OPTION, argc);
-	return &expr_true;
+	return &bfs_true;
 }
 
 /**
  * Parse a positional option that doesn't take a value.
  */
-static struct expr *parse_nullary_positional_option(struct parser_state *state) {
+static struct bfs_expr *parse_nullary_positional_option(struct parser_state *state) {
 	return parse_positional_option(state, 1);
 }
 
 /**
  * Parse a positional option that takes a single value.
  */
-static struct expr *parse_unary_positional_option(struct parser_state *state) {
+static struct bfs_expr *parse_unary_positional_option(struct parser_state *state) {
 	return parse_positional_option(state, 2);
 }
 
 /**
  * Parse a single test.
  */
-static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t argc) {
+static struct bfs_expr *parse_test(struct parser_state *state, bfs_eval_fn *eval_fn, size_t argc) {
 	char **argv = parser_advance(state, T_TEST, argc);
-	struct expr *expr = new_expr(eval, argc, argv);
+	struct bfs_expr *expr = bfs_expr_new(eval_fn, argc, argv);
 	if (expr) {
 		expr->pure = true;
 	}
@@ -690,14 +691,14 @@ static struct expr *parse_test(struct parser_state *state, eval_fn *eval, size_t
 /**
  * Parse a test that doesn't take a value.
  */
-static struct expr *parse_nullary_test(struct parser_state *state, eval_fn *eval) {
-	return parse_test(state, eval, 1);
+static struct bfs_expr *parse_nullary_test(struct parser_state *state, bfs_eval_fn *eval_fn) {
+	return parse_test(state, eval_fn, 1);
 }
 
 /**
  * Parse a test that takes a value.
  */
-static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) {
+static struct bfs_expr *parse_unary_test(struct parser_state *state, bfs_eval_fn *eval_fn) {
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
@@ -705,17 +706,13 @@ static struct expr *parse_unary_test(struct parser_state *state, eval_fn *eval) 
 		return NULL;
 	}
 
-	struct expr *expr = parse_test(state, eval, 2);
-	if (expr) {
-		expr->sdata = value;
-	}
-	return expr;
+	return parse_test(state, eval_fn, 2);
 }
 
 /**
  * Parse a single action.
  */
-static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size_t argc) {
+static struct bfs_expr *parse_action(struct parser_state *state, bfs_eval_fn *eval_fn, size_t argc) {
 	char **argv = state->argv;
 
 	if (state->excluding) {
@@ -723,25 +720,25 @@ static struct expr *parse_action(struct parser_state *state, eval_fn *eval, size
 		return NULL;
 	}
 
-	if (eval != eval_prune && eval != eval_quit) {
+	if (eval_fn != eval_prune && eval_fn != eval_quit) {
 		state->implicit_print = false;
 	}
 
 	parser_advance(state, T_ACTION, argc);
-	return new_expr(eval, argc, argv);
+	return bfs_expr_new(eval_fn, argc, argv);
 }
 
 /**
  * Parse an action that takes no arguments.
  */
-static struct expr *parse_nullary_action(struct parser_state *state, eval_fn *eval) {
-	return parse_action(state, eval, 1);
+static struct bfs_expr *parse_nullary_action(struct parser_state *state, bfs_eval_fn *eval_fn) {
+	return parse_action(state, eval_fn, 1);
 }
 
 /**
  * Parse an action that takes one argument.
  */
-static struct expr *parse_unary_action(struct parser_state *state, eval_fn *eval) {
+static struct bfs_expr *parse_unary_action(struct parser_state *state, bfs_eval_fn *eval_fn) {
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
 	if (!value) {
@@ -749,24 +746,20 @@ static struct expr *parse_unary_action(struct parser_state *state, eval_fn *eval
 		return NULL;
 	}
 
-	struct expr *expr = parse_action(state, eval, 2);
-	if (expr) {
-		expr->sdata = value;
-	}
-	return expr;
+	return parse_action(state, eval_fn, 2);
 }
 
 /**
  * Parse a test expression with integer data and a comparison flag.
  */
-static struct expr *parse_test_icmp(struct parser_state *state, eval_fn *eval) {
-	struct expr *expr = parse_unary_test(state, eval);
+static struct bfs_expr *parse_test_icmp(struct parser_state *state, bfs_eval_fn *eval_fn) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_fn);
 	if (!expr) {
 		return NULL;
 	}
 
-	if (!parse_icmp(state, expr->sdata, expr, 0)) {
-		free_expr(expr);
+	if (!parse_icmp(state, expr->argv[1], expr, 0)) {
+		bfs_expr_free(expr);
 		return NULL;
 	}
 
@@ -802,7 +795,7 @@ static bool parse_debug_flag(const char *flag, size_t len, const char *expected)
 /**
  * Parse -D FLAG.
  */
-static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_debug(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_ctx *ctx = state->ctx;
 
 	const char *arg = state->argv[0];
@@ -862,7 +855,7 @@ static struct expr *parse_debug(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -On.
  */
-static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_optlevel(struct parser_state *state, int arg1, int arg2) {
 	int *optlevel = &state->ctx->optlevel;
 
 	if (strcmp(state->argv[0], "-Ofast") == 0) {
@@ -881,7 +874,7 @@ static struct expr *parse_optlevel(struct parser_state *state, int arg1, int arg
 /**
  * Parse -[PHL], -(no)?follow.
  */
-static struct expr *parse_follow(struct parser_state *state, int flags, int option) {
+static struct bfs_expr *parse_follow(struct parser_state *state, int flags, int option) {
 	struct bfs_ctx *ctx = state->ctx;
 	ctx->flags &= ~(BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
 	ctx->flags |= flags;
@@ -895,7 +888,7 @@ static struct expr *parse_follow(struct parser_state *state, int flags, int opti
 /**
  * Parse -X.
  */
-static struct expr *parse_xargs_safe(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_xargs_safe(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->xargs_safe = true;
 	return parse_nullary_flag(state);
 }
@@ -903,13 +896,13 @@ static struct expr *parse_xargs_safe(struct parser_state *state, int arg1, int a
 /**
  * Parse -executable, -readable, -writable
  */
-static struct expr *parse_access(struct parser_state *state, int flag, int arg2) {
-	struct expr *expr = parse_nullary_test(state, eval_access);
+static struct bfs_expr *parse_access(struct parser_state *state, int flag, int arg2) {
+	struct bfs_expr *expr = parse_nullary_test(state, eval_access);
 	if (!expr) {
 		return NULL;
 	}
 
-	expr->idata = flag;
+	expr->num = flag;
 	expr->cost = STAT_COST;
 
 	switch (flag) {
@@ -930,9 +923,9 @@ static struct expr *parse_access(struct parser_state *state, int flag, int arg2)
 /**
  * Parse -acl.
  */
-static struct expr *parse_acl(struct parser_state *state, int flag, int arg2) {
+static struct bfs_expr *parse_acl(struct parser_state *state, int flag, int arg2) {
 #if BFS_CAN_CHECK_ACL
-	struct expr *expr = parse_nullary_test(state, eval_acl);
+	struct bfs_expr *expr = parse_nullary_test(state, eval_acl);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.00002;
@@ -947,14 +940,14 @@ static struct expr *parse_acl(struct parser_state *state, int flag, int arg2) {
 /**
  * Parse -[aBcm]?newer.
  */
-static struct expr *parse_newer(struct parser_state *state, int field, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_newer);
+static struct bfs_expr *parse_newer(struct parser_state *state, int field, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_newer);
 	if (!expr) {
 		return NULL;
 	}
 
 	struct bfs_stat sb;
-	if (stat_arg(state, expr, &sb) != 0) {
+	if (stat_arg(state, expr, expr->argv[1], &sb) != 0) {
 		goto fail;
 	}
 
@@ -964,15 +957,15 @@ static struct expr *parse_newer(struct parser_state *state, int field, int arg2)
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -[aBcm]min.
  */
-static struct expr *parse_min(struct parser_state *state, int field, int arg2) {
-	struct expr *expr = parse_test_icmp(state, eval_time);
+static struct bfs_expr *parse_min(struct parser_state *state, int field, int arg2) {
+	struct bfs_expr *expr = parse_test_icmp(state, eval_time);
 	if (!expr) {
 		return NULL;
 	}
@@ -980,15 +973,15 @@ static struct expr *parse_min(struct parser_state *state, int field, int arg2) {
 	expr->cost = STAT_COST;
 	expr->reftime = state->now;
 	expr->stat_field = field;
-	expr->time_unit = MINUTES;
+	expr->time_unit = BFS_MINUTES;
 	return expr;
 }
 
 /**
  * Parse -[aBcm]time.
  */
-static struct expr *parse_time(struct parser_state *state, int field, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_time);
+static struct bfs_expr *parse_time(struct parser_state *state, int field, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_time);
 	if (!expr) {
 		return NULL;
 	}
@@ -997,18 +990,18 @@ static struct expr *parse_time(struct parser_state *state, int field, int arg2) 
 	expr->reftime = state->now;
 	expr->stat_field = field;
 
-	const char *tail = parse_icmp(state, expr->sdata, expr, IF_PARTIAL_OK);
+	const char *tail = parse_icmp(state, expr->argv[1], expr, IF_PARTIAL_OK);
 	if (!tail) {
 		goto fail;
 	}
 
 	if (!*tail) {
-		expr->time_unit = DAYS;
+		expr->time_unit = BFS_DAYS;
 		return expr;
 	}
 
-	unsigned long long time = expr->idata;
-	expr->idata = 0;
+	unsigned long long time = expr->num;
+	expr->num = 0;
 
 	while (true) {
 		switch (*tail) {
@@ -1032,7 +1025,7 @@ static struct expr *parse_time(struct parser_state *state, int field, int arg2) 
 			goto fail;
 		}
 
-		expr->idata += time;
+		expr->num += time;
 
 		if (!*++tail) {
 			break;
@@ -1049,20 +1042,20 @@ static struct expr *parse_time(struct parser_state *state, int field, int arg2) 
 		}
 	}
 
-	expr->time_unit = SECONDS;
+	expr->time_unit = BFS_SECONDS;
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -capable.
  */
-static struct expr *parse_capable(struct parser_state *state, int flag, int arg2) {
+static struct bfs_expr *parse_capable(struct parser_state *state, int flag, int arg2) {
 #if BFS_CAN_CHECK_CAPABILITIES
-	struct expr *expr = parse_nullary_test(state, eval_capable);
+	struct bfs_expr *expr = parse_nullary_test(state, eval_capable);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.000002;
@@ -1077,7 +1070,7 @@ static struct expr *parse_capable(struct parser_state *state, int flag, int arg2
 /**
  * Parse -(no)?color.
  */
-static struct expr *parse_color(struct parser_state *state, int color, int arg2) {
+static struct bfs_expr *parse_color(struct parser_state *state, int color, int arg2) {
 	struct bfs_ctx *ctx = state->ctx;
 	struct colors *colors = ctx->colors;
 
@@ -1102,15 +1095,15 @@ static struct expr *parse_color(struct parser_state *state, int color, int arg2)
 /**
  * Parse -{false,true}.
  */
-static struct expr *parse_const(struct parser_state *state, int value, int arg2) {
+static struct bfs_expr *parse_const(struct parser_state *state, int value, int arg2) {
 	parser_advance(state, T_TEST, 1);
-	return value ? &expr_true : &expr_false;
+	return value ? &bfs_true : &bfs_false;
 }
 
 /**
  * Parse -daystart.
  */
-static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_daystart(struct parser_state *state, int arg1, int arg2) {
 	struct tm tm;
 	if (xlocaltime(&state->now.tv_sec, &tm) != 0) {
 		parse_perror(state, "xlocaltime()");
@@ -1139,7 +1132,7 @@ static struct expr *parse_daystart(struct parser_state *state, int arg1, int arg
 /**
  * Parse -delete.
  */
-static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_delete(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->flags |= BFTW_POST_ORDER;
 	state->depth_arg = state->argv[0];
 	return parse_nullary_action(state, eval_delete);
@@ -1148,7 +1141,7 @@ static struct expr *parse_delete(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -d.
  */
-static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_depth(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->flags |= BFTW_POST_ORDER;
 	state->depth_arg = state->argv[0];
 	return parse_nullary_flag(state);
@@ -1157,7 +1150,7 @@ static struct expr *parse_depth(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -depth [N].
  */
-static struct expr *parse_depth_n(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_depth_n(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[1];
 	if (arg && looks_like_icmp(arg)) {
 		return parse_test_icmp(state, eval_depth);
@@ -1169,7 +1162,7 @@ static struct expr *parse_depth_n(struct parser_state *state, int arg1, int arg2
 /**
  * Parse -{min,max}depth N.
  */
-static struct expr *parse_depth_limit(struct parser_state *state, int is_min, int arg2) {
+static struct bfs_expr *parse_depth_limit(struct parser_state *state, int is_min, int arg2) {
 	struct bfs_ctx *ctx = state->ctx;
 	const char *arg = state->argv[0];
 	const char *value = state->argv[1];
@@ -1189,8 +1182,8 @@ static struct expr *parse_depth_limit(struct parser_state *state, int is_min, in
 /**
  * Parse -empty.
  */
-static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_test(state, eval_empty);
+static struct bfs_expr *parse_empty(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_test(state, eval_empty);
 	if (!expr) {
 		return NULL;
 	}
@@ -1213,19 +1206,19 @@ static struct expr *parse_empty(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -exec(dir)?/-ok(dir)?.
  */
-static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) {
+static struct bfs_expr *parse_exec(struct parser_state *state, int flags, int arg2) {
 	struct bfs_exec *execbuf = bfs_exec_parse(state->ctx, state->argv, flags);
 	if (!execbuf) {
 		return NULL;
 	}
 
-	struct expr *expr = parse_action(state, eval_exec, execbuf->tmpl_argc + 2);
+	struct bfs_expr *expr = parse_action(state, eval_exec, execbuf->tmpl_argc + 2);
 	if (!expr) {
 		bfs_exec_free(execbuf);
 		return NULL;
 	}
 
-	expr->execbuf = execbuf;
+	expr->exec = execbuf;
 
 	if (execbuf->flags & BFS_EXEC_MULTI) {
 		expr_set_always_true(expr);
@@ -1252,7 +1245,7 @@ static struct expr *parse_exec(struct parser_state *state, int flags, int arg2) 
 /**
  * Parse -exit [STATUS].
  */
-static struct expr *parse_exit(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_exit(struct parser_state *state, int arg1, int arg2) {
 	size_t argc = 1;
 	const char *value = state->argv[1];
 
@@ -1261,10 +1254,10 @@ static struct expr *parse_exit(struct parser_state *state, int arg1, int arg2) {
 		argc = 2;
 	}
 
-	struct expr *expr = parse_action(state, eval_exit, argc);
+	struct bfs_expr *expr = parse_action(state, eval_exit, argc);
 	if (expr) {
 		expr_set_never_returns(expr);
-		expr->idata = status;
+		expr->num = status;
 	}
 	return expr;
 }
@@ -1272,7 +1265,7 @@ static struct expr *parse_exit(struct parser_state *state, int arg1, int arg2) {
 /**
  * Parse -f PATH.
  */
-static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 	parser_advance(state, T_FLAG, 1);
 
 	const char *path = state->argv[0];
@@ -1286,13 +1279,13 @@ static struct expr *parse_f(struct parser_state *state, int arg1, int arg2) {
 	}
 
 	parser_advance(state, T_PATH, 1);
-	return &expr_true;
+	return &bfs_true;
 }
 
 /**
  * Parse -files0-from PATH.
  */
-static struct expr *parse_files0_from(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_files0_from(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 	const char *from = state->argv[1];
 	if (!from) {
@@ -1311,7 +1304,7 @@ static struct expr *parse_files0_from(struct parser_state *state, int arg1, int 
 		return NULL;
 	}
 
-	struct expr *expr = parse_unary_positional_option(state);
+	struct bfs_expr *expr = parse_unary_positional_option(state);
 
 	while (true) {
 		char *path = xgetdelim(file, '\0');
@@ -1344,24 +1337,24 @@ static struct expr *parse_files0_from(struct parser_state *state, int arg1, int 
 /**
  * Parse -flags FLAGS.
  */
-static struct expr *parse_flags(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_flags);
+static struct bfs_expr *parse_flags(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_flags);
 	if (!expr) {
 		return NULL;
 	}
 
-	const char *flags = expr->sdata;
+	const char *flags = expr->argv[1];
 	switch (flags[0]) {
 	case '-':
-		expr->mode_cmp = MODE_ALL;
+		expr->flags_cmp = BFS_MODE_ALL;
 		++flags;
 		break;
 	case '+':
-		expr->mode_cmp = MODE_ANY;
+		expr->flags_cmp = BFS_MODE_ANY;
 		++flags;
 		break;
 	default:
-		expr->mode_cmp = MODE_EXACT;
+		expr->flags_cmp = BFS_MODE_EQUAL;
 		break;
 	}
 
@@ -1371,7 +1364,7 @@ static struct expr *parse_flags(struct parser_state *state, int arg1, int arg2) 
 		} else {
 			parse_error(state, "${blu}%s${rs}: Invalid flags ${bld}%s${rs}.\n", expr->argv[0], flags);
 		}
-		free_expr(expr);
+		bfs_expr_free(expr);
 		return NULL;
 	}
 
@@ -1381,13 +1374,13 @@ static struct expr *parse_flags(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -fls FILE.
  */
-static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_action(state, eval_fls);
+static struct bfs_expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_action(state, eval_fls);
 	if (!expr) {
 		goto fail;
 	}
 
-	if (expr_open(state, expr, expr->sdata) != 0) {
+	if (expr_open(state, expr, expr->argv[1]) != 0) {
 		goto fail;
 	}
 
@@ -1403,52 +1396,52 @@ static struct expr *parse_fls(struct parser_state *state, int arg1, int arg2) {
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -fprint FILE.
  */
-static struct expr *parse_fprint(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_action(state, eval_fprint);
+static struct bfs_expr *parse_fprint(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_action(state, eval_fprint);
 	if (expr) {
 		expr_set_always_true(expr);
 		expr->cost = PRINT_COST;
-		if (expr_open(state, expr, expr->sdata) != 0) {
+		if (expr_open(state, expr, expr->argv[1]) != 0) {
 			goto fail;
 		}
 	}
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -fprint0 FILE.
  */
-static struct expr *parse_fprint0(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_action(state, eval_fprint0);
+static struct bfs_expr *parse_fprint0(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_action(state, eval_fprint0);
 	if (expr) {
 		expr_set_always_true(expr);
 		expr->cost = PRINT_COST;
-		if (expr_open(state, expr, expr->sdata) != 0) {
+		if (expr_open(state, expr, expr->argv[1]) != 0) {
 			goto fail;
 		}
 	}
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -fprintf FILE FORMAT.
  */
-static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_fprintf(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 
 	const char *file = state->argv[1];
@@ -1463,7 +1456,7 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 		return NULL;
 	}
 
-	struct expr *expr = parse_action(state, eval_fprintf, 3);
+	struct bfs_expr *expr = parse_action(state, eval_fprintf, 3);
 	if (!expr) {
 		return NULL;
 	}
@@ -1484,20 +1477,20 @@ static struct expr *parse_fprintf(struct parser_state *state, int arg1, int arg2
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -fstype TYPE.
  */
-static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_fstype(struct parser_state *state, int arg1, int arg2) {
 	if (!bfs_ctx_mtab(state->ctx)) {
 		parse_error(state, "Couldn't parse the mount table: %m.\n");
 		return NULL;
 	}
 
-	struct expr *expr = parse_unary_test(state, eval_fstype);
+	struct bfs_expr *expr = parse_unary_test(state, eval_fstype);
 	if (expr) {
 		expr->cost = STAT_COST;
 	}
@@ -1507,7 +1500,7 @@ static struct expr *parse_fstype(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -gid/-group.
  */
-static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_group(struct parser_state *state, int arg1, int arg2) {
 	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
 	if (!groups) {
 		parse_error(state, "Couldn't parse the group table: %m.\n");
@@ -1516,21 +1509,21 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 
 	const char *arg = state->argv[0];
 
-	struct expr *expr = parse_unary_test(state, eval_gid);
+	struct bfs_expr *expr = parse_unary_test(state, eval_gid);
 	if (!expr) {
 		return NULL;
 	}
 
-	const struct group *grp = bfs_getgrnam(groups, expr->sdata);
+	const struct group *grp = bfs_getgrnam(groups, expr->argv[1]);
 	if (grp) {
-		expr->idata = grp->gr_gid;
-		expr->cmp_flag = CMP_EXACT;
-	} else if (looks_like_icmp(expr->sdata)) {
-		if (!parse_icmp(state, expr->sdata, expr, 0)) {
+		expr->num = grp->gr_gid;
+		expr->int_cmp = BFS_INT_EQUAL;
+	} else if (looks_like_icmp(expr->argv[1])) {
+		if (!parse_icmp(state, expr->argv[1], expr, 0)) {
 			goto fail;
 		}
 	} else {
-		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: No such group.\n", arg, expr->sdata);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: No such group.\n", arg, expr->argv[1]);
 		goto fail;
 	}
 
@@ -1539,14 +1532,14 @@ static struct expr *parse_group(struct parser_state *state, int arg1, int arg2) 
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -unique.
  */
-static struct expr *parse_unique(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_unique(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->unique = true;
 	return parse_nullary_option(state);
 }
@@ -1554,8 +1547,8 @@ static struct expr *parse_unique(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -used N.
  */
-static struct expr *parse_used(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_test_icmp(state, eval_used);
+static struct bfs_expr *parse_used(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_test_icmp(state, eval_used);
 	if (expr) {
 		expr->cost = STAT_COST;
 	}
@@ -1565,7 +1558,7 @@ static struct expr *parse_used(struct parser_state *state, int arg1, int arg2) {
 /**
  * Parse -uid/-user.
  */
-static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 	const struct bfs_users *users = bfs_ctx_users(state->ctx);
 	if (!users) {
 		parse_error(state, "Couldn't parse the user table: %m.\n");
@@ -1574,21 +1567,21 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 
 	const char *arg = state->argv[0];
 
-	struct expr *expr = parse_unary_test(state, eval_uid);
+	struct bfs_expr *expr = parse_unary_test(state, eval_uid);
 	if (!expr) {
 		return NULL;
 	}
 
-	const struct passwd *pwd = bfs_getpwnam(users, expr->sdata);
+	const struct passwd *pwd = bfs_getpwnam(users, expr->argv[1]);
 	if (pwd) {
-		expr->idata = pwd->pw_uid;
-		expr->cmp_flag = CMP_EXACT;
-	} else if (looks_like_icmp(expr->sdata)) {
-		if (!parse_icmp(state, expr->sdata, expr, 0)) {
+		expr->num = pwd->pw_uid;
+		expr->int_cmp = BFS_INT_EQUAL;
+	} else if (looks_like_icmp(expr->argv[1])) {
+		if (!parse_icmp(state, expr->argv[1], expr, 0)) {
 			goto fail;
 		}
 	} else {
-		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: No such user.\n", arg, expr->sdata);
+		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: No such user.\n", arg, expr->argv[1]);
 		goto fail;
 	}
 
@@ -1597,15 +1590,15 @@ static struct expr *parse_user(struct parser_state *state, int arg1, int arg2) {
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -hidden.
  */
-static struct expr *parse_hidden(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_test(state, eval_hidden);
+static struct bfs_expr *parse_hidden(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_test(state, eval_hidden);
 	if (expr) {
 		expr->probability = 0.01;
 	}
@@ -1615,7 +1608,7 @@ static struct expr *parse_hidden(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -(no)?ignore_readdir_race.
  */
-static struct expr *parse_ignore_races(struct parser_state *state, int ignore, int arg2) {
+static struct bfs_expr *parse_ignore_races(struct parser_state *state, int ignore, int arg2) {
 	state->ctx->ignore_races = ignore;
 	return parse_nullary_option(state);
 }
@@ -1623,11 +1616,11 @@ static struct expr *parse_ignore_races(struct parser_state *state, int ignore, i
 /**
  * Parse -inum N.
  */
-static struct expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_test_icmp(state, eval_inum);
+static struct bfs_expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_test_icmp(state, eval_inum);
 	if (expr) {
 		expr->cost = STAT_COST;
-		expr->probability = expr->cmp_flag == CMP_EXACT ? 0.01 : 0.50;
+		expr->probability = expr->int_cmp == BFS_INT_EQUAL ? 0.01 : 0.50;
 	}
 	return expr;
 }
@@ -1635,11 +1628,11 @@ static struct expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
 /**
  * Parse -links N.
  */
-static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_test_icmp(state, eval_links);
+static struct bfs_expr *parse_links(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_test_icmp(state, eval_links);
 	if (expr) {
 		expr->cost = STAT_COST;
-		expr->probability = expr_cmp(expr, 1) ? 0.99 : 0.01;
+		expr->probability = bfs_expr_cmp(expr, 1) ? 0.99 : 0.01;
 	}
 	return expr;
 }
@@ -1647,8 +1640,8 @@ static struct expr *parse_links(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -ls.
  */
-static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_action(state, eval_fls);
+static struct bfs_expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_action(state, eval_fls);
 	if (!expr) {
 		return NULL;
 	}
@@ -1667,7 +1660,7 @@ static struct expr *parse_ls(struct parser_state *state, int arg1, int arg2) {
 /**
  * Parse -mount.
  */
-static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_mount(struct parser_state *state, int arg1, int arg2) {
 	parse_warning(state,
 	              "In the future, ${blu}%s${rs} will skip mount points entirely, unlike\n"
 	              "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n",
@@ -1681,24 +1674,24 @@ static struct expr *parse_mount(struct parser_state *state, int arg1, int arg2) 
 /**
  * Common code for fnmatch() tests.
  */
-static struct expr *parse_fnmatch(const struct parser_state *state, struct expr *expr, bool casefold) {
+static struct bfs_expr *parse_fnmatch(const struct parser_state *state, struct bfs_expr *expr, bool casefold) {
 	if (!expr) {
 		return NULL;
 	}
 
 	const char *arg = expr->argv[0];
-	const char *pattern = expr->sdata;
+	const char *pattern = expr->argv[1];
 
 	if (casefold) {
 #ifdef FNM_CASEFOLD
-		expr->idata = FNM_CASEFOLD;
+		expr->num = FNM_CASEFOLD;
 #else
 		parse_error(state, "${blu}%s${rs} is missing platform support.\n", arg);
-		free_expr(expr);
+		bfs_expr_free(expr);
 		return NULL;
 #endif
 	} else {
-		expr->idata = 0;
+		expr->num = 0;
 	}
 
 	// POSIX says, about fnmatch():
@@ -1715,8 +1708,8 @@ static struct expr *parse_fnmatch(const struct parser_state *state, struct expr 
 	}
 	if (i % 2 != 0) {
 		parse_warning(state, "${blu}%s${rs} ${bld}%s${rs}: Unescaped trailing backslash.\n\n", arg, pattern);
-		free_expr(expr);
-		return &expr_false;
+		bfs_expr_free(expr);
+		return &bfs_false;
 	}
 
 	expr->cost = 400.0;
@@ -1733,24 +1726,24 @@ static struct expr *parse_fnmatch(const struct parser_state *state, struct expr 
 /**
  * Parse -i?name.
  */
-static struct expr *parse_name(struct parser_state *state, int casefold, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_name);
+static struct bfs_expr *parse_name(struct parser_state *state, int casefold, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_name);
 	return parse_fnmatch(state, expr, casefold);
 }
 
 /**
  * Parse -i?path, -i?wholename.
  */
-static struct expr *parse_path(struct parser_state *state, int casefold, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_path);
+static struct bfs_expr *parse_path(struct parser_state *state, int casefold, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_path);
 	return parse_fnmatch(state, expr, casefold);
 }
 
 /**
  * Parse -i?lname.
  */
-static struct expr *parse_lname(struct parser_state *state, int casefold, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_lname);
+static struct bfs_expr *parse_lname(struct parser_state *state, int casefold, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_lname);
 	return parse_fnmatch(state, expr, casefold);
 }
 
@@ -1771,8 +1764,8 @@ static enum bfs_stat_field parse_newerxy_field(char c) {
 }
 
 /** Parse an explicit reference timestamp for -newerXt and -*since. */
-static int parse_reftime(const struct parser_state *state, struct expr *expr) {
-	if (parse_timestamp(expr->sdata, &expr->reftime) == 0) {
+static int parse_reftime(const struct parser_state *state, struct bfs_expr *expr) {
+	if (parse_timestamp(expr->argv[1], &expr->reftime) == 0) {
 		return 0;
 	} else if (errno != EINVAL) {
 		parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: %m.\n", expr->argv[0], expr->argv[1]);
@@ -1818,14 +1811,14 @@ static int parse_reftime(const struct parser_state *state, struct expr *expr) {
 /**
  * Parse -newerXY.
  */
-static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
 		parse_error(state, "Expected ${blu}-newer${bld}XY${rs}; found ${blu}-newer${bld}%s${rs}.\n", arg + 6);
 		return NULL;
 	}
 
-	struct expr *expr = parse_unary_test(state, eval_newer);
+	struct bfs_expr *expr = parse_unary_test(state, eval_newer);
 	if (!expr) {
 		goto fail;
 	}
@@ -1852,14 +1845,14 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 		}
 
 		struct bfs_stat sb;
-		if (stat_arg(state, expr, &sb) != 0) {
+		if (stat_arg(state, expr, expr->argv[1], &sb) != 0) {
 			goto fail;
 		}
 
 
 		const struct timespec *reftime = bfs_stat_time(&sb, field);
 		if (!reftime) {
-			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Couldn't get file %s.\n", arg, expr->sdata, bfs_stat_field_name(field));
+			parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Couldn't get file %s.\n", arg, expr->argv[1], bfs_stat_field_name(field));
 			goto fail;
 		}
 
@@ -1871,20 +1864,20 @@ static struct expr *parse_newerxy(struct parser_state *state, int arg1, int arg2
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -nogroup.
  */
-static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
 	if (!bfs_ctx_groups(state->ctx)) {
 		parse_error(state, "Couldn't parse the group table: %m.\n");
 		return NULL;
 	}
 
-	struct expr *expr = parse_nullary_test(state, eval_nogroup);
+	struct bfs_expr *expr = parse_nullary_test(state, eval_nogroup);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.01;
@@ -1895,8 +1888,8 @@ static struct expr *parse_nogroup(struct parser_state *state, int arg1, int arg2
 /**
  * Parse -nohidden.
  */
-static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg2) {
-	struct expr *hidden = new_expr(eval_hidden, 1, &fake_hidden_arg);
+static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *hidden = bfs_expr_new(eval_hidden, 1, &fake_hidden_arg);
 	if (!hidden) {
 		return NULL;
 	}
@@ -1911,13 +1904,13 @@ static struct expr *parse_nohidden(struct parser_state *state, int arg1, int arg
 	}
 
 	parser_advance(state, T_OPTION, 1);
-	return &expr_true;
+	return &bfs_true;
 }
 
 /**
  * Parse -noleaf.
  */
-static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
 	parse_warning(state, "${ex}bfs${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n", state->argv[0]);
 	return parse_nullary_option(state);
 }
@@ -1925,13 +1918,13 @@ static struct expr *parse_noleaf(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -nouser.
  */
-static struct expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
 	if (!bfs_ctx_users(state->ctx)) {
 		parse_error(state, "Couldn't parse the user table: %m.\n");
 		return NULL;
 	}
 
-	struct expr *expr = parse_nullary_test(state, eval_nouser);
+	struct bfs_expr *expr = parse_nullary_test(state, eval_nouser);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.01;
@@ -1942,7 +1935,7 @@ static struct expr *parse_nouser(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse a permission mode like chmod(1).
  */
-static int parse_mode(const struct parser_state *state, const char *mode, struct expr *expr) {
+static int parse_mode(const struct parser_state *state, const char *mode, struct bfs_expr *expr) {
 	if (mode[0] >= '0' && mode[0] <= '9') {
 		unsigned int parsed;
 		if (!parse_int(state, mode, &parsed, 8 | IF_INT | IF_UNSIGNED | IF_QUIET)) {
@@ -2163,31 +2156,31 @@ fail:
 /**
  * Parse -perm MODE.
  */
-static struct expr *parse_perm(struct parser_state *state, int field, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_perm);
+static struct bfs_expr *parse_perm(struct parser_state *state, int field, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_perm);
 	if (!expr) {
 		return NULL;
 	}
 
-	const char *mode = expr->sdata;
+	const char *mode = expr->argv[1];
 	switch (mode[0]) {
 	case '-':
-		expr->mode_cmp = MODE_ALL;
+		expr->mode_cmp = BFS_MODE_ALL;
 		++mode;
 		break;
 	case '/':
-		expr->mode_cmp = MODE_ANY;
+		expr->mode_cmp = BFS_MODE_ANY;
 		++mode;
 		break;
 	case '+':
 		if (mode[1] >= '0' && mode[1] <= '9') {
-			expr->mode_cmp = MODE_ANY;
+			expr->mode_cmp = BFS_MODE_ANY;
 			++mode;
 			break;
 		}
 		BFS_FALLTHROUGH;
 	default:
-		expr->mode_cmp = MODE_EXACT;
+		expr->mode_cmp = BFS_MODE_EQUAL;
 		break;
 	}
 
@@ -2200,15 +2193,15 @@ static struct expr *parse_perm(struct parser_state *state, int field, int arg2) 
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -print.
  */
-static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_action(state, eval_fprint);
+static struct bfs_expr *parse_print(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_action(state, eval_fprint);
 	if (expr) {
 		init_print_expr(state, expr);
 	}
@@ -2218,8 +2211,8 @@ static struct expr *parse_print(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -print0.
  */
-static struct expr *parse_print0(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_action(state, eval_fprint0);
+static struct bfs_expr *parse_print0(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_action(state, eval_fprint0);
 	if (expr) {
 		init_print_expr(state, expr);
 	}
@@ -2229,17 +2222,17 @@ static struct expr *parse_print0(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -printf FORMAT.
  */
-static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_action(state, eval_fprintf);
+static struct bfs_expr *parse_printf(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_action(state, eval_fprintf);
 	if (!expr) {
 		return NULL;
 	}
 
 	init_print_expr(state, expr);
 
-	expr->printf = bfs_printf_parse(state->ctx, expr->sdata);
+	expr->printf = bfs_printf_parse(state->ctx, expr->argv[1]);
 	if (!expr->printf) {
-		free_expr(expr);
+		bfs_expr_free(expr);
 		return NULL;
 	}
 
@@ -2249,8 +2242,8 @@ static struct expr *parse_printf(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -printx.
  */
-static struct expr *parse_printx(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_action(state, eval_fprintx);
+static struct bfs_expr *parse_printx(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_action(state, eval_fprintx);
 	if (expr) {
 		init_print_expr(state, expr);
 	}
@@ -2260,10 +2253,10 @@ static struct expr *parse_printx(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -prune.
  */
-static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
 	state->prune_arg = state->argv[0];
 
-	struct expr *expr = parse_nullary_action(state, eval_prune);
+	struct bfs_expr *expr = parse_nullary_action(state, eval_prune);
 	if (expr) {
 		expr_set_always_true(expr);
 	}
@@ -2273,8 +2266,8 @@ static struct expr *parse_prune(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -quit.
  */
-static struct expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_action(state, eval_quit);
+static struct bfs_expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_action(state, eval_quit);
 	if (expr) {
 		expr_set_never_returns(expr);
 	}
@@ -2284,13 +2277,13 @@ static struct expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
 /**
  * Parse -i?regex.
  */
-static struct expr *parse_regex(struct parser_state *state, int flags, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_regex);
+static struct bfs_expr *parse_regex(struct parser_state *state, int flags, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_regex);
 	if (!expr) {
 		goto fail;
 	}
 
-	if (bfs_regcomp(&expr->regex, expr->sdata, state->regex_type, flags) != 0) {
+	if (bfs_regcomp(&expr->regex, expr->argv[1], state->regex_type, flags) != 0) {
 		if (!expr->regex) {
 			parse_perror(state, "bfs_regcomp()");
 			goto fail;
@@ -2310,14 +2303,14 @@ static struct expr *parse_regex(struct parser_state *state, int flags, int arg2)
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -E.
  */
-static struct expr *parse_regex_extended(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_regex_extended(struct parser_state *state, int arg1, int arg2) {
 	state->regex_type = BFS_REGEX_POSIX_EXTENDED;
 	return parse_nullary_flag(state);
 }
@@ -2325,7 +2318,7 @@ static struct expr *parse_regex_extended(struct parser_state *state, int arg1, i
 /**
  * Parse -regextype TYPE.
  */
-static struct expr *parse_regextype(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_regextype(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_ctx *ctx = state->ctx;
 	CFILE *cfile = ctx->cerr;
 
@@ -2376,7 +2369,7 @@ list_types:
 /**
  * Parse -s.
  */
-static struct expr *parse_s(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_s(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->flags |= BFTW_SORT;
 	return parse_nullary_flag(state);
 }
@@ -2384,15 +2377,15 @@ static struct expr *parse_s(struct parser_state *state, int arg1, int arg2) {
 /**
  * Parse -samefile FILE.
  */
-static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_samefile);
+static struct bfs_expr *parse_samefile(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_samefile);
 	if (!expr) {
 		return NULL;
 	}
 
 	struct bfs_stat sb;
-	if (stat_arg(state, expr, &sb) != 0) {
-		free_expr(expr);
+	if (stat_arg(state, expr, expr->argv[1], &sb) != 0) {
+		bfs_expr_free(expr);
 		return NULL;
 	}
 
@@ -2408,7 +2401,7 @@ static struct expr *parse_samefile(struct parser_state *state, int arg1, int arg
 /**
  * Parse -S STRATEGY.
  */
-static struct expr *parse_search_strategy(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_search_strategy(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_ctx *ctx = state->ctx;
 	CFILE *cfile = ctx->cerr;
 
@@ -2451,8 +2444,8 @@ list_strategies:
 /**
  * Parse -[aBcm]?since.
  */
-static struct expr *parse_since(struct parser_state *state, int field, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_newer);
+static struct bfs_expr *parse_since(struct parser_state *state, int field, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_newer);
 	if (!expr) {
 		return NULL;
 	}
@@ -2466,20 +2459,20 @@ static struct expr *parse_since(struct parser_state *state, int field, int arg2)
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -size N[cwbkMGTP]?.
  */
-static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_unary_test(state, eval_size);
+static struct bfs_expr *parse_size(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_test(state, eval_size);
 	if (!expr) {
 		return NULL;
 	}
 
-	const char *unit = parse_icmp(state, expr->sdata, expr, IF_PARTIAL_OK);
+	const char *unit = parse_icmp(state, expr->argv[1], expr, IF_PARTIAL_OK);
 	if (!unit) {
 		goto fail;
 	}
@@ -2491,28 +2484,28 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	switch (*unit) {
 	case '\0':
 	case 'b':
-		expr->size_unit = SIZE_BLOCKS;
+		expr->size_unit = BFS_BLOCKS;
 		break;
 	case 'c':
-		expr->size_unit = SIZE_BYTES;
+		expr->size_unit = BFS_BYTES;
 		break;
 	case 'w':
-		expr->size_unit = SIZE_WORDS;
+		expr->size_unit = BFS_WORDS;
 		break;
 	case 'k':
-		expr->size_unit = SIZE_KB;
+		expr->size_unit = BFS_KB;
 		break;
 	case 'M':
-		expr->size_unit = SIZE_MB;
+		expr->size_unit = BFS_MB;
 		break;
 	case 'G':
-		expr->size_unit = SIZE_GB;
+		expr->size_unit = BFS_GB;
 		break;
 	case 'T':
-		expr->size_unit = SIZE_TB;
+		expr->size_unit = BFS_TB;
 		break;
 	case 'P':
-		expr->size_unit = SIZE_PB;
+		expr->size_unit = BFS_PB;
 		break;
 
 	default:
@@ -2520,7 +2513,7 @@ static struct expr *parse_size(struct parser_state *state, int arg1, int arg2) {
 	}
 
 	expr->cost = STAT_COST;
-	expr->probability = expr->cmp_flag == CMP_EXACT ? 0.01 : 0.50;
+	expr->probability = expr->int_cmp == BFS_INT_EQUAL ? 0.01 : 0.50;
 
 	return expr;
 
@@ -2528,15 +2521,15 @@ bad_unit:
 	parse_error(state, "${blu}%s${rs} ${bld}%s${rs}: Expected a size unit (one of ${bld}cwbkMGTP${rs}); found ${er}%s${rs}.\n",
 	            expr->argv[0], expr->argv[1], unit);
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -sparse.
  */
-static struct expr *parse_sparse(struct parser_state *state, int arg1, int arg2) {
-	struct expr *expr = parse_nullary_test(state, eval_sparse);
+static struct bfs_expr *parse_sparse(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_test(state, eval_sparse);
 	if (expr) {
 		expr->cost = STAT_COST;
 	}
@@ -2546,7 +2539,7 @@ static struct expr *parse_sparse(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -status.
  */
-static struct expr *parse_status(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_status(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->status = true;
 	return parse_nullary_option(state);
 }
@@ -2554,9 +2547,9 @@ static struct expr *parse_status(struct parser_state *state, int arg1, int arg2)
 /**
  * Parse -x?type [bcdpflsD].
  */
-static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
-	eval_fn *eval = x ? eval_xtype : eval_type;
-	struct expr *expr = parse_unary_test(state, eval);
+static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) {
+	bfs_eval_fn *eval = x ? eval_xtype : eval_type;
+	struct bfs_expr *expr = parse_unary_test(state, eval);
 	if (!expr) {
 		return NULL;
 	}
@@ -2564,7 +2557,7 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 	unsigned int types = 0;
 	double probability = 0.0;
 
-	const char *c = expr->sdata;
+	const char *c = expr->argv[1];
 	while (true) {
 		enum bfs_type type;
 		double type_prob;
@@ -2635,7 +2628,7 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 		}
 	}
 
-	expr->idata = types;
+	expr->num = types;
 	expr->probability = probability;
 
 	if (x && state->ctx->optlevel < 4) {
@@ -2648,14 +2641,14 @@ static struct expr *parse_type(struct parser_state *state, int x, int arg2) {
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /**
  * Parse -(no)?warn.
  */
-static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
+static struct bfs_expr *parse_warn(struct parser_state *state, int warn, int arg2) {
 	state->ctx->warn = warn;
 	return parse_nullary_positional_option(state);
 }
@@ -2663,9 +2656,9 @@ static struct expr *parse_warn(struct parser_state *state, int warn, int arg2) {
 /**
  * Parse -xattr.
  */
-static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_xattr(struct parser_state *state, int arg1, int arg2) {
 #if BFS_CAN_CHECK_XATTRS
-	struct expr *expr = parse_nullary_test(state, eval_xattr);
+	struct bfs_expr *expr = parse_nullary_test(state, eval_xattr);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.01;
@@ -2680,9 +2673,9 @@ static struct expr *parse_xattr(struct parser_state *state, int arg1, int arg2) 
 /**
  * Parse -xattrname.
  */
-static struct expr *parse_xattrname(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_xattrname(struct parser_state *state, int arg1, int arg2) {
 #if BFS_CAN_CHECK_XATTRS
-	struct expr *expr = parse_unary_test(state, eval_xattrname);
+	struct bfs_expr *expr = parse_unary_test(state, eval_xattrname);
 	if (expr) {
 		expr->cost = STAT_COST;
 		expr->probability = 0.01;
@@ -2697,7 +2690,7 @@ static struct expr *parse_xattrname(struct parser_state *state, int arg1, int ar
 /**
  * Parse -xdev.
  */
-static struct expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_xdev(struct parser_state *state, int arg1, int arg2) {
 	state->ctx->flags |= BFTW_PRUNE_MOUNTS;
 	state->xdev_arg = state->argv[0];
 	return parse_nullary_option(state);
@@ -2800,7 +2793,7 @@ fail:
 /**
  * "Parse" -help.
  */
-static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 	CFILE *cout = state->ctx->cout;
 
 	pid_t pager = -1;
@@ -3063,7 +3056,7 @@ static struct expr *parse_help(struct parser_state *state, int arg1, int arg2) {
 /**
  * "Parse" -version.
  */
-static struct expr *parse_version(struct parser_state *state, int arg1, int arg2) {
+static struct bfs_expr *parse_version(struct parser_state *state, int arg1, int arg2) {
 	cfprintf(state->ctx->cout, "${ex}bfs${rs} ${bld}%s${rs}\n\n", BFS_VERSION);
 
 	printf("%s\n", BFS_HOMEPAGE);
@@ -3072,7 +3065,7 @@ static struct expr *parse_version(struct parser_state *state, int arg1, int arg2
 	return NULL;
 }
 
-typedef struct expr *parse_fn(struct parser_state *state, int arg1, int arg2);
+typedef struct bfs_expr *parse_fn(struct parser_state *state, int arg1, int arg2);
 
 /**
  * An entry in the parse table for literals.
@@ -3248,7 +3241,7 @@ static const struct table_entry *table_lookup_fuzzy(const char *arg) {
  *         | TEST
  *         | ACTION
  */
-static struct expr *parse_literal(struct parser_state *state) {
+static struct bfs_expr *parse_literal(struct parser_state *state) {
 	// Paths are already skipped at this point
 	const char *arg = state->argv[0];
 
@@ -3311,7 +3304,7 @@ unexpected:
  *        | "-exclude" FACTOR
  *        | LITERAL
  */
-static struct expr *parse_factor(struct parser_state *state) {
+static struct bfs_expr *parse_factor(struct parser_state *state) {
 	if (skip_paths(state) != 0) {
 		return NULL;
 	}
@@ -3325,20 +3318,20 @@ static struct expr *parse_factor(struct parser_state *state) {
 	if (strcmp(arg, "(") == 0) {
 		parser_advance(state, T_OPERATOR, 1);
 
-		struct expr *expr = parse_expr(state);
+		struct bfs_expr *expr = parse_expr(state);
 		if (!expr) {
 			return NULL;
 		}
 
 		if (skip_paths(state) != 0) {
-			free_expr(expr);
+			bfs_expr_free(expr);
 			return NULL;
 		}
 
 		arg = state->argv[0];
 		if (!arg || strcmp(arg, ")") != 0) {
 			parse_error(state, "Expected a ${red})${rs} after ${blu}%s${rs}.\n", state->argv[-1]);
-			free_expr(expr);
+			bfs_expr_free(expr);
 			return NULL;
 		}
 		parser_advance(state, T_OPERATOR, 1);
@@ -3353,7 +3346,7 @@ static struct expr *parse_factor(struct parser_state *state) {
 		}
 		state->excluding = true;
 
-		struct expr *factor = parse_factor(state);
+		struct bfs_expr *factor = parse_factor(state);
 		if (!factor) {
 			return NULL;
 		}
@@ -3366,11 +3359,11 @@ static struct expr *parse_factor(struct parser_state *state) {
 			return NULL;
 		}
 
-		return &expr_true;
+		return &bfs_true;
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
 		char **argv = parser_advance(state, T_OPERATOR, 1);
 
-		struct expr *factor = parse_factor(state);
+		struct bfs_expr *factor = parse_factor(state);
 		if (!factor) {
 			return NULL;
 		}
@@ -3387,12 +3380,12 @@ static struct expr *parse_factor(struct parser_state *state) {
  *      | TERM "-a" FACTOR
  *      | TERM "-and" FACTOR
  */
-static struct expr *parse_term(struct parser_state *state) {
-	struct expr *term = parse_factor(state);
+static struct bfs_expr *parse_term(struct parser_state *state) {
+	struct bfs_expr *term = parse_factor(state);
 
 	while (term) {
 		if (skip_paths(state) != 0) {
-			free_expr(term);
+			bfs_expr_free(term);
 			return NULL;
 		}
 
@@ -3412,10 +3405,10 @@ static struct expr *parse_term(struct parser_state *state) {
 			argv = parser_advance(state, T_OPERATOR, 1);
 		}
 
-		struct expr *lhs = term;
-		struct expr *rhs = parse_factor(state);
+		struct bfs_expr *lhs = term;
+		struct bfs_expr *rhs = parse_factor(state);
 		if (!rhs) {
-			free_expr(lhs);
+			bfs_expr_free(lhs);
 			return NULL;
 		}
 
@@ -3430,12 +3423,12 @@ static struct expr *parse_term(struct parser_state *state) {
  *        | CLAUSE "-o" TERM
  *        | CLAUSE "-or" TERM
  */
-static struct expr *parse_clause(struct parser_state *state) {
-	struct expr *clause = parse_term(state);
+static struct bfs_expr *parse_clause(struct parser_state *state) {
+	struct bfs_expr *clause = parse_term(state);
 
 	while (clause) {
 		if (skip_paths(state) != 0) {
-			free_expr(clause);
+			bfs_expr_free(clause);
 			return NULL;
 		}
 
@@ -3450,10 +3443,10 @@ static struct expr *parse_clause(struct parser_state *state) {
 
 		char **argv = parser_advance(state, T_OPERATOR, 1);
 
-		struct expr *lhs = clause;
-		struct expr *rhs = parse_term(state);
+		struct bfs_expr *lhs = clause;
+		struct bfs_expr *rhs = parse_term(state);
 		if (!rhs) {
-			free_expr(lhs);
+			bfs_expr_free(lhs);
 			return NULL;
 		}
 
@@ -3467,12 +3460,12 @@ static struct expr *parse_clause(struct parser_state *state) {
  * EXPR : CLAUSE
  *      | EXPR "," CLAUSE
  */
-static struct expr *parse_expr(struct parser_state *state) {
-	struct expr *expr = parse_clause(state);
+static struct bfs_expr *parse_expr(struct parser_state *state) {
+	struct bfs_expr *expr = parse_clause(state);
 
 	while (expr) {
 		if (skip_paths(state) != 0) {
-			free_expr(expr);
+			bfs_expr_free(expr);
 			return NULL;
 		}
 
@@ -3487,10 +3480,10 @@ static struct expr *parse_expr(struct parser_state *state) {
 
 		char **argv = parser_advance(state, T_OPERATOR, 1);
 
-		struct expr *lhs = expr;
-		struct expr *rhs = parse_clause(state);
+		struct bfs_expr *lhs = expr;
+		struct bfs_expr *rhs = parse_clause(state);
 		if (!rhs) {
-			free_expr(lhs);
+			bfs_expr_free(lhs);
 			return NULL;
 		}
 
@@ -3503,12 +3496,12 @@ static struct expr *parse_expr(struct parser_state *state) {
 /**
  * Parse the top-level expression.
  */
-static struct expr *parse_whole_expr(struct parser_state *state) {
+static struct bfs_expr *parse_whole_expr(struct parser_state *state) {
 	if (skip_paths(state) != 0) {
 		return NULL;
 	}
 
-	struct expr *expr = &expr_true;
+	struct bfs_expr *expr = &bfs_true;
 	if (state->argv[0]) {
 		expr = parse_expr(state);
 		if (!expr) {
@@ -3522,7 +3515,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	}
 
 	if (state->implicit_print) {
-		struct expr *print = new_expr(eval_fprint, 1, &fake_print_arg);
+		struct bfs_expr *print = bfs_expr_new(eval_fprint, 1, &fake_print_arg);
 		if (!print) {
 			goto fail;
 		}
@@ -3559,7 +3552,7 @@ static struct expr *parse_whole_expr(struct parser_state *state) {
 	return expr;
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
@@ -3667,12 +3660,12 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 	}
 
 	if (flag == DEBUG_RATES) {
-		if (ctx->exclude != &expr_false) {
+		if (ctx->exclude != &bfs_false) {
 			cfprintf(cerr, "(${red}-exclude${rs} %pE) ", ctx->exclude);
 		}
 		cfprintf(cerr, "%pE", ctx->expr);
 	} else {
-		if (ctx->exclude != &expr_false) {
+		if (ctx->exclude != &bfs_false) {
 			cfprintf(cerr, "(${red}-exclude${rs} %pe) ", ctx->exclude);
 		}
 		cfprintf(cerr, "%pe", ctx->expr);
@@ -3685,7 +3678,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
  * Dump the estimated costs.
  */
 static void dump_costs(const struct bfs_ctx *ctx) {
-	const struct expr *expr = ctx->expr;
+	const struct bfs_expr *expr = ctx->expr;
 	bfs_debug(ctx, DEBUG_COST, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
 	bfs_debug(ctx, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
 }
@@ -3804,7 +3797,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	ctx->exclude = &expr_false;
+	ctx->exclude = &bfs_false;
 	ctx->expr = parse_whole_expr(&state);
 	if (!ctx->expr) {
 		if (state.just_info) {

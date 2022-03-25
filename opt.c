@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -333,65 +333,66 @@ static bool debug_opt(const struct opt_state *state, int level, const char *form
 }
 
 /** Extract a child expression, freeing the outer expression. */
-static struct expr *extract_child_expr(struct expr *expr, struct expr **child) {
-	struct expr *ret = *child;
+static struct bfs_expr *extract_child_expr(struct bfs_expr *expr, struct bfs_expr **child) {
+	struct bfs_expr *ret = *child;
 	*child = NULL;
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return ret;
 }
 
 /**
  * Negate an expression.
  */
-static struct expr *negate_expr(struct expr *rhs, char **argv) {
-	if (rhs->eval == eval_not) {
+static struct bfs_expr *negate_expr(struct bfs_expr *rhs, char **argv) {
+	if (rhs->eval_fn == eval_not) {
 		return extract_child_expr(rhs, &rhs->rhs);
 	}
 
-	struct expr *expr = new_expr(eval_not, 1, argv);
+	struct bfs_expr *expr = bfs_expr_new(eval_not, 1, argv);
 	if (!expr) {
-		free_expr(rhs);
+		bfs_expr_free(rhs);
 		return NULL;
 	}
 
+	expr->lhs = NULL;
 	expr->rhs = rhs;
 	return expr;
 }
 
-static struct expr *optimize_not_expr(const struct opt_state *state, struct expr *expr);
-static struct expr *optimize_and_expr(const struct opt_state *state, struct expr *expr);
-static struct expr *optimize_or_expr(const struct opt_state *state, struct expr *expr);
+static struct bfs_expr *optimize_not_expr(const struct opt_state *state, struct bfs_expr *expr);
+static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct bfs_expr *expr);
+static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct bfs_expr *expr);
 
 /**
  * Apply De Morgan's laws.
  */
-static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, char **argv) {
+static struct bfs_expr *de_morgan(const struct opt_state *state, struct bfs_expr *expr, char **argv) {
 	bool debug = debug_opt(state, 1, "De Morgan's laws: %pe ", expr);
 
-	struct expr *parent = negate_expr(expr, argv);
+	struct bfs_expr *parent = negate_expr(expr, argv);
 	if (!parent) {
 		return NULL;
 	}
 
 	bool has_parent = true;
-	if (parent->eval != eval_not) {
+	if (parent->eval_fn != eval_not) {
 		expr = parent;
 		has_parent = false;
 	}
 
-	assert(expr->eval == eval_and || expr->eval == eval_or);
-	if (expr->eval == eval_and) {
-		expr->eval = eval_or;
+	assert(expr->eval_fn == eval_and || expr->eval_fn == eval_or);
+	if (expr->eval_fn == eval_and) {
+		expr->eval_fn = eval_or;
 		expr->argv = &fake_or_arg;
 	} else {
-		expr->eval = eval_and;
+		expr->eval_fn = eval_and;
 		expr->argv = &fake_and_arg;
 	}
 
 	expr->lhs = negate_expr(expr->lhs, argv);
 	expr->rhs = negate_expr(expr->rhs, argv);
 	if (!expr->lhs || !expr->rhs) {
-		free_expr(parent);
+		bfs_expr_free(parent);
 		return NULL;
 	}
 
@@ -399,18 +400,18 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 		cfprintf(state->ctx->cerr, "<==> %pe\n", parent);
 	}
 
-	if (expr->lhs->eval == eval_not) {
+	if (expr->lhs->eval_fn == eval_not) {
 		expr->lhs = optimize_not_expr(state, expr->lhs);
 	}
-	if (expr->rhs->eval == eval_not) {
+	if (expr->rhs->eval_fn == eval_not) {
 		expr->rhs = optimize_not_expr(state, expr->rhs);
 	}
 	if (!expr->lhs || !expr->rhs) {
-		free_expr(parent);
+		bfs_expr_free(parent);
 		return NULL;
 	}
 
-	if (expr->eval == eval_and) {
+	if (expr->eval_fn == eval_and) {
 		expr = optimize_and_expr(state, expr);
 	} else {
 		expr = optimize_or_expr(state, expr);
@@ -421,7 +422,7 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 		parent = expr;
 	}
 	if (!expr) {
-		free_expr(parent);
+		bfs_expr_free(parent);
 		return NULL;
 	}
 
@@ -432,34 +433,34 @@ static struct expr *de_morgan(const struct opt_state *state, struct expr *expr, 
 }
 
 /** Optimize an expression recursively. */
-static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr *expr);
+static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct bfs_expr *expr);
 
 /**
  * Optimize a negation.
  */
-static struct expr *optimize_not_expr(const struct opt_state *state, struct expr *expr) {
-	assert(expr->eval == eval_not);
+static struct bfs_expr *optimize_not_expr(const struct opt_state *state, struct bfs_expr *expr) {
+	assert(expr->eval_fn == eval_not);
 
-	struct expr *rhs = expr->rhs;
+	struct bfs_expr *rhs = expr->rhs;
 
 	int optlevel = state->ctx->optlevel;
 	if (optlevel >= 1) {
-		if (rhs == &expr_true) {
-			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &expr_false);
-			free_expr(expr);
-			return &expr_false;
-		} else if (rhs == &expr_false) {
-			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &expr_true);
-			free_expr(expr);
-			return &expr_true;
-		} else if (rhs->eval == eval_not) {
+		if (rhs == &bfs_true) {
+			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &bfs_false);
+			bfs_expr_free(expr);
+			return &bfs_false;
+		} else if (rhs == &bfs_false) {
+			debug_opt(state, 1, "constant propagation: %pe <==> %pe\n", expr, &bfs_true);
+			bfs_expr_free(expr);
+			return &bfs_true;
+		} else if (rhs->eval_fn == eval_not) {
 			debug_opt(state, 1, "double negation: %pe <==> %pe\n", expr, rhs->rhs);
 			return extract_child_expr(expr, &rhs->rhs);
-		} else if (expr_never_returns(rhs)) {
+		} else if (bfs_expr_never_returns(rhs)) {
 			debug_opt(state, 1, "reachability: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
-		} else if ((rhs->eval == eval_and || rhs->eval == eval_or)
-			   && (rhs->lhs->eval == eval_not || rhs->rhs->eval == eval_not)) {
+		} else if ((rhs->eval_fn == eval_and || rhs->eval_fn == eval_or)
+			   && (rhs->lhs->eval_fn == eval_not || rhs->rhs->eval_fn == eval_not)) {
 			return de_morgan(state, expr, expr->argv);
 		}
 	}
@@ -474,7 +475,7 @@ static struct expr *optimize_not_expr(const struct opt_state *state, struct expr
 }
 
 /** Optimize a negation recursively. */
-static struct expr *optimize_not_expr_recursive(struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *optimize_not_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
 	struct opt_state rhs_state = *state;
 	expr->rhs = optimize_expr_recursive(&rhs_state, expr->rhs);
 	if (!expr->rhs) {
@@ -487,41 +488,41 @@ static struct expr *optimize_not_expr_recursive(struct opt_state *state, struct 
 	return optimize_not_expr(state, expr);
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /** Optimize a conjunction. */
-static struct expr *optimize_and_expr(const struct opt_state *state, struct expr *expr) {
-	assert(expr->eval == eval_and);
+static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct bfs_expr *expr) {
+	assert(expr->eval_fn == eval_and);
 
-	struct expr *lhs = expr->lhs;
-	struct expr *rhs = expr->rhs;
+	struct bfs_expr *lhs = expr->lhs;
+	struct bfs_expr *rhs = expr->rhs;
 
 	const struct bfs_ctx *ctx = state->ctx;
 	int optlevel = ctx->optlevel;
 	if (optlevel >= 1) {
-		if (lhs == &expr_true) {
+		if (lhs == &bfs_true) {
 			debug_opt(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
-		} else if (rhs == &expr_true) {
+		} else if (rhs == &bfs_true) {
 			debug_opt(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs->always_false) {
 			debug_opt(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs->always_true && rhs == &expr_false) {
+		} else if (lhs->always_true && rhs == &bfs_false) {
 			bool debug = debug_opt(state, 1, "strength reduction: %pe <==> ", expr);
-			struct expr *ret = extract_child_expr(expr, &expr->lhs);
+			struct bfs_expr *ret = extract_child_expr(expr, &expr->lhs);
 			ret = negate_expr(ret, &fake_not_arg);
 			if (debug && ret) {
 				cfprintf(ctx->cerr, "%pe\n", ret);
 			}
 			return ret;
-		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_false) {
+		} else if (optlevel >= 2 && lhs->pure && rhs == &bfs_false) {
 			debug_opt(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
-		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
+		} else if (lhs->eval_fn == eval_not && rhs->eval_fn == eval_not) {
 			return de_morgan(state, expr, expr->lhs->argv);
 		}
 	}
@@ -536,7 +537,7 @@ static struct expr *optimize_and_expr(const struct opt_state *state, struct expr
 }
 
 /** Optimize a conjunction recursively. */
-static struct expr *optimize_and_expr_recursive(struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *optimize_and_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
 	struct opt_state lhs_state = *state;
 	expr->lhs = optimize_expr_recursive(&lhs_state, expr->lhs);
 	if (!expr->lhs) {
@@ -556,16 +557,16 @@ static struct expr *optimize_and_expr_recursive(struct opt_state *state, struct 
 	return optimize_and_expr(state, expr);
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /** Optimize a disjunction. */
-static struct expr *optimize_or_expr(const struct opt_state *state, struct expr *expr) {
-	assert(expr->eval == eval_or);
+static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct bfs_expr *expr) {
+	assert(expr->eval_fn == eval_or);
 
-	struct expr *lhs = expr->lhs;
-	struct expr *rhs = expr->rhs;
+	struct bfs_expr *lhs = expr->lhs;
+	struct bfs_expr *rhs = expr->rhs;
 
 	const struct bfs_ctx *ctx = state->ctx;
 	int optlevel = ctx->optlevel;
@@ -573,24 +574,24 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 		if (lhs->always_true) {
 			debug_opt(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs == &expr_false) {
+		} else if (lhs == &bfs_false) {
 			debug_opt(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
-		} else if (rhs == &expr_false) {
+		} else if (rhs == &bfs_false) {
 			debug_opt(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs->always_false && rhs == &expr_true) {
+		} else if (lhs->always_false && rhs == &bfs_true) {
 			bool debug = debug_opt(state, 1, "strength reduction: %pe <==> ", expr);
-			struct expr *ret = extract_child_expr(expr, &expr->lhs);
+			struct bfs_expr *ret = extract_child_expr(expr, &expr->lhs);
 			ret = negate_expr(ret, &fake_not_arg);
 			if (debug && ret) {
 				cfprintf(ctx->cerr, "%pe\n", ret);
 			}
 			return ret;
-		} else if (optlevel >= 2 && lhs->pure && rhs == &expr_true) {
+		} else if (optlevel >= 2 && lhs->pure && rhs == &bfs_true) {
 			debug_opt(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
 			return extract_child_expr(expr, &expr->rhs);
-		} else if (lhs->eval == eval_not && rhs->eval == eval_not) {
+		} else if (lhs->eval_fn == eval_not && rhs->eval_fn == eval_not) {
 			return de_morgan(state, expr, expr->lhs->argv);
 		}
 	}
@@ -605,7 +606,7 @@ static struct expr *optimize_or_expr(const struct opt_state *state, struct expr 
 }
 
 /** Optimize a disjunction recursively. */
-static struct expr *optimize_or_expr_recursive(struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *optimize_or_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
 	struct opt_state lhs_state = *state;
 	expr->lhs = optimize_expr_recursive(&lhs_state, expr->lhs);
 	if (!expr->lhs) {
@@ -625,21 +626,21 @@ static struct expr *optimize_or_expr_recursive(struct opt_state *state, struct e
 	return optimize_or_expr(state, expr);
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
 /** Optimize an expression in an ignored-result context. */
-static struct expr *ignore_result(const struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *ignore_result(const struct opt_state *state, struct bfs_expr *expr) {
 	int optlevel = state->ctx->optlevel;
 
 	if (optlevel >= 1) {
 		while (true) {
-			if (expr->eval == eval_not) {
+			if (expr->eval_fn == eval_not) {
 				debug_opt(state, 1, "ignored result: %pe --> %pe\n", expr, expr->rhs);
 				expr = extract_child_expr(expr, &expr->rhs);
 			} else if (optlevel >= 2
-			           && (expr->eval == eval_and || expr->eval == eval_or || expr->eval == eval_comma)
+			           && (expr->eval_fn == eval_and || expr->eval_fn == eval_or || expr->eval_fn == eval_comma)
 			           && expr->rhs->pure) {
 				debug_opt(state, 2, "ignored result: %pe --> %pe\n", expr, expr->lhs);
 				expr = extract_child_expr(expr, &expr->lhs);
@@ -648,10 +649,10 @@ static struct expr *ignore_result(const struct opt_state *state, struct expr *ex
 			}
 		}
 
-		if (optlevel >= 2 && expr->pure && expr != &expr_false) {
-			debug_opt(state, 2, "ignored result: %pe --> %pe\n", expr, &expr_false);
-			free_expr(expr);
-			expr = &expr_false;
+		if (optlevel >= 2 && expr->pure && expr != &bfs_false) {
+			debug_opt(state, 2, "ignored result: %pe --> %pe\n", expr, &bfs_false);
+			bfs_expr_free(expr);
+			expr = &bfs_false;
 		}
 	}
 
@@ -659,21 +660,21 @@ static struct expr *ignore_result(const struct opt_state *state, struct expr *ex
 }
 
 /** Optimize a comma expression. */
-static struct expr *optimize_comma_expr(const struct opt_state *state, struct expr *expr) {
-	assert(expr->eval == eval_comma);
+static struct bfs_expr *optimize_comma_expr(const struct opt_state *state, struct bfs_expr *expr) {
+	assert(expr->eval_fn == eval_comma);
 
-	struct expr *lhs = expr->lhs;
-	struct expr *rhs = expr->rhs;
+	struct bfs_expr *lhs = expr->lhs;
+	struct bfs_expr *rhs = expr->rhs;
 
 	int optlevel = state->ctx->optlevel;
 	if (optlevel >= 1) {
 		lhs = expr->lhs = ignore_result(state, lhs);
 
-		if (expr_never_returns(lhs)) {
+		if (bfs_expr_never_returns(lhs)) {
 			debug_opt(state, 1, "reachability: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
-		} else if ((lhs->always_true && rhs == &expr_true)
-			   || (lhs->always_false && rhs == &expr_false)) {
+		} else if ((lhs->always_true && rhs == &bfs_true)
+			   || (lhs->always_false && rhs == &bfs_false)) {
 			debug_opt(state, 1, "redundancy elimination: %pe <==> %pe\n", expr, lhs);
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (optlevel >= 2 && lhs->pure) {
@@ -683,8 +684,8 @@ static struct expr *optimize_comma_expr(const struct opt_state *state, struct ex
 	}
 
 	expr->pure = lhs->pure && rhs->pure;
-	expr->always_true = expr_never_returns(lhs) || rhs->always_true;
-	expr->always_false = expr_never_returns(lhs) || rhs->always_false;
+	expr->always_true = bfs_expr_never_returns(lhs) || rhs->always_true;
+	expr->always_false = bfs_expr_never_returns(lhs) || rhs->always_false;
 	expr->cost = lhs->cost + rhs->cost;
 	expr->probability = rhs->probability;
 
@@ -692,7 +693,7 @@ static struct expr *optimize_comma_expr(const struct opt_state *state, struct ex
 }
 
 /** Optimize a comma expression recursively. */
-static struct expr *optimize_comma_expr_recursive(struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *optimize_comma_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
 	struct opt_state lhs_state = *state;
 	expr->lhs = optimize_expr_recursive(&lhs_state, expr->lhs);
 	if (!expr->lhs) {
@@ -709,7 +710,7 @@ static struct expr *optimize_comma_expr_recursive(struct opt_state *state, struc
 	return optimize_comma_expr(state, expr);
 
 fail:
-	free_expr(expr);
+	bfs_expr_free(expr);
 	return NULL;
 }
 
@@ -720,38 +721,38 @@ static void infer_pred_facts(struct opt_state *state, enum pred_type pred) {
 }
 
 /** Infer data flow facts about an -{execut,read,writ}able expression. */
-static void infer_access_facts(struct opt_state *state, const struct expr *expr) {
-	if (expr->idata & R_OK) {
+static void infer_access_facts(struct opt_state *state, const struct bfs_expr *expr) {
+	if (expr->num & R_OK) {
 		infer_pred_facts(state, READABLE_PRED);
 	}
-	if (expr->idata & W_OK) {
+	if (expr->num & W_OK) {
 		infer_pred_facts(state, WRITABLE_PRED);
 	}
-	if (expr->idata & X_OK) {
+	if (expr->num & X_OK) {
 		infer_pred_facts(state, EXECUTABLE_PRED);
 	}
 }
 
 /** Infer data flow facts about an icmp-style ([+-]N) expression. */
-static void infer_icmp_facts(struct opt_state *state, const struct expr *expr, enum range_type type) {
+static void infer_icmp_facts(struct opt_state *state, const struct bfs_expr *expr, enum range_type type) {
 	struct range *range_when_true = &state->facts_when_true.ranges[type];
-	struct range *range_when_false =& state->facts_when_false.ranges[type];
-	long long value = expr->idata;
+	struct range *range_when_false = &state->facts_when_false.ranges[type];
+	long long value = expr->num;
 
-	switch (expr->cmp_flag) {
-	case CMP_EXACT:
+	switch (expr->int_cmp) {
+	case BFS_INT_EQUAL:
 		constrain_min(range_when_true, value);
 		constrain_max(range_when_true, value);
 		range_remove(range_when_false, value);
 		break;
 
-	case CMP_LESS:
+	case BFS_INT_LESS:
 		constrain_min(range_when_false, value);
 		constrain_max(range_when_true, value);
 		range_remove(range_when_true, value);
 		break;
 
-	case CMP_GREATER:
+	case BFS_INT_GREATER:
 		constrain_max(range_when_false, value);
 		constrain_min(range_when_true, value);
 		range_remove(range_when_true, value);
@@ -760,7 +761,7 @@ static void infer_icmp_facts(struct opt_state *state, const struct expr *expr, e
 }
 
 /** Infer data flow facts about a -gid expression. */
-static void infer_gid_facts(struct opt_state *state, const struct expr *expr) {
+static void infer_gid_facts(struct opt_state *state, const struct bfs_expr *expr) {
 	infer_icmp_facts(state, expr, GID_RANGE);
 
 	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
@@ -773,7 +774,7 @@ static void infer_gid_facts(struct opt_state *state, const struct expr *expr) {
 }
 
 /** Infer data flow facts about a -uid expression. */
-static void infer_uid_facts(struct opt_state *state, const struct expr *expr) {
+static void infer_uid_facts(struct opt_state *state, const struct bfs_expr *expr) {
 	infer_icmp_facts(state, expr, UID_RANGE);
 
 	const struct bfs_users *users = bfs_ctx_users(state->ctx);
@@ -786,84 +787,84 @@ static void infer_uid_facts(struct opt_state *state, const struct expr *expr) {
 }
 
 /** Infer data flow facts about a -samefile expression. */
-static void infer_samefile_facts(struct opt_state *state, const struct expr *expr) {
+static void infer_samefile_facts(struct opt_state *state, const struct bfs_expr *expr) {
 	struct range *range_when_true = &state->facts_when_true.ranges[INUM_RANGE];
 	constrain_min(range_when_true, expr->ino);
 	constrain_max(range_when_true, expr->ino);
 }
 
 /** Infer data flow facts about a -type expression. */
-static void infer_type_facts(struct opt_state *state, const struct expr *expr) {
-	state->facts_when_true.types &= expr->idata;
-	state->facts_when_false.types &= ~expr->idata;
+static void infer_type_facts(struct opt_state *state, const struct bfs_expr *expr) {
+	state->facts_when_true.types &= expr->num;
+	state->facts_when_false.types &= ~expr->num;
 }
 
 /** Infer data flow facts about an -xtype expression. */
-static void infer_xtype_facts(struct opt_state *state, const struct expr *expr) {
-	state->facts_when_true.xtypes &= expr->idata;
-	state->facts_when_false.xtypes &= ~expr->idata;
+static void infer_xtype_facts(struct opt_state *state, const struct bfs_expr *expr) {
+	state->facts_when_true.xtypes &= expr->num;
+	state->facts_when_false.xtypes &= ~expr->num;
 }
 
-static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
 	int optlevel = state->ctx->optlevel;
 
 	state->facts_when_true = state->facts;
 	state->facts_when_false = state->facts;
 
 	if (optlevel >= 2 && facts_are_impossible(&state->facts)) {
-		debug_opt(state, 2, "reachability: %pe --> %pe\n", expr, &expr_false);
-		free_expr(expr);
-		expr = &expr_false;
+		debug_opt(state, 2, "reachability: %pe --> %pe\n", expr, &bfs_false);
+		bfs_expr_free(expr);
+		expr = &bfs_false;
 		goto done;
 	}
 
-	if (!expr->rhs && !expr->pure) {
+	if (!bfs_expr_has_children(expr) && !expr->pure) {
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
-	if (expr->eval == eval_access) {
+	if (expr->eval_fn == eval_access) {
 		infer_access_facts(state, expr);
-	} else if (expr->eval == eval_acl) {
+	} else if (expr->eval_fn == eval_acl) {
 		infer_pred_facts(state, ACL_PRED);
-	} else if (expr->eval == eval_capable) {
+	} else if (expr->eval_fn == eval_capable) {
 		infer_pred_facts(state, CAPABLE_PRED);
-	} else if (expr->eval == eval_depth) {
+	} else if (expr->eval_fn == eval_depth) {
 		infer_icmp_facts(state, expr, DEPTH_RANGE);
-	} else if (expr->eval == eval_empty) {
+	} else if (expr->eval_fn == eval_empty) {
 		infer_pred_facts(state, EMPTY_PRED);
-	} else if (expr->eval == eval_gid) {
+	} else if (expr->eval_fn == eval_gid) {
 		infer_gid_facts(state, expr);
-	} else if (expr->eval == eval_hidden) {
+	} else if (expr->eval_fn == eval_hidden) {
 		infer_pred_facts(state, HIDDEN_PRED);
-	} else if (expr->eval == eval_inum) {
+	} else if (expr->eval_fn == eval_inum) {
 		infer_icmp_facts(state, expr, INUM_RANGE);
-	} else if (expr->eval == eval_links) {
+	} else if (expr->eval_fn == eval_links) {
 		infer_icmp_facts(state, expr, LINKS_RANGE);
-	} else if (expr->eval == eval_nogroup) {
+	} else if (expr->eval_fn == eval_nogroup) {
 		infer_pred_facts(state, NOGROUP_PRED);
-	} else if (expr->eval == eval_nouser) {
+	} else if (expr->eval_fn == eval_nouser) {
 		infer_pred_facts(state, NOUSER_PRED);
-	} else if (expr->eval == eval_samefile) {
+	} else if (expr->eval_fn == eval_samefile) {
 		infer_samefile_facts(state, expr);
-	} else if (expr->eval == eval_size) {
+	} else if (expr->eval_fn == eval_size) {
 		infer_icmp_facts(state, expr, SIZE_RANGE);
-	} else if (expr->eval == eval_sparse) {
+	} else if (expr->eval_fn == eval_sparse) {
 		infer_pred_facts(state, SPARSE_PRED);
-	} else if (expr->eval == eval_type) {
+	} else if (expr->eval_fn == eval_type) {
 		infer_type_facts(state, expr);
-	} else if (expr->eval == eval_uid) {
+	} else if (expr->eval_fn == eval_uid) {
 		infer_uid_facts(state, expr);
-	} else if (expr->eval == eval_xattr) {
+	} else if (expr->eval_fn == eval_xattr) {
 		infer_pred_facts(state, XATTR_PRED);
-	} else if (expr->eval == eval_xtype) {
+	} else if (expr->eval_fn == eval_xtype) {
 		infer_xtype_facts(state, expr);
-	} else if (expr->eval == eval_not) {
+	} else if (expr->eval_fn == eval_not) {
 		expr = optimize_not_expr_recursive(state, expr);
-	} else if (expr->eval == eval_and) {
+	} else if (expr->eval_fn == eval_and) {
 		expr = optimize_and_expr_recursive(state, expr);
-	} else if (expr->eval == eval_or) {
+	} else if (expr->eval_fn == eval_or) {
 		expr = optimize_or_expr_recursive(state, expr);
-	} else if (expr->eval == eval_comma) {
+	} else if (expr->eval_fn == eval_comma) {
 		expr = optimize_comma_expr_recursive(state, expr);
 	}
 
@@ -871,16 +872,18 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		goto done;
 	}
 
-	struct expr *lhs = expr->lhs;
-	struct expr *rhs = expr->rhs;
-	if (rhs) {
-		expr->persistent_fds = rhs->persistent_fds;
-		expr->ephemeral_fds = rhs->ephemeral_fds;
-	}
-	if (lhs) {
-		expr->persistent_fds += lhs->persistent_fds;
-		if (lhs->ephemeral_fds > expr->ephemeral_fds) {
-			expr->ephemeral_fds = lhs->ephemeral_fds;
+	if (bfs_expr_has_children(expr)) {
+		struct bfs_expr *lhs = expr->lhs;
+		struct bfs_expr *rhs = expr->rhs;
+		if (rhs) {
+			expr->persistent_fds = rhs->persistent_fds;
+			expr->ephemeral_fds = rhs->ephemeral_fds;
+		}
+		if (lhs) {
+			expr->persistent_fds += lhs->persistent_fds;
+			if (lhs->ephemeral_fds > expr->ephemeral_fds) {
+				expr->ephemeral_fds = lhs->ephemeral_fds;
+			}
 		}
 	}
 
@@ -891,24 +894,24 @@ static struct expr *optimize_expr_recursive(struct opt_state *state, struct expr
 		set_facts_impossible(&state->facts_when_true);
 	}
 
-	if (optlevel < 2 || expr == &expr_true || expr == &expr_false) {
+	if (optlevel < 2 || expr == &bfs_true || expr == &bfs_false) {
 		goto done;
 	}
 
 	if (facts_are_impossible(&state->facts_when_true)) {
 		if (expr->pure) {
-			debug_opt(state, 2, "data flow: %pe --> %pe\n", expr, &expr_false);
-			free_expr(expr);
-			expr = &expr_false;
+			debug_opt(state, 2, "data flow: %pe --> %pe\n", expr, &bfs_false);
+			bfs_expr_free(expr);
+			expr = &bfs_false;
 		} else {
 			expr->always_false = true;
 			expr->probability = 0.0;
 		}
 	} else if (facts_are_impossible(&state->facts_when_false)) {
 		if (expr->pure) {
-			debug_opt(state, 2, "data flow: %pe --> %pe\n", expr, &expr_true);
-			free_expr(expr);
-			expr = &expr_true;
+			debug_opt(state, 2, "data flow: %pe --> %pe\n", expr, &bfs_true);
+			bfs_expr_free(expr);
+			expr = &bfs_true;
 		} else {
 			expr->always_true = true;
 			expr->probability = 1.0;
@@ -920,10 +923,10 @@ done:
 }
 
 /** Swap the children of a binary expression if it would reduce the cost. */
-static bool reorder_expr(const struct opt_state *state, struct expr *expr, double swapped_cost) {
+static bool reorder_expr(const struct opt_state *state, struct bfs_expr *expr, double swapped_cost) {
 	if (swapped_cost < expr->cost) {
 		bool debug = debug_opt(state, 3, "cost: %pe <==> ", expr);
-		struct expr *lhs = expr->lhs;
+		struct bfs_expr *lhs = expr->lhs;
 		expr->lhs = expr->rhs;
 		expr->rhs = lhs;
 		if (debug) {
@@ -944,11 +947,15 @@ static bool reorder_expr(const struct opt_state *state, struct expr *expr, doubl
  * @return
  *         Whether any subexpression was reordered.
  */
-static bool reorder_expr_recursive(const struct opt_state *state, struct expr *expr) {
-	bool ret = false;
-	struct expr *lhs = expr->lhs;
-	struct expr *rhs = expr->rhs;
+static bool reorder_expr_recursive(const struct opt_state *state, struct bfs_expr *expr) {
+	if (!bfs_expr_has_children(expr)) {
+		return false;
+	}
 
+	struct bfs_expr *lhs = expr->lhs;
+	struct bfs_expr *rhs = expr->rhs;
+
+	bool ret = false;
 	if (lhs) {
 		ret |= reorder_expr_recursive(state, lhs);
 	}
@@ -956,9 +963,9 @@ static bool reorder_expr_recursive(const struct opt_state *state, struct expr *e
 		ret |= reorder_expr_recursive(state, rhs);
 	}
 
-	if (expr->eval == eval_and || expr->eval == eval_or) {
+	if (expr->eval_fn == eval_and || expr->eval_fn == eval_or) {
 		if (lhs->pure && rhs->pure) {
-			double rhs_prob = expr->eval == eval_and ? rhs->probability : 1.0 - rhs->probability;
+			double rhs_prob = expr->eval_fn == eval_and ? rhs->probability : 1.0 - rhs->probability;
 			double swapped_cost = rhs->cost + rhs_prob*lhs->cost;
 			ret |= reorder_expr(state, expr, swapped_cost);
 		}
@@ -970,7 +977,7 @@ static bool reorder_expr_recursive(const struct opt_state *state, struct expr *e
 /**
  * Optimize a top-level expression.
  */
-static struct expr *optimize_expr(struct opt_state *state, struct expr *expr) {
+static struct bfs_expr *optimize_expr(struct opt_state *state, struct bfs_expr *expr) {
 	struct opt_facts saved_impure = *state->facts_when_impure;
 
 	expr = optimize_expr_recursive(state, expr);

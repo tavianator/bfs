@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -868,12 +868,18 @@ BFS_FORMATTER(2, 3)
 static int cbuff(CFILE *cfile, const char *format, ...);
 
 /** Dump a parsed expression tree, for debugging. */
-static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
+static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 	if (dstrcat(&cfile->buffer, "(") != 0) {
 		return -1;
 	}
 
-	if (expr->lhs || expr->rhs) {
+	const struct bfs_expr *lhs = NULL;
+	const struct bfs_expr *rhs = NULL;
+
+	if (bfs_expr_has_children(expr)) {
+		lhs = expr->lhs;
+		rhs = expr->rhs;
+
 		if (cbuff(cfile, "${red}%s${rs}", expr->argv[0]) < 0) {
 			return -1;
 		}
@@ -901,20 +907,20 @@ static int print_expr(CFILE *cfile, const struct expr *expr, bool verbose) {
 		}
 	}
 
-	if (expr->lhs) {
+	if (lhs) {
 		if (dstrcat(&cfile->buffer, " ") != 0) {
 			return -1;
 		}
-		if (print_expr(cfile, expr->lhs, verbose) != 0) {
+		if (print_expr(cfile, lhs, verbose) != 0) {
 			return -1;
 		}
 	}
 
-	if (expr->rhs) {
+	if (rhs) {
 		if (dstrcat(&cfile->buffer, " ") != 0) {
 			return -1;
 		}
-		if (print_expr(cfile, expr->rhs, verbose) != 0) {
+		if (print_expr(cfile, rhs, verbose) != 0) {
 			return -1;
 		}
 	}
@@ -1007,12 +1013,12 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 					break;
 
 				case 'e':
-					if (print_expr(cfile, va_arg(args, const struct expr *), false) != 0) {
+					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), false) != 0) {
 						return -1;
 					}
 					break;
 				case 'E':
-					if (print_expr(cfile, va_arg(args, const struct expr *), true) != 0) {
+					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), true) != 0) {
 						return -1;
 					}
 					break;

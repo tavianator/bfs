@@ -62,9 +62,9 @@ struct bfs_ctx {
 	/** The root paths. */
 	const char **paths;
 	/** The main command line expression. */
-	struct expr *expr;
+	struct bfs_expr *expr;
 	/** An expression for files to filter out. */
-	struct expr *exclude;
+	struct bfs_expr *exclude;
 
 	/** -mindepth option. */
 	int mindepth;

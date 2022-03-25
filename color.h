@@ -103,8 +103,8 @@ int cfclose(CFILE *cfile);
  *         %pF: A colored file name, from a const struct BFTW * argument
  *         %pP: A colored file path, from a const struct BFTW * argument
  *         %pL: A colored link target, from a const struct BFTW * argument
- *         %pe: Dump a const struct expr *, for debugging.
- *         %pE: Dump a const struct expr * in verbose form, for debugging.
+ *         %pe: Dump a const struct bfs_expr *, for debugging.
+ *         %pE: Dump a const struct bfs_expr * in verbose form, for debugging.
  *         %%: A literal '%'
  *         ${cc}: Change the color to 'cc'
  *         $$: A literal '$'
