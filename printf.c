@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2021 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -18,6 +18,7 @@
 #include "bftw.h"
 #include "color.h"
 #include "ctx.h"
+#include "darray.h"
 #include "diag.h"
 #include "dir.h"
 #include "dstring.h"
@@ -37,8 +38,15 @@
 #include <string.h>
 #include <time.h>
 
+/**
+ * A function implementing a printf directive.
+ */
 typedef int bfs_printf_fn(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf);
 
+/**
+ * A single printf directive like %f or %#4m.  The whole format string is stored
+ * as a darray of these.
+ */
 struct bfs_printf {
 	/** The printing function to invoke. */
 	bfs_printf_fn *fn;
@@ -50,8 +58,6 @@ struct bfs_printf {
 	char c;
 	/** Some data used by the directive. */
 	const void *ptr;
-	/** The next printf directive in the chain. */
-	struct bfs_printf *next;
 };
 
 /** Print some text as-is. */
@@ -537,70 +543,54 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_printf *directive, const 
 }
 
 /**
- * Free a printf directive.
+ * Append a literal string to the chain.
  */
-static void free_directive(struct bfs_printf *directive) {
-	if (directive) {
-		dstrfree(directive->str);
-		free(directive);
-	}
-}
-
-/**
- * Create a new printf directive.
- */
-static struct bfs_printf *new_directive(const struct bfs_ctx *ctx, bfs_printf_fn *fn) {
-	struct bfs_printf *directive = malloc(sizeof(*directive));
-	if (!directive) {
-		bfs_perror(ctx, "malloc()");
-		goto error;
+static int append_literal(const struct bfs_ctx *ctx, struct bfs_printf **format, char **literal) {
+	if (dstrlen(*literal) == 0) {
+		return 0;
 	}
 
-	directive->fn = fn;
-	directive->str = dstralloc(2);
-	if (!directive->str) {
+	struct bfs_printf directive = {
+		.fn = bfs_printf_literal,
+		.str = *literal,
+	};
+
+	if (DARRAY_PUSH(format, &directive) != 0) {
+		bfs_perror(ctx, "DARRAY_PUSH()");
+		return -1;
+	}
+
+	*literal = dstralloc(0);
+	if (!*literal) {
 		bfs_perror(ctx, "dstralloc()");
-		goto error;
+		return -1;
 	}
-	directive->stat_field = 0;
-	directive->c = 0;
-	directive->ptr = NULL;
-	directive->next = NULL;
-	return directive;
 
-error:
-	free_directive(directive);
-	return NULL;
+	return 0;
 }
 
 /**
  * Append a printf directive to the chain.
  */
-static struct bfs_printf **append_directive(struct bfs_printf **tail, struct bfs_printf *directive) {
-	assert(directive);
-	*tail = directive;
-	return &directive->next;
-}
-
-/**
- * Append a literal string to the chain.
- */
-static struct bfs_printf **append_literal(struct bfs_printf **tail, struct bfs_printf **literal) {
-	struct bfs_printf *directive = *literal;
-	if (directive && dstrlen(directive->str) > 0) {
-		*literal = NULL;
-		return append_directive(tail, directive);
-	} else {
-		return tail;
+static int append_directive(const struct bfs_ctx *ctx, struct bfs_printf **format, char **literal, struct bfs_printf *directive) {
+	if (append_literal(ctx, format, literal) != 0) {
+		return -1;
 	}
+
+	if (DARRAY_PUSH(format, directive) != 0) {
+		bfs_perror(ctx, "DARRAY_PUSH()");
+		return -1;
+	}
+
+	return 0;
 }
 
 struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *format) {
-	struct bfs_printf *head = NULL;
-	struct bfs_printf **tail = &head;
+	struct bfs_printf *ret = NULL;
 
-	struct bfs_printf *literal = new_directive(ctx, bfs_printf_literal);
+	char *literal = dstralloc(0);
 	if (!literal) {
+		bfs_perror(ctx, "dstralloc()");
 		goto error;
 	}
 
@@ -631,13 +621,15 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 			case '\\': c = '\\'; break;
 
 			case 'c':
-				tail = append_literal(tail, &literal);
-				struct bfs_printf *directive = new_directive(ctx, bfs_printf_flush);
-				if (!directive) {
-					goto error;
+				{
+					struct bfs_printf directive = {
+						.fn = bfs_printf_flush,
+					};
+					if (append_directive(ctx, &ret, &literal, &directive) != 0) {
+						goto error;
+					}
+					goto done;
 				}
-				tail = append_directive(tail, directive);
-				goto done;
 
 			case '\0':
 				bfs_error(ctx, "'%s': Incomplete escape sequence '\\'.\n", format);
@@ -653,11 +645,13 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 				goto one_char;
 			}
 
-			struct bfs_printf *directive = new_directive(ctx, NULL);
-			if (!directive) {
+			struct bfs_printf directive = {
+				.str = dstralloc(2),
+			};
+			if (!directive.str) {
 				goto directive_error;
 			}
-			if (dstrapp(&directive->str, c) != 0) {
+			if (dstrapp(&directive.str, c) != 0) {
 				bfs_perror(ctx, "dstrapp()");
 				goto directive_error;
 			}
@@ -677,11 +671,11 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 					BFS_FALLTHROUGH;
 				case ' ':
 				case '-':
-					if (strchr(directive->str, c)) {
+					if (strchr(directive.str, c)) {
 						bfs_error(ctx, "'%s': Duplicate flag '%c'.\n", format, c);
 						goto directive_error;
 					}
-					if (dstrapp(&directive->str, c) != 0) {
+					if (dstrapp(&directive.str, c) != 0) {
 						bfs_perror(ctx, "dstrapp()");
 						goto directive_error;
 					}
@@ -693,7 +687,7 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 
 			// Parse the field width
 			while (c >= '0' && c <= '9') {
-				if (dstrapp(&directive->str, c) != 0) {
+				if (dstrapp(&directive.str, c) != 0) {
 					bfs_perror(ctx, "dstrapp()");
 					goto directive_error;
 				}
@@ -703,7 +697,7 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 			// Parse the precision
 			if (c == '.') {
 				do {
-					if (dstrapp(&directive->str, c) != 0) {
+					if (dstrapp(&directive.str, c) != 0) {
 						bfs_perror(ctx, "dstrapp()");
 						goto directive_error;
 					}
@@ -713,131 +707,131 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 
 			switch (c) {
 			case 'a':
-				directive->fn = bfs_printf_ctime;
-				directive->stat_field = BFS_STAT_ATIME;
+				directive.fn = bfs_printf_ctime;
+				directive.stat_field = BFS_STAT_ATIME;
 				break;
 			case 'b':
-				directive->fn = bfs_printf_b;
+				directive.fn = bfs_printf_b;
 				break;
 			case 'c':
-				directive->fn = bfs_printf_ctime;
-				directive->stat_field = BFS_STAT_CTIME;
+				directive.fn = bfs_printf_ctime;
+				directive.stat_field = BFS_STAT_CTIME;
 				break;
 			case 'd':
-				directive->fn = bfs_printf_d;
+				directive.fn = bfs_printf_d;
 				specifier = "jd";
 				break;
 			case 'D':
-				directive->fn = bfs_printf_D;
+				directive.fn = bfs_printf_D;
 				break;
 			case 'f':
-				directive->fn = bfs_printf_f;
+				directive.fn = bfs_printf_f;
 				break;
 			case 'F':
-				directive->ptr = bfs_ctx_mtab(ctx);
-				if (!directive->ptr) {
+				directive.ptr = bfs_ctx_mtab(ctx);
+				if (!directive.ptr) {
 					bfs_error(ctx, "Couldn't parse the mount table: %m.\n");
 					goto directive_error;
 				}
-				directive->fn = bfs_printf_F;
+				directive.fn = bfs_printf_F;
 				break;
 			case 'g':
-				directive->ptr = bfs_ctx_groups(ctx);
-				if (!directive->ptr) {
+				directive.ptr = bfs_ctx_groups(ctx);
+				if (!directive.ptr) {
 					bfs_error(ctx, "Couldn't parse the group table: %m.\n");
 					goto directive_error;
 				}
-				directive->fn = bfs_printf_g;
+				directive.fn = bfs_printf_g;
 				break;
 			case 'G':
-				directive->fn = bfs_printf_G;
+				directive.fn = bfs_printf_G;
 				break;
 			case 'h':
-				directive->fn = bfs_printf_h;
+				directive.fn = bfs_printf_h;
 				break;
 			case 'H':
-				directive->fn = bfs_printf_H;
+				directive.fn = bfs_printf_H;
 				break;
 			case 'i':
-				directive->fn = bfs_printf_i;
+				directive.fn = bfs_printf_i;
 				break;
 			case 'k':
-				directive->fn = bfs_printf_k;
+				directive.fn = bfs_printf_k;
 				break;
 			case 'l':
-				directive->fn = bfs_printf_l;
+				directive.fn = bfs_printf_l;
 				break;
 			case 'm':
-				directive->fn = bfs_printf_m;
+				directive.fn = bfs_printf_m;
 				specifier = "o";
 				break;
 			case 'M':
-				directive->fn = bfs_printf_M;
+				directive.fn = bfs_printf_M;
 				break;
 			case 'n':
-				directive->fn = bfs_printf_n;
+				directive.fn = bfs_printf_n;
 				break;
 			case 'p':
-				directive->fn = bfs_printf_p;
+				directive.fn = bfs_printf_p;
 				break;
 			case 'P':
-				directive->fn = bfs_printf_P;
+				directive.fn = bfs_printf_P;
 				break;
 			case 's':
-				directive->fn = bfs_printf_s;
+				directive.fn = bfs_printf_s;
 				break;
 			case 'S':
-				directive->fn = bfs_printf_S;
+				directive.fn = bfs_printf_S;
 				specifier = "g";
 				break;
 			case 't':
-				directive->fn = bfs_printf_ctime;
-				directive->stat_field = BFS_STAT_MTIME;
+				directive.fn = bfs_printf_ctime;
+				directive.stat_field = BFS_STAT_MTIME;
 				break;
 			case 'u':
-				directive->ptr = bfs_ctx_users(ctx);
-				if (!directive->ptr) {
+				directive.ptr = bfs_ctx_users(ctx);
+				if (!directive.ptr) {
 					bfs_error(ctx, "Couldn't parse the user table: %m.\n");
 					goto directive_error;
 				}
-				directive->fn = bfs_printf_u;
+				directive.fn = bfs_printf_u;
 				break;
 			case 'U':
-				directive->fn = bfs_printf_U;
+				directive.fn = bfs_printf_U;
 				break;
 			case 'w':
-				directive->fn = bfs_printf_ctime;
-				directive->stat_field = BFS_STAT_BTIME;
+				directive.fn = bfs_printf_ctime;
+				directive.stat_field = BFS_STAT_BTIME;
 				break;
 			case 'y':
-				directive->fn = bfs_printf_y;
+				directive.fn = bfs_printf_y;
 				break;
 			case 'Y':
-				directive->fn = bfs_printf_Y;
+				directive.fn = bfs_printf_Y;
 				break;
 
 			case 'A':
-				directive->stat_field = BFS_STAT_ATIME;
+				directive.stat_field = BFS_STAT_ATIME;
 				goto directive_strftime;
 			case 'B':
 			case 'W':
-				directive->stat_field = BFS_STAT_BTIME;
+				directive.stat_field = BFS_STAT_BTIME;
 				goto directive_strftime;
 			case 'C':
-				directive->stat_field = BFS_STAT_CTIME;
+				directive.stat_field = BFS_STAT_CTIME;
 				goto directive_strftime;
 			case 'T':
-				directive->stat_field = BFS_STAT_MTIME;
+				directive.stat_field = BFS_STAT_MTIME;
 				goto directive_strftime;
 
 			directive_strftime:
-				directive->fn = bfs_printf_strftime;
+				directive.fn = bfs_printf_strftime;
 				c = *++i;
 				if (!c) {
-					bfs_error(ctx, "'%s': Incomplete time specifier '%s%c'.\n", format, directive->str, i[-1]);
+					bfs_error(ctx, "'%s': Incomplete time specifier '%s%c'.\n", format, directive.str, i[-1]);
 					goto directive_error;
 				} else if (strchr("%+@aAbBcCdDeFgGhHIjklmMnprRsStTuUVwWxXyYzZ", c)) {
-					directive->c = c;
+					directive.c = c;
 				} else {
 					bfs_error(ctx, "'%s': Unrecognized time specifier '%%%c%c'.\n", format, i[-1], c);
 					goto directive_error;
@@ -845,7 +839,7 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 				break;
 
 			case '\0':
-				bfs_error(ctx, "'%s': Incomplete format specifier '%s'.\n", format, directive->str);
+				bfs_error(ctx, "'%s': Incomplete format specifier '%s'.\n", format, directive.str);
 				goto directive_error;
 
 			default:
@@ -854,58 +848,59 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 			}
 
 			if (must_be_numeric && strcmp(specifier, "s") == 0) {
-				bfs_error(ctx, "'%s': Invalid flags '%s' for string format '%%%c'.\n", format, directive->str + 1, c);
+				bfs_error(ctx, "'%s': Invalid flags '%s' for string format '%%%c'.\n", format, directive.str + 1, c);
 				goto directive_error;
 			}
 
-			if (dstrcat(&directive->str, specifier) != 0) {
+			if (dstrcat(&directive.str, specifier) != 0) {
 				bfs_perror(ctx, "dstrcat()");
 				goto directive_error;
 			}
 
-			tail = append_literal(tail, &literal);
-			tail = append_directive(tail, directive);
-
-			if (!literal) {
-				literal = new_directive(ctx, bfs_printf_literal);
-				if (!literal) {
-					goto error;
-				}
+			if (append_directive(ctx, &ret, &literal, &directive) != 0) {
+				goto directive_error;
 			}
 
 			continue;
 
 		directive_error:
-			free_directive(directive);
+			dstrfree(directive.str);
 			goto error;
 		}
 
 	one_char:
-		if (dstrapp(&literal->str, c) != 0) {
+		if (dstrapp(&literal, c) != 0) {
 			bfs_perror(ctx, "dstrapp()");
 			goto error;
 		}
 	}
 
 done:
-	tail = append_literal(tail, &literal);
-	if (head) {
-		free_directive(literal);
-		return head;
+	if (!ret || dstrlen(literal) > 0) {
+		struct bfs_printf directive = {
+			.fn = bfs_printf_literal,
+			.str = literal,
+		};
+		if (DARRAY_PUSH(&ret, &directive) != 0) {
+			bfs_perror(ctx, "DARRAY_PUSH()");
+			goto error;
+		}
 	} else {
-		return literal;
+		dstrfree(literal);
 	}
+	return ret;
 
 error:
-	free_directive(literal);
-	bfs_printf_free(head);
+	dstrfree(literal);
+	bfs_printf_free(ret);
 	return NULL;
 }
 
 int bfs_printf(CFILE *cfile, const struct bfs_printf *format, const struct BFTW *ftwbuf) {
 	int ret = 0, error = 0;
 
-	for (const struct bfs_printf *directive = format; directive; directive = directive->next) {
+	for (size_t i = 0; i < darray_length(format); ++i) {
+		const struct bfs_printf *directive = &format[i];
 		if (directive->fn(cfile, directive, ftwbuf) < 0) {
 			ret = -1;
 			error = errno;
@@ -917,9 +912,8 @@ int bfs_printf(CFILE *cfile, const struct bfs_printf *format, const struct BFTW 
 }
 
 void bfs_printf_free(struct bfs_printf *format) {
-	while (format) {
-		struct bfs_printf *next = format->next;
-		free_directive(format);
-		format = next;
+	for (size_t i = 0; i < darray_length(format); ++i) {
+		dstrfree(format[i].str);
 	}
+	darray_free(format);
 }
