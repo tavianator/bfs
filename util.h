@@ -208,6 +208,16 @@ int xfaccessat(int fd, const char *path, int amode);
 int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear);
 
 /**
+ * wcswidth() variant that works on narrow strings.
+ *
+ * @param str
+ *         The string to measure.
+ * @return
+ *         The likely width of that string in a terminal.
+ */
+size_t xstrwidth(const char *str);
+
+/**
  * Return whether an error code is due to a path not existing.
  */
 bool is_nonexistence_error(int error);

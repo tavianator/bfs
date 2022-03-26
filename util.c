@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <wchar.h>
 
 #if BFS_HAS_SYS_PARAM
 #	include <sys/param.h>
@@ -250,6 +251,41 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 	errno = ENOTSUP;
 	return -1;
 #endif
+}
+
+size_t xstrwidth(const char *str) {
+	size_t len = strlen(str);
+	size_t ret = 0;
+
+	mbstate_t mb;
+	memset(&mb, 0, sizeof(mb));
+
+	while (len > 0) {
+		wchar_t wc;
+		size_t mblen = mbrtowc(&wc, str, len, &mb);
+		int cwidth;
+		if (mblen == (size_t)-1) {
+			// Invalid byte sequence, assume a single-width '?'
+			mblen = 1;
+			cwidth = 1;
+			memset(&mb, 0, sizeof(mb));
+		} else if (mblen == (size_t)-2) {
+			// Incomplete byte sequence, assume a single-width '?'
+			mblen = len;
+			cwidth = 1;
+		} else {
+			cwidth = wcwidth(wc);
+			if (cwidth < 0) {
+				cwidth = 0;
+			}
+		}
+
+		str += mblen;
+		len -= mblen;
+		ret += cwidth;
+	}
+
+	return ret;
 }
 
 bool is_nonexistence_error(int error) {
