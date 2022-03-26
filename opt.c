@@ -335,75 +335,14 @@ static bool opt_debug(const struct opt_state *state, int level, const char *form
 }
 
 /** Warn about an expression. */
-static void opt_vwarning(const struct opt_state *state, const struct bfs_expr *expr, const char *format, va_list args) {
-	if (bfs_expr_has_children(expr)) {
-		if (expr->lhs) {
-			va_list copy;
-			va_copy(copy, args);
-			opt_vwarning(state, expr->lhs, format, copy);
-			va_end(copy);
-		}
-
-		if (expr->rhs) {
-			opt_vwarning(state, expr->rhs, format, args);
-		}
-
-		return;
-	}
-
-	if (expr->synthetic) {
-		return;
-	}
-
-	const struct bfs_ctx *ctx = state->ctx;
-	if (!bfs_warning_prefix(ctx)) {
-		return;
-	}
-
-	size_t offset = 0;
-	size_t start = SIZE_MAX, end = SIZE_MAX;
-	for (size_t i = 0; ctx->argv[i]; ++i) {
-		if (i > 0) {
-			cfprintf(ctx->cerr, " ");
-			offset += 1;
-		}
-
-		if (expr->argv == &ctx->argv[i]) {
-			start = offset;
-		}
-
-		cfprintf(ctx->cerr, "%s", ctx->argv[i]);
-		offset += strlen(ctx->argv[i]);
-
-		if (&expr->argv[expr->argc - 1] == &ctx->argv[i]) {
-			end = offset;
-		}
-	}
-	cfprintf(ctx->cerr, "\n");
-
-	assert(start <= offset);
-	assert(end <= offset);
-
-	bfs_warning_prefix(ctx);
-	for (size_t i = 0; i < end; ++i) {
-		if (i < start) {
-			fputc(' ', stderr);
-		} else {
-			fputc('~', stderr);
-		}
-	}
-	fputc('\n', stderr);
-
-	bfs_vwarning(ctx, format, args);
-}
-
-/** Warn about an expression. */
 BFS_FORMATTER(3, 4)
 static void opt_warning(const struct opt_state *state, const struct bfs_expr *expr, const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-	opt_vwarning(state, expr, format, args);
-	va_end(args);
+	if (bfs_expr_warning(state->ctx, expr)) {
+		va_list args;
+		va_start(args, format);
+		bfs_warning(state->ctx, format, args);
+		va_end(args);
+	}
 }
 
 /** Extract a child expression, freeing the outer expression. */
@@ -426,6 +365,10 @@ static struct bfs_expr *negate_expr(struct bfs_expr *rhs, char **argv) {
 	if (!expr) {
 		bfs_expr_free(rhs);
 		return NULL;
+	}
+
+	if (argv == &fake_not_arg) {
+		expr->synthetic = true;
 	}
 
 	expr->lhs = NULL;
@@ -462,6 +405,7 @@ static struct bfs_expr *de_morgan(const struct opt_state *state, struct bfs_expr
 		expr->eval_fn = eval_and;
 		expr->argv = &fake_and_arg;
 	}
+	expr->synthetic = true;
 
 	expr->lhs = negate_expr(expr->lhs, argv);
 	expr->rhs = negate_expr(expr->rhs, argv);

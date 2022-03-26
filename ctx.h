@@ -57,8 +57,11 @@ const char *debug_flag_name(enum debug_flags flag);
  * The execution context for bfs.
  */
 struct bfs_ctx {
+	/** The number of command line arguments. */
+	size_t argc;
 	/** The unparsed command line arguments. */
 	char **argv;
+
 	/** The root paths. */
 	const char **paths;
 	/** The main command line expression. */

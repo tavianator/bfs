@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -17,7 +17,9 @@
 #include "diag.h"
 #include "ctx.h"
 #include "color.h"
+#include "expr.h"
 #include "util.h"
+#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 
@@ -101,4 +103,129 @@ bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag) {
 	} else {
 		return false;
 	}
+}
+
+/** Recursive part of highlight_expr(). */
+static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs_expr *expr, bool *args) {
+	if (!expr) {
+		return false;
+	}
+
+	bool ret = false;
+
+	if (!expr->synthetic) {
+		size_t i = expr->argv - ctx->argv;
+		for (size_t j = 0; j < expr->argc; ++j) {
+			assert(i + j < ctx->argc);
+			args[i + j] = true;
+			ret = true;
+		}
+	}
+
+	if (bfs_expr_has_children(expr)) {
+		ret |= highlight_expr_recursive(ctx, expr->lhs, args);
+		ret |= highlight_expr_recursive(ctx, expr->rhs, args);
+	}
+
+	return ret;
+}
+
+/** Highlight an expression in the command line. */
+static bool highlight_expr(const struct bfs_ctx *ctx, const struct bfs_expr *expr, bool *args) {
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		args[i] = false;
+	}
+
+	return highlight_expr_recursive(ctx, expr, args);
+}
+
+/** Print a hilighted portion of the command line. */
+static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warning) {
+	if (warning) {
+		bfs_warning_prefix(ctx);
+	} else {
+		bfs_error_prefix(ctx);
+	}
+
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		if (i > 0) {
+			cfprintf(ctx->cerr, " ");
+		}
+
+		if (args[i]) {
+			cfprintf(ctx->cerr, "${bld}%s${rs}", ctx->argv[i]);
+		} else {
+			cfprintf(ctx->cerr, "%s", ctx->argv[i]);
+		}
+	}
+
+	cfprintf(ctx->cerr, "\n");
+
+	if (warning) {
+		bfs_warning_prefix(ctx);
+	} else {
+		bfs_error_prefix(ctx);
+	}
+
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		if (i > 0) {
+			if (args[i - 1] && args[i]) {
+				cfprintf(ctx->cerr, "~");
+			} else {
+				cfprintf(ctx->cerr, " ");
+			}
+		}
+
+		if (args[i] && (i == 0 || !args[i - 1])) {
+			if (warning) {
+				cfprintf(ctx->cerr, "${wr}");
+			} else {
+				cfprintf(ctx->cerr, "${er}");
+			}
+		}
+
+		size_t len = xstrwidth(ctx->argv[i]);
+		for (size_t j = 0; j < len; ++j) {
+			if (args[i]) {
+				cfprintf(ctx->cerr, "~");
+			} else {
+				cfprintf(ctx->cerr, " ");
+			}
+		}
+
+		if (args[i] && (i + 1 >= ctx->argc || !args[i + 1])) {
+			cfprintf(ctx->cerr, "${rs}");
+		}
+	}
+
+	cfprintf(ctx->cerr, "\n");
+}
+
+void bfs_argv_error(const struct bfs_ctx *ctx, const bool *args) {
+	bfs_argv_diag(ctx, args, false);
+}
+
+void bfs_expr_error(const struct bfs_ctx *ctx, const struct bfs_expr *expr) {
+	bool args[ctx->argc];
+	if (highlight_expr(ctx, expr, args)) {
+		bfs_argv_error(ctx, args);
+	}
+}
+
+bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool *args) {
+	if (!ctx->warn) {
+		return false;
+	}
+
+	bfs_argv_diag(ctx, args, true);
+	return true;
+}
+
+bool bfs_expr_warning(const struct bfs_ctx *ctx, const struct bfs_expr *expr) {
+	bool args[ctx->argc];
+	if (highlight_expr(ctx, expr, args)) {
+		return bfs_argv_warning(ctx, args);
+	}
+
+	return false;
 }

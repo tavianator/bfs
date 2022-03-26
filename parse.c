@@ -173,6 +173,10 @@ static struct bfs_expr *new_binary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *l
 	expr->rhs = rhs;
 	assert(bfs_expr_has_children(expr));
 
+	if (argv == &fake_and_arg || argv == &fake_or_arg) {
+		expr->synthetic = true;
+	}
+
 	expr->persistent_fds = lhs->persistent_fds + rhs->persistent_fds;
 	if (lhs->ephemeral_fds > rhs->ephemeral_fds) {
 		expr->ephemeral_fds = lhs->ephemeral_fds;
@@ -714,6 +718,19 @@ static struct bfs_expr *parse_unary_action(struct parser_state *state, bfs_eval_
 	}
 
 	return parse_action(state, eval_fn, 2);
+}
+
+/**
+ * Add an expression to the exclusions.
+ */
+static int parse_exclude(struct parser_state *state, struct bfs_expr *expr) {
+	struct bfs_ctx *ctx = state->ctx;
+	ctx->exclude = new_binary_expr(eval_or, ctx->exclude, expr, &fake_or_arg);
+	if (ctx->exclude) {
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 /**
@@ -1865,9 +1882,7 @@ static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int
 	hidden->pure = true;
 	hidden->synthetic = true;
 
-	struct bfs_ctx *ctx = state->ctx;
-	ctx->exclude = new_binary_expr(eval_or, ctx->exclude, hidden, &fake_or_arg);
-	if (!ctx->exclude) {
+	if (parse_exclude(state, hidden) != 0) {
 		return NULL;
 	}
 
@@ -3321,9 +3336,7 @@ static struct bfs_expr *parse_factor(struct parser_state *state) {
 
 		state->excluding = false;
 
-		struct bfs_ctx *ctx = state->ctx;
-		ctx->exclude = new_binary_expr(eval_or, ctx->exclude, factor, &fake_or_arg);
-		if (!ctx->exclude) {
+		if (parse_exclude(state, factor) != 0) {
 			return NULL;
 		}
 
@@ -3688,6 +3701,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		argv = default_argv;
 	}
 
+	ctx->argc = argc;
 	ctx->argv = malloc((argc + 1)*sizeof(*ctx->argv));
 	if (!ctx->argv) {
 		perror("malloc()");

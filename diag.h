@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -25,6 +25,8 @@
 #include "util.h"
 #include <stdarg.h>
 #include <stdbool.h>
+
+struct bfs_expr;
 
 /**
  * Like perror(), but decorated like bfs_error().
@@ -82,5 +84,25 @@ bool bfs_warning_prefix(const struct bfs_ctx *ctx);
  * Print the debug message prefix.
  */
 bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag);
+
+/**
+ * Highlight parts of the command line in an error message.
+ */
+void bfs_argv_error(const struct bfs_ctx *ctx, const bool *args);
+
+/**
+ * Highlight parts of an expression in an error message.
+ */
+void bfs_expr_error(const struct bfs_ctx *ctx, const struct bfs_expr *expr);
+
+/**
+ * Highlight parts of the command line in a warning message.
+ */
+bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool *args);
+
+/**
+ * Highlight parts of an expression in a warning message.
+ */
+bool bfs_expr_warning(const struct bfs_ctx *ctx, const struct bfs_expr *expr);
 
 #endif // BFS_DIAG_H
