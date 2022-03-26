@@ -244,8 +244,6 @@ struct parser_state {
 	bool implicit_root;
 	/** Whether the expression has started. */
 	bool expr_started;
-	/** Whether any non-option arguments have been encountered. */
-	bool non_option_seen;
 	/** Whether an information option like -help or -version was passed. */
 	bool just_info;
 	/** Whether we are currently parsing an -exclude expression. */
@@ -393,10 +391,6 @@ static struct bfs_expr *parse_expr(struct parser_state *state);
 static char **parser_advance(struct parser_state *state, enum token_type type, size_t argc) {
 	if (type != T_FLAG && type != T_PATH) {
 		state->expr_started = true;
-
-		if (type != T_OPTION) {
-			state->non_option_seen = true;
-		}
 	}
 
 	if (type != T_PATH) {
@@ -628,15 +622,7 @@ static struct bfs_expr *parse_unary_flag(struct parser_state *state) {
  * Parse a single option.
  */
 static struct bfs_expr *parse_option(struct parser_state *state, size_t argc) {
-	const char *arg = *parser_advance(state, T_OPTION, argc);
-
-	if (state->non_option_seen) {
-		parse_warning(state,
-		              "The ${blu}%s${rs} option applies to the entire command line.  For clarity, place\n"
-		              "it before any non-option arguments.\n\n",
-		              arg);
-	}
-
+	parser_advance(state, T_OPTION, argc);
 	return &bfs_true;
 }
 
@@ -652,28 +638,6 @@ static struct bfs_expr *parse_nullary_option(struct parser_state *state) {
  */
 static struct bfs_expr *parse_unary_option(struct parser_state *state) {
 	return parse_option(state, 2);
-}
-
-/**
- * Parse a single positional option.
- */
-static struct bfs_expr *parse_positional_option(struct parser_state *state, size_t argc) {
-	parser_advance(state, T_OPTION, argc);
-	return &bfs_true;
-}
-
-/**
- * Parse a positional option that doesn't take a value.
- */
-static struct bfs_expr *parse_nullary_positional_option(struct parser_state *state) {
-	return parse_positional_option(state, 1);
-}
-
-/**
- * Parse a positional option that takes a single value.
- */
-static struct bfs_expr *parse_unary_positional_option(struct parser_state *state) {
-	return parse_positional_option(state, 2);
 }
 
 /**
@@ -872,14 +836,14 @@ static struct bfs_expr *parse_optlevel(struct parser_state *state, int arg1, int
 }
 
 /**
- * Parse -[PHL], -(no)?follow.
+ * Parse -[PHL], -follow.
  */
 static struct bfs_expr *parse_follow(struct parser_state *state, int flags, int option) {
 	struct bfs_ctx *ctx = state->ctx;
 	ctx->flags &= ~(BFTW_FOLLOW_ROOTS | BFTW_FOLLOW_ALL);
 	ctx->flags |= flags;
 	if (option) {
-		return parse_nullary_positional_option(state);
+		return parse_nullary_option(state);
 	} else {
 		return parse_nullary_flag(state);
 	}
@@ -1126,7 +1090,7 @@ static struct bfs_expr *parse_daystart(struct parser_state *state, int arg1, int
 	state->now.tv_sec = time;
 	state->now.tv_nsec = 0;
 
-	return parse_nullary_positional_option(state);
+	return parse_nullary_option(state);
 }
 
 /**
@@ -1304,7 +1268,7 @@ static struct bfs_expr *parse_files0_from(struct parser_state *state, int arg1, 
 		return NULL;
 	}
 
-	struct bfs_expr *expr = parse_unary_positional_option(state);
+	struct bfs_expr *expr = parse_unary_option(state);
 
 	while (true) {
 		char *path = xgetdelim(file, '\0');
@@ -2351,7 +2315,7 @@ static struct bfs_expr *parse_regextype(struct parser_state *state, int arg1, in
 		goto list_types;
 	}
 
-	return parse_unary_positional_option(state);
+	return parse_unary_option(state);
 
 list_types:
 	cfprintf(cfile, "Supported types are:\n\n");
@@ -2650,7 +2614,7 @@ fail:
  */
 static struct bfs_expr *parse_warn(struct parser_state *state, int warn, int arg2) {
 	state->ctx->warn = warn;
-	return parse_nullary_positional_option(state);
+	return parse_nullary_option(state);
 }
 
 /**
@@ -3777,7 +3741,6 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.use_color = use_color,
 		.implicit_print = true,
 		.implicit_root = true,
-		.non_option_seen = false,
 		.just_info = false,
 		.excluding = false,
 		.last_arg = NULL,
