@@ -79,6 +79,7 @@ struct bfs_expr bfs_true = {
 	.argv = &fake_true_arg,
 	.pure = true,
 	.always_true = true,
+	.synthetic = true,
 	.cost = FAST_COST,
 	.probability = 1.0,
 };
@@ -89,6 +90,7 @@ struct bfs_expr bfs_false = {
 	.argv = &fake_false_arg,
 	.pure = true,
 	.always_false = true,
+	.synthetic = true,
 	.cost = FAST_COST,
 	.probability = 0.0,
 };
@@ -127,6 +129,7 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	expr->pure = false;
 	expr->always_true = false;
 	expr->always_false = false;
+	expr->synthetic = false;
 	expr->cost = FAST_COST;
 	expr->probability = 0.5;
 	expr->evaluations = 0;
@@ -1860,6 +1863,7 @@ static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int
 
 	hidden->probability = 0.01;
 	hidden->pure = true;
+	hidden->synthetic = true;
 
 	struct bfs_ctx *ctx = state->ctx;
 	ctx->exclude = new_binary_expr(eval_or, ctx->exclude, hidden, &fake_or_arg);
@@ -3484,6 +3488,7 @@ static struct bfs_expr *parse_whole_expr(struct parser_state *state) {
 			goto fail;
 		}
 		init_print_expr(state, print);
+		print->synthetic = true;
 
 		expr = new_binary_expr(eval_and, expr, print, &fake_and_arg);
 		if (!expr) {
