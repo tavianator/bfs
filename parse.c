@@ -2672,12 +2672,12 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 	}
 
 	unsigned int types = 0;
-	double probability = 0.0;
+	float probability = 0.0;
 
 	const char *c = expr->argv[1];
 	while (true) {
 		enum bfs_type type;
-		double type_prob;
+		float type_prob;
 
 		switch (*c) {
 		case 'b':

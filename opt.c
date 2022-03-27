@@ -953,7 +953,7 @@ done:
 }
 
 /** Swap the children of a binary expression if it would reduce the cost. */
-static bool reorder_expr(const struct opt_state *state, struct bfs_expr *expr, double swapped_cost) {
+static bool reorder_expr(const struct opt_state *state, struct bfs_expr *expr, float swapped_cost) {
 	if (swapped_cost < expr->cost) {
 		bool debug = opt_debug(state, 3, "cost: %pe <==> ", expr);
 		struct bfs_expr *lhs = expr->lhs;
@@ -995,8 +995,8 @@ static bool reorder_expr_recursive(const struct opt_state *state, struct bfs_exp
 
 	if (expr->eval_fn == eval_and || expr->eval_fn == eval_or) {
 		if (lhs->pure && rhs->pure) {
-			double rhs_prob = expr->eval_fn == eval_and ? rhs->probability : 1.0 - rhs->probability;
-			double swapped_cost = rhs->cost + rhs_prob*lhs->cost;
+			float rhs_prob = expr->eval_fn == eval_and ? rhs->probability : 1.0 - rhs->probability;
+			float swapped_cost = rhs->cost + rhs_prob*lhs->cost;
 			ret |= reorder_expr(state, expr, swapped_cost);
 		}
 	}
