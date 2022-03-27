@@ -116,6 +116,27 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 	return arg_max;
 }
 
+/** Highlight part of the command line as an error. */
+static void bfs_exec_parse_error(const struct bfs_ctx *ctx, const struct bfs_exec *execbuf) {
+	char **argv = execbuf->tmpl_argv - 1;
+	size_t argc = execbuf->tmpl_argc + 1;
+	if (argv[argc]) {
+		++argc;
+	}
+
+	bool args[ctx->argc];
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		args[i] = false;
+	}
+
+	size_t i = argv - ctx->argv;
+	for (size_t j = 0; j < argc; ++j) {
+		args[i + j] = true;
+	}
+
+	bfs_argv_error(ctx, args);
+}
+
 struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs_exec_flags flags) {
 	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
 	if (!execbuf) {
@@ -125,6 +146,8 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 
 	execbuf->flags = flags;
 	execbuf->ctx = ctx;
+	execbuf->tmpl_argv = argv + 1;
+	execbuf->tmpl_argc = 0;
 	execbuf->argv = NULL;
 	execbuf->argc = 0;
 	execbuf->argv_cap = 0;
@@ -136,31 +159,33 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 	execbuf->wd_len = 0;
 	execbuf->ret = 0;
 
-	size_t i;
-	for (i = 1; ; ++i) {
-		const char *arg = argv[i];
+	while (true) {
+		const char *arg = execbuf->tmpl_argv[execbuf->tmpl_argc];
 		if (!arg) {
 			if (execbuf->flags & BFS_EXEC_CONFIRM) {
-				bfs_error(ctx, "%s: Expected '... ;'.\n", argv[0]);
+				bfs_exec_parse_error(ctx, execbuf);
+				bfs_error(ctx, "Expected '... ;'.\n");
 			} else {
-				bfs_error(ctx, "%s: Expected '... ;' or '... {} +'.\n", argv[0]);
+				bfs_exec_parse_error(ctx, execbuf);
+				bfs_error(ctx, "Expected '... ;' or '... {} +'.\n");
 			}
 			goto fail;
 		} else if (strcmp(arg, ";") == 0) {
 			break;
 		} else if (strcmp(arg, "+") == 0) {
-			if (!(execbuf->flags & BFS_EXEC_CONFIRM) && strcmp(argv[i - 1], "{}") == 0) {
+			const char *prev = execbuf->tmpl_argv[execbuf->tmpl_argc - 1];
+			if (!(execbuf->flags & BFS_EXEC_CONFIRM) && strcmp(prev, "{}") == 0) {
 				execbuf->flags |= BFS_EXEC_MULTI;
 				break;
 			}
 		}
+
+		++execbuf->tmpl_argc;
 	}
 
-	execbuf->tmpl_argv = argv + 1;
-	execbuf->tmpl_argc = i - 1;
-
 	if (execbuf->tmpl_argc == 0) {
-		bfs_error(ctx, "%s: Missing command.\n", argv[0]);
+		bfs_exec_parse_error(ctx, execbuf);
+		bfs_error(ctx, "Missing command.\n");
 		goto fail;
 	}
 
@@ -172,10 +197,11 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 	}
 
 	if (execbuf->flags & BFS_EXEC_MULTI) {
-		for (i = 0; i < execbuf->tmpl_argc - 1; ++i) {
+		for (size_t i = 0; i < execbuf->tmpl_argc - 1; ++i) {
 			char *arg = execbuf->tmpl_argv[i];
 			if (strstr(arg, "{}")) {
-				bfs_error(ctx, "%s ... +: Only one '{}' is supported.\n", argv[0]);
+				bfs_exec_parse_error(ctx, execbuf);
+				bfs_error(ctx, "Only one '{}' is supported.\n");
 				goto fail;
 			}
 			execbuf->argv[i] = arg;

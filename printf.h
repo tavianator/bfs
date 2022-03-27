@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2017-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -25,6 +25,7 @@
 
 struct BFTW;
 struct bfs_ctx;
+struct bfs_expr;
 
 /**
  * A printf command, the result of parsing a single format string.
@@ -36,12 +37,14 @@ struct bfs_printf;
  *
  * @param ctx
  *         The bfs context.
+ * @param expr
+ *         The expression to fill in.
  * @param format
  *         The format string to parse.
  * @return
- *         The parsed printf command, or NULL on failure.
+ *         0 on success, -1 on failure.
  */
-struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *format);
+int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const char *format);
 
 /**
  * Evaluate a parsed format string.

@@ -22,6 +22,7 @@
 #include "diag.h"
 #include "dir.h"
 #include "dstring.h"
+#include "expr.h"
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
@@ -585,8 +586,8 @@ static int append_directive(const struct bfs_ctx *ctx, struct bfs_printf **forma
 	return 0;
 }
 
-struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *format) {
-	struct bfs_printf *ret = NULL;
+int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const char *format) {
+	expr->printf = NULL;
 
 	char *literal = dstralloc(0);
 	if (!literal) {
@@ -625,18 +626,20 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 					struct bfs_printf directive = {
 						.fn = bfs_printf_flush,
 					};
-					if (append_directive(ctx, &ret, &literal, &directive) != 0) {
+					if (append_directive(ctx, &expr->printf, &literal, &directive) != 0) {
 						goto error;
 					}
 					goto done;
 				}
 
 			case '\0':
-				bfs_error(ctx, "'%s': Incomplete escape sequence '\\'.\n", format);
+				bfs_expr_error(ctx, expr);
+				bfs_error(ctx, "Incomplete escape sequence '\\'.\n");
 				goto error;
 
 			default:
-				bfs_error(ctx, "'%s': Unrecognized escape sequence '\\%c'.\n", format, c);
+				bfs_expr_error(ctx, expr);
+				bfs_error(ctx, "Unrecognized escape sequence '\\%c'.\n", c);
 				goto error;
 			}
 		} else if (c == '%') {
@@ -672,7 +675,8 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 				case ' ':
 				case '-':
 					if (strchr(directive.str, c)) {
-						bfs_error(ctx, "'%s': Duplicate flag '%c'.\n", format, c);
+						bfs_expr_error(ctx, expr);
+						bfs_error(ctx, "Duplicate flag '%c'.\n", c);
 						goto directive_error;
 					}
 					if (dstrapp(&directive.str, c) != 0) {
@@ -730,7 +734,9 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 			case 'F':
 				directive.ptr = bfs_ctx_mtab(ctx);
 				if (!directive.ptr) {
-					bfs_error(ctx, "Couldn't parse the mount table: %m.\n");
+					int error = errno;
+					bfs_expr_error(ctx, expr);
+					bfs_error(ctx, "Couldn't parse the mount table: %s.\n", strerror(error));
 					goto directive_error;
 				}
 				directive.fn = bfs_printf_F;
@@ -738,7 +744,9 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 			case 'g':
 				directive.ptr = bfs_ctx_groups(ctx);
 				if (!directive.ptr) {
-					bfs_error(ctx, "Couldn't parse the group table: %m.\n");
+					int error = errno;
+					bfs_expr_error(ctx, expr);
+					bfs_error(ctx, "Couldn't parse the group table: %s.\n", strerror(error));
 					goto directive_error;
 				}
 				directive.fn = bfs_printf_g;
@@ -791,7 +799,9 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 			case 'u':
 				directive.ptr = bfs_ctx_users(ctx);
 				if (!directive.ptr) {
-					bfs_error(ctx, "Couldn't parse the user table: %m.\n");
+					int error = errno;
+					bfs_expr_error(ctx, expr);
+					bfs_error(ctx, "Couldn't parse the user table: %s.\n", strerror(error));
 					goto directive_error;
 				}
 				directive.fn = bfs_printf_u;
@@ -828,27 +838,32 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 				directive.fn = bfs_printf_strftime;
 				c = *++i;
 				if (!c) {
-					bfs_error(ctx, "'%s': Incomplete time specifier '%s%c'.\n", format, directive.str, i[-1]);
+					bfs_expr_error(ctx, expr);
+					bfs_error(ctx, "Incomplete time specifier '%s%c'.\n", directive.str, i[-1]);
 					goto directive_error;
 				} else if (strchr("%+@aAbBcCdDeFgGhHIjklmMnprRsStTuUVwWxXyYzZ", c)) {
 					directive.c = c;
 				} else {
-					bfs_error(ctx, "'%s': Unrecognized time specifier '%%%c%c'.\n", format, i[-1], c);
+					bfs_expr_error(ctx, expr);
+					bfs_error(ctx, "Unrecognized time specifier '%%%c%c'.\n", i[-1], c);
 					goto directive_error;
 				}
 				break;
 
 			case '\0':
-				bfs_error(ctx, "'%s': Incomplete format specifier '%s'.\n", format, directive.str);
+				bfs_expr_error(ctx, expr);
+				bfs_error(ctx, "Incomplete format specifier '%s'.\n", directive.str);
 				goto directive_error;
 
 			default:
-				bfs_error(ctx, "'%s': Unrecognized format specifier '%%%c'.\n", format, c);
+				bfs_expr_error(ctx, expr);
+				bfs_error(ctx, "Unrecognized format specifier '%%%c'.\n", c);
 				goto directive_error;
 			}
 
 			if (must_be_numeric && strcmp(specifier, "s") == 0) {
-				bfs_error(ctx, "'%s': Invalid flags '%s' for string format '%%%c'.\n", format, directive.str + 1, c);
+				bfs_expr_error(ctx, expr);
+				bfs_error(ctx, "Invalid flags '%s' for string format '%%%c'.\n", directive.str + 1, c);
 				goto directive_error;
 			}
 
@@ -857,7 +872,7 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 				goto directive_error;
 			}
 
-			if (append_directive(ctx, &ret, &literal, &directive) != 0) {
+			if (append_directive(ctx, &expr->printf, &literal, &directive) != 0) {
 				goto directive_error;
 			}
 
@@ -876,24 +891,17 @@ struct bfs_printf *bfs_printf_parse(const struct bfs_ctx *ctx, const char *forma
 	}
 
 done:
-	if (!ret || dstrlen(literal) > 0) {
-		struct bfs_printf directive = {
-			.fn = bfs_printf_literal,
-			.str = literal,
-		};
-		if (DARRAY_PUSH(&ret, &directive) != 0) {
-			bfs_perror(ctx, "DARRAY_PUSH()");
-			goto error;
-		}
-	} else {
-		dstrfree(literal);
+	if (append_literal(ctx, &expr->printf, &literal) != 0) {
+		goto error;
 	}
-	return ret;
+	dstrfree(literal);
+	return 0;
 
 error:
 	dstrfree(literal);
-	bfs_printf_free(ret);
-	return NULL;
+	bfs_printf_free(expr->printf);
+	expr->printf = NULL;
+	return -1;
 }
 
 int bfs_printf(CFILE *cfile, const struct bfs_printf *format, const struct BFTW *ftwbuf) {
