@@ -1,6 +1,33 @@
 2.*
 ===
 
+2.5
+---
+
+**March 27, 20222**
+
+- Added compiler-style context for errors and warnings.
+  Errors look like this:
+
+      $ bfs -nam needle
+      bfs: error: bfs -nam needle
+      bfs: error:     ~~~~
+      bfs: error: Unknown argument; did you mean -name?
+
+  and warnings look like this:
+
+      $ bfs -print -name 'needle'
+      bfs: warning: bfs -print -name needle
+      bfs: warning:            ~~~~~~~~~~~~
+      bfs: warning: The result of this expression is ignored.
+
+- Updated from C99 to C11
+
+- Fixed the tests when built against musl
+
+- Fixed a build error reported on Manjaro
+
+
 2.4.1
 -----
 
