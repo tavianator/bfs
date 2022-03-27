@@ -139,7 +139,7 @@ static bool highlight_expr(const struct bfs_ctx *ctx, const struct bfs_expr *exp
 	return highlight_expr_recursive(ctx, expr, args);
 }
 
-/** Print a hilighted portion of the command line. */
+/** Print a highlighted portion of the command line. */
 static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warning) {
 	if (warning) {
 		bfs_warning_prefix(ctx);
@@ -147,12 +147,14 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 		bfs_error_prefix(ctx);
 	}
 
+	size_t max_argc = 0;
 	for (size_t i = 0; i < ctx->argc; ++i) {
 		if (i > 0) {
 			cfprintf(ctx->cerr, " ");
 		}
 
 		if (args[i]) {
+			max_argc = i + 1;
 			cfprintf(ctx->cerr, "${bld}%s${rs}", ctx->argv[i]);
 		} else {
 			cfprintf(ctx->cerr, "%s", ctx->argv[i]);
@@ -167,7 +169,7 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 		bfs_error_prefix(ctx);
 	}
 
-	for (size_t i = 0; i < ctx->argc; ++i) {
+	for (size_t i = 0; i < max_argc; ++i) {
 		if (i > 0) {
 			if (args[i - 1] && args[i]) {
 				cfprintf(ctx->cerr, "~");
@@ -193,7 +195,7 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 			}
 		}
 
-		if (args[i] && (i + 1 >= ctx->argc || !args[i + 1])) {
+		if (args[i] && (i + 1 >= max_argc || !args[i + 1])) {
 			cfprintf(ctx->cerr, "${rs}");
 		}
 	}
