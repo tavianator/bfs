@@ -528,6 +528,7 @@ static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct 
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs->always_false) {
 			opt_debug(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
+			opt_warning(state, expr->rhs, "This expression is unreachable.\n\n");
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs->always_true && rhs == &bfs_false) {
 			bool debug = opt_debug(state, 1, "strength reduction: %pe <==> ", expr);
@@ -539,6 +540,7 @@ static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct 
 			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &bfs_false) {
 			opt_debug(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
+			opt_warning(state, expr->lhs, "The result of this expression is ignored.\n\n");
 			return extract_child_expr(expr, &expr->rhs);
 		} else if (lhs->eval_fn == eval_not && rhs->eval_fn == eval_not) {
 			return de_morgan(state, expr, expr->lhs->argv);
@@ -591,6 +593,7 @@ static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct b
 	if (optlevel >= 1) {
 		if (lhs->always_true) {
 			opt_debug(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
+			opt_warning(state, expr->rhs, "This expression is unreachable.\n\n");
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (lhs == &bfs_false) {
 			opt_debug(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, rhs);
@@ -608,6 +611,7 @@ static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct b
 			return ret;
 		} else if (optlevel >= 2 && lhs->pure && rhs == &bfs_true) {
 			opt_debug(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
+			opt_warning(state, expr->lhs, "The result of this expression is ignored.\n\n");
 			return extract_child_expr(expr, &expr->rhs);
 		} else if (lhs->eval_fn == eval_not && rhs->eval_fn == eval_not) {
 			return de_morgan(state, expr, expr->lhs->argv);
@@ -656,6 +660,7 @@ static struct bfs_expr *ignore_result(const struct opt_state *state, struct bfs_
 		while (true) {
 			if (expr->eval_fn == eval_not) {
 				opt_debug(state, 1, "ignored result: %pe --> %pe\n", expr, expr->rhs);
+				opt_warning(state, expr, "The result of this expression is ignored.\n\n");
 				expr = extract_child_expr(expr, &expr->rhs);
 			} else if (optlevel >= 2
 			           && (expr->eval_fn == eval_and || expr->eval_fn == eval_or || expr->eval_fn == eval_comma)
@@ -700,6 +705,7 @@ static struct bfs_expr *optimize_comma_expr(const struct opt_state *state, struc
 			return extract_child_expr(expr, &expr->lhs);
 		} else if (optlevel >= 2 && lhs->pure) {
 			opt_debug(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
+			opt_warning(state, expr->lhs, "The result of this expression is ignored.\n\n");
 			return extract_child_expr(expr, &expr->rhs);
 		}
 	}
