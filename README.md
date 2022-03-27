@@ -89,6 +89,28 @@ $ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'    │ $ <strong>find
 </details>
 
 <details>
+<summary><code>bfs</code> gives helpful errors and warnings.</summary>
+
+For example, `bfs` will detect and suggest corrections for typos:
+
+<pre>
+$ bfs -nam needle
+<strong>bfs: error:</strong> bfs <strong>-nam</strong> needle
+<strong>bfs: error:</strong>     <strong>~~~~</strong>
+<strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
+</pre>
+
+`bfs` also includes a powerful static analysis to identify likely mistakes:
+
+<pre>
+$ bfs -print -name 'needle'
+<strong>bfs: warning:</strong> bfs -print <strong>-name needle</strong>
+<strong>bfs: warning:</strong>            <strong>~~~~~~~~~~~~</strong>
+<strong>bfs: warning:</strong> The result of this expression is ignored.
+</pre>
+</details>
+
+<details>
 <summary><code>bfs</code> adds some options that make common tasks easier.</summary>
 
 ### `-exclude`
