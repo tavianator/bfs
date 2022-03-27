@@ -324,15 +324,9 @@ static void parse_error(const struct parser_state *state, const char *format, ..
 	int error = errno;
 	const struct bfs_ctx *ctx = state->ctx;
 
-	// If we're at the end of the command line, highlight the last argument
-	char **argv = state->argv;
-	if (!*argv) {
-		--argv;
-	}
-
 	bool highlight[ctx->argc];
 	init_highlight(ctx, highlight);
-	highlight_args(ctx, argv, 1, highlight);
+	highlight_args(ctx, state->argv, 1, highlight);
 	bfs_argv_error(ctx, highlight);
 
 	va_list args;
@@ -408,15 +402,9 @@ static bool parse_warning(const struct parser_state *state, const char *format, 
 	int error = errno;
 	const struct bfs_ctx *ctx = state->ctx;
 
-	// If we're at the end of the command line, highlight the last argument
-	char **argv = state->argv;
-	if (!*argv) {
-		--argv;
-	}
-
 	bool highlight[ctx->argc];
 	init_highlight(ctx, highlight);
-	highlight_args(ctx, argv, 1, highlight);
+	highlight_args(ctx, state->argv, 1, highlight);
 	if (!bfs_argv_warning(ctx, highlight)) {
 		return false;
 	}
@@ -3458,12 +3446,12 @@ static struct bfs_expr *parse_factor(struct parser_state *state) {
 
 		arg = state->argv[0];
 		if (!arg || strcmp(arg, ")") != 0) {
-			parse_error(state, "Expected a ${red})${rs}.\n");
+			parse_argv_error(state, state->last_arg, 1, "Expected a ${red})${rs}.\n");
 			bfs_expr_free(expr);
 			return NULL;
 		}
-		parser_advance(state, T_OPERATOR, 1);
 
+		parser_advance(state, T_OPERATOR, 1);
 		return expr;
 	} else if (strcmp(arg, "-exclude") == 0) {
 		if (state->excluding) {
