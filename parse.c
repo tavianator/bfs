@@ -1941,7 +1941,7 @@ static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int 
 	expr->stat_field = parse_newerxy_field(arg[6]);
 	if (!expr->stat_field) {
 		parse_expr_error(state, expr,
-		                 "For ${blu}-newer${bld}XY${rs}, ${bld}X${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, or ${bld}B${rs}, not ${er}%c${rs}.\n",
+		                 "For ${blu}-newer${bld}XY${rs}, ${bld}X${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, or ${bld}B${rs}, not ${err}%c${rs}.\n",
 		                 arg[6]);
 		goto fail;
 	}
@@ -1954,7 +1954,7 @@ static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int 
 		enum bfs_stat_field field = parse_newerxy_field(arg[7]);
 		if (!field) {
 			parse_expr_error(state, expr,
-			                 "For ${blu}-newer${bld}XY${rs}, ${bld}Y${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, ${bld}B${rs}, or ${bld}t${rs}, not ${er}%c${rs}.\n",
+			                 "For ${blu}-newer${bld}XY${rs}, ${bld}Y${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, ${bld}B${rs}, or ${bld}t${rs}, not ${err}%c${rs}.\n",
 			                 arg[7]);
 			goto fail;
 		}
@@ -2636,7 +2636,7 @@ static struct bfs_expr *parse_size(struct parser_state *state, int arg1, int arg
 	return expr;
 
 bad_unit:
-	parse_expr_error(state, expr, "Expected a size unit (one of ${bld}cwbkMGTP${rs}); found ${er}%s${rs}.\n", unit);
+	parse_expr_error(state, expr, "Expected a size unit (one of ${bld}cwbkMGTP${rs}); found ${err}%s${rs}.\n", unit);
 fail:
 	bfs_expr_free(expr);
 	return NULL;
@@ -2722,7 +2722,7 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 			goto fail;
 
 		default:
-			parse_expr_error(state, expr, "Unknown type flag ${er}%c${rs}; expected one of [${bld}bcdpflsD${rs}].\n", *c);
+			parse_expr_error(state, expr, "Unknown type flag ${err}%c${rs}; expected one of [${bld}bcdpflsD${rs}].\n", *c);
 			goto fail;
 		}
 
@@ -3455,7 +3455,7 @@ static struct bfs_expr *parse_factor(struct parser_state *state) {
 		return expr;
 	} else if (strcmp(arg, "-exclude") == 0) {
 		if (state->excluding) {
-			parse_error(state, "${er}%s${rs} is not supported within ${red}-exclude${rs}.\n", arg);
+			parse_error(state, "${err}%s${rs} is not supported within ${red}-exclude${rs}.\n", arg);
 			return NULL;
 		}
 

@@ -84,12 +84,12 @@ bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *fo
 }
 
 void bfs_error_prefix(const struct bfs_ctx *ctx) {
-	cfprintf(ctx->cerr, "${bld}%s:${rs} ${er}error:${rs} ", xbasename(ctx->argv[0]));
+	cfprintf(ctx->cerr, "${bld}%s:${rs} ${err}error:${rs} ", xbasename(ctx->argv[0]));
 }
 
 bool bfs_warning_prefix(const struct bfs_ctx *ctx) {
 	if (ctx->warn) {
-		cfprintf(ctx->cerr, "${bld}%s:${rs} ${wr}warning:${rs} ", xbasename(ctx->argv[0]));
+		cfprintf(ctx->cerr, "${bld}%s:${rs} ${wrn}warning:${rs} ", xbasename(ctx->argv[0]));
 		return true;
 	} else {
 		return false;
@@ -180,9 +180,9 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 
 		if (args[i] && (i == 0 || !args[i - 1])) {
 			if (warning) {
-				cfprintf(ctx->cerr, "${wr}");
+				cfprintf(ctx->cerr, "${wrn}");
 			} else {
-				cfprintf(ctx->cerr, "${er}");
+				cfprintf(ctx->cerr, "${err}");
 			}
 		}
 

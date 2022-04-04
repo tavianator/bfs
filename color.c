@@ -387,8 +387,8 @@ struct colors *parse_colors(const char *ls_colors) {
 	ret |= init_color(colors, "cyn", "01;36", &colors->cyan);
 	ret |= init_color(colors, "wht", "01;37", &colors->white);
 
-	ret |= init_color(colors, "wr", "01;33", &colors->warning);
-	ret |= init_color(colors, "er", "01;31", &colors->error);
+	ret |= init_color(colors, "wrn", "01;33", &colors->warning);
+	ret |= init_color(colors, "err", "01;31", &colors->error);
 
 	// Defaults from man dir_colors
 
