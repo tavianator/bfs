@@ -196,7 +196,7 @@ fail:
 
 static void bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 	for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
-		struct bfs_mtab_entry *entry = mtab->entries + i;
+		struct bfs_mtab_entry *entry = &mtab->entries[i];
 
 		struct bfs_stat sb;
 		if (bfs_stat(AT_FDCWD, entry->path, BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC, &sb) != 0) {

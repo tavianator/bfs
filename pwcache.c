@@ -77,7 +77,7 @@ struct bfs_users *bfs_users_parse(void) {
 	endpwent();
 
 	for (size_t i = 0; i < darray_length(users->entries); ++i) {
-		struct passwd *entry = users->entries + i;
+		struct passwd *entry = &users->entries[i];
 		struct trie_leaf *leaf = trie_insert_str(&users->by_name, entry->pw_name);
 		if (leaf) {
 			if (!leaf->value) {
@@ -133,7 +133,7 @@ void bfs_users_free(struct bfs_users *users) {
 		trie_destroy(&users->by_name);
 
 		for (size_t i = 0; i < darray_length(users->entries); ++i) {
-			struct passwd *entry = users->entries + i;
+			struct passwd *entry = &users->entries[i];
 			free(entry->pw_shell);
 			free(entry->pw_dir);
 			free(entry->pw_name);
@@ -223,7 +223,7 @@ struct bfs_groups *bfs_groups_parse(void) {
 	endgrent();
 
 	for (size_t i = 0; i < darray_length(groups->entries); ++i) {
-		struct group *entry = groups->entries + i;
+		struct group *entry = &groups->entries[i];
 		struct trie_leaf *leaf = trie_insert_str(&groups->by_name, entry->gr_name);
 		if (leaf) {
 			if (!leaf->value) {
@@ -279,7 +279,7 @@ void bfs_groups_free(struct bfs_groups *groups) {
 		trie_destroy(&groups->by_name);
 
 		for (size_t i = 0; i < darray_length(groups->entries); ++i) {
-			struct group *entry = groups->entries + i;
+			struct group *entry = &groups->entries[i];
 			for (size_t j = 0; j < darray_length(entry->gr_mem); ++j) {
 				free(entry->gr_mem[j]);
 			}

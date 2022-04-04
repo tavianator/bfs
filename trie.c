@@ -413,7 +413,7 @@ static struct trie_leaf *trie_node_insert(uintptr_t *ptr, const void *key, size_
 	node->bitmap |= bit;
 
 	unsigned int index = trie_popcount(node->bitmap & (bit - 1));
-	uintptr_t *child = node->children + index;
+	uintptr_t *child = &node->children[index];
 	if (index < size) {
 		memmove(child + 1, child, (size - index)*sizeof(*child));
 	}
@@ -550,7 +550,7 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 		if (node->bitmap & bit) {
 			assert(offset < mismatch);
 			unsigned int index = trie_popcount(node->bitmap & (bit - 1));
-			ptr = node->children + index;
+			ptr = &node->children[index];
 		} else {
 			assert(offset == mismatch);
 			return trie_node_insert(ptr, key, length, offset);
@@ -638,7 +638,7 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 			child_index = index;
 		}
 
-		child = node->children + index;
+		child = &node->children[index];
 	}
 
 	assert(trie_decode_leaf(*child) == leaf);
