@@ -29,7 +29,7 @@ args=(
     #       As they are single letters, can we even do anything useful?
 
     # Special forms
-    '*-exclude[exclude paths matching expression from search]:expression:'
+    '*-exclude[exclude paths matching EXPRESSION from search]'
 
     # Options
     '(-nocolor)-color[turn on colors]'
