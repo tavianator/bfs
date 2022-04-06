@@ -152,25 +152,25 @@ args=(
 )
 
 _arguments -C $args \
-  '(--help --version)*:directory:_files -/' \
+    '(--help --version)*:directory:_files -/' \
 && ret=0
 
 if [[ $state = times ]]; then
-  if ! compset -P '[+-]' || [[ -prefix '[0-9]' ]]; then
-    compstate[list]+=' packed'
-    if zstyle -t ":completion:${curcontext}:senses" verbose; then
-      zstyle -s ":completion:${curcontext}:senses" list-separator sep || sep=--
-      default=" [default exactly]"
-      disp=( "- $sep before" "+ $sep since" )
-      smatch=( - + )
-    else
-      disp=( before exactly since )
-      smatch=( - '' + )
+    if ! compset -P '[+-]' || [[ -prefix '[0-9]' ]]; then
+        compstate[list]+=' packed'
+        if zstyle -t ":completion:${curcontext}:senses" verbose; then
+            zstyle -s ":completion:${curcontext}:senses" list-separator sep || sep=--
+            default=" [default exactly]"
+            disp=( "- $sep before" "+ $sep since" )
+            smatch=( - + )
+        else
+            disp=( before exactly since )
+            smatch=( - '' + )
+        fi
+        alts=( "senses:sense${default}:compadd -V times -S '' -d disp -a smatch" )
     fi
-    alts=( "senses:sense${default}:compadd -V times -S '' -d disp -a smatch" )
-  fi
-  alts+=( "times:${state_descr}:_dates -f d" )
-  _alternative $alts && ret=0
+    alts+=( "times:${state_descr}:_dates -f d" )
+    _alternative $alts && ret=0
 fi
 
 return ret
