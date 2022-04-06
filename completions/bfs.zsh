@@ -120,8 +120,8 @@ args=(
     '*-xattr[find files with extended attributes]'
     '*-xattrname[find files with extended attribute NAME]:name:'
     '*-xtype[find files of the given type following links when -type would not, and vice versa]:file type:((b\:block\ device c\:character\ device d\:directory p\:named\ pipe f\:normal\ file l\:symbolic\ link s\:socket w\:whiteout D\:Door))'
-    + actions
-
+    
+    # Actions
     '*-delete[delete any found files (-implies -depth)]'
     '*-rm[delete any found files (-implies -depth)]'
 
