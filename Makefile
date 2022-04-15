@@ -40,6 +40,7 @@ DEFAULT_CFLAGS := \
     -Wshadow \
     -Wsign-compare \
     -Wstrict-prototypes \
+    -I./Include/ \
     -Wimplicit-fallthrough
 
 CFLAGS ?= $(DEFAULT_CFLAGS)
@@ -232,7 +233,7 @@ tests/xtimegm: xtime.o tests/xtimegm.o
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-%.o: %.c .flags
+%.o: Source/%.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 # Need a rule for .flags to convince make to apply the above pattern rule if
