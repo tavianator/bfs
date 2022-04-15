@@ -3242,7 +3242,7 @@ function test_flags() {
     rm -rf scratch/*
 
     $TOUCH scratch/{foo,bar}
-    skip_if fail chflags offline scratch/bar
+    skip_if fail quiet chflags offline scratch/bar
 
     bfs_diff scratch -flags -offline,nohidden
 }
