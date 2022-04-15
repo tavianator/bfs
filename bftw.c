@@ -1168,7 +1168,7 @@ static int bftw_stream(const struct bftw_args *args) {
 		return -1;
 	}
 
-	assert(!(state.flags & BFTW_SORT));
+	assert(!(state.flags & (BFTW_SORT | BFTW_BUFFER)));
 
 	bftw_batch_start(&state);
 	for (size_t i = 0; i < args->npaths; ++i) {
@@ -1279,7 +1279,7 @@ done:
 
 /** Select bftw_stream() or bftw_batch() appropriately. */
 static int bftw_auto(const struct bftw_args *args) {
-	if (args->flags & BFTW_SORT) {
+	if (args->flags & (BFTW_SORT | BFTW_BUFFER)) {
 		return bftw_batch(args);
 	} else {
 		return bftw_stream(args);

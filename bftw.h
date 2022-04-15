@@ -167,6 +167,8 @@ enum bftw_flags {
 	BFTW_PRUNE_MOUNTS  = 1 << 7,
 	/** Sort directory entries before processing them. */
 	BFTW_SORT          = 1 << 8,
+	/** Read each directory into memory before processing its children. */
+	BFTW_BUFFER        = 1 << 9,
 };
 
 /**
