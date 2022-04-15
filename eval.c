@@ -1512,6 +1512,7 @@ static void dump_bftw_flags(enum bftw_flags flags) {
 	DEBUG_FLAG(flags, BFTW_SKIP_MOUNTS);
 	DEBUG_FLAG(flags, BFTW_PRUNE_MOUNTS);
 	DEBUG_FLAG(flags, BFTW_SORT);
+	DEBUG_FLAG(flags, BFTW_BUFFER);
 
 	assert(!flags);
 }
@@ -1527,6 +1528,36 @@ static const char *dump_bftw_strategy(enum bftw_strategy strategy) {
 		DUMP_MAP(BFTW_EDS),
 	};
 	return strategies[strategy];
+}
+
+/** Check if we need to enable BFTW_BUFFER. */
+static bool eval_must_buffer(const struct bfs_expr *expr) {
+#if __FreeBSD__
+	// FreeBSD doesn't properly handle adding/removing directory entries
+	// during readdir() on NFS mounts.  Work around it by passing BFTW_BUFFER
+	// whenever we could be mutating the directory ourselves through -delete
+	// or -exec.  We don't attempt to handle concurrent modification by other
+	// processes, which are racey anyway.
+	//
+	// https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=57696
+	// https://github.com/tavianator/bfs/issues/67
+
+	if (expr->eval_fn == eval_delete || expr->eval_fn == eval_exec) {
+		return true;
+	}
+
+	if (bfs_expr_has_children(expr)) {
+		if (expr->lhs && eval_must_buffer(expr->lhs)) {
+			return true;
+		}
+
+		if (expr->rhs && eval_must_buffer(expr->rhs)) {
+			return true;
+		}
+	}
+#endif // __FreeBSD__
+
+	return false;
 }
 
 int bfs_eval(const struct bfs_ctx *ctx) {
@@ -1565,6 +1596,10 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 		.strategy = ctx->strategy,
 		.mtab = bfs_ctx_mtab(ctx),
 	};
+
+	if (eval_must_buffer(ctx->expr)) {
+		bftw_args.flags |= BFTW_BUFFER;
+	}
 
 	if (bfs_debug(ctx, DEBUG_SEARCH, "bftw({\n")) {
 		fprintf(stderr, "\t.paths = {\n");
