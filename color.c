@@ -34,9 +34,6 @@
 #include <time.h>
 #include <unistd.h>
 
-/**
- * The parsed form of LS_COLORS.
- */
 struct colors {
 	char *reset;
 	char *leftcode;
@@ -198,7 +195,7 @@ static const char *get_ext_color(const struct colors *colors, const char *filena
 }
 
 /**
- * Parse a chunk of LS_COLORS that may have escape sequences.  The supported
+ * Parse a chunk of $LS_COLORS that may have escape sequences.  The supported
  * escapes are:
  *
  * \a, \b, \f, \n, \r, \t, \v:
@@ -358,7 +355,66 @@ fail:
 	return NULL;
 }
 
-struct colors *parse_colors(const char *ls_colors) {
+/** Parse the GNU $LS_COLORS format. */
+static void parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
+	for (const char *chunk = ls_colors, *next; chunk; chunk = next) {
+		if (chunk[0] == '*') {
+			char *key = unescape(chunk + 1, '=', &next);
+			if (!key) {
+				continue;
+			}
+
+			char *value = unescape(next, ':', &next);
+			if (value) {
+				if (set_ext_color(colors, key, value) != 0) {
+					dstrfree(value);
+				}
+			}
+
+			dstrfree(key);
+		} else {
+			const char *equals = strchr(chunk, '=');
+			if (!equals) {
+				break;
+			}
+
+			char *value = unescape(equals + 1, ':', &next);
+			if (!value) {
+				continue;
+			}
+
+			char *key = strndup(chunk, equals - chunk);
+			if (!key) {
+				dstrfree(value);
+				continue;
+			}
+
+			// All-zero values should be treated like NULL, to fall
+			// back on any other relevant coloring for that file
+			if (strspn(value, "0") == strlen(value)
+			    && strcmp(key, "rs") != 0
+			    && strcmp(key, "lc") != 0
+			    && strcmp(key, "rc") != 0
+			    && strcmp(key, "ec") != 0) {
+				dstrfree(value);
+				value = NULL;
+			}
+
+			if (set_color(colors, key, value) != 0) {
+				dstrfree(value);
+			}
+			free(key);
+		}
+	}
+
+	if (colors->link && strcmp(colors->link, "target") == 0) {
+		colors->link_as_target = true;
+		dstrfree(colors->link);
+		colors->link = NULL;
+	}
+}
+
+struct colors *parse_colors() {
 	struct colors *colors = malloc(sizeof(struct colors));
 	if (!colors) {
 		return NULL;
@@ -422,61 +478,8 @@ struct colors *parse_colors(const char *ls_colors) {
 		return NULL;
 	}
 
-	for (const char *chunk = ls_colors, *next; chunk; chunk = next) {
-		if (chunk[0] == '*') {
-			char *key = unescape(chunk + 1, '=', &next);
-			if (!key) {
-				continue;
-			}
-
-			char *value = unescape(next, ':', &next);
-			if (value) {
-				if (set_ext_color(colors, key, value) != 0) {
-					dstrfree(value);
-				}
-			}
-
-			dstrfree(key);
-		} else {
-			const char *equals = strchr(chunk, '=');
-			if (!equals) {
-				break;
-			}
-
-			char *value = unescape(equals + 1, ':', &next);
-			if (!value) {
-				continue;
-			}
-
-			char *key = strndup(chunk, equals - chunk);
-			if (!key) {
-				dstrfree(value);
-				continue;
-			}
-
-			// All-zero values should be treated like NULL, to fall
-			// back on any other relevant coloring for that file
-			if (strspn(value, "0") == strlen(value)
-			    && strcmp(key, "rs") != 0
-			    && strcmp(key, "lc") != 0
-			    && strcmp(key, "rc") != 0
-			    && strcmp(key, "ec") != 0) {
-				dstrfree(value);
-				value = NULL;
-			}
-
-			if (set_color(colors, key, value) != 0) {
-				dstrfree(value);
-			}
-			free(key);
-		}
-	}
-
-	if (colors->link && strcmp(colors->link, "target") == 0) {
-		colors->link_as_target = true;
-		dstrfree(colors->link);
-		colors->link = NULL;
-	}
+	parse_gnu_ls_colors(colors, getenv("LS_COLORS"));
+	parse_gnu_ls_colors(colors, getenv("BFS_COLORS"));
 
 	return colors;
 }

@@ -27,18 +27,16 @@
 #include <stdio.h>
 
 /**
- * A lookup table for colors.
+ * A color scheme.
  */
 struct colors;
 
 /**
  * Parse a color table.
  *
- * @param ls_colors
- *         A color table in the LS_COLORS environment variable format.
  * @return The parsed color table.
  */
-struct colors *parse_colors(const char *ls_colors);
+struct colors *parse_colors(void);
 
 /**
  * Free a color table.

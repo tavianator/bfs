@@ -28,6 +28,9 @@ export MSAN_OPTIONS="abort_on_error=1"
 export TSAN_OPTIONS="abort_on_error=1"
 export UBSAN_OPTIONS="abort_on_error=1"
 
+export LS_COLORS=""
+unset BFS_COLORS
+
 if [ -t 1 ]; then
     BLD=$(printf '\033[01m')
     RED=$(printf '\033[01;31m')
@@ -2452,7 +2455,7 @@ function test_printf_must_be_numeric() {
 }
 
 function test_printf_color() {
-    LS_COLORS="" bfs_diff -color -path './rainbow*' -printf '%H %h %f %p %P %l\n'
+    bfs_diff -color -path './rainbow*' -printf '%H %h %f %p %P %l\n'
 }
 
 function test_fprintf() {
@@ -2552,11 +2555,11 @@ function test_extra_paren() {
 }
 
 function test_color() {
-    LS_COLORS="" bfs_diff rainbow -color
+    bfs_diff rainbow -color
 }
 
 function test_color_L() {
-    LS_COLORS="" bfs_diff -L rainbow -color
+    bfs_diff -L rainbow -color
 }
 
 function test_color_rs_lc_rc_ec() {

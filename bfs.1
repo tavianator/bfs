@@ -715,16 +715,26 @@ Yes/no prompts (e.g. from
 .BR \-ok )
 will also be interpreted according to the current locale.
 .RE
-.TP
+.PP
 .B LS_COLORS
+.br
+.B BFS_COLORS
+.RS
 Controls the colors used when displaying file paths if
 .B \-color
 is enabled.
 .B bfs
-interprets this environment variable is interpreted the same way GNU
+interprets
+.B LS_COLORS
+the same way GNU
 .BR ls (1)
 does (see
 .BR dir_colors (5)).
+.B BFS_COLORS
+can be used to customize
+.B bfs
+without affecting other commands.
+.RE
 .TP
 .B NO_COLOR
 Causes

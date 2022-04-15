@@ -3856,7 +3856,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		use_color = COLOR_NEVER;
 	}
 
-	ctx->colors = parse_colors(getenv("LS_COLORS"));
+	ctx->colors = parse_colors();
 	if (!ctx->colors) {
 		ctx->colors_error = errno;
 	}
