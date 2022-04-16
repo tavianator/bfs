@@ -15,6 +15,13 @@
 
 <br>
 
+**⸢ [Install] ⸥**  
+**⸢ [Usage] ⸥**  
+**⸢ [Changelog] ⸥**  
+**⸢ [Contribute] ⸥**  
+
+<br>
+
 ![Showcase]
 
 <br>
@@ -48,6 +55,14 @@
 [Releases]: https://github.com/tavianator/bfs/releases
 [License]: LICENSE
 [CI]: https://github.com/tavianator/bfs/actions/workflows/ci.yml
+
+
+<!--------------------------------{ Quicklinks }------------------------------->
+
+[Contribute]: docs/Contribute.md
+[Changelog]: docs/Changelog.md
+[Install]: docs/Install.md
+[Usage]: docs/Usage.md
 
 
 <!--------------------------------{ References }------------------------------->
