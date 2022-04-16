@@ -232,8 +232,6 @@ tests/xtimegm: xtime.o tests/xtimegm.o
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-
-
 %.o: src/%.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
     
