@@ -232,7 +232,10 @@ tests/xtimegm: build/xtime.o tests/xtimegm.o
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-build/%.o: src/%.c .flags
+build:
+	$(MKDIR) $@
+
+build/%.o: src/%.c .flags | build
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
     
 tests/%.o: tests/%.c .flags
@@ -285,6 +288,4 @@ uninstall:
 
 .SUFFIXES:
 
--include $(wildcard *.d)
-
-$(shell mkdir -p build)
+-include $(wildcard build/*.d tests/*.d)
