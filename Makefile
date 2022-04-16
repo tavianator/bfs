@@ -40,7 +40,7 @@ DEFAULT_CFLAGS := \
     -Wshadow \
     -Wsign-compare \
     -Wstrict-prototypes \
-    -I./Include/ \
+    -I./src/ \
     -Wimplicit-fallthrough
 
 CFLAGS ?= $(DEFAULT_CFLAGS)
@@ -235,7 +235,7 @@ $(BIN_GOALS):
 
 
 
-%.o: Source/%.c .flags
+%.o: src/%.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
     
 tests/%.o: tests/%.c .flags

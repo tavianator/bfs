@@ -16,7 +16,7 @@
 
 #undef NDEBUG
 
-#include "../Include/trie.h"
+#include "../src/trie.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
