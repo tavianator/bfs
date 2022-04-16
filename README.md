@@ -1,13 +1,22 @@
-`bfs`
-=====
 
-[![Badge License]][License]
-[![Badge Version]][Releases]
 [![Badge CI]][CI]
 
-Breadth-first search for your files.
+<div align = center>
+
+# BFS
+
+***Breadth - first Search For Your Files.***
+
+<br>
+
+[![Badge License]][License]
+[![Badge Version]][Releases] <br>
+
+<br>
 
 ![Showcase]
+
+</div>
 
 `bfs` is a variant of the UNIX `find` command that operates [breadth-first] rather than [depth-first].
 It is otherwise compatible with many versions of `find`, including
