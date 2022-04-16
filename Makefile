@@ -269,7 +269,7 @@ endif
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
-	$(RM) $(BIN_GOALS) .flags *.[od] *.gcda *.gcno tests/*.[od] tests/*.gcda tests/*.gcno
+	$(RM) $(BIN_GOALS) .flags build/*.[od] *.gcda *.gcno tests/*.[od] tests/*.gcda tests/*.gcno
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
