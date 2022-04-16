@@ -200,39 +200,39 @@ default: bfs
 all: $(BIN_GOALS)
 
 bfs: \
-    bar.o \
-    bftw.o \
-    color.o \
-    ctx.o \
-    darray.o \
-    diag.o \
-    dir.o \
-    dstring.o \
-    eval.o \
-    exec.o \
-    fsade.o \
-    main.o \
-    mtab.o \
-    opt.o \
-    parse.o \
-    printf.o \
-    pwcache.o \
-    stat.o \
-    trie.o \
-    typo.o \
-    util.o \
-    xregex.o \
-    xspawn.o \
-    xtime.o
+    build/bar.o \
+    build/bftw.o \
+    build/color.o \
+    build/ctx.o \
+    build/darray.o \
+    build/diag.o \
+    build/dir.o \
+    build/dstring.o \
+    build/eval.o \
+    build/exec.o \
+    build/fsade.o \
+    build/main.o \
+    build/mtab.o \
+    build/opt.o \
+    build/parse.o \
+    build/printf.o \
+    build/pwcache.o \
+    build/stat.o \
+    build/trie.o \
+    build/typo.o \
+    build/util.o \
+    build/xregex.o \
+    build/xspawn.o \
+    build/xtime.o
 
 tests/mksock: tests/mksock.o
-tests/trie: trie.o tests/trie.o
-tests/xtimegm: xtime.o tests/xtimegm.o
+tests/trie: build/trie.o tests/trie.o
+tests/xtimegm: build/xtime.o tests/xtimegm.o
 
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-%.o: src/%.c .flags
+build/%.o: src/%.c .flags
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
     
 tests/%.o: tests/%.c .flags
@@ -286,3 +286,5 @@ uninstall:
 .SUFFIXES:
 
 -include $(wildcard *.d)
+
+$(shell mkdir -p build)
