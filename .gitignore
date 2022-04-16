@@ -1,9 +1,3 @@
 .flags
-*.o
-*.d
-*.gcda
-*.gcno
+/build/
 /bfs
-/tests/mksock
-/tests/trie
-/tests/xtimegm

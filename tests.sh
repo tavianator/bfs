@@ -881,6 +881,7 @@ ROOT=$(dirname -- "${BASH_SOURCE[0]}")
 read -a BFS <<<"${BFS:-$ROOT/bfs}"
 BFS[0]=$(_realpath "$(command -v "${BFS[0]}")")
 
+BUILD=$(_realpath "$ROOT/build")
 TESTS=$(_realpath "$ROOT/tests")
 
 # The temporary directory that will hold our test data
@@ -1053,7 +1054,7 @@ function make_rainbow() {
     # TODO: block
     ln -s /dev/null "$1/chardev_link"
     ln -s nowhere "$1/broken"
-    "$TESTS/mksock" "$1/socket"
+    "$BUILD/tests/mksock" "$1/socket"
     touchp "$1"/s{u,g,ug}id
     chmod u+s "$1"/su{,g}id
     chmod g+s "$1"/s{u,}gid

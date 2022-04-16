@@ -174,7 +174,7 @@ ALL_FLAGS := $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
 $(shell ./flags.sh $(ALL_FLAGS))
 
 # Goals that make binaries
-BIN_GOALS := bfs tests/mksock tests/trie tests/xtimegm
+BIN_GOALS := bfs build/tests/mksock build/tests/trie build/tests/xtimegm
 
 # Goals that are treated like flags by this Makefile
 FLAG_GOALS := asan lsan msan tsan ubsan gcov release
@@ -225,20 +225,20 @@ bfs: \
     build/xspawn.o \
     build/xtime.o
 
-tests/mksock: tests/mksock.o
-tests/trie: build/trie.o tests/trie.o
-tests/xtimegm: build/xtime.o tests/xtimegm.o
+build/tests/mksock: build/tests/mksock.o
+build/tests/trie: build/trie.o build/tests/trie.o
+build/tests/xtimegm: build/xtime.o build/tests/xtimegm.o
 
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-build:
+build build/tests:
 	$(MKDIR) $@
 
 build/%.o: src/%.c .flags | build
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
-    
-tests/%.o: tests/%.c .flags
+
+build/tests/%.o: tests/%.c .flags | build/tests
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 # Need a rule for .flags to convince make to apply the above pattern rule if
@@ -251,10 +251,10 @@ $(FLAG_GOALS): $(FLAG_PREREQS)
 
 check: $(CHECKS)
 
-$(STRATEGY_CHECKS): check-%: bfs tests/mksock
+$(STRATEGY_CHECKS): check-%: bfs build/tests/mksock
 	./tests.sh --bfs="./bfs -S $*" $(TEST_FLAGS)
 
-check-trie check-xtimegm: check-%: tests/%
+check-trie check-xtimegm: check-%: build/tests/%
 	$<
 
 distcheck:
@@ -269,7 +269,7 @@ endif
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
 
 clean:
-	$(RM) $(BIN_GOALS) .flags build/*.[od] *.gcda *.gcno tests/*.[od] tests/*.gcda tests/*.gcno
+	$(RM) -r bfs .flags build
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
@@ -288,4 +288,4 @@ uninstall:
 
 .SUFFIXES:
 
--include $(wildcard build/*.d tests/*.d)
+-include $(wildcard build/*.d build/tests/*.d)
