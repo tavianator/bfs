@@ -3,8 +3,8 @@
 
 [<img src = 'https://github.com/tavianator/bfs/actions/workflows/ci.yml/badge.svg' align = left>][CI]
 
+[![Badge Version]][Releases]
 [![Badge License]][License]
-[![Badge Version]][Releases] <br>
 
 </div>
 <div align = center>
@@ -17,17 +17,28 @@
 
 ![Showcase]
 
+<br>
+
+`bfs` is a `find` variant that operates <br>
+***[breadth - first]*** rather than ***[depth - first]*** .
+
+<br>
+
 </div>
 
-`bfs` is a variant of the UNIX `find` command that operates [breadth-first] rather than [depth-first].
-It is otherwise compatible with many versions of `find`, including
+## Compatibility
 
-- [POSIX `find`][POSIX]
-- [GNU `find`][GNU]
-- {[Free],[Open],[Net]}BSD `find`
-- [macOS `find`][MacOS]
+`bfs` *is compatible with the following* `find` *commands:*
 
-If you're not familiar with `find`, the [GNU find manual][GNU Manual] provides a good introduction.
+- **[FreeBSD] / [OpenBSD] / [NetBSD]**
+- **[MacOS]**
+- **[POSIX]**
+- **[GNU]**
+
+<br>
+
+*If you're not familiar with* `find` *, find out* <br>
+*more by checking the* **[GNU Find Manual]** *.*
 
 
 <!----------------------------------------------------------------------------->
@@ -41,16 +52,16 @@ If you're not familiar with `find`, the [GNU find manual][GNU Manual] provides a
 
 <!--------------------------------{ References }------------------------------->
 
-[breadth-first]: https://en.wikipedia.org/wiki/Breadth-first_search
-[depth-first]: https://en.wikipedia.org/wiki/Depth-first_search
+[breadth - first]: https://en.wikipedia.org/wiki/Breadth-first_search
+[depth - first]: https://en.wikipedia.org/wiki/Depth-first_search
 
-[GNU Manual]: https://www.gnu.org/software/findutils/manual/html_mono/find.html
+[GNU Find Manual]: https://www.gnu.org/software/findutils/manual/html_mono/find.html
+[FreeBSD]: https://www.freebsd.org/cgi/man.cgi?find(1)
+[OpenBSD]: https://man.openbsd.org/find.1
+[NetBSD]: https://man.netbsd.org/find.1
 [POSIX]: http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html
 [MacOS]: https://ss64.com/osx/find.html
-[Free]: https://www.freebsd.org/cgi/man.cgi?find(1)
-[Open]: https://man.openbsd.org/find.1
 [GNU]: https://www.gnu.org/software/findutils/
-[Net]: https://man.netbsd.org/find.1
 
 
 <!----------------------------------{ Badges }--------------------------------->
