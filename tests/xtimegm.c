@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#include "../xtime.h"
+#include "../src/xtime.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
