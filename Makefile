@@ -40,7 +40,6 @@ DEFAULT_CFLAGS := \
     -Wshadow \
     -Wsign-compare \
     -Wstrict-prototypes \
-    -I./src/ \
     -Wimplicit-fallthrough
 
 CFLAGS ?= $(DEFAULT_CFLAGS)
