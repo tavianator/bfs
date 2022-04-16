@@ -7,6 +7,7 @@
 [![Badge License]][License]
 
 </div>
+<br>
 <div align = center>
 
 # BFS
