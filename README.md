@@ -1,16 +1,17 @@
 
-[![Badge CI]][CI]
+<div align = right>
 
+[<img src = 'https://github.com/tavianator/bfs/actions/workflows/ci.yml/badge.svg' align = left>][CI]
+
+[![Badge License]][License]
+[![Badge Version]][Releases] <br>
+
+</div>
 <div align = center>
 
 # BFS
 
-***Breadth - first Search For Your Files.***
-
-<br>
-
-[![Badge License]][License]
-[![Badge Version]][Releases] <br>
+***Breadth - First Search For Your Files.***
 
 <br>
 
@@ -56,4 +57,3 @@ If you're not familiar with `find`, the [GNU find manual][GNU Manual] provides a
 
 [Badge License]: http://img.shields.io/badge/license-0BSD-blue.svg?style=for-the-badge
 [Badge Version]: https://img.shields.io/github/v/tag/tavianator/bfs?label=Version&style=for-the-badge
-[Badge CI]: https://github.com/tavianator/bfs/actions/workflows/ci.yml/badge.svg
