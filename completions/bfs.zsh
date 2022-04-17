@@ -25,8 +25,6 @@ args=(
     '*-not'
     '*-or'
     '*-a' '*-o'
-    # TODO: Do we need to handle any of: , ! ( )
-    #       As they are single letters, can we even do anything useful?
 
     # Special forms
     '*-exclude[exclude paths matching EXPRESSION from search]'
@@ -36,7 +34,7 @@ args=(
     '(-color)-nocolor[turn off colors]'
     '*-daystart[measure times relative to start of today]'
     '(-d)*-depth[search in post-order (descendents first)]'
-    '-files0-from[search NUL separated paths from FILE]:file:_path'
+    '-files0-from[search NUL separated paths from FILE]:file:_files'
     '*-follow[follow all symbolic links (same as -L)]'
     '*-ignore_readdir_race[report an error if bfs detects file tree is modified during search]'
     '*-noignore_readdir_race[do not report an error if bfs detects file tree is modified during search]'
@@ -44,7 +42,6 @@ args=(
     '*-mindepth[ignore files shallower than N]:minimum search depth'
     "*-mount[don't descend into other mount points]"
     '*-nohidden[exclude hidden files]'
-    # TODO: Should this be removed to reduce clutter in the already long list, since it doesn't do anything?
     '*-noleaf[ignored, for compatibility with GNU find]'
     '-regextype[type of regex to use, default posix-basic]:regexp syntax:(help posix-basic posix-extended ed emacs grep sed)'
     '*-status[display a status bar while searching]'
@@ -149,11 +146,11 @@ args=(
     '(- *)-version[print version information]'
     '(-)--version[print version information]'
 
+    # TODO: Handle ( and )
+    '(--help --version)*:other:{_alternative "directories:directory:_files -/" "logic:logic:_values logic , \!"}'
 )
 
-_arguments -C $args \
-    '(--help --version)*:directory:_files -/' \
-&& ret=0
+_arguments -C $args && ret=0
 
 if [[ $state = times ]]; then
     if ! compset -P '[+-]' || [[ -prefix '[0-9]' ]]; then
