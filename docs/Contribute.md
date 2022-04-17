@@ -126,23 +126,77 @@ To test a different configuration, you'll have to repeat it (e.g. `make release 
 
 - Use `goto` for cleanups in error paths.
 
-### Adding tests
+<br>
 
-Both new features and bug fixes should have associated tests.
-To add a test, create a new function in `tests.sh` called `test_<something>`.
-Snapshot tests use the `bfs_diff` function to automatically compare the generated and expected outputs.
-For example,
+### Coverage
 
-```bash
-function test_something() {
+*Both new **Features** and bug **Fixes** should have associated tests.*
+
+<br>
+
+#### Adding
+
+Create a test by adding a function in **[`tests.sh`][Tests]** .
+
+Name it `test_< Label >` .
+
+<br>
+
+#### Comparing
+
+Snapshot tests can automatically compare the <br>
+generated output to expected results by using <br>
+the `bfs_diff` function.
+
+```sh
+function test_something(){
     bfs_diff basic -name something
 }
 ```
 
-`basic` is one of the directory trees generated for test cases; others include `links`, `loops`, `deep`, and `rainbow`.
+<br>
 
-Run `./tests.sh test_something --update` to generate the reference snapshot (and don't forget to `git add` it).
-Finally, add the test case to one of the arrays `posix_tests`, `bsd_tests`, `gnu_tests`, or `bfs_tests` depending on which `find` implementations it should be compatible with.
+#### Directories
+
+There are multiple directory trees generated for test cases:
+
+- `rainbow`
+
+- `basic`
+
+- `links`
+
+- `loops`
+
+- `deep`
+
+<br>
+
+#### Updating
+
+To add a reference snapshot for your new test, run:
+
+```sh
+./tests.sh test_something --update
+```
+
+*Don't forget to add this change to your commit.*
+
+<br>
+
+#### Compatibility
+
+Add your test to one of the lists, <br>
+depending on it's compatibility.
+
+- `posix_tests`
+
+- `bsd_tests`
+
+- `gnu_tests`
+
+- `bfs_tests`
+
 
 <!----------------------------------------------------------------------------->
 

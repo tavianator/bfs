@@ -100,3 +100,8 @@ make distcheck
 
 *Some of theses tests require `sudo`* <br>
 *privileges and will prompt you for it.*
+
+
+<!----------------------------------------------------------------------------->
+
+[Tests]: ../tests.sh
