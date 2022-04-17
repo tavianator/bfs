@@ -1,77 +1,146 @@
-Building
---------
 
-`bfs` uses [GNU Make](https://www.gnu.org/software/make/) as its build system.
-A simple invocation of
+# Makefile
 
-    $ make
+## Parallel
 
-should build `bfs` successfully, with no additional steps necessary.
-As usual with `make`, you can run a [parallel build](https://www.gnu.org/software/make/manual/html_node/Parallel.html) with `-j`.
-For example, to use all your cores, run `make -j$(nproc)`.
+You can run a **[Parallel Build]**  with:
+
+```sh
+make -j < Processor Count >
+```
+```sh
+make -j 2
+```
+
+<br>
+
 
 ### Targets
 
-| Command          | Description                                                   |
-|------------------|---------------------------------------------------------------|
-| `make`           | Builds just the `bfs` binary                                  |
-| `make all`       | Builds everything, including the tests (but doesn't run them) |
-| `make check`     | Builds everything, and runs the tests                         |
-| `make install`   | Installs `bfs` (with man page, shell completions, etc.)       |
-| `make uninstall` | Uninstalls `bfs`                                              |
+```sh
+make < Target >
+```
 
-### Flag-like targets
+<br>
 
-The build system provides a few shorthand targets for handy configurations:
+   Target   | Description
+:----------:|:-----------
+ **/**      | Builds Binary
+`all`       | Builds Everything
+`check`     | Builds Everything + Runs Tests
+`install`   | Installs:<br>- **BFS**<br>- **Man Page**<br>- **Shell Completions**
+`uninstall` | Removes **BFS**
 
-| Command        | Description                                                 |
-|----------------|-------------------------------------------------------------|
-| `make release` | Build `bfs` with optimizations, LTO, and without assertions |
-| `make asan`    | Enable [AddressSanitizer]                                   |
-| `make lsan`    | Enable [LeakSanitizer]                                      |
-| `make msan`    | Enable [MemorySanitizer]                                    |
-| `make tsan`    | Enable [ThreadSanitizer]                                    |
-| `make ubsan`   | Enable [UndefinedBehaviorSanitizer]                         |
-| `make gcov`    | Enable [code coverage]                                      |
+<br>
 
-[AddressSanitizer]: https://github.com/google/sanitizers/wiki/AddressSanitizer
-[LeakSanitizer]: https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#stand-alone-mode
-[MemorySanitizer]: https://github.com/google/sanitizers/wiki/MemorySanitizer
-[ThreadSanitizer]: https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
-[UndefinedBehaviorSanitizer]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
-[code coverage]: https://gcc.gnu.org/onlinedocs/gcc/Gcov.html
+### Shorthands
 
-You can combine multiple flags and other targets (e.g. `make asan ubsan check`), but not all of them will work together.
+```sh
+make < Shorthand >
+```
+
+Shorthand | Description
+:--------:|:-----------
+`release` | Builds Binary <br>**+** *Optimizations*<br>**+** *LTO*<br>**-** *Assertions*
+`gcov`    | Enables **[Code Coverage]**
+
+Shorthand | Enables Sanitizer
+:--------:|:-----------------:
+`asan`    | **[Address]**
+`lsan`    | **[Leak]**
+`msan`    | **[Memory]**
+`tsan`    | **[Thread]**
+`ubsan`   | **[Undefined Behavior]**
+
+<br>
+
+*You can combine mutlitple flags &* <br>
+*targets, but not all work together.*
+
+```sh
+make asan ubsan check
+```
+
+<br>
 
 ### Flags
 
-Other flags are controlled with `make` variables and/or environment variables.
-Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
+*These flags are controlled with make / environment variables.*
 
-| Flag                             | Description                                 |
-|----------------------------------|---------------------------------------------|
-| `CC`                             | The C compiler to use, e.g. `make CC=clang` |
-| `CFLAGS`<br>`EXTRA_CFLAGS`       | Override/add to the default compiler flags  |
-| `LDFLAGS`<br>`EXTRA_LDFLAGS`     | Override/add to the linker flags            |
-| `WITH_ACL`<br>`WITH_ATTR`<br>... | Enable/disable optional dependencies        |
-| `TEST_FLAGS`                     | `tests.sh` flags for `make check`           |
-| `DESTDIR`                        | The root directory for `make install`       |
-| `PREFIX`                         | The installation prefix (default: `/usr`)   |
-| `MANDIR`                         | The man page installation directory         |
+<br>
 
-### Dependency tracking
+ Flag | Description
+:----:|:------------
+`CC`                         | What compiler to use 🠖 `make CC=clang`
+`CFLAGS`<br>`EXTRA_CFLAGS`   | Override / Add to the default compiler flags
+`LDFLAGS`<br>`EXTRA_LDFLAGS` | Override / Add to the linker flags
+`WITH_ACL`<br>`WITH_ATTR`    | Enable / Disable optional dependencies
+`TEST_FLAGS`                 | `tests.sh` flags for `make check`
+`DESTDIR`                    | The root directory for `make install`
+`PREFIX`                     | The installation prefix ( default : `/usr` )
+`MANDIR`                     | The man page installation directory
 
-The build system automatically tracks header dependencies with the `-M` family of compiler options (see `DEPFLAGS` in the `Makefile`).
-So if you edit a header file, `make` will rebuild the necessary object files ensuring they don't go out of sync.
+<br>
 
-We go one step further than most build systems by tracking the flags that were used for the previous compilation.
-That means you can change configurations without having to `make clean`.
-For example,
+*Check the **[Makefile]** for more flags.*
 
-    $ make
-    $ make release
+<br>
 
-will build the project in debug mode and then rebuild it in release mode.
+### Dependencies
 
-A side effect of this may be surprising: `make check` by itself will rebuild the project in the default configuration.
-To test a different configuration, you'll have to repeat it (e.g. `make release check`).
+*The build system automatically tracks <br>
+header dependencies with the family <br>
+of `-M` compiler options.*
+
+⤷ See `DEPFLAGS` in [`Makefile`][Makefile]
+
+<br>
+
+#### Changes
+
+This means that changes to a header file will <br>
+automatically have object files using it be rebuilt.
+
+<br>
+
+#### Beyond
+
+We go one step further than most build <br>
+systems by tracking the flags that were <br>
+used for the previous compilation.
+
+This enables you to change your build config <br>
+without having to first call `make clean` .
+
+```sh
+make            # Builds In Debug Mode
+make release    # Rebuilds In Release Mode
+```
+
+<br>
+
+#### Side Effects
+
+A side effect that may surprise you is that to check <br>
+a non - standard build you have to specify both the <br>
+build target as well as `check` .
+
+```sh
+make < Target > check
+```
+```sh
+make release check
+```
+
+
+<!----------------------------------------------------------------------------->
+
+[Undefined Behavior]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+[Parallel Build]: https://www.gnu.org/software/make/manual/html_node/Parallel.html
+[code coverage]: https://gcc.gnu.org/onlinedocs/gcc/Gcov.html
+[Address]: https://github.com/google/sanitizers/wiki/AddressSanitizer
+[Thread]: https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
+[Memory]: https://github.com/google/sanitizers/wiki/MemorySanitizer
+[Leak]: https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#stand-alone-mode
+
+[Makefile]: ../Makefile
