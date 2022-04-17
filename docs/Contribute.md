@@ -1,11 +1,11 @@
-Contributing
-============
 
-License
--------
+# Contribute
 
-`bfs` is licensed under the [Zero-Clause BSD License](https://opensource.org/licenses/0BSD), a maximally permissive license.
-Contributions must use the same license.
+<br>
+
+## License
+
+**BFS** and any contributions to it are licensed under <br>**[Zero - Clause BSD]**, a maximally permissive license.
 
 
 Building
@@ -87,40 +87,80 @@ A side effect of this may be surprising: `make check` by itself will rebuild the
 To test a different configuration, you'll have to repeat it (e.g. `make release check`).
 
 
-Testing
--------
+<br>
 
-`bfs` comes with an extensive testsuite which can be run with
+---
 
-    $ make check
+<br>
 
-Most of the testsuite is implemented in the file [`tests.sh`](/tests.sh).
-This script contains hundreds of separate test cases.
-Most of them are *snapshot tests* which compare `bfs`'s output to a known-good copy saved under [`tests`](/tests).
+## Testing
 
-You can pass the name of a particular test case (or a few) to run just those tests.
-For example:
+**BFS** testsuite contains hundreds of separate tests, most of <br>
+which are snapshot - tests and implemented in [`tests.sh`][Tests] .
 
-    $ ./tests.sh test_basic
+*Snapshot-tests compare generated output to **[Predefined Truths]**.*
 
-If you need to update the reference snapshot, pass `--update`.
-It can be handy to generate the snapshot with a different `find` implementation to ensure the output is correct, for example:
+<br>
 
-    $ ./tests.sh test_basic --bfs=find --update
+### Help
 
-But keep in mind, other `find` implementations may not be correct.
-To my knowledge, no other implementation passes even the POSIX-compatible subset of the tests:
+```sh
+./tests.sh --help
+```
 
-    $ ./tests.sh --bfs=find --posix
-    ...
-    tests passed: 89
-    tests failed: 5
+<br>
 
-Run
+### Run
 
-    $ ./tests.sh --help
+##### All
 
-for more details.
+```sh
+make check
+```
+
+##### Specific
+
+```sh
+./tests.sh test_basic
+```
+```sh
+./tests.sh test_basic test_bang
+```
+
+<br>
+
+### Update
+
+To update the reference snapshot, pass `--update`
+
+```sh
+./tests.sh test_basic --bfs=find --update
+```
+
+*It can be handy to generate the snapshot with a different* <br>
+`find` *implementation to ensure that the output is correct.*
+
+<br>
+
+### Implementations
+
+***Other*** `find` ***implementations may not be correct.***
+
+*To my knowledge, no other implementation even <br>
+passes the POSIX - compatible subset of the tests.*
+
+```console
+foo@bar:~$ ./tests.sh --bfs=find --posix
+...
+tests passed: 89
+tests failed: 5
+```
+
+<br>
+
+---
+
+<br>
 
 ### Validation
 
@@ -165,3 +205,10 @@ function test_something() {
 
 Run `./tests.sh test_something --update` to generate the reference snapshot (and don't forget to `git add` it).
 Finally, add the test case to one of the arrays `posix_tests`, `bsd_tests`, `gnu_tests`, or `bfs_tests` depending on which `find` implementations it should be compatible with.
+
+<!----------------------------------------------------------------------------->
+
+[Zero - Clause BSD]: https://opensource.org/licenses/0BSD
+
+[Predefined Truths]: ../tests
+[Tests]: ../tests.sh
