@@ -1,6 +1,15 @@
-## Build
+# Build
 
-### Dependencies
+*The following describes how to* <br>
+*build this project from source.*
+
+<br>
+
+---
+
+<br>
+
+## Dependencies
 
 - **C Compiler**
 
@@ -16,74 +25,171 @@
 
 <br>
 
-### Libraries
+---
 
-- 
+<br>
 
+## Libraries
 
-`bfs` also depends on some system libraries for some of its features.
+- **[Oniguruma]**
 
-These dependencies are optional, and can be turned off at build time if necessary by setting the appropriate variable to the empty string (e.g. `make WITH_ONIGURUMA=`).
+- **[LibCap]** *`Linux Only`*
 
-| Dependency                                            | Platforms  | `make` flag      |
-|-------------------------------------------------------|------------|------------------|
-| [acl](https://savannah.nongnu.org/projects/acl)       | Linux only | `WITH_ACL`       |
-| [attr](https://savannah.nongnu.org/projects/attr)     | Linux only | `WITH_ATTR`      |
-| [libcap](https://sites.google.com/site/fullycapable/) | Linux only | `WITH_LIBCAP`    |
-| [Oniguruma](https://github.com/kkos/oniguruma)        | All        | `WITH_ONIGURUMA` |
+- **[ATTR]** *`Linux Only`*
 
-Here's how to install them on some common platforms:
+- **[ACL]** *`Linux Only`*
 
-<pre>
-<strong>Alpine Linux</strong>
-# apk add acl{,-dev} attr{,-dev} libcap{,-dev} oniguruma-dev
+<br>
 
-<strong>Arch Linux</strong>
-# pacman -S acl attr libcap oniguruma
+### Optional
 
-<strong>Debian/Ubuntu</strong>
-# apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev libonig-dev
+*These dependencies are optional and can <br>
+be disabled by specifying them in the build <br>
+command as shown in the following:*
 
-<strong>Fedora</strong>
-# dnf install libacl-devel libattr-devel libcap-devel oniguruma-devel
+```sh
+make WITH_< Library >=
+```
 
-<strong>NixOS</strong>
-# nix-env -i acl attr libcap oniguruma
+```sh
+make WITH_ONIGURUMA=
+```
 
-<strong>Void Linux</strong>
-# xbps-install -S acl-{devel,progs} attr-{devel,progs} libcap-{devel,progs} oniguruma-devel
+<br>
 
-<strong>FreeBSD</strong>
-# pkg install oniguruma
+### Installation
 
-<strong>MacPorts</strong>
-# port install oniguruma6
+<br>
 
-<strong>Homebrew</strong>
-$ brew install oniguruma
-</pre>
-</details>
+### ![Badge Arch]
 
-Once the dependencies are installed, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
-Then run
+```sh
+pacman -S acl attr libcap oniguruma
+```
 
-    $ make
+### ![Badge Alpine]
 
-This will build the `bfs` binary in the current directory.
-Run the test suite to make sure it works correctly:
+```sh
+apk add acl{,-dev} attr{,-dev} libcap{,-dev} oniguruma-dev
+```
 
-    $ make check
+<br>
 
-If you're interested in speed, you may want to build the release version instead:
+### ![Badge Debian] ![Badge Ubuntu]
 
-    $ make release
+```sh
+apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev libonig-dev
+```
 
-Finally, if you want to install it globally, run
+### ![Badge Fedora]
 
-    # make install
+```sh
+dnf install libacl-devel libattr-devel libcap-devel oniguruma-devel
+```
 
+<br>
+
+### ![Badge NixOS]
+
+```sh
+nix-env -i acl attr libcap oniguruma
+```
+
+<br>
+
+### ![Badge Void]
+
+```sh
+xbps-install -S acl-{devel,progs} attr-{devel,progs} libcap-{devel,progs} oniguruma-devel
+```
+
+<br>
+
+### ![Badge FreeBSD]
+
+```sh
+pkg install oniguruma
+```
+
+<br>
+
+### ![Badge MacPorts]
+
+```sh
+port install oniguruma6
+```
+
+<br>
+
+### ![Badge Homebrew]
+
+```sh
+brew install oniguruma
+```
+
+<br>
+
+---
+
+<br>
+
+## Steps
+
+1. Download a **[Release]** or clone the **[Repository]**.
+
+2. Compile the project with:
+
+   ```sh
+   make
+   ```
+   
+   <br>
+   
+   ***With Tests:***
+   
+   ```sh
+   make check
+   ```
+   
+   <br>
+   
+   ***With Speed:***
+   
+   ```sh
+   make release
+   ```
+   
+3. Optionally, install it globally with:
+
+   ```sh
+   make install
+   ```
 
 <!----------------------------------------------------------------------------->
 
 [GNU Make]: https://www.gnu.org/software/make/
 [Bash]: https://www.gnu.org/software/bash/
+
+
+[Oniguruma]: https://github.com/kkos/oniguruma 
+[libcap]: https://sites.google.com/site/fullycapable/
+[attr]: https://savannah.nongnu.org/projects/attr
+[acl]: https://savannah.nongnu.org/projects/acl
+
+
+
+[Repository]: https://github.com/tavianator/bfs
+[Release]: https://github.com/tavianator/bfs/releases
+
+<!----------------------------------{ Badges }--------------------------------->
+
+[Badge Alpine]: https://img.shields.io/badge/Alpine_Linux-0D597F?style=for-the-badge&logo=Alpine-linux&logoColor=white
+[Badge Ubuntu]: https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=Ubuntu&logoColor=white
+[Badge Debian]: https://img.shields.io/badge/Debian-A81D33?style=for-the-badge&logo=Debian&logoColor=white
+[Badge Homebrew]: https://img.shields.io/badge/Homebrew-FBB040?style=for-the-badge&logo=Homebrew&logoColor=white
+[Badge NixOS]: https://img.shields.io/badge/NixOS-5277C3?style=for-the-badge&logo=NixOS&logoColor=white
+[Badge FreeBSD]: https://img.shields.io/badge/FreeBSD-AB2B28?style=for-the-badge&logo=FreeBSD&logoColor=white
+[Badge MacPorts]: https://img.shields.io/badge/MacPorts-gray?style=for-the-badge&logo=Apple&logoColor=white
+[Badge Void]: https://img.shields.io/badge/VoidLinux-478061?style=for-the-badge&logo=Linux&logoColor=white
+[Badge Fedora]: https://img.shields.io/badge/Fedora-51A2DA?style=for-the-badge&logo=Fedora&logoColor=white
+[Badge Arch]: https://img.shields.io/badge/Arch_Linux-1793D1?style=for-the-badge&logo=ArchLinux&logoColor=white
