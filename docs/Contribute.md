@@ -96,20 +96,35 @@ To test a different configuration, you'll have to repeat it (e.g. `make release 
 ## [Testing](./Testing.md)
 
 
-Hacking
--------
+## Hacking
 
-`bfs` is written in [C](https://en.wikipedia.org/wiki/C_(programming_language)), specifically [C11](https://en.wikipedia.org/wiki/C11_(C_standard_revision)).
-You can get a feel for the coding style by skimming the source code.
-[`main.c`](src/main.c) contains an overview of the rest of source files.
-A quick summary:
+**BFS** is written in **[C11]**.
 
-- Tabs for indentation, spaces for alignment.
-- Most types and functions should be namespaced with `bfs_`.
-  Exceptions are made for things that could be generally useful outside of `bfs`.
-- Error handling follows the C standard library conventions: return a nonzero `int` or a `NULL` pointer, with the error code in `errno`.
-  All failure cases should be handled, including `malloc()` failures.
-- `goto` is not harmful for cleaning up in error paths.
+*You can get a feel for the coding style* <br>
+*by skimming through the **[Source Code]** .*
+
+<br>
+
+### Style
+
+- <kbd>Tabs</kbd> for indentation
+
+- <kbd>Spaces</kbd> for alignment
+
+- Prefix types and functions with `bfs_`
+
+  *Exceptions are things that could be* <br>
+  *generally useful outside of **BFS** .*
+
+- Error handling follows the C STL convention
+
+  *Return a* `NULL` *pointer or a nonzero* <br>
+  `int` *with the error code in* `errno` *.*
+  
+  ***All failure cases should be handled,*** <br>
+  ***including***  `malloc()`  ***failures.***
+
+- Use `goto` for cleanups in error paths.
 
 ### Adding tests
 
@@ -132,8 +147,10 @@ Finally, add the test case to one of the arrays `posix_tests`, `bsd_tests`, `gnu
 <!----------------------------------------------------------------------------->
 
 [Zero - Clause BSD]: https://opensource.org/licenses/0BSD
+[C11]: https://en.wikipedia.org/wiki/C11_(C_standard_revision)
 
 [CI]: https://github.com/tavianator/bfs/actions
 
 [Predefined Truths]: ../tests
+[Source Code]: ../src/main.c
 [Tests]: ../tests.sh
