@@ -68,9 +68,9 @@
 [License]: LICENSE
 [CI]: https://github.com/tavianator/bfs/actions/workflows/ci.yml
 
-[Errors / Warnings]: docs/Usage#Errors-&-Warnings
-[Options]: docs/Usage#Options
-[Easier]: docs/Usage#Arguments
+[Errors / Warnings]: docs/Usage.md#Errors-&-Warnings
+[Options]: docs/Usage.md#Options
+[Easier]: docs/Usage.md#Arguments
 
 <!--------------------------------{ Quicklinks }------------------------------->
 
