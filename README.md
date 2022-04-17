@@ -17,6 +17,7 @@
 <br>
 
 **⸢ [Install] ⸥**  
+**⸢ [Build] ⸥**  
 **⸢ [Usage] ⸥**  
 **⸢ [Changelog] ⸥**  
 **⸢ [Contribute] ⸥**  
@@ -63,6 +64,7 @@
 [Contribute]: docs/Contribute.md
 [Changelog]: docs/Changelog.md
 [Install]: docs/Install.md
+[Build]: docs/Build.md
 [Usage]: docs/Usage.md
 
 
