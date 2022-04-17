@@ -146,8 +146,7 @@ args=(
     '(- *)-version[print version information]'
     '(-)--version[print version information]'
 
-    # TODO: Handle ( and )
-    '(--help --version)*:other:{_alternative "directories:directory:_files -/" "logic:logic:_values logic , \!"}'
+    '(--help --version)*:other:{_alternative "directories:directory:_files -/" "logic:logic:(, ! \( \) )"}'
 )
 
 _arguments -C $args && ret=0
