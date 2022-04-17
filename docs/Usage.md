@@ -59,11 +59,11 @@ On the other hand, `bfs` lists files from shallowest to deepest, so you never ha
 
 ### Path Last
 
-```sh
+```console
 foo@bar:~$ bfs  -L -name 'needle' haystack
 haystack/needle
 ```
-```sh
+```console
 foo@bar:~$ find -L -name 'needle' haystack
 find: paths must precede expression: haystack
 ```
@@ -72,12 +72,12 @@ find: paths must precede expression: haystack
 
 ### Path First
 
-```sh
+```console
 foo@bar:~$ bfs  haystack -L -name 'needle'
 haystack/needle
 ```
 
-```sh
+```console
 foo@bar:~$ find haystack -L -name 'needle'
 find: unknown predicate '-L'
 ```
@@ -85,12 +85,12 @@ find: unknown predicate '-L'
 
 ### Path Default
 
-```sh
+```console
 foo@bar:~$ bfs  -L haystack -name 'needle'
 haystack/needle
 ```
 
-```sh
+```console
 foo@bar:~$ find -L haystack -name 'needle'
 haystack/needle
 ```
@@ -101,24 +101,36 @@ haystack/needle
 
 <br>
 
+## Errors & Warnings
 
-# C
+### Typos
 
-**BFS** gives helpful errors and warnings.
+*Detects & suggests corrections.*
 
-For example, `bfs` will detect and suggest corrections for typos:
+```console
+foo@bar:~$ bfs -nam needle
+bfs: error: bfs -nam needle
+bfs: error:     ~~~~
+bfs: error: Unknown argument; did you mean -name?
+```
 
-    $ bfs -nam needle
-    <strong>bfs: error:</strong> bfs <strong>-nam</strong> needle
-    <strong>bfs: error:</strong>     <strong>~~~~</strong>
-    <strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
+<br>
 
-`bfs` also includes a powerful static analysis to identify likely mistakes:
+### Mistakes
 
-    $ bfs -print -name 'needle'
-    <strong>bfs: warning:</strong> bfs -print <strong>-name needle</strong>
-    <strong>bfs: warning:</strong>            <strong>~~~~~~~~~~~~</strong>
-    <strong>bfs: warning:</strong> The result of this expression is ignored.
+*Uses static analysis to identify likely mistakes.*
+
+```console
+foo@bar:~$ bfs -print -name 'needle'
+bfs: warning: bfs -print -name 'needle'
+bfs: warning:            ~~~~~~~~~~~~~~
+bfs: warning: The result of this expression is ignored.
+```
+<br>
+
+---
+
+<br>
 
 # D
 
