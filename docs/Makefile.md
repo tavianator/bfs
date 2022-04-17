@@ -1,6 +1,8 @@
 
 # Makefile
 
+<br>
+
 ## Parallel
 
 You can run a **[Parallel Build]**  with:
@@ -14,8 +16,12 @@ make -j 2
 
 <br>
 
+---
 
-### Targets
+<br>
+
+
+## Targets
 
 ```sh
 make < Target >
@@ -33,16 +39,24 @@ make < Target >
 
 <br>
 
-### Shorthands
+---
+
+<br>
+
+## Shorthands
 
 ```sh
 make < Shorthand >
 ```
 
+<br>
+
 Shorthand | Description
 :--------:|:-----------
 `release` | Builds Binary <br>**+** *Optimizations*<br>**+** *LTO*<br>**-** *Assertions*
 `gcov`    | Enables **[Code Coverage]**
+
+<br>
 
 Shorthand | Enables Sanitizer
 :--------:|:-----------------:
@@ -63,7 +77,11 @@ make asan ubsan check
 
 <br>
 
-### Flags
+---
+
+<br>
+
+## Flags
 
 *These flags are controlled with make / environment variables.*
 
@@ -86,7 +104,11 @@ make asan ubsan check
 
 <br>
 
-### Dependencies
+---
+
+<br>
+
+## Dependencies
 
 *The build system automatically tracks <br>
 header dependencies with the family <br>
@@ -96,14 +118,14 @@ of `-M` compiler options.*
 
 <br>
 
-#### Changes
+### Changes
 
 This means that changes to a header file will <br>
 automatically have object files using it be rebuilt.
 
 <br>
 
-#### Beyond
+### Beyond
 
 We go one step further than most build <br>
 systems by tracking the flags that were <br>
@@ -119,7 +141,7 @@ make release    # Rebuilds In Release Mode
 
 <br>
 
-#### Side Effects
+### Side Effects
 
 A side effect that may surprise you is that to check <br>
 a non - standard build you have to specify both the <br>
