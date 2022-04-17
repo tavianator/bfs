@@ -1,30 +1,57 @@
-Installation
-------------
+
+# Installation
+
+## Packages
+
+### ![Badge Alpine]
+
+```sh
+apk add bfs
+```
+
+### ![Badge Debian] ![Badge Ubuntu]
+
+```sh
+apt install bfs
+```
+
+### ![Badge NixOS]
+
+```sh
+nix-env -i bfs
+```
+
+### ![Badge Void]
+
+```sh
+xbps-install -S bfs
+```
+
+### ![Badge FreeBSD]
+
+```sh
+pkg install bfs
+```
+
+### ![Badge MacPorts]
+
+```sh
+port install bfs
+```
+
+### ![Badge Homebrew]
+
+```sh
+brew install tavianator/tap/bfs
+```
+
+
 
 <details>
 <summary><code>bfs</code> may already be packaged for your operating system.</summary>
 
 <pre>
-<strong>Alpine Linux</strong>
-# apk add bfs
 
-<strong>Debian/Ubuntu</strong>
-# apt install bfs
-
-<strong>NixOS</strong>
-# nix-env -i bfs
-
-<strong>Void Linux</strong>
-# xbps-install -S bfs
-
-<strong>FreeBSD</strong>
-# pkg install bfs
-
-<strong>MacPorts</strong>
-# port install bfs
-
-<strong>Homebrew</strong>
-$ brew install tavianator/tap/bfs
 </pre>
 </details>
 
@@ -94,3 +121,16 @@ If you're interested in speed, you may want to build the release version instead
 Finally, if you want to install it globally, run
 
     # make install
+
+
+
+<!----------------------------------------------------------------------------->
+
+[Badge Alpine]: https://img.shields.io/badge/Alpine_Linux-0D597F?style=for-the-badge&logo=alpine-linux&logoColor=white
+[Badge Ubuntu]: https://img.shields.io/badge/Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white
+[Badge Debian]: https://img.shields.io/badge/Debian-A81D33?style=for-the-badge&logo=debian&logoColor=white
+[Badge Homebrew]: https://img.shields.io/badge/Homebrew-FBB040?style=for-the-badge&logo=homebrew&logoColor=white
+[Badge NixOS]: https://img.shields.io/badge/NixOS-5277C3?style=for-the-badge&logo=nixos&logoColor=white
+[Badge FreeBSD]: https://img.shields.io/badge/FreeBSD-AB2B28?style=for-the-badge&logo=freebsd&logoColor=white
+[Badge MacPorts]: https://img.shields.io/badge/MacPorts-gray?style=for-the-badge&logo=apple&logoColor=white
+[Badge Void]: https://img.shields.io/badge/VoidLinux-478061?style=for-the-badge&logo=linux&logoColor=white
