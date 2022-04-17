@@ -104,4 +104,7 @@ make distcheck
 
 <!----------------------------------------------------------------------------->
 
+[CI]: https://github.com/tavianator/bfs/actions
+
+[Predefined Truths]: ../tests
 [Tests]: ../tests.sh
