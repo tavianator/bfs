@@ -67,6 +67,8 @@ make WITH_ONIGURUMA=
 pacman -S acl attr libcap oniguruma
 ```
 
+<br>
+
 ### ![Badge Alpine]
 
 ```sh
@@ -80,6 +82,8 @@ apk add acl{,-dev} attr{,-dev} libcap{,-dev} oniguruma-dev
 ```sh
 apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev libonig-dev
 ```
+
+<br>
 
 ### ![Badge Fedora]
 
