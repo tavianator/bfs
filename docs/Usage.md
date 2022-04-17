@@ -30,11 +30,11 @@ bfs -name config -exclude -name .git
 In / Excludes `.files`
 
 ```sh
-bfs -name test -nohidden
+bfs -name test -nohidden    # Excludes
 ```
 
 ```sh
-bfs -name test -hidden
+bfs -name test -hidden      # Includes
 ```
 
 <br>
@@ -128,6 +128,8 @@ haystack/needle
 <br>
 
 ## Errors & Warnings
+
+<br>
 
 ### Typos
 

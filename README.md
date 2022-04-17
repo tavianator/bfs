@@ -53,7 +53,7 @@
 
 ## Features
 
-- Operates breath - first, which typically finds files faster.
+- Operates **[Breath - First]**, which typically finds files faster.
 - Provides useful **[Options]** to make life easier
 - **[Easier]** to use while staying compatible
 - Shows helpful **[Errors / Warnings]**
@@ -68,7 +68,8 @@
 [License]: LICENSE
 [CI]: https://github.com/tavianator/bfs/actions/workflows/ci.yml
 
-[Errors / Warnings]: docs/Usage.md#Errors-&-Warnings
+[Errors / Warnings]: docs/Usage.md#Errors--Warnings
+[Breath - First]: docs/Design.md
 [Options]: docs/Usage.md#Options
 [Easier]: docs/Usage.md#Arguments
 
