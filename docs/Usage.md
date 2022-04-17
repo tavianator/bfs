@@ -5,51 +5,71 @@
 
 ## Options
 
-<code>bfs</code> adds some options that make common tasks easier.</
+*Command - line options **BFS** provides.*
 
-### `-exclude`
+<br>
 
-The `-exclude` operator skips an entire subtree whenever an expression matches.
-For example, `-exclude -name .git` will exclude any files or directories named `.git` from the search results.
-`-exclude` is easier to use than the standard `-prune` action; compare
+### Exclude
 
-    bfs -name config -exclude -name .git
+Skips matching items.
 
-to the equivalent
+```sh
+bfs -name config -exclude -name .git
+```
 
-    find ! \( -name .git -prune \) -name config
+🠖 Skips any files / directories named `.git`
 
-Unlike `-prune`, `-exclude` even works in combination with `-depth`/`-delete`.
+<br>
 
----
+*Can even be used with `-depth` & `-delete` .*
 
-### `-hidden`/`-nohidden`
+<br>
 
-`-hidden` matches "hidden" files (dotfiles).
-`bfs -hidden` is effectively shorthand for
+### Hidden
 
-    find \( -name '.*' -not -name . -not -name .. \)
+In / Excludes `.files`
 
-`-nohidden` is equivalent to `-exclude -hidden`.
+```sh
+bfs -name test -nohidden
+```
 
----
+```sh
+bfs -name test -hidden
+```
 
-### `-unique`
+<br>
 
-This option ensures that `bfs` only visits each file once, even if it's reachable through multiple hard or symbolic links.
-It's particularly useful when following symbolic links (`-L`).
+### Unique
 
----
+Ensures every file is only visited once even if it's <br>
+reachable through multiple hard / symbolic links.
 
-### `-color`/`-nocolor`
+```sh
+bfs -name images -L -unique
+```
 
-When printing to a terminal, `bfs` automatically colors paths like GNU `ls`, according to the `LS_COLORS` environment variable.
-The `-color` and `-nocolor` options override the automatic behavior, which may be handy when you want to preserve colors through a pipe:
+*Particularly useful when following symbolic links (* `-L` *)*
 
-    bfs -color | less -R
+<br>
 
-If the [`NO_COLOR`](https://no-color.org/) environment variable is set, colors will be disabled by default.
+### Color
 
+**BFS** automatically colors paths similar to **GNUs** `ls`. <br>
+*For this it uses the* `LS_COLORS` *environment variable.*
+
+```sh
+bfs -nocolor -name documents
+```
+
+This option might come into handy if you want <br>
+to preserve the original colors through a pipe:
+
+```sh
+bfs -color | less -R
+```
+
+*If the* [`NO_COLOR`][Color] *environment variable <br>
+is set, coloring will be disabled by default.*
 
 <br>
 
@@ -134,4 +154,7 @@ bfs: warning: The result of this expression is ignored.
 ```
 <br>
 
+<!----------------------------------------------------------------------------->
+
+[Color]: https://no-color.org/
 
