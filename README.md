@@ -49,6 +49,16 @@
 *If you're not familiar with* `find` *, find out* <br>
 *more by checking the* **[GNU Find Manual]** *.*
 
+<br>
+
+## Features
+
+- Operates breath - first, which typically finds files faster.
+- Provides useful **[Options]** to make life easier
+- **[Easier]** to use while staying compatible
+- Shows helpful **[Errors / Warnings]**
+
+<br>
 
 <!----------------------------------------------------------------------------->
 
@@ -58,6 +68,9 @@
 [License]: LICENSE
 [CI]: https://github.com/tavianator/bfs/actions/workflows/ci.yml
 
+[Errors / Warnings]: docs/Usage#Errors-&-Warnings
+[Options]: docs/Usage#Options
+[Easier]: docs/Usage#Arguments
 
 <!--------------------------------{ Quicklinks }------------------------------->
 

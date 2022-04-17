@@ -1,94 +1,127 @@
-Features
---------
 
-<details>
-<summary><code>bfs</code> operates breadth-first, which typically finds the file(s) you're looking for faster.</summary>
+
+**BFS** operates breath-first, which typically finds files faster.
 
 Imagine the following directory tree:
 
-<pre>
-haystack
-├── deep
-│   └── 1
-│       └── 2
-│           └── 3
-│               └── 4
-│                   └── ...
-└── shallow
-    └── <strong>needle</strong>
-</pre>
+
+    haystack
+    ├── deep
+    │   └── 1
+    │       └── 2
+    │           └── 3
+    │               └── 4
+    │                   └── ...
+    └── shallow
+        └── <strong>needle</strong>
+
 
 `find` will explore the entire `deep` directory tree before it ever gets to the `shallow` one that contains what you're looking for.
 
-<pre>
-$ <strong>find</strong> haystack
-haystack
-haystack/deep
-haystack/deep/1
-haystack/deep/1/2
-haystack/deep/1/2/3
-haystack/deep/1/2/3/4
-...
-haystack/shallow
-<strong>haystack/shallow/needle</strong>
-</pre>
+    $ <strong>find</strong> haystack
+    haystack
+    haystack/deep
+    haystack/deep/1
+    haystack/deep/1/2
+    haystack/deep/1/2/3
+    haystack/deep/1/2/3/4
+    ...
+    haystack/shallow
+    <strong>haystack/shallow/needle</strong>
+
 
 On the other hand, `bfs` lists files from shallowest to deepest, so you never have to wait for it to explore an entire unrelated subtree.
 
-<pre>
-$ <strong>bfs</strong> haystack
-haystack
-haystack/deep
-haystack/shallow
-haystack/deep/1
-<strong>haystack/shallow/needle</strong>
-haystack/deep/1/2
-haystack/deep/1/2/3
-haystack/deep/1/2/3/4
-...
-</pre>
-</details>
 
-<details>
-<summary><code>bfs</code> tries to be easier to use than <code>find</code>, while remaining compatible.</summary>
+    $ <strong>bfs</strong> haystack
+    haystack
+    haystack/deep
+    haystack/shallow
+    haystack/deep/1
+    <strong>haystack/shallow/needle</strong>
+    haystack/deep/1/2
+    haystack/deep/1/2/3
+    haystack/deep/1/2/3/4
+    ...
 
-For example, `bfs` is less picky about where you put its arguments:
 
-<pre>
-$ <strong>bfs</strong> -L -name 'needle' <em>haystack</em>    │ $ <strong>find</strong> -L -name 'needle' <em>haystack</em>
-<strong>haystack/needle</strong>                     │ find: paths must precede expression: haystack
-                                    │
-$ <strong>bfs</strong> <em>haystack</em> -L -name 'needle'    │ $ <strong>find</strong> <em>haystack</em> -L -name 'needle'
-<strong>haystack/needle</strong>                     │ find: unknown predicate `-L'
-                                    │
-$ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'    │ $ <strong>find</strong> -L <em>haystack</em> -name 'needle'
-<strong>haystack/needle</strong>                     │ <strong>haystack/needle</strong>
-</pre>
-</details>
+<br>
 
-<details>
-<summary><code>bfs</code> gives helpful errors and warnings.</summary>
+---
+
+<br>
+
+## Arguments
+
+**BFS** isn't picky about where you place arguments.
+
+<br>
+
+### Path Last
+
+```sh
+foo@bar:~$ bfs  -L -name 'needle' haystack
+haystack/needle
+```
+```sh
+foo@bar:~$ find -L -name 'needle' haystack
+find: paths must precede expression: haystack
+```
+
+<br>
+
+### Path First
+
+```sh
+foo@bar:~$ bfs  haystack -L -name 'needle'
+haystack/needle
+```
+
+```sh
+foo@bar:~$ find haystack -L -name 'needle'
+find: unknown predicate '-L'
+```
+<br>
+
+### Path Default
+
+```sh
+foo@bar:~$ bfs  -L haystack -name 'needle'
+haystack/needle
+```
+
+```sh
+foo@bar:~$ find -L haystack -name 'needle'
+haystack/needle
+```
+
+<br>
+
+---
+
+<br>
+
+
+# C
+
+**BFS** gives helpful errors and warnings.
 
 For example, `bfs` will detect and suggest corrections for typos:
 
-<pre>
-$ bfs -nam needle
-<strong>bfs: error:</strong> bfs <strong>-nam</strong> needle
-<strong>bfs: error:</strong>     <strong>~~~~</strong>
-<strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
-</pre>
+    $ bfs -nam needle
+    <strong>bfs: error:</strong> bfs <strong>-nam</strong> needle
+    <strong>bfs: error:</strong>     <strong>~~~~</strong>
+    <strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
 
 `bfs` also includes a powerful static analysis to identify likely mistakes:
 
-<pre>
-$ bfs -print -name 'needle'
-<strong>bfs: warning:</strong> bfs -print <strong>-name needle</strong>
-<strong>bfs: warning:</strong>            <strong>~~~~~~~~~~~~</strong>
-<strong>bfs: warning:</strong> The result of this expression is ignored.
-</pre>
-</details>
+    $ bfs -print -name 'needle'
+    <strong>bfs: warning:</strong> bfs -print <strong>-name needle</strong>
+    <strong>bfs: warning:</strong>            <strong>~~~~~~~~~~~~</strong>
+    <strong>bfs: warning:</strong> The result of this expression is ignored.
 
-<details>
+# D
+
 <summary><code>bfs</code> adds some options that make common tasks easier.</summary>
 
 ### `-exclude`
