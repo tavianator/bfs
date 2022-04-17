@@ -170,6 +170,17 @@ brew install oniguruma
    ```sh
    make install
    ```
+   
+<br>
+
+---
+
+<br>
+
+## Details
+
+*Check our **[Makefile]** documentation* <br>
+*for more ways to adjust your build.*
 
 <!----------------------------------------------------------------------------->
 
@@ -183,9 +194,9 @@ brew install oniguruma
 [acl]: https://savannah.nongnu.org/projects/acl
 
 
-
 [Repository]: https://github.com/tavianator/bfs
 [Release]: https://github.com/tavianator/bfs/releases
+[Makefile]: Makefile.md
 
 <!----------------------------------{ Badges }--------------------------------->
 
