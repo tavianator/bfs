@@ -163,6 +163,8 @@ brew install oniguruma
    make release
    ```
    
+   <br>
+   
 3. Optionally, install it globally with:
 
    ```sh
