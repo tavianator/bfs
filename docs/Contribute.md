@@ -131,7 +131,7 @@ make check
 
 ### Update
 
-To update the reference snapshot, pass `--update`
+To update the reference snapshot, pass `--update` .
 
 ```sh
 ./tests.sh test_basic --bfs=find --update
@@ -162,16 +162,41 @@ tests failed: 5
 
 <br>
 
-### Validation
+## Validation
 
-A more thorough testsuite is run by the [CI](https://github.com/tavianator/bfs/actions) and to validate releases.
-It builds `bfs` in multiple configurations to test for latent bugs, memory leaks, 32-bit compatibility, etc.
-You can run it yourself with
+A more thorough testsuite is run by the **[CI]** .
 
-    $ make distcheck
+<br>
 
-Some of these tests require `sudo`, and will prompt for your password if necessary.
+*This builds **BFS** in multiple configurations to test for :*
 
+- **32-bit Compatibility**
+
+- **Memory Leaks**
+
+- **Latent Bugs**
+
+<br>
+
+### Manual
+
+You can run it yourself with:
+
+```sh
+make distcheck
+```
+
+<br>
+
+*Some of theses tests require `sudo`* <br>
+*privileges and will prompt you for it.*
+
+
+<br>
+
+---
+
+<br>
 
 Hacking
 -------
@@ -209,6 +234,8 @@ Finally, add the test case to one of the arrays `posix_tests`, `bsd_tests`, `gnu
 <!----------------------------------------------------------------------------->
 
 [Zero - Clause BSD]: https://opensource.org/licenses/0BSD
+
+[CI]: https://github.com/tavianator/bfs/actions
 
 [Predefined Truths]: ../tests
 [Tests]: ../tests.sh
