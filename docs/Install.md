@@ -3,11 +3,15 @@
 
 ## Packages
 
+<br>
+
 ### ![Badge Alpine]
 
 ```sh
 apk add bfs
 ```
+
+<br>
 
 ### ![Badge Debian] ![Badge Ubuntu]
 
@@ -15,11 +19,15 @@ apk add bfs
 apt install bfs
 ```
 
+<br>
+
 ### ![Badge NixOS]
 
 ```sh
 nix-env -i bfs
 ```
+
+<br>
 
 ### ![Badge Void]
 
@@ -27,17 +35,23 @@ nix-env -i bfs
 xbps-install -S bfs
 ```
 
+<br>
+
 ### ![Badge FreeBSD]
 
 ```sh
 pkg install bfs
 ```
 
+<br>
+
 ### ![Badge MacPorts]
 
 ```sh
 port install bfs
 ```
+
+<br>
 
 ### ![Badge Homebrew]
 
