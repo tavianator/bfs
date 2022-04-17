@@ -53,7 +53,7 @@
 
 ## Features
 
-- Operates **[Breath - First]**, which typically finds files faster.
+- Operates **[Breath - First]** , which typically finds files faster.
 - Provides useful **[Options]** to make life easier
 - **[Easier]** to use while staying compatible
 - Shows helpful **[Errors / Warnings]**
