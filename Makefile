@@ -192,8 +192,10 @@ STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
 
 default: bfs
+.PHONY: default
 
 all: $(BIN_GOALS)
+.PHONY: all
 
 bfs: \
     build/bar.o \
@@ -240,12 +242,15 @@ build/tests/%.o: tests/%.c .flags | build/tests
 # Save the full set of flags to rebuild everything when they change
 .flags: FORCE
 	@./flags.sh $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
+.PHONY: FORCE
 
 # Make sure that "make release" builds everything, but "make release main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
+.PHONY: $(FLAG_GOALS)
 
 check: $(CHECKS)
+.PHONY: check $(CHECKS)
 
 $(STRATEGY_CHECKS): check-%: bfs build/tests/mksock
 	./tests.sh --bfs="./bfs -S $*" $(TEST_FLAGS)
@@ -263,9 +268,11 @@ ifeq ($(OS) $(ARCH),Linux x86_64)
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
+.PHONY: distcheck
 
 clean:
 	$(RM) -r bfs .flags build
+.PHONY: clean
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
@@ -274,13 +281,13 @@ install:
 	$(INSTALL) -m644 bfs.1 $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(MKDIR) $(DESTDIR)$(PREFIX)/share/bash-completion/completions
 	$(INSTALL) -m644 completions/bfs.bash $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
+.PHONY: install
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
-
-.PHONY: default all $(FLAG_GOALS) check $(CHECKS) distcheck clean install uninstall FORCE
+.PHONY: uninstall
 
 .SUFFIXES:
 
