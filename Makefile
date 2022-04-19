@@ -14,10 +14,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
 ############################################################################
 
-ifeq ($(wildcard .git),)
+ifneq ($(wildcard .git),)
+VERSION := $(shell git describe --always 2>/dev/null)
+endif
+
+ifndef VERSION
 VERSION := 2.5
-else
-VERSION := $(shell git describe --always)
 endif
 
 ifndef OS
