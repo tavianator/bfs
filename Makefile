@@ -243,7 +243,8 @@ build/tests/%.o: tests/%.c build/FLAGS | build/tests
 
 # Save the full set of flags to rebuild everything when they change
 build/FLAGS: FORCE | build
-	@./flags.sh $@ $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
+	@echo $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS) >$@.tmp
+	@test -e $@ && cmp -s $@ $@.tmp && rm $@.tmp || mv $@.tmp $@
 .PHONY: FORCE
 
 # Make sure that "make release" builds everything, but "make release build/main.o" doesn't
