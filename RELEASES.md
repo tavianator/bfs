@@ -4,7 +4,7 @@
 2.5
 ---
 
-**March 27, 20222**
+**March 27, 2022**
 
 - Added compiler-style context for errors and warnings.
   Errors look like this:
