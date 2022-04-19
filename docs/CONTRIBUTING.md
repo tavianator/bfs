@@ -138,7 +138,7 @@ Hacking
 
 `bfs` is written in [C](https://en.wikipedia.org/wiki/C_(programming_language)), specifically [C11](https://en.wikipedia.org/wiki/C11_(C_standard_revision)).
 You can get a feel for the coding style by skimming the source code.
-[`main.c`](src/main.c) contains an overview of the rest of source files.
+[`main.c`](/src/main.c) contains an overview of the rest of source files.
 A quick summary:
 
 - Tabs for indentation, spaces for alignment.

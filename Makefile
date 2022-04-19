@@ -280,7 +280,7 @@ install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
 	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
 	$(MKDIR) $(DESTDIR)$(MANDIR)/man1
-	$(INSTALL) -m644 bfs.1 $(DESTDIR)$(MANDIR)/man1/bfs.1
+	$(INSTALL) -m644 docs/bfs.1 $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(MKDIR) $(DESTDIR)$(PREFIX)/share/bash-completion/completions
 	$(INSTALL) -m644 completions/bfs.bash $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
 	$(MKDIR) $(DESTDIR)$(PREFIX)/share/zsh/site-functions
