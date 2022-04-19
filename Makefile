@@ -169,10 +169,6 @@ ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(EXTRA_CFLAGS) $(DEPFLAG
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS) $(EXTRA_LDLIBS)
 
-# Save the full set of flags to rebuild everything when they change
-ALL_FLAGS := $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
-$(shell ./flags.sh $(ALL_FLAGS))
-
 # Goals that make binaries
 BIN_GOALS := bfs build/tests/mksock build/tests/trie build/tests/xtimegm
 
@@ -241,9 +237,9 @@ build/%.o: src/%.c .flags | build
 build/tests/%.o: tests/%.c .flags | build/tests
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-# Need a rule for .flags to convince make to apply the above pattern rule if
-# .flags didn't exist when make was run
-.flags:
+# Save the full set of flags to rebuild everything when they change
+.flags: FORCE
+	@./flags.sh $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
 
 # Make sure that "make release" builds everything, but "make release main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
@@ -284,7 +280,7 @@ uninstall:
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 
-.PHONY: default all $(FLAG_GOALS) check $(CHECKS) distcheck clean install uninstall
+.PHONY: default all $(FLAG_GOALS) check $(CHECKS) distcheck clean install uninstall FORCE
 
 .SUFFIXES:
 
