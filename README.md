@@ -1,21 +1,37 @@
+<div align="center">
+
 `bfs`
 =====
 
-[![License](http://img.shields.io/badge/license-0BSD-blue.svg)](https://github.com/tavianator/bfs/blob/main/LICENSE)
-[![Version](https://img.shields.io/github/v/tag/tavianator/bfs?label=version)](https://github.com/tavianator/bfs/releases)
-[![CI Status](https://github.com/tavianator/bfs/actions/workflows/ci.yml/badge.svg)](https://github.com/tavianator/bfs/actions/workflows/ci.yml)
+<a href="https://github.com/tavianator/bfs/releases"><img src="https://img.shields.io/github/v/tag/tavianator/bfs?label=version" alt="Version" align="left"></a>
+<a href="/LICENSE"><img src="https://img.shields.io/badge/license-0BSD-blue.svg" alt="License" align="left"></a>
+<a href="https://github.com/tavianator/bfs/actions/workflows/ci.yml"><img src="https://img.shields.io/github/workflow/status/tavianator/bfs/CI?label=CI" alt="CI Status" align="right"></a>
+<a href="https://codecov.io/gh/tavianator/bfs"><img src="https://img.shields.io/codecov/c/github/tavianator/bfs?token=PpBVuozOVC" alt="Code coverage" align="right"/></a>
 
-Breadth-first search for your files.
+***Breadth-first search for your files.***
 
-<img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot" />
+[ **[Features](#features)** ]&emsp;
+[ **[Installation](#installation)** ]&emsp;
+[ **[Changelog](/docs/CHANGELOG.md)** ]&emsp;
+[ **[Contributing](/docs/CONTRIBUTING.md)** ]
 
-`bfs` is a variant of the UNIX `find` command that operates [breadth-first](https://en.wikipedia.org/wiki/Breadth-first_search) rather than [depth-first](https://en.wikipedia.org/wiki/Depth-first_search).
+<img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot">
+<p></p>
+</div>
+
+`bfs` is a variant of the UNIX `find` command that operates [**breadth-first**](https://en.wikipedia.org/wiki/Breadth-first_search) rather than [**depth-first**](https://en.wikipedia.org/wiki/Depth-first_search).
 It is otherwise compatible with many versions of `find`, including
 
-- [POSIX `find`](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)
-- [GNU `find`](https://www.gnu.org/software/findutils/)
-- {[Free](https://www.freebsd.org/cgi/man.cgi?find(1)),[Open](https://man.openbsd.org/find.1),[Net](https://man.netbsd.org/find.1)}BSD `find`
-- [macOS `find`](https://ss64.com/osx/find.html)
+<div align="center">
+
+[ **[POSIX](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)** ]&emsp;
+[ **[GNU](https://www.gnu.org/software/findutils/)** ]&emsp;
+[ **[FreeBSD](https://www.freebsd.org/cgi/man.cgi?find(1))** ]&emsp;
+[ **[OpenBSD](https://man.openbsd.org/find.1)** ]&emsp;
+[ **[NetBSD](https://man.netbsd.org/find.1)** ]&emsp;
+[ **[macOS](https://ss64.com/osx/find.html)** ]
+
+</div>
 
 If you're not familiar with `find`, the [GNU find manual](https://www.gnu.org/software/findutils/manual/html_mono/find.html) provides a good introduction.
 
@@ -24,7 +40,10 @@ Features
 --------
 
 <details>
-<summary><code>bfs</code> operates breadth-first, which typically finds the file(s) you're looking for faster.</summary>
+<summary>
+<code>bfs</code> operates breadth-first, which typically finds the file(s) you're looking for faster.
+<p></p>
+</summary>
 
 Imagine the following directory tree:
 
@@ -72,7 +91,10 @@ haystack/deep/1/2/3/4
 </details>
 
 <details>
-<summary><code>bfs</code> tries to be easier to use than <code>find</code>, while remaining compatible.</summary>
+<summary>
+<code>bfs</code> tries to be easier to use than <code>find</code>, while remaining compatible.
+<p></p>
+</summary>
 
 For example, `bfs` is less picky about where you put its arguments:
 
@@ -89,7 +111,10 @@ $ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'    │ $ <strong>find
 </details>
 
 <details>
-<summary><code>bfs</code> gives helpful errors and warnings.</summary>
+<summary>
+<code>bfs</code> gives helpful errors and warnings.
+<p></p>
+</summary>
 
 For example, `bfs` will detect and suggest corrections for typos:
 
@@ -111,7 +136,10 @@ $ bfs -print -name 'needle'
 </details>
 
 <details>
-<summary><code>bfs</code> adds some options that make common tasks easier.</summary>
+<summary>
+<code>bfs</code> adds some options that make common tasks easier.
+<p></p>
+</summary>
 
 ### `-exclude`
 
@@ -162,7 +190,10 @@ Installation
 ------------
 
 <details>
-<summary><code>bfs</code> may already be packaged for your operating system.</summary>
+<summary>
+<code>bfs</code> may already be packaged for your operating system.
+<p></p>
+</summary>
 
 <pre>
 <strong>Alpine Linux</strong>
@@ -189,7 +220,10 @@ $ brew install tavianator/tap/bfs
 </details>
 
 <details>
-<summary>To build <code>bfs</code> from source, you may need to install some dependencies.</summary>
+<summary>
+To build <code>bfs</code> from source, you may need to install some dependencies.
+<p></p>
+</summary>
 
 The only absolute requirements for building `bfs` are a C compiler, [GNU make](https://www.gnu.org/software/make/), and [Bash](https://www.gnu.org/software/bash/).
 These are installed by default on many systems, and easy to install on most others.
