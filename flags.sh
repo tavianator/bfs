@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 
-set -e
+set -eu
 
-echo "$@" >.newflags
+OUT="$1"
+shift
 
-if [ -e .flags ] && cmp -s .flags .newflags; then
-    rm .newflags
+echo "$@" >"$OUT.tmp"
+
+if [ -e "$OUT" ] && cmp -s "$OUT" "$OUT.tmp"; then
+    rm "$OUT.tmp"
 else
-    mv .newflags .flags
+    mv "$OUT.tmp" "$OUT"
 fi

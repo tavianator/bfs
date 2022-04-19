@@ -235,18 +235,18 @@ $(BIN_GOALS):
 build build/tests:
 	$(MKDIR) $@
 
-build/%.o: src/%.c .flags | build
+build/%.o: src/%.c build/FLAGS
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
-build/tests/%.o: tests/%.c .flags | build/tests
+build/tests/%.o: tests/%.c build/FLAGS | build/tests
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 # Save the full set of flags to rebuild everything when they change
-.flags: FORCE
-	@./flags.sh $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
+build/FLAGS: FORCE | build
+	@./flags.sh $@ $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS)
 .PHONY: FORCE
 
-# Make sure that "make release" builds everything, but "make release main.o" doesn't
+# Make sure that "make release" builds everything, but "make release build/main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
 .PHONY: $(FLAG_GOALS)
@@ -273,7 +273,7 @@ endif
 .PHONY: distcheck
 
 clean:
-	$(RM) -r bfs .flags build
+	$(RM) -r bfs build
 .PHONY: clean
 
 install:
