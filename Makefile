@@ -242,10 +242,13 @@ build/tests/%.o: tests/%.c build/FLAGS | build/tests
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 # Save the full set of flags to rebuild everything when they change
-build/FLAGS: FORCE | build
-	@echo $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS) >$@.tmp
-	@test -e $@ && cmp -s $@ $@.tmp && rm $@.tmp || mv $@.tmp $@
-.PHONY: FORCE
+build/FLAGS.new: | build
+	@echo $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS) >$@
+.PHONY: build/FLAGS.new
+
+# Only update build/FLAGS if build/FLAGS.new is different
+build/FLAGS: build/FLAGS.new
+	@test -e $@ && cmp -s $@ $< && rm $< || mv $< $@
 
 # Make sure that "make release" builds everything, but "make release build/main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
