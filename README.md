@@ -199,6 +199,9 @@ Installation
 <strong>Alpine Linux</strong>
 # apk add bfs
 
+<strong>Arch Linux</strong>
+Available in the <a href="https://aur.archlinux.org/packages/bfs">AUR</a>
+
 <strong>Debian/Ubuntu</strong>
 # apt install bfs
 
