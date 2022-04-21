@@ -200,49 +200,45 @@ all: $(BIN_GOALS)
 .PHONY: all
 
 bfs: \
-    build/bar.o \
-    build/bftw.o \
-    build/color.o \
-    build/ctx.o \
-    build/darray.o \
-    build/diag.o \
-    build/dir.o \
-    build/dstring.o \
-    build/eval.o \
-    build/exec.o \
-    build/fsade.o \
-    build/main.o \
-    build/mtab.o \
-    build/opt.o \
-    build/parse.o \
-    build/printf.o \
-    build/pwcache.o \
-    build/stat.o \
-    build/trie.o \
-    build/typo.o \
-    build/util.o \
-    build/xregex.o \
-    build/xspawn.o \
-    build/xtime.o
+    build/src/bar.o \
+    build/src/bftw.o \
+    build/src/color.o \
+    build/src/ctx.o \
+    build/src/darray.o \
+    build/src/diag.o \
+    build/src/dir.o \
+    build/src/dstring.o \
+    build/src/eval.o \
+    build/src/exec.o \
+    build/src/fsade.o \
+    build/src/main.o \
+    build/src/mtab.o \
+    build/src/opt.o \
+    build/src/parse.o \
+    build/src/printf.o \
+    build/src/pwcache.o \
+    build/src/stat.o \
+    build/src/trie.o \
+    build/src/typo.o \
+    build/src/util.o \
+    build/src/xregex.o \
+    build/src/xspawn.o \
+    build/src/xtime.o
 
 build/tests/mksock: build/tests/mksock.o
-build/tests/trie: build/trie.o build/tests/trie.o
-build/tests/xtimegm: build/xtime.o build/tests/xtimegm.o
+build/tests/trie: build/src/trie.o build/tests/trie.o
+build/tests/xtimegm: build/src/xtime.o build/tests/xtimegm.o
 
 $(BIN_GOALS):
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-build build/tests:
-	$(MKDIR) $@
-
-build/%.o: src/%.c build/FLAGS
-	$(CC) $(ALL_CFLAGS) -c $< -o $@
-
-build/tests/%.o: tests/%.c build/FLAGS | build/tests
+build/%.o: %.c build/FLAGS
+	@$(MKDIR) $(@D)
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 # Save the full set of flags to rebuild everything when they change
-build/FLAGS.new: | build
+build/FLAGS.new:
+	@$(MKDIR) $(@D)
 	@echo $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS) >$@
 .PHONY: build/FLAGS.new
 
@@ -250,7 +246,7 @@ build/FLAGS.new: | build
 build/FLAGS: build/FLAGS.new
 	@test -e $@ && cmp -s $@ $< && rm $< || mv $< $@
 
-# Make sure that "make release" builds everything, but "make release build/main.o" doesn't
+# Make sure that "make release" builds everything, but "make release build/src/main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
 .PHONY: $(FLAG_GOALS)
