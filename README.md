@@ -189,7 +189,7 @@ If the [`NO_COLOR`](https://no-color.org/) environment variable is set, colors w
 Installation
 ------------
 
-<details>
+<details open>
 <summary>
 <code>bfs</code> may already be packaged for your operating system.
 <p></p>
@@ -271,7 +271,13 @@ $ brew install oniguruma
 </pre>
 </details>
 
-Once the dependencies are installed, download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
+<details>
+<summary>
+Once you have the dependencies, you can build <code>bfs</code>.
+<p></p>
+</summary>
+
+Download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
 Then run
 
     $ make
@@ -288,3 +294,5 @@ If you're interested in speed, you may want to build the release version instead
 Finally, if you want to install it globally, run
 
     # make install
+
+</details>
