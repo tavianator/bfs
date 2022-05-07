@@ -12,9 +12,10 @@
 
 [ **[Features](#features)** ]&emsp;
 [ **[Installation](#installation)** ]&emsp;
-[ **[Changelog](/docs/CHANGELOG.md)** ]&emsp;
+[ **[Usage](/docs/USAGE.md)** ]&emsp;
 [ **[Building](/docs/BUILDING.md)** ]&emsp;
-[ **[Hacking](/docs/HACKING.md)** ]
+[ **[Hacking](/docs/HACKING.md)** ]&emsp;
+[ **[Changelog](/docs/CHANGELOG.md)** ]
 
 <img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot">
 <p></p>
@@ -126,7 +127,7 @@ $ bfs -nam needle
 <strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
 </pre>
 
-`bfs` also includes a powerful static analysis to identify likely mistakes:
+`bfs` also includes a powerful static analysis to help catch mistakes:
 
 <pre>
 $ bfs -print -name 'needle'
@@ -142,48 +143,21 @@ $ bfs -print -name 'needle'
 <p></p>
 </summary>
 
-### `-exclude`
+For example, the `-exclude` operator skips over entire subtrees whenever an expression matches.
+`-exclude` is both more powerful and easier to use than the standard `-prune` action; compare
 
-The `-exclude` operator skips an entire subtree whenever an expression matches.
-For example, `-exclude -name .git` will exclude any files or directories named `.git` from the search results.
-`-exclude` is easier to use than the standard `-prune` action; compare
-
-    bfs -name config -exclude -name .git
+<pre>
+$ bfs -name config <strong>-exclude -name .git</strong>
+</pre>
 
 to the equivalent
 
-    find ! \( -name .git -prune \) -name config
+<pre>
+$ find <strong>! \( -name .git -prune \)</strong> -name config
+</pre>
 
-Unlike `-prune`, `-exclude` even works in combination with `-depth`/`-delete`.
-
----
-
-### `-hidden`/`-nohidden`
-
-`-hidden` matches "hidden" files (dotfiles).
-`bfs -hidden` is effectively shorthand for
-
-    find \( -name '.*' -not -name . -not -name .. \)
-
-`-nohidden` is equivalent to `-exclude -hidden`.
-
----
-
-### `-unique`
-
-This option ensures that `bfs` only visits each file once, even if it's reachable through multiple hard or symbolic links.
-It's particularly useful when following symbolic links (`-L`).
-
----
-
-### `-color`/`-nocolor`
-
-When printing to a terminal, `bfs` automatically colors paths like GNU `ls`, according to the `LS_COLORS` environment variable.
-The `-color` and `-nocolor` options override the automatic behavior, which may be handy when you want to preserve colors through a pipe:
-
-    bfs -color | less -R
-
-If the [`NO_COLOR`](https://no-color.org/) environment variable is set, colors will be disabled by default.
+As an additional shorthand, `-nohidden` skips over all hidden files and directories.
+See the [usage documentation](/docs/USAGE.md#extensions) for more about the extensions provided by `bfs`.
 </details>
 
 
