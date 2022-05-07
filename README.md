@@ -13,7 +13,8 @@
 [ **[Features](#features)** ]&emsp;
 [ **[Installation](#installation)** ]&emsp;
 [ **[Changelog](/docs/CHANGELOG.md)** ]&emsp;
-[ **[Contributing](/docs/CONTRIBUTING.md)** ]
+[ **[Building](/docs/BUILDING.md)** ]&emsp;
+[ **[Hacking](/docs/HACKING.md)** ]
 
 <img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot">
 <p></p>
