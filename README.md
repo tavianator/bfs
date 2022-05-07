@@ -234,15 +234,6 @@ These are installed by default on many systems, and easy to install on most othe
 Refer to your operating system's documentation on building software.
 
 `bfs` also depends on some system libraries for some of its features.
-These dependencies are optional, and can be turned off at build time if necessary by setting the appropriate variable to the empty string (e.g. `make WITH_ONIGURUMA=`).
-
-| Dependency                                            | Platforms  | `make` flag      |
-|-------------------------------------------------------|------------|------------------|
-| [acl](https://savannah.nongnu.org/projects/acl)       | Linux only | `WITH_ACL`       |
-| [attr](https://savannah.nongnu.org/projects/attr)     | Linux only | `WITH_ATTR`      |
-| [libcap](https://sites.google.com/site/fullycapable/) | Linux only | `WITH_LIBCAP`    |
-| [Oniguruma](https://github.com/kkos/oniguruma)        | All        | `WITH_ONIGURUMA` |
-
 Here's how to install them on some common platforms:
 
 <pre>
@@ -273,6 +264,9 @@ Here's how to install them on some common platforms:
 <strong>Homebrew</strong>
 $ brew install oniguruma
 </pre>
+
+These dependencies are technically optional, though strongly recommended.
+See the [build documentation](/docs/BUILDING.md#dependencies) for how to disable them.
 </details>
 
 <details>
