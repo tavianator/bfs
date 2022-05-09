@@ -100,16 +100,41 @@ haystack/deep/1/2/3/4
 
 For example, `bfs` is less picky about where you put its arguments:
 
-<pre>
-$ <strong>bfs</strong> -L -name 'needle' <em>haystack</em>    │ $ <strong>find</strong> -L -name 'needle' <em>haystack</em>
-<strong>haystack/needle</strong>                     │ find: paths must precede expression: haystack
-                                    │
-$ <strong>bfs</strong> <em>haystack</em> -L -name 'needle'    │ $ <strong>find</strong> <em>haystack</em> -L -name 'needle'
-<strong>haystack/needle</strong>                     │ find: unknown predicate `-L'
-                                    │
-$ <strong>bfs</strong> -L <em>haystack</em> -name 'needle'    │ $ <strong>find</strong> -L <em>haystack</em> -name 'needle'
-<strong>haystack/needle</strong>                     │ <strong>haystack/needle</strong>
-</pre>
+<table>
+<tbody>
+<tr></tr>
+<tr>
+<td width="506">
+
+```console
+$ bfs -L -name 'needle' haystack
+haystack/needle
+
+$ bfs haystack -L -name 'needle'
+haystack/needle
+
+$ bfs -L haystack -name 'needle'
+haystack/needle
+```
+
+</td>
+<td width="506">
+
+```console
+$ find -L -name 'needle' haystack
+find: paths must precede expression: haystack
+
+$ find haystack -L -name 'needle'
+find: unknown predicate `-L'
+
+$ find -L haystack -name 'needle'
+haystack/needle
+```
+
+</td>
+</tr>
+</tbody>
+</table>
 </details>
 
 <details>
