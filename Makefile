@@ -270,6 +270,7 @@ ifeq ($(OS) $(ARCH),Linux x86_64)
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
+	+$(MAKE) check-install
 .PHONY: distcheck
 
 clean:
@@ -293,6 +294,13 @@ uninstall:
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 .PHONY: uninstall
+
+check-install:
+	+$(MAKE) install DESTDIR=build/pkg
+	+$(MAKE) uninstall DESTDIR=build/pkg
+	./bfs build/pkg -not -type d -print -exit 1
+	$(RM) -r build/pkg
+.PHONY: check-install
 
 .SUFFIXES:
 
