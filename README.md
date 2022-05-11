@@ -196,28 +196,28 @@ Installation
 </summary>
 
 <pre>
-<strong>Alpine Linux</strong>
+<strong><a href="https://pkgs.alpinelinux.org/packages?name=bfs">Alpine Linux</a></strong>
 # apk add bfs
 
-<strong>Arch Linux</strong>
-Available in the <a href="https://aur.archlinux.org/packages/bfs">AUR</a>
+<strong><a href="https://aur.archlinux.org/packages/bfs">Arch Linux</a></strong>
+(Available in the AUR)
 
-<strong>Debian/Ubuntu</strong>
+<strong><a href="https://packages.debian.org/sid/bfs">Debian</a>/<a href="https://packages.ubuntu.com/kinetic/bfs">Ubuntu</a></strong>
 # apt install bfs
 
-<strong>NixOS</strong>
+<strong><a href="https://search.nixos.org/packages?channel=unstable&show=bfs&from=0&size=1&sort=relevance&type=packages&query=bfs">NixOS</a></strong>
 # nix-env -i bfs
 
-<strong>Void Linux</strong>
+<strong><a href="https://voidlinux.org/packages/?arch=x86_64&q=bfs">Void Linux</a></strong>
 # xbps-install -S bfs
 
-<strong>FreeBSD</strong>
+<strong><a href="https://www.freshports.org/sysutils/bfs">FreeBSD</a></strong>
 # pkg install bfs
 
-<strong>MacPorts</strong>
+<strong><a href="https://ports.macports.org/port/bfs/">MacPorts</a></strong>
 # port install bfs
 
-<strong>Homebrew</strong>
+<strong><a href="https://github.com/tavianator/homebrew-tap/blob/master/Formula/bfs.rb">Homebrew</a></strong>
 $ brew install tavianator/tap/bfs
 </pre>
 </details>
