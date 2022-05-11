@@ -117,25 +117,24 @@ static int open_std_streams(void) {
  * bfs entry point.
  */
 int main(int argc, char *argv[]) {
-	int ret = EXIT_FAILURE;
-
 	// Make sure the standard streams are open
 	if (open_std_streams() != 0) {
-		goto done;
+		return EXIT_FAILURE;
 	}
 
 	// Use the system locale instead of "C"
 	setlocale(LC_ALL, "");
 
 	struct bfs_ctx *ctx = bfs_parse_cmdline(argc, argv);
-	if (ctx) {
-		ret = bfs_eval(ctx);
+	if (!ctx) {
+		return EXIT_FAILURE;
 	}
+
+	int ret = bfs_eval(ctx);
 
 	if (bfs_ctx_free(ctx) != 0 && ret == EXIT_SUCCESS) {
 		ret = EXIT_FAILURE;
 	}
 
-done:
 	return ret;
 }
