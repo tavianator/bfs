@@ -406,12 +406,6 @@ static void parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
 			free(key);
 		}
 	}
-
-	if (colors->link && strcmp(colors->link, "target") == 0) {
-		colors->link_as_target = true;
-		dstrfree(colors->link);
-		colors->link = NULL;
-	}
 }
 
 struct colors *parse_colors() {
@@ -448,7 +442,7 @@ struct colors *parse_colors() {
 
 	// Defaults from man dir_colors
 
-	ret |= init_color(colors, "no", NULL, &colors->normal);
+	ret |= init_color(colors, "no", NULL,    &colors->normal);
 
 	ret |= init_color(colors, "fi", NULL,    &colors->file);
 	ret |= init_color(colors, "mh", NULL,    &colors->multi_hard);
@@ -480,6 +474,12 @@ struct colors *parse_colors() {
 
 	parse_gnu_ls_colors(colors, getenv("LS_COLORS"));
 	parse_gnu_ls_colors(colors, getenv("BFS_COLORS"));
+
+	if (colors->link && strcmp(colors->link, "target") == 0) {
+		colors->link_as_target = true;
+		dstrfree(colors->link);
+		colors->link = NULL;
+	}
 
 	return colors;
 }
