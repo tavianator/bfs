@@ -447,7 +447,7 @@ struct colors *parse_colors() {
 	ret |= init_color(colors, "fi", NULL,    &colors->file);
 	ret |= init_color(colors, "mh", NULL,    &colors->multi_hard);
 	ret |= init_color(colors, "ex", "01;32", &colors->executable);
-	ret |= init_color(colors, "ca", "30;41", &colors->capable);
+	ret |= init_color(colors, "ca", NULL,    &colors->capable);
 	ret |= init_color(colors, "sg", "30;43", &colors->setgid);
 	ret |= init_color(colors, "su", "37;41", &colors->setuid);
 
