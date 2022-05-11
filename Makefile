@@ -304,4 +304,4 @@ check-install:
 
 .SUFFIXES:
 
--include $(wildcard build/*.d build/tests/*.d)
+-include $(wildcard build/*/*.d)
