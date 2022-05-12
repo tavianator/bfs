@@ -119,10 +119,6 @@ endif
 
 LOCAL_LDFLAGS += -Wl,--as-needed
 LOCAL_LDLIBS += -lrt
-
-DISTCHECK_FLAGS := TEST_FLAGS="--verbose --all --sudo"
-else # Linux
-DISTCHECK_FLAGS := TEST_FLAGS="--verbose"
 endif
 
 ifeq ($(OS),NetBSD)
@@ -192,6 +188,9 @@ STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 
 # All the different checks we run
 CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
+
+# Custom test flags for distcheck
+DISTCHECK_FLAGS := TEST_FLAGS="--sudo --verbose"
 
 default: bfs
 .PHONY: default

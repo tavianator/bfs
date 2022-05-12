@@ -92,7 +92,7 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
       Choose which test cases to run (default: ${BLU}--all${RST})
 
   ${BLU}--sudo${RST}
-      Run tests that require root (not included in ${BLU}--all${RST})
+      Run tests that require root
 
   ${BLU}--noclean${RST}
       Keep the test directories around after the run
@@ -151,7 +151,6 @@ for arg; do
             ALL=yes
             ;;
         --sudo)
-            DEFAULT=
             SUDO=yes
             ;;
         --noclean)
@@ -169,6 +168,7 @@ for arg; do
             ;;
         test_*)
             EXPLICIT=yes
+            SUDO=yes
             enabled_tests+=("$arg")
             ;;
         *)
@@ -282,10 +282,14 @@ posix_tests=(
     test_type_l
     test_H_type_l
     test_L_type_l
+    test_type_bind_mount
 
     test_user_name
     test_user_id
     test_user_nouser
+
+    test_xdev
+    test_L_xdev
 
     # Closed file descriptors
     test_closed_stdin
@@ -375,6 +379,8 @@ bsd_tests=(
     test_iname
 
     test_inum
+    test_inum_mount
+    test_inum_bind_mount
 
     test_ipath
 
@@ -392,6 +398,9 @@ bsd_tests=(
 
     test_mnewer
     test_H_mnewer
+
+    test_mount
+    test_L_mount
 
     test_msince
 
@@ -446,6 +455,12 @@ bsd_tests=(
     test_size_big
 
     test_uid_name
+
+    test_xattr
+    test_L_xattr
+
+    test_xattrname
+    test_L_xattrname
 
     # Optimizer tests
     test_data_flow_sparse
@@ -557,6 +572,9 @@ gnu_tests=(
     test_iname
 
     test_inum
+    test_inum_mount
+    test_inum_bind_mount
+    test_inum_automount
 
     test_ipath
 
@@ -573,6 +591,9 @@ gnu_tests=(
     test_maxdepth
 
     test_mindepth
+
+    test_mount
+    test_L_mount
 
     test_name_slash
     test_name_slashes
@@ -666,6 +687,7 @@ gnu_tests=(
     test_xtype_f
     test_L_xtype_l
     test_L_xtype_f
+    test_xtype_bind_mount
 
     # Optimizer tests
     test_and_purity
@@ -712,6 +734,9 @@ bfs_tests=(
     test_exclude_exclude
 
     # Primaries
+
+    test_capable
+    test_L_capable
 
     test_color
     test_color_L
@@ -814,44 +839,6 @@ bfs_tests=(
     test_stderr_fails_loudly
 )
 
-sudo_tests=(
-    test_capable
-    test_L_capable
-
-    test_mount
-    test_L_mount
-    test_xdev
-    test_L_xdev
-
-    test_inum_mount
-    test_inum_bind_mount
-    test_type_bind_mount
-    test_xtype_bind_mount
-
-    test_automount
-)
-
-case "$UNAME" in
-    Darwin|FreeBSD)
-        bsd_tests+=(
-            test_xattr
-            test_L_xattr
-
-            test_xattrname
-            test_L_xattrname
-        )
-        ;;
-    *)
-        sudo_tests+=(
-            test_xattr
-            test_L_xattr
-
-            test_xattrname
-            test_L_xattrname
-        )
-        ;;
-esac
-
 if [ "$DEFAULT" ]; then
     POSIX=yes
     BSD=yes
@@ -864,7 +851,6 @@ if [ ! "$EXPLICIT" ]; then
     [ "$BSD" ] && enabled_tests+=("${bsd_tests[@]}")
     [ "$GNU" ] && enabled_tests+=("${gnu_tests[@]}")
     [ "$ALL" ] && enabled_tests+=("${bfs_tests[@]}")
-    [ "$SUDO" ] && enabled_tests+=("${sudo_tests[@]}")
 fi
 
 eval "enabled_tests=($(printf '%q\n' "${enabled_tests[@]}" | sort -u))"
@@ -2917,6 +2903,9 @@ function test_L_unique_depth() {
 }
 
 function test_mount() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" = "Darwin"
+
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
@@ -2930,6 +2919,9 @@ function test_mount() {
 }
 
 function test_L_mount() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" = "Darwin"
+
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
@@ -2945,6 +2937,9 @@ function test_L_mount() {
 }
 
 function test_xdev() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" = "Darwin"
+
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
@@ -2958,6 +2953,9 @@ function test_xdev() {
 }
 
 function test_L_xdev() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" = "Darwin"
+
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
@@ -2973,6 +2971,9 @@ function test_L_xdev() {
 }
 
 function test_inum_mount() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" = "Darwin"
+
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
     sudo mount -t tmpfs tmpfs scratch/mnt
@@ -2985,6 +2986,9 @@ function test_inum_mount() {
 }
 
 function test_inum_bind_mount() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" != "Linux"
+
     rm -rf scratch/*
     $TOUCH scratch/{foo,bar}
     sudo mount --bind scratch/{foo,bar}
@@ -2997,6 +3001,9 @@ function test_inum_bind_mount() {
 }
 
 function test_type_bind_mount() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" != "Linux"
+
     rm -rf scratch/*
     $TOUCH scratch/{file,null}
     sudo mount --bind /dev/null scratch/null
@@ -3009,6 +3016,9 @@ function test_type_bind_mount() {
 }
 
 function test_xtype_bind_mount() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" != "Linux"
+
     rm -rf scratch/*
     $TOUCH scratch/{file,null}
     sudo mount --bind /dev/null scratch/null
@@ -3021,14 +3031,15 @@ function test_xtype_bind_mount() {
     return $ret
 }
 
-function test_automount() {
+function test_inum_automount() {
     # bfs shouldn't trigger automounts unless it descends into them
 
+    skip_if test ! "$SUDO"
     skip_if fail command -v systemd-mount &>/dev/null
 
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
-    quiet sudo systemd-mount -A -o bind basic scratch/mnt
+    skip_if fail quiet sudo systemd-mount -A -o bind basic scratch/mnt
 
     local before=$(inum scratch/mnt)
     bfs_diff scratch -inum "$before" -prune
@@ -3083,6 +3094,9 @@ function test_L_acl() {
 }
 
 function test_capable() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" != "Linux"
+
     rm -rf scratch/*
 
     skip_if fail quiet invoke_bfs scratch -quit -capable
@@ -3095,6 +3109,9 @@ function test_capable() {
 }
 
 function test_L_capable() {
+    skip_if test ! "$SUDO"
+    skip_if test "$UNAME" != "Linux"
+
     rm -rf scratch/*
 
     skip_if fail quiet invoke_bfs scratch -quit -capable
@@ -3127,7 +3144,8 @@ function make_xattrs() {
         *)
             # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
             # namespace, which is writable by root and readable by others
-            sudo setfattr -n security.bfs_test scratch/xattr \
+            [ "$SUDO" ] \
+                && sudo setfattr -n security.bfs_test scratch/xattr \
                 && sudo setfattr -n security.bfs_test_2 scratch/xattr_2 \
                 && sudo setfattr -h -n security.bfs_test scratch/xattr_link
             ;;
