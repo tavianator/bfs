@@ -310,6 +310,10 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 	}
 
+#ifdef AT_NO_AUTOMOUNT
+	at_flags |= AT_NO_AUTOMOUNT;
+#endif
+
 	int x_flags = 0;
 #ifdef AT_STATX_DONT_SYNC
 	if (flags & BFS_STAT_NOSYNC) {

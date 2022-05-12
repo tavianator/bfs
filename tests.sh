@@ -827,6 +827,8 @@ sudo_tests=(
     test_inum_bind_mount
     test_type_bind_mount
     test_xtype_bind_mount
+
+    test_automount
 )
 
 case "$UNAME" in
@@ -3017,6 +3019,25 @@ function test_xtype_bind_mount() {
 
     sudo umount scratch/null
     return $ret
+}
+
+function test_automount() {
+    # bfs shouldn't trigger automounts unless it descends into them
+
+    skip_if fail command -v systemd-mount &>/dev/null
+
+    rm -rf scratch/*
+    mkdir scratch/{foo,mnt}
+    quiet sudo systemd-mount -A -o bind basic scratch/mnt
+
+    local before=$(inum scratch/mnt)
+    bfs_diff scratch -inum "$before" -prune
+    local ret=$?
+    local after=$(inum scratch/mnt)
+
+    quiet sudo systemd-umount scratch/mnt
+
+    ((ret == 0 && before == after))
 }
 
 function set_acl() {
