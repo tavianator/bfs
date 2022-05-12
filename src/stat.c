@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
+ * Copyright (C) 2018-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -29,15 +29,15 @@
 #endif
 
 #ifdef STATX_BASIC_STATS
-#	define HAVE_STATX true
+#	define BFS_LIBC_STATX true
 #elif __linux__
 #	include <linux/stat.h>
 #	include <sys/syscall.h>
 #	include <unistd.h>
 #endif
 
-#if HAVE_STATX || defined(__NR_statx)
-#	define HAVE_BFS_STATX true
+#if BFS_LIBC_STATX || defined(__NR_statx)
+#	define BFS_STATX true
 #endif
 
 #if __APPLE__
@@ -166,7 +166,7 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, enum bfs_
 	return ret;
 }
 
-#if HAVE_BFS_STATX
+#if BFS_STATX
 
 /**
  * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
@@ -178,7 +178,7 @@ static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int 
 	memset(buf, 0, sizeof(*buf));
 #endif
 
-#if HAVE_STATX
+#if BFS_LIBC_STATX
 	return statx(at_fd, at_path, at_flags, mask, buf);
 #else
 	return syscall(__NR_statx, at_fd, at_path, at_flags, mask, buf);
@@ -285,13 +285,13 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 	return ret;
 }
 
-#endif // HAVE_BFS_STATX
+#endif // BFS_STATX
 
 /**
  * Allows calling stat with custom at_flags.
  */
 static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags flags, struct bfs_stat *buf) {
-#if HAVE_BFS_STATX
+#if BFS_STATX
 	static bool has_statx = true;
 
 	if (has_statx) {
