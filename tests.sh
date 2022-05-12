@@ -1118,8 +1118,8 @@ function fail() {
     local STATUS="$?"
 
     if ((STATUS > 125)); then
-        return "$STATUS"
-    elif ((STATUS)); then
+        exit "$STATUS"
+    elif ((STATUS > 0)); then
         return 0
     else
         return 1
