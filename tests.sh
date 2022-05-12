@@ -1175,10 +1175,18 @@ function bfs_diff() (
     fi
 )
 
+function skip() {
+    exit $EX_SKIP
+}
+
 function skip_if() {
     if "$@"; then
-        exit $EX_SKIP
+        skip
     fi
+}
+
+function skip_unless() {
+    skip_if fail "$@"
 }
 
 function closefrom() {
@@ -1600,17 +1608,17 @@ function test_xtype_depth() {
 }
 
 function test_iname() {
-    skip_if fail quiet invoke_bfs -quit -iname PATTERN
+    skip_unless quiet invoke_bfs -quit -iname PATTERN
     bfs_diff basic -iname '*F*'
 }
 
 function test_ipath() {
-    skip_if fail quiet invoke_bfs -quit -ipath PATTERN
+    skip_unless quiet invoke_bfs -quit -ipath PATTERN
     bfs_diff basic -ipath 'basic/*F*'
 }
 
 function test_iwholename() {
-    skip_if fail quiet invoke_bfs -quit -iwholename PATTERN
+    skip_unless quiet invoke_bfs -quit -iwholename PATTERN
     bfs_diff basic -iwholename 'basic/*F*'
 }
 
@@ -1619,7 +1627,7 @@ function test_lname() {
 }
 
 function test_ilname() {
-    skip_if fail quiet invoke_bfs -quit -ilname PATTERN
+    skip_unless quiet invoke_bfs -quit -ilname PATTERN
     bfs_diff links -ilname '[AQ]'
 }
 
@@ -1628,7 +1636,7 @@ function test_L_lname() {
 }
 
 function test_L_ilname() {
-    skip_if fail quiet invoke_bfs -quit -ilname PATTERN
+    skip_unless quiet invoke_bfs -quit -ilname PATTERN
     bfs_diff -L links -ilname '[AQ]'
 }
 
@@ -1749,7 +1757,7 @@ function test_exec_flush() {
 
 function test_exec_flush_fail() {
     # Failure to flush streams before exec should be caught
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail quiet invoke_bfs basic -print0 -exec true \; >/dev/full
 }
 
@@ -1759,7 +1767,7 @@ function test_exec_flush_fprint() {
 }
 
 function test_exec_flush_fprint_fail() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail quiet invoke_bfs basic/a -fprint /dev/full -exec true \;
 }
 
@@ -1768,7 +1776,7 @@ function test_exec_plus_flush() {
 }
 
 function test_exec_plus_flush_fail() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail quiet invoke_bfs basic/a -print0 -exec echo found {} + >/dev/full
 }
 
@@ -1778,7 +1786,11 @@ function test_execdir() {
 
 function test_execdir_plus() {
     local tree=$(invoke_bfs -D tree 2>&1 -quit)
-    skip_if eval '[[ "$tree" == *"-S dfs"* ]]'
+
+    if [[ "$tree" == *"-S dfs"* ]]; then
+        skip
+    fi
+
     bfs_diff basic -execdir "$TESTS/sort-args.sh" {} +
 }
 
@@ -2131,9 +2143,9 @@ function test_regex_invalid_utf8() {
     rm -rf scratch/*
 
     # Incomplete UTF-8 sequences
-    skip_if fail quiet touch scratch/$'\xC3'
-    skip_if fail quiet touch scratch/$'\xE2\x84'
-    skip_if fail quiet touch scratch/$'\xF0\x9F\x92'
+    skip_unless quiet touch scratch/$'\xC3'
+    skip_unless quiet touch scratch/$'\xE2\x84'
+    skip_unless quiet touch scratch/$'\xF0\x9F\x92'
 
     bfs_diff scratch -regex 'scratch/..'
 }
@@ -2159,13 +2171,13 @@ function test_regextype_ed() {
 }
 
 function test_regextype_emacs() {
-    skip_if fail quiet invoke_bfs -regextype emacs -quit
+    skip_unless quiet invoke_bfs -regextype emacs -quit
 
     bfs_diff basic -regextype emacs -regex '.*/\(f+o?o?\|bar\)'
 }
 
 function test_regextype_grep() {
-    skip_if fail quiet invoke_bfs -regextype grep -quit
+    skip_unless quiet invoke_bfs -regextype grep -quit
 
     bfs_diff basic -regextype grep -regex '.*/f\+o\?o\?'
 }
@@ -2823,28 +2835,28 @@ function test_data_flow_or_swap() {
 }
 
 function test_print_error() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail quiet invoke_bfs basic -maxdepth 0 >/dev/full
 }
 
 function test_fprint_error() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
 }
 
 function test_fprint_noerror() {
     # Regression test: /dev/full should not fail until actually written to
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     invoke_bfs basic -false -fprint /dev/full
 }
 
 function test_fprint_error_stdout() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
 }
 
 function test_fprint_error_stderr() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail invoke_bfs basic -maxdepth 0 -fprint /dev/full 2>/dev/full
 }
 
@@ -2903,7 +2915,7 @@ function test_L_unique_depth() {
 }
 
 function test_mount() {
-    skip_if test ! "$SUDO"
+    skip_unless test "$SUDO"
     skip_if test "$UNAME" = "Darwin"
 
     rm -rf scratch/*
@@ -2919,7 +2931,7 @@ function test_mount() {
 }
 
 function test_L_mount() {
-    skip_if test ! "$SUDO"
+    skip_unless test "$SUDO"
     skip_if test "$UNAME" = "Darwin"
 
     rm -rf scratch/*
@@ -2937,7 +2949,7 @@ function test_L_mount() {
 }
 
 function test_xdev() {
-    skip_if test ! "$SUDO"
+    skip_unless test "$SUDO"
     skip_if test "$UNAME" = "Darwin"
 
     rm -rf scratch/*
@@ -2953,7 +2965,7 @@ function test_xdev() {
 }
 
 function test_L_xdev() {
-    skip_if test ! "$SUDO"
+    skip_unless test "$SUDO"
     skip_if test "$UNAME" = "Darwin"
 
     rm -rf scratch/*
@@ -2971,7 +2983,7 @@ function test_L_xdev() {
 }
 
 function test_inum_mount() {
-    skip_if test ! "$SUDO"
+    skip_unless test "$SUDO"
     skip_if test "$UNAME" = "Darwin"
 
     rm -rf scratch/*
@@ -2986,8 +2998,8 @@ function test_inum_mount() {
 }
 
 function test_inum_bind_mount() {
-    skip_if test ! "$SUDO"
-    skip_if test "$UNAME" != "Linux"
+    skip_unless test "$SUDO"
+    skip_unless test "$UNAME" = "Linux"
 
     rm -rf scratch/*
     $TOUCH scratch/{foo,bar}
@@ -3001,8 +3013,8 @@ function test_inum_bind_mount() {
 }
 
 function test_type_bind_mount() {
-    skip_if test ! "$SUDO"
-    skip_if test "$UNAME" != "Linux"
+    skip_unless test "$SUDO"
+    skip_unless test "$UNAME" = "Linux"
 
     rm -rf scratch/*
     $TOUCH scratch/{file,null}
@@ -3016,8 +3028,8 @@ function test_type_bind_mount() {
 }
 
 function test_xtype_bind_mount() {
-    skip_if test ! "$SUDO"
-    skip_if test "$UNAME" != "Linux"
+    skip_unless test "$SUDO"
+    skip_unless test "$UNAME" = "Linux"
 
     rm -rf scratch/*
     $TOUCH scratch/{file,null}
@@ -3034,12 +3046,12 @@ function test_xtype_bind_mount() {
 function test_inum_automount() {
     # bfs shouldn't trigger automounts unless it descends into them
 
-    skip_if test ! "$SUDO"
-    skip_if fail command -v systemd-mount &>/dev/null
+    skip_unless test "$SUDO"
+    skip_unless command -v systemd-mount &>/dev/null
 
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
-    skip_if fail quiet sudo systemd-mount -A -o bind basic scratch/mnt
+    skip_unless quiet sudo systemd-mount -A -o bind basic scratch/mnt
 
     local before=$(inum scratch/mnt)
     bfs_diff scratch -inum "$before" -prune
@@ -3072,10 +3084,10 @@ function set_acl() {
 function test_acl() {
     rm -rf scratch/*
 
-    skip_if fail quiet invoke_bfs scratch -quit -acl
+    skip_unless quiet invoke_bfs scratch -quit -acl
 
     $TOUCH scratch/{normal,acl}
-    skip_if fail set_acl scratch/acl
+    skip_unless set_acl scratch/acl
     ln -s acl scratch/link
 
     bfs_diff scratch -acl
@@ -3084,22 +3096,22 @@ function test_acl() {
 function test_L_acl() {
     rm -rf scratch/*
 
-    skip_if fail quiet invoke_bfs scratch -quit -acl
+    skip_unless quiet invoke_bfs scratch -quit -acl
 
     $TOUCH scratch/{normal,acl}
-    skip_if fail set_acl scratch/acl
+    skip_unless set_acl scratch/acl
     ln -s acl scratch/link
 
     bfs_diff -L scratch -acl
 }
 
 function test_capable() {
-    skip_if test ! "$SUDO"
-    skip_if test "$UNAME" != "Linux"
+    skip_unless test "$SUDO"
+    skip_unless test "$UNAME" = "Linux"
 
     rm -rf scratch/*
 
-    skip_if fail quiet invoke_bfs scratch -quit -capable
+    skip_unless quiet invoke_bfs scratch -quit -capable
 
     $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
@@ -3109,12 +3121,12 @@ function test_capable() {
 }
 
 function test_L_capable() {
-    skip_if test ! "$SUDO"
-    skip_if test "$UNAME" != "Linux"
+    skip_unless test "$SUDO"
+    skip_unless test "$UNAME" = "Linux"
 
     rm -rf scratch/*
 
-    skip_if fail quiet invoke_bfs scratch -quit -capable
+    skip_unless quiet invoke_bfs scratch -quit -capable
 
     $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
@@ -3153,20 +3165,20 @@ function make_xattrs() {
 }
 
 function test_xattr() {
-    skip_if fail quiet invoke_bfs scratch -quit -xattr
-    skip_if fail make_xattrs
+    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless make_xattrs
     bfs_diff scratch -xattr
 }
 
 function test_L_xattr() {
-    skip_if fail quiet invoke_bfs scratch -quit -xattr
-    skip_if fail make_xattrs
+    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless make_xattrs
     bfs_diff -L scratch -xattr
 }
 
 function test_xattrname() {
-    skip_if fail quiet invoke_bfs scratch -quit -xattr
-    skip_if fail make_xattrs
+    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless make_xattrs
 
     case "$UNAME" in
         Darwin|FreeBSD)
@@ -3179,8 +3191,8 @@ function test_xattrname() {
 }
 
 function test_L_xattrname() {
-    skip_if fail quiet invoke_bfs scratch -quit -xattr
-    skip_if fail make_xattrs
+    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless make_xattrs
 
     case "$UNAME" in
         Darwin|FreeBSD)
@@ -3280,12 +3292,12 @@ function test_exclude_exclude() {
 }
 
 function test_flags() {
-    skip_if fail quiet invoke_bfs scratch -quit -flags offline
+    skip_unless quiet invoke_bfs scratch -quit -flags offline
 
     rm -rf scratch/*
 
     $TOUCH scratch/{foo,bar}
-    skip_if fail quiet chflags offline scratch/bar
+    skip_unless quiet chflags offline scratch/bar
 
     bfs_diff scratch -flags -offline,nohidden
 }
@@ -3322,12 +3334,12 @@ function test_files0_from_ok() {
 }
 
 function test_stderr_fails_silently() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     bfs_diff -D all basic 2>/dev/full
 }
 
 function test_stderr_fails_loudly() {
-    skip_if test ! -e /dev/full
+    skip_unless test -e /dev/full
     fail invoke_bfs -D all basic -false -fprint /dev/full 2>/dev/full
 }
 
