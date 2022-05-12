@@ -86,15 +86,6 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 }
 
 /**
- * Check if we should retry a failed stat() due to a potentially broken link.
- */
-static bool bfs_stat_retry(int ret, enum bfs_stat_flags flags) {
-	return ret != 0
-		&& (flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW
-		&& is_nonexistence_error(errno);
-}
-
-/**
  * Convert a struct stat to a struct bfs_stat.
  */
 static void bfs_stat_convert(const struct stat *statbuf, struct bfs_stat *buf) {
@@ -150,19 +141,12 @@ static void bfs_stat_convert(const struct stat *statbuf, struct bfs_stat *buf) {
 /**
  * bfs_stat() implementation backed by stat().
  */
-static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags flags, struct bfs_stat *buf) {
+static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, struct bfs_stat *buf) {
 	struct stat statbuf;
 	int ret = fstatat(at_fd, at_path, &statbuf, at_flags);
-
-	if (bfs_stat_retry(ret, flags)) {
-		at_flags |= AT_SYMLINK_NOFOLLOW;
-		ret = fstatat(at_fd, at_path, &statbuf, at_flags);
-	}
-
 	if (ret == 0) {
 		bfs_stat_convert(&statbuf, buf);
 	}
-
 	return ret;
 }
 
@@ -188,16 +172,10 @@ static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int 
 /**
  * bfs_stat() implementation backed by statx().
  */
-static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags flags, struct bfs_stat *buf) {
+static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct bfs_stat *buf) {
 	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
 	struct statx xbuf;
 	int ret = bfs_statx(at_fd, at_path, at_flags, mask, &xbuf);
-
-	if (bfs_stat_retry(ret, flags)) {
-		at_flags |= AT_SYMLINK_NOFOLLOW;
-		ret = bfs_statx(at_fd, at_path, at_flags, mask, &xbuf);
-	}
-
 	if (ret != 0) {
 		return ret;
 	}
@@ -288,14 +266,14 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, enum bfs
 #endif // BFS_STATX
 
 /**
- * Allows calling stat with custom at_flags.
+ * Calls the stat() implementation with explicit flags.
  */
-static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags flags, struct bfs_stat *buf) {
+static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, struct bfs_stat *buf) {
 #if BFS_STATX
 	static bool has_statx = true;
 
 	if (has_statx) {
-		int ret = bfs_statx_impl(at_fd, at_path, at_flags, flags, buf);
+		int ret = bfs_statx_impl(at_fd, at_path, at_flags, buf);
 		// EPERM is commonly returned in a seccomp() sandbox that does
 		// not allow statx()
 		if (ret != 0 && (errno == ENOSYS || errno == EPERM)) {
@@ -306,7 +284,24 @@ static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, enum 
 	}
 #endif
 
-	return bfs_stat_impl(at_fd, at_path, at_flags, flags, buf);
+	return bfs_stat_impl(at_fd, at_path, at_flags, buf);
+}
+
+/**
+ * Implements the BFS_STAT_TRYFOLLOW retry logic.
+ */
+static int bfs_stat_tryfollow(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags bfs_flags, struct bfs_stat *buf) {
+	int ret = bfs_stat_explicit(at_fd, at_path, at_flags, buf);
+
+	if (ret != 0
+	    && (bfs_flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW
+	    && is_nonexistence_error(errno))
+	{
+		at_flags |= AT_SYMLINK_NOFOLLOW;
+		ret = bfs_stat_explicit(at_fd, at_path, at_flags, buf);
+	}
+
+	return ret;
 }
 
 int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct bfs_stat *buf) {
@@ -322,7 +317,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 #endif
 
 	if (at_path) {
-		return bfs_stat_explicit(at_fd, at_path, at_flags, flags, buf);
+		return bfs_stat_tryfollow(at_fd, at_path, at_flags, flags, buf);
 	}
 
 	// Check __GNU__ to work around https://lists.gnu.org/archive/html/bug-hurd/2021-12/msg00001.html
@@ -330,7 +325,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 	static bool has_at_ep = true;
 	if (has_at_ep) {
 		at_flags |= AT_EMPTY_PATH;
-		int ret = bfs_stat_explicit(at_fd, "", at_flags, flags, buf);
+		int ret = bfs_stat_explicit(at_fd, "", at_flags, buf);
 		if (ret != 0 && errno == EINVAL) {
 			has_at_ep = false;
 		} else {
