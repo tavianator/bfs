@@ -268,12 +268,12 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 /**
  * Calls the stat() implementation with explicit flags.
  */
-static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, struct bfs_stat *buf) {
+static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, int x_flags, struct bfs_stat *buf) {
 #if BFS_STATX
 	static bool has_statx = true;
 
 	if (has_statx) {
-		int ret = bfs_statx_impl(at_fd, at_path, at_flags, buf);
+		int ret = bfs_statx_impl(at_fd, at_path, at_flags | x_flags, buf);
 		// EPERM is commonly returned in a seccomp() sandbox that does
 		// not allow statx()
 		if (ret != 0 && (errno == ENOSYS || errno == EPERM)) {
@@ -290,15 +290,15 @@ static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, struc
 /**
  * Implements the BFS_STAT_TRYFOLLOW retry logic.
  */
-static int bfs_stat_tryfollow(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags bfs_flags, struct bfs_stat *buf) {
-	int ret = bfs_stat_explicit(at_fd, at_path, at_flags, buf);
+static int bfs_stat_tryfollow(int at_fd, const char *at_path, int at_flags, int x_flags, enum bfs_stat_flags bfs_flags, struct bfs_stat *buf) {
+	int ret = bfs_stat_explicit(at_fd, at_path, at_flags, x_flags, buf);
 
 	if (ret != 0
 	    && (bfs_flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW
 	    && is_nonexistence_error(errno))
 	{
 		at_flags |= AT_SYMLINK_NOFOLLOW;
-		ret = bfs_stat_explicit(at_fd, at_path, at_flags, buf);
+		ret = bfs_stat_explicit(at_fd, at_path, at_flags, x_flags, buf);
 	}
 
 	return ret;
@@ -310,14 +310,15 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 	}
 
+	int x_flags = 0;
 #ifdef AT_STATX_DONT_SYNC
 	if (flags & BFS_STAT_NOSYNC) {
-		at_flags |= AT_STATX_DONT_SYNC;
+		x_flags |= AT_STATX_DONT_SYNC;
 	}
 #endif
 
 	if (at_path) {
-		return bfs_stat_tryfollow(at_fd, at_path, at_flags, flags, buf);
+		return bfs_stat_tryfollow(at_fd, at_path, at_flags, x_flags, flags, buf);
 	}
 
 	// Check __GNU__ to work around https://lists.gnu.org/archive/html/bug-hurd/2021-12/msg00001.html
@@ -325,7 +326,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 	static bool has_at_ep = true;
 	if (has_at_ep) {
 		at_flags |= AT_EMPTY_PATH;
-		int ret = bfs_stat_explicit(at_fd, "", at_flags, buf);
+		int ret = bfs_stat_explicit(at_fd, "", at_flags, x_flags, buf);
 		if (ret != 0 && errno == EINVAL) {
 			has_at_ep = false;
 		} else {
