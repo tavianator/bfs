@@ -62,7 +62,7 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    concurrency: muon
+    concurrency: spurion
 
     steps:
       - uses: actions/checkout@v2
@@ -78,10 +78,10 @@ jobs:
           mkdir ~/.ssh
           printf '%s' "$SSH_KEY" >~/.ssh/github-actions
           chmod 0600 ~/.ssh/github-actions
-          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' "$(tailscale ip -6 muon)" >~/.ssh/config
+          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' "$(tailscale ip -6 spurion)" >~/.ssh/config
 
       - name: Run tests
         run: |
-          muon=$(tailscale ip -6 muon)
-          rsync -rl --delete . "[$muon]:bfs"
-          ssh "$muon" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck DISTCHECK_FLAGS=TEST_FLAGS=--verbose'
+          spurion=$(tailscale ip -6 spurion)
+          rsync -rl --delete . "[$spurion]:bfs"
+          ssh "$spurion" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck'
