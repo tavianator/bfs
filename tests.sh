@@ -82,7 +82,7 @@ function usage() {
     local pad=$(printf "%*s" ${#0} "")
     cat <<EOF
 Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLU}--sudo${RST}]
-       $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
+       $pad [${BLU}--stop${RST}] [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
        $pad [${BLD}test_*${RST} [${BLD}test_*${RST} ...]]
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
@@ -93,6 +93,9 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
 
   ${BLU}--sudo${RST}
       Run tests that require root
+
+  ${BLU}--stop${RST}
+      Stop when the first error occurs
 
   ${BLU}--noclean${RST}
       Keep the test directories around after the run
@@ -125,6 +128,7 @@ BSD=
 GNU=
 ALL=
 SUDO=
+STOP=
 CLEAN=yes
 UPDATE=
 VERBOSE_COMMANDS=
@@ -163,6 +167,9 @@ for arg; do
             ;;
         --sudo)
             SUDO=yes
+            ;;
+        --stop)
+            STOP=yes
             ;;
         --noclean)
             CLEAN=
@@ -3412,6 +3419,7 @@ for test in "${enabled_tests[@]}"; do
         ((++failed))
         [ "$VERBOSE_ERRORS" ] || cat "$TMP/stderr" >&2
         printf "${BOL}${RED}%s failed!${RST}\n" "$test"
+        [ "$STOP" ] && break
     fi
 done
 
