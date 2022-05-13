@@ -190,7 +190,7 @@ STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
 
 # Custom test flags for distcheck
-DISTCHECK_FLAGS := TEST_FLAGS="--sudo --verbose"
+DISTCHECK_FLAGS := TEST_FLAGS="--sudo --verbose=tests"
 
 default: bfs
 .PHONY: default

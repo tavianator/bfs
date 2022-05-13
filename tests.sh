@@ -82,7 +82,7 @@ function usage() {
     local pad=$(printf "%*s" ${#0} "")
     cat <<EOF
 Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLU}--sudo${RST}]
-       $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}] [${BLU}--help${RST}]
+       $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
        $pad [${BLD}test_*${RST} [${BLD}test_*${RST} ...]]
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
@@ -100,8 +100,16 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
   ${BLU}--update${RST}
       Update the expected outputs for the test cases
 
-  ${BLU}--verbose${RST}
+  ${BLU}--verbose${RST}=${BLD}commands${RST}
       Log the commands that get executed
+  ${BLU}--verbose${RST}=${BLD}errors${RST}
+      Don't redirect standard error
+  ${BLU}--verbose${RST}=${BLD}skipped${RST}
+      Log which tests get skipped
+  ${BLU}--verbose${RST}=${BLD}tests${RST}
+      Log all tests that get run
+  ${BLU}--verbose${RST}
+      Log everything
 
   ${BLU}--help${RST}
       This message
@@ -119,7 +127,10 @@ ALL=
 SUDO=
 CLEAN=yes
 UPDATE=
-VERBOSE=
+VERBOSE_COMMANDS=
+VERBOSE_ERRORS=
+VERBOSE_SKIPPED=
+VERBOSE_TESTS=
 EXPLICIT=
 
 enabled_tests=()
@@ -159,8 +170,24 @@ for arg; do
         --update)
             UPDATE=yes
             ;;
+        --verbose=commands)
+            VERBOSE_COMMANDS=yes
+            ;;
+        --verbose=errors)
+            VERBOSE_ERRORS=yes
+            ;;
+        --verbose=skipped)
+            VERBOSE_SKIPPED=yes
+            ;;
+        --verbose=tests)
+            VERBOSE_SKIPPED=yes
+            VERBOSE_TESTS=yes
+            ;;
         --verbose)
-            VERBOSE=yes
+            VERBOSE_COMMANDS=yes
+            VERBOSE_ERRORS=yes
+            VERBOSE_SKIPPED=yes
+            VERBOSE_TESTS=yes
             ;;
         --help)
             usage
@@ -1063,13 +1090,13 @@ make_scratch "$TMP/scratch"
 # Close stdin so bfs doesn't think we're interactive
 exec </dev/null
 
-if [ "$VERBOSE" ]; then
+if [ "$VERBOSE_COMMANDS" ]; then
     # dup stdout for verbose logging even when redirected
     exec 3>&1
 fi
 
 function bfs_verbose() {
-    if [ "$VERBOSE" ]; then
+    if [ "$VERBOSE_COMMANDS" ]; then
         if [ -t 3 ]; then
             printf "${GRN}%q${RST} " "${BFS[@]}" >&3
 
@@ -1103,9 +1130,9 @@ function invoke_bfs() {
     "${BFS[@]}" "$@"
 }
 
-# Silence stderr unless --verbose is set
+# Silence stderr unless --verbose=errors is set
 function quiet() {
-    if [ "$VERBOSE" ]; then
+    if [ "$VERBOSE_ERRORS" ]; then
         "$@"
     else
         "$@" 2>/dev/null
@@ -3356,7 +3383,7 @@ function update_eol() {
     EOL="\\033[${COLUMNS}G "
 }
 
-if [[ -t 1 && ! "$VERBOSE" ]]; then
+if [[ -t 1 && ! "$VERBOSE_TESTS" ]]; then
     BOL='\r\033[K'
 
     # Workaround for bash 4: checkwinsize is off by default.  We can turn it on,
@@ -3383,7 +3410,7 @@ for test in "${enabled_tests[@]}"; do
         ((++passed))
     elif ((status == EX_SKIP)); then
         ((++skipped))
-        if [ "$VERBOSE" ]; then
+        if [ "$VERBOSE_SKIPPED" ]; then
             printf "${BOL}${CYN}%s skipped!${RST}\n" "$test"
         fi
     else
