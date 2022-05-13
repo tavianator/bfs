@@ -1130,15 +1130,6 @@ function invoke_bfs() {
     "${BFS[@]}" "$@"
 }
 
-# Silence stderr unless --verbose=errors is set
-function quiet() {
-    if [ "$VERBOSE_ERRORS" ]; then
-        "$@"
-    else
-        "$@" 2>/dev/null
-    fi
-}
-
 # Expect a command to fail, but not crash
 function fail() {
     "$@"
@@ -1154,8 +1145,8 @@ function fail() {
 }
 
 # Detect colored diff support
-if diff --color /dev/null /dev/null 2>/dev/null; then
-    DIFF="diff --color"
+if [ -t 2 ] && diff --color=always /dev/null /dev/null 2>/dev/null; then
+    DIFF="diff --color=always"
 else
     DIFF="diff"
 fi
@@ -1192,7 +1183,7 @@ function bfs_diff() (
     local STATUS="${PIPESTATUS[0]}"
 
     if [ ! "$UPDATE" ]; then
-        $DIFF -u "$EXPECTED" "$ACTUAL" || return $EX_DIFF
+        $DIFF -u "$EXPECTED" "$ACTUAL" >&2 || return $EX_DIFF
     fi
 
     if [ "$STATUS" -eq 0 ]; then
@@ -1310,7 +1301,7 @@ function test_depth_error() {
     touchp scratch/foo/bar
     chmod a-r scratch/foo
 
-    quiet bfs_diff scratch -depth
+    bfs_diff scratch -depth
     local ret=$?
 
     chmod +r scratch/foo
@@ -1478,19 +1469,19 @@ function test_links_minus() {
 }
 
 function test_links_noarg() {
-    fail quiet invoke_bfs links -links
+    fail invoke_bfs links -links
 }
 
 function test_links_empty() {
-    fail quiet invoke_bfs links -links ''
+    fail invoke_bfs links -links ''
 }
 
 function test_links_negative() {
-    fail quiet invoke_bfs links -links +-1
+    fail invoke_bfs links -links +-1
 }
 
 function test_links_invalid() {
-    fail quiet invoke_bfs links -links ASDF
+    fail invoke_bfs links -links ASDF
 }
 
 function test_P() {
@@ -1545,12 +1536,12 @@ function test_L_loops() {
 }
 
 function test_L_loops_continue() {
-    quiet bfs_diff -L loops
+    bfs_diff -L loops
     [ $? -eq $EX_BFS ]
 }
 
 function test_X() {
-    quiet bfs_diff -X weirdnames
+    bfs_diff -X weirdnames
     [ $? -eq $EX_BFS ]
 }
 
@@ -1631,21 +1622,21 @@ function test_xtype_reorder() {
 
 function test_xtype_depth() {
     # Make sure -xtype is considered side-effecting for facts_when_impure
-    fail quiet invoke_bfs loops -xtype l -depth 100
+    fail invoke_bfs loops -xtype l -depth 100
 }
 
 function test_iname() {
-    skip_unless quiet invoke_bfs -quit -iname PATTERN
+    skip_unless invoke_bfs -quit -iname PATTERN
     bfs_diff basic -iname '*F*'
 }
 
 function test_ipath() {
-    skip_unless quiet invoke_bfs -quit -ipath PATTERN
+    skip_unless invoke_bfs -quit -ipath PATTERN
     bfs_diff basic -ipath 'basic/*F*'
 }
 
 function test_iwholename() {
-    skip_unless quiet invoke_bfs -quit -iwholename PATTERN
+    skip_unless invoke_bfs -quit -iwholename PATTERN
     bfs_diff basic -iwholename 'basic/*F*'
 }
 
@@ -1654,7 +1645,7 @@ function test_lname() {
 }
 
 function test_ilname() {
-    skip_unless quiet invoke_bfs -quit -ilname PATTERN
+    skip_unless invoke_bfs -quit -ilname PATTERN
     bfs_diff links -ilname '[AQ]'
 }
 
@@ -1663,7 +1654,7 @@ function test_L_lname() {
 }
 
 function test_L_ilname() {
-    skip_unless quiet invoke_bfs -quit -ilname PATTERN
+    skip_unless invoke_bfs -quit -ilname PATTERN
     bfs_diff -L links -ilname '[AQ]'
 }
 
@@ -1714,19 +1705,19 @@ function test_newermt_epoch_minus_one() {
 }
 
 function test_newermt_invalid() {
-    fail quiet invoke_bfs times -newermt not_a_date_time
+    fail invoke_bfs times -newermt not_a_date_time
 }
 
 function test_newerma_nonexistent() {
-    fail quiet invoke_bfs times -newerma basic/nonexistent
+    fail invoke_bfs times -newerma basic/nonexistent
 }
 
 function test_newermq() {
-    fail quiet invoke_bfs times -newermq times/a
+    fail invoke_bfs times -newermq times/a
 }
 
 function test_newerqm() {
-    fail quiet invoke_bfs times -newerqm times/a
+    fail invoke_bfs times -newerqm times/a
 }
 
 function test_size() {
@@ -1751,7 +1742,7 @@ function test_exec() {
 
 function test_exec_nothing() {
     # Regression test: don't segfault on missing command
-    fail quiet invoke_bfs basic -exec \;
+    fail invoke_bfs basic -exec \;
 }
 
 function test_exec_plus() {
@@ -1785,7 +1776,7 @@ function test_exec_flush() {
 function test_exec_flush_fail() {
     # Failure to flush streams before exec should be caught
     skip_unless test -e /dev/full
-    fail quiet invoke_bfs basic -print0 -exec true \; >/dev/full
+    fail invoke_bfs basic -print0 -exec true \; >/dev/full
 }
 
 function test_exec_flush_fprint() {
@@ -1795,7 +1786,7 @@ function test_exec_flush_fprint() {
 
 function test_exec_flush_fprint_fail() {
     skip_unless test -e /dev/full
-    fail quiet invoke_bfs basic/a -fprint /dev/full -exec true \;
+    fail invoke_bfs basic/a -fprint /dev/full -exec true \;
 }
 
 function test_exec_plus_flush() {
@@ -1804,7 +1795,7 @@ function test_exec_plus_flush() {
 
 function test_exec_plus_flush_fail() {
     skip_unless test -e /dev/full
-    fail quiet invoke_bfs basic/a -print0 -exec echo found {} + >/dev/full
+    fail invoke_bfs basic/a -print0 -exec echo found {} + >/dev/full
 }
 
 function test_execdir() {
@@ -1920,11 +1911,11 @@ function test_fprint_duplicate_stdout() {
 }
 
 function test_fprint_noarg() {
-    fail quiet invoke_bfs basic -fprint
+    fail invoke_bfs basic -fprint
 }
 
 function test_fprint_nonexistent() {
-    fail quiet invoke_bfs basic -fprint scratch/nonexistent/path
+    fail invoke_bfs basic -fprint scratch/nonexistent/path
 }
 
 function test_fprint_truncate() {
@@ -1960,7 +1951,7 @@ function test_ignore_readdir_race() {
 
 function test_ignore_readdir_race_root() {
     # Make sure -ignore_readdir_race doesn't suppress ENOENT at the root
-    fail quiet invoke_bfs basic/nonexistent -ignore_readdir_race
+    fail invoke_bfs basic/nonexistent -ignore_readdir_race
 }
 
 function test_ignore_readdir_race_notdir() {
@@ -2032,15 +2023,15 @@ function test_perm_symbolic_slash() {
 }
 
 function test_perm_symbolic_trailing_comma() {
-    fail quiet invoke_bfs perms -perm a+r,
+    fail invoke_bfs perms -perm a+r,
 }
 
 function test_perm_symbolic_double_comma() {
-    fail quiet invoke_bfs perms -perm a+r,,u+w
+    fail invoke_bfs perms -perm a+r,,u+w
 }
 
 function test_perm_symbolic_missing_action() {
-    fail quiet invoke_bfs perms -perm a
+    fail invoke_bfs perms -perm a
 }
 
 function test_perm_leading_plus_symbolic() {
@@ -2085,26 +2076,26 @@ function test_not_prune() {
 
 function test_ok_nothing() {
     # Regression test: don't segfault on missing command
-    fail quiet invoke_bfs basic -ok \;
+    fail invoke_bfs basic -ok \;
 }
 
 function test_ok_stdin() {
     # -ok should *not* close stdin
     # See https://savannah.gnu.org/bugs/?24561
-    yes | quiet bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash {} \;
+    yes | bfs_diff basic -ok bash -c 'printf "%s? " "$1" && head -n1' bash {} \;
 }
 
 function test_okdir_stdin() {
     # -okdir should *not* close stdin
-    yes | quiet bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash {} \;
+    yes | bfs_diff basic -okdir bash -c 'printf "%s? " "$1" && head -n1' bash {} \;
 }
 
 function test_ok_plus_semicolon() {
-    yes | quiet bfs_diff basic -ok echo {} + \;
+    yes | bfs_diff basic -ok echo {} + \;
 }
 
 function test_okdir_plus_semicolon() {
-    yes | quiet bfs_diff basic -okdir echo {} + \;
+    yes | bfs_diff basic -okdir echo {} + \;
 }
 
 function test_delete() {
@@ -2163,16 +2154,16 @@ function test_regex_parens() {
 }
 
 function test_regex_error() {
-    fail quiet invoke_bfs basic -regex '['
+    fail invoke_bfs basic -regex '['
 }
 
 function test_regex_invalid_utf8() {
     rm -rf scratch/*
 
     # Incomplete UTF-8 sequences
-    skip_unless quiet touch scratch/$'\xC3'
-    skip_unless quiet touch scratch/$'\xE2\x84'
-    skip_unless quiet touch scratch/$'\xF0\x9F\x92'
+    skip_unless touch scratch/$'\xC3'
+    skip_unless touch scratch/$'\xE2\x84'
+    skip_unless touch scratch/$'\xF0\x9F\x92'
 
     bfs_diff scratch -regex 'scratch/..'
 }
@@ -2198,13 +2189,13 @@ function test_regextype_ed() {
 }
 
 function test_regextype_emacs() {
-    skip_unless quiet invoke_bfs -regextype emacs -quit
+    skip_unless invoke_bfs -regextype emacs -quit
 
     bfs_diff basic -regextype emacs -regex '.*/\(f+o?o?\|bar\)'
 }
 
 function test_regextype_grep() {
-    skip_unless quiet invoke_bfs -regextype grep -quit
+    skip_unless invoke_bfs -regextype grep -quit
 
     bfs_diff basic -regextype grep -regex '.*/f\+o\?o\?'
 }
@@ -2435,7 +2426,7 @@ function test_printf_Y_error() {
     chmod -x scratch/foo
     ln -s foo/bar scratch/bar
 
-    quiet bfs_diff scratch -printf '(%p) (%l) %y %Y\n'
+    bfs_diff scratch -printf '(%p) (%l) %y %Y\n'
     local ret=$?
 
     chmod +x scratch/foo
@@ -2459,27 +2450,27 @@ function test_printf_l_nonlink() {
 }
 
 function test_printf_incomplete_escape() {
-    fail quiet invoke_bfs basic -printf '\'
+    fail invoke_bfs basic -printf '\'
 }
 
 function test_printf_invalid_escape() {
-    fail quiet invoke_bfs basic -printf '\!'
+    fail invoke_bfs basic -printf '\!'
 }
 
 function test_printf_incomplete_format() {
-    fail quiet invoke_bfs basic -printf '%'
+    fail invoke_bfs basic -printf '%'
 }
 
 function test_printf_invalid_format() {
-    fail quiet invoke_bfs basic -printf '%!'
+    fail invoke_bfs basic -printf '%!'
 }
 
 function test_printf_duplicate_flag() {
-    fail quiet invoke_bfs basic -printf '%--p'
+    fail invoke_bfs basic -printf '%--p'
 }
 
 function test_printf_must_be_numeric() {
-    fail quiet invoke_bfs basic -printf '%+p'
+    fail invoke_bfs basic -printf '%+p'
 }
 
 function test_printf_color() {
@@ -2498,11 +2489,11 @@ function test_fprintf() {
 }
 
 function test_fprintf_nofile() {
-    fail quiet invoke_bfs basic -fprintf
+    fail invoke_bfs basic -fprintf
 }
 
 function test_fprintf_noformat() {
-    fail quiet invoke_bfs basic -fprintf /dev/null
+    fail invoke_bfs basic -fprintf /dev/null
 }
 
 function test_fstype() {
@@ -2571,15 +2562,15 @@ function test_precedence() {
 }
 
 function test_incomplete() {
-    fail quiet invoke_bfs basic \(
+    fail invoke_bfs basic \(
 }
 
 function test_missing_paren() {
-    fail quiet invoke_bfs basic \( -print
+    fail invoke_bfs basic \( -print
 }
 
 function test_extra_paren() {
-    fail quiet invoke_bfs basic -print \)
+    fail invoke_bfs basic -print \)
 }
 
 function test_color() {
@@ -2863,12 +2854,12 @@ function test_data_flow_or_swap() {
 
 function test_print_error() {
     skip_unless test -e /dev/full
-    fail quiet invoke_bfs basic -maxdepth 0 >/dev/full
+    fail invoke_bfs basic -maxdepth 0 >/dev/full
 }
 
 function test_fprint_error() {
     skip_unless test -e /dev/full
-    fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full
+    fail invoke_bfs basic -maxdepth 0 -fprint /dev/full
 }
 
 function test_fprint_noerror() {
@@ -2879,7 +2870,7 @@ function test_fprint_noerror() {
 
 function test_fprint_error_stdout() {
     skip_unless test -e /dev/full
-    fail quiet invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
+    fail invoke_bfs basic -maxdepth 0 -fprint /dev/full >/dev/full
 }
 
 function test_fprint_error_stderr() {
@@ -2906,15 +2897,15 @@ function test_closed_stdin() {
 }
 
 function test_ok_closed_stdin() {
-    quiet bfs_diff basic -ok echo \; <&-
+    bfs_diff basic -ok echo \; <&-
 }
 
 function test_okdir_closed_stdin() {
-    quiet bfs_diff basic -okdir echo {} \; <&-
+    bfs_diff basic -okdir echo {} \; <&-
 }
 
 function test_closed_stdout() {
-    fail quiet invoke_bfs basic >&-
+    fail invoke_bfs basic >&-
 }
 
 function test_closed_stderr() {
@@ -3078,14 +3069,14 @@ function test_inum_automount() {
 
     rm -rf scratch/*
     mkdir scratch/{foo,mnt}
-    skip_unless quiet sudo systemd-mount -A -o bind basic scratch/mnt
+    skip_unless sudo systemd-mount -A -o bind basic scratch/mnt
 
     local before=$(inum scratch/mnt)
     bfs_diff scratch -inum "$before" -prune
     local ret=$?
     local after=$(inum scratch/mnt)
 
-    quiet sudo systemd-umount scratch/mnt
+    sudo systemd-umount scratch/mnt
 
     ((ret == 0 && before == after))
 }
@@ -3111,7 +3102,7 @@ function set_acl() {
 function test_acl() {
     rm -rf scratch/*
 
-    skip_unless quiet invoke_bfs scratch -quit -acl
+    skip_unless invoke_bfs scratch -quit -acl
 
     $TOUCH scratch/{normal,acl}
     skip_unless set_acl scratch/acl
@@ -3123,7 +3114,7 @@ function test_acl() {
 function test_L_acl() {
     rm -rf scratch/*
 
-    skip_unless quiet invoke_bfs scratch -quit -acl
+    skip_unless invoke_bfs scratch -quit -acl
 
     $TOUCH scratch/{normal,acl}
     skip_unless set_acl scratch/acl
@@ -3138,7 +3129,7 @@ function test_capable() {
 
     rm -rf scratch/*
 
-    skip_unless quiet invoke_bfs scratch -quit -capable
+    skip_unless invoke_bfs scratch -quit -capable
 
     $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
@@ -3153,7 +3144,7 @@ function test_L_capable() {
 
     rm -rf scratch/*
 
-    skip_unless quiet invoke_bfs scratch -quit -capable
+    skip_unless invoke_bfs scratch -quit -capable
 
     $TOUCH scratch/{normal,capable}
     sudo setcap all+ep scratch/capable
@@ -3192,19 +3183,19 @@ function make_xattrs() {
 }
 
 function test_xattr() {
-    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless invoke_bfs scratch -quit -xattr
     skip_unless make_xattrs
     bfs_diff scratch -xattr
 }
 
 function test_L_xattr() {
-    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless invoke_bfs scratch -quit -xattr
     skip_unless make_xattrs
     bfs_diff -L scratch -xattr
 }
 
 function test_xattrname() {
-    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless invoke_bfs scratch -quit -xattr
     skip_unless make_xattrs
 
     case "$UNAME" in
@@ -3218,7 +3209,7 @@ function test_xattrname() {
 }
 
 function test_L_xattrname() {
-    skip_unless quiet invoke_bfs scratch -quit -xattr
+    skip_unless invoke_bfs scratch -quit -xattr
     skip_unless make_xattrs
 
     case "$UNAME" in
@@ -3249,11 +3240,11 @@ function test_typo() {
 }
 
 function test_D_multi() {
-    quiet bfs_diff -D opt,tree,unknown basic
+    bfs_diff -D opt,tree,unknown basic
 }
 
 function test_D_all() {
-    quiet bfs_diff -D all basic
+    bfs_diff -D all basic
 }
 
 function test_O0() {
@@ -3311,20 +3302,20 @@ function test_exclude_mindepth() {
 }
 
 function test_exclude_print() {
-    fail quiet invoke_bfs basic -exclude -print
+    fail invoke_bfs basic -exclude -print
 }
 
 function test_exclude_exclude() {
-    fail quiet invoke_bfs basic -exclude -exclude -name foo
+    fail invoke_bfs basic -exclude -exclude -name foo
 }
 
 function test_flags() {
-    skip_unless quiet invoke_bfs scratch -quit -flags offline
+    skip_unless invoke_bfs scratch -quit -flags offline
 
     rm -rf scratch/*
 
     $TOUCH scratch/{foo,bar}
-    skip_unless quiet chflags offline scratch/bar
+    skip_unless chflags offline scratch/bar
 
     bfs_diff scratch -flags -offline,nohidden
 }
@@ -3341,23 +3332,23 @@ function test_files0_from_stdin() {
 }
 
 function test_files0_from_none() {
-    printf "" | fail quiet invoke_bfs -files0-from -
+    printf "" | fail invoke_bfs -files0-from -
 }
 
 function test_files0_from_empty() {
-    printf "\0" | fail quiet invoke_bfs -files0-from -
+    printf "\0" | fail invoke_bfs -files0-from -
 }
 
 function test_files0_from_nowhere() {
-    fail quiet invoke_bfs -files0-from
+    fail invoke_bfs -files0-from
 }
 
 function test_files0_from_nothing() {
-    fail quiet invoke_bfs -files0-from basic/nonexistent
+    fail invoke_bfs -files0-from basic/nonexistent
 }
 
 function test_files0_from_ok() {
-    printf "basic\0" | fail quiet invoke_bfs -files0-from - -ok echo {} \;
+    printf "basic\0" | fail invoke_bfs -files0-from - -ok echo {} \;
 }
 
 function test_stderr_fails_silently() {
@@ -3371,7 +3362,7 @@ function test_stderr_fails_loudly() {
 }
 
 function test_unexpected_operator() {
-    fail quiet invoke_bfs \! -o -print
+    fail invoke_bfs \! -o -print
 }
 
 BOL=
@@ -3403,7 +3394,11 @@ skipped=0
 for test in "${enabled_tests[@]}"; do
     printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
 
-    ("$test")
+    if [ "$VERBOSE_ERRORS" ]; then
+        ("$test")
+    else
+        ("$test") 2>"$TMP/stderr"
+    fi
     status=$?
 
     if ((status == 0)); then
@@ -3415,6 +3410,7 @@ for test in "${enabled_tests[@]}"; do
         fi
     else
         ((++failed))
+        [ "$VERBOSE_ERRORS" ] || cat "$TMP/stderr" >&2
         printf "${BOL}${RED}%s failed!${RST}\n" "$test"
     fi
 done

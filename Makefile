@@ -190,7 +190,7 @@ STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
 
 # Custom test flags for distcheck
-DISTCHECK_FLAGS := TEST_FLAGS="--sudo --verbose=tests"
+DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
 
 default: bfs
 .PHONY: default
@@ -269,7 +269,7 @@ ifeq ($(OS) $(ARCH),Linux x86_64)
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)
-	+$(MAKE) check-install
+	+$(MAKE) check-install $(DISTCHECK_FLAGS)
 .PHONY: distcheck
 
 clean:
