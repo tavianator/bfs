@@ -608,6 +608,11 @@ static int skip_paths(struct parser_state *state) {
 			}
 		}
 
+		if (state->excluding) {
+			parse_warning(state, "This path will not be excluded.  Use a test like ${blu}-name${rs} or ${blu}-path${rs}\n");
+			bfs_warning(state->ctx, "within ${red}-exclude${rs} to exclude matching files.\n\n");
+		}
+
 		if (parse_root(state, arg) != 0) {
 			return -1;
 		}
