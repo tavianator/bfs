@@ -279,7 +279,7 @@ Then run
 
     $ make
 
-This will build the `bfs` binary in the current directory.
+This will build the `./bin/bfs` binary.
 Run the test suite to make sure it works correctly:
 
     $ make check

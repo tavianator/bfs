@@ -167,9 +167,6 @@ ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(EXTRA_CFLAGS) $(DEPFLAG
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS) $(EXTRA_LDLIBS)
 
-# Goals that make binaries
-BIN_GOALS := bfs build/tests/mksock build/tests/trie build/tests/xtimegm
-
 # Goals that are treated like flags by this Makefile
 FLAG_GOALS := asan lsan msan tsan ubsan gcov release
 
@@ -179,7 +176,7 @@ GOALS := $(filter-out $(FLAG_GOALS),$(MAKECMDGOALS))
 # Build the default goal if only flag goals are specified
 FLAG_PREREQS :=
 ifndef GOALS
-FLAG_PREREQS += default
+FLAG_PREREQS += bfs
 endif
 
 # The different search strategies that we test
@@ -192,60 +189,61 @@ CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
 # Custom test flags for distcheck
 DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
 
-default: bfs
-.PHONY: default
+bfs: bin/bfs
+.PHONY: bfs
 
-all: $(BIN_GOALS)
+all: bin/bfs bin/tests/mksock bin/tests/trie bin/tests/xtimegm
 .PHONY: all
 
-bfs: \
-    build/src/bar.o \
-    build/src/bftw.o \
-    build/src/color.o \
-    build/src/ctx.o \
-    build/src/darray.o \
-    build/src/diag.o \
-    build/src/dir.o \
-    build/src/dstring.o \
-    build/src/eval.o \
-    build/src/exec.o \
-    build/src/fsade.o \
-    build/src/main.o \
-    build/src/mtab.o \
-    build/src/opt.o \
-    build/src/parse.o \
-    build/src/printf.o \
-    build/src/pwcache.o \
-    build/src/stat.o \
-    build/src/trie.o \
-    build/src/typo.o \
-    build/src/util.o \
-    build/src/xregex.o \
-    build/src/xspawn.o \
-    build/src/xtime.o
+bin/bfs: \
+    obj/src/bar.o \
+    obj/src/bftw.o \
+    obj/src/color.o \
+    obj/src/ctx.o \
+    obj/src/darray.o \
+    obj/src/diag.o \
+    obj/src/dir.o \
+    obj/src/dstring.o \
+    obj/src/eval.o \
+    obj/src/exec.o \
+    obj/src/fsade.o \
+    obj/src/main.o \
+    obj/src/mtab.o \
+    obj/src/opt.o \
+    obj/src/parse.o \
+    obj/src/printf.o \
+    obj/src/pwcache.o \
+    obj/src/stat.o \
+    obj/src/trie.o \
+    obj/src/typo.o \
+    obj/src/util.o \
+    obj/src/xregex.o \
+    obj/src/xspawn.o \
+    obj/src/xtime.o
 
-build/tests/mksock: build/tests/mksock.o
-build/tests/trie: build/src/trie.o build/tests/trie.o
-build/tests/xtimegm: build/src/xtime.o build/tests/xtimegm.o
+bin/tests/mksock: obj/tests/mksock.o
+bin/tests/trie: obj/src/trie.o obj/tests/trie.o
+bin/tests/xtimegm: obj/src/xtime.o obj/tests/xtimegm.o
 
-$(BIN_GOALS):
+bin/%:
+	@$(MKDIR) $(@D)
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
 
-build/%.o: %.c build/FLAGS
+obj/%.o: %.c obj/FLAGS
 	@$(MKDIR) $(@D)
 	$(CC) $(ALL_CFLAGS) -c $< -o $@
 
 # Save the full set of flags to rebuild everything when they change
-build/FLAGS.new:
+obj/FLAGS.new:
 	@$(MKDIR) $(@D)
 	@echo $(CC) : $(ALL_CFLAGS) : $(ALL_LDFLAGS) : $(ALL_LDLIBS) >$@
-.PHONY: build/FLAGS.new
+.PHONY: obj/FLAGS.new
 
-# Only update build/FLAGS if build/FLAGS.new is different
-build/FLAGS: build/FLAGS.new
+# Only update obj/FLAGS if obj/FLAGS.new is different
+obj/FLAGS: obj/FLAGS.new
 	@test -e $@ && cmp -s $@ $< && rm $< || mv $< $@
 
-# Make sure that "make release" builds everything, but "make release build/src/main.o" doesn't
+# Make sure that "make release" builds everything, but "make release obj/src/main.o" doesn't
 $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
 .PHONY: $(FLAG_GOALS)
@@ -253,10 +251,10 @@ $(FLAG_GOALS): $(FLAG_PREREQS)
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
 
-$(STRATEGY_CHECKS): check-%: bfs build/tests/mksock
-	./tests.sh --bfs="./bfs -S $*" $(TEST_FLAGS)
+$(STRATEGY_CHECKS): check-%: bin/bfs bin/tests/mksock
+	./tests/tests.sh --bfs="./bin/bfs -S $*" $(TEST_FLAGS)
 
-check-trie check-xtimegm: check-%: build/tests/%
+check-trie check-xtimegm: check-%: bin/tests/%
 	$<
 
 distcheck:
@@ -273,12 +271,12 @@ endif
 .PHONY: distcheck
 
 clean:
-	$(RM) -r bfs build
+	$(RM) -r bin obj
 .PHONY: clean
 
 install:
 	$(MKDIR) $(DESTDIR)$(PREFIX)/bin
-	$(INSTALL) -m755 bfs $(DESTDIR)$(PREFIX)/bin/bfs
+	$(INSTALL) -m755 bin/bfs $(DESTDIR)$(PREFIX)/bin/bfs
 	$(MKDIR) $(DESTDIR)$(MANDIR)/man1
 	$(INSTALL) -m644 docs/bfs.1 $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(MKDIR) $(DESTDIR)$(PREFIX)/share/bash-completion/completions
@@ -295,12 +293,12 @@ uninstall:
 .PHONY: uninstall
 
 check-install:
-	+$(MAKE) install DESTDIR=build/pkg
-	+$(MAKE) uninstall DESTDIR=build/pkg
-	./bfs build/pkg -not -type d -print -exit 1
-	$(RM) -r build/pkg
+	+$(MAKE) install DESTDIR=pkg
+	+$(MAKE) uninstall DESTDIR=pkg
+	./bin/bfs pkg -not -type d -print -exit 1
+	$(RM) -r pkg
 .PHONY: check-install
 
 .SUFFIXES:
 
--include $(wildcard build/*/*.d)
+-include $(wildcard obj/*/*.d)

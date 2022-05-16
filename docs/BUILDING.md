@@ -113,24 +113,24 @@ Most of them are *snapshot tests* which compare `bfs`'s output to a known-good c
 You can pass the name of a particular test case (or a few) to run just those tests.
 For example:
 
-    $ ./tests.sh test_basic
+    $ ./tests/tests.sh test_basic
 
 If you need to update the reference snapshot, pass `--update`.
 It can be handy to generate the snapshot with a different `find` implementation to ensure the output is correct, for example:
 
-    $ ./tests.sh test_basic --bfs=find --update
+    $ ./tests/tests.sh test_basic --bfs=find --update
 
 But keep in mind, other `find` implementations may not be correct.
 To my knowledge, no other implementation passes even the POSIX-compatible subset of the tests:
 
-    $ ./tests.sh --bfs=find --posix
+    $ ./tests/tests.sh --bfs=find --posix
     ...
     tests passed: 89
     tests failed: 5
 
 Run
 
-    $ ./tests.sh --help
+    $ ./tests/tests.sh --help
 
 for more details.
 

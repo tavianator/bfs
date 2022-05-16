@@ -25,7 +25,7 @@ jobs:
       - name: Generate coverage
         run: |
           make -j$(nproc) gcov check
-          gcov -abcfu build/*/*.o
+          gcov -abcfu obj/*/*.o
 
       - uses: codecov/codecov-action@v2
         with:

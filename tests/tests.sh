@@ -86,7 +86,7 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
        $pad [${BLD}test_*${RST} [${BLD}test_*${RST} ...]]
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
-      Set the path to the bfs executable to test (default: ${MAG}./bfs${RST})
+      Set the path to the bfs executable to test (default: ${MAG}./bin/bfs${RST})
 
   ${BLU}--posix${RST}, ${BLU}--bsd${RST}, ${BLU}--gnu${RST}, ${BLU}--all${RST}
       Choose which test cases to run (default: ${BLU}--all${RST})
@@ -896,15 +896,13 @@ function _realpath() {
     )
 }
 
-ROOT=$(dirname -- "${BASH_SOURCE[0]}")
+TESTS=$(_realpath "$(dirname -- "${BASH_SOURCE[0]}")")
+BIN=$(_realpath "$TESTS/../bin")
 
 # Try to resolve the path to $BFS before we cd, while also supporting
-# --bfs="./bfs -S ids"
-read -a BFS <<<"${BFS:-$ROOT/bfs}"
+# --bfs="./bin/bfs -S ids"
+read -a BFS <<<"${BFS:-$BIN/bfs}"
 BFS[0]=$(_realpath "$(command -v "${BFS[0]}")")
-
-BUILD=$(_realpath "$ROOT/build")
-TESTS=$(_realpath "$ROOT/tests")
 
 # The temporary directory that will hold our test data
 TMP=$(mktemp -d "${TMPDIR:-/tmp}"/bfs.XXXXXXXXXX)
@@ -1076,7 +1074,7 @@ function make_rainbow() {
     # TODO: block
     ln -s /dev/null "$1/chardev_link"
     ln -s nowhere "$1/broken"
-    "$BUILD/tests/mksock" "$1/socket"
+    "$BIN/tests/mksock" "$1/socket"
     touchp "$1"/s{u,g,ug}id
     chmod u+s "$1"/su{,g}id
     chmod g+s "$1"/s{u,}gid

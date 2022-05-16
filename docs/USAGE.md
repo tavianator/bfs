@@ -13,7 +13,6 @@ $ bfs
 ./completions
 ./docs
 ./src
-./tests.sh
 ./tests
 ./completions/bfs.bash
 ./completions/bfs.zsh
@@ -81,11 +80,11 @@ There are other operators like `-or`:
 ```console
 $ bfs -name '*.md' -or -name '*.sh'
 ./README.md
-./tests.sh
 ./tests/find-color.sh
 ./tests/ls-color.sh
 ./tests/remove-sibling.sh
 ./tests/sort-args.sh
+./tests/tests.sh
 ./docs/CHANGELOG.md
 ./docs/HACKING.md
 ./docs/BUILDING.md

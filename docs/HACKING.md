@@ -43,5 +43,5 @@ function test_something() {
 
 `basic` is one of the directory trees generated for test cases; others include `links`, `loops`, `deep`, and `rainbow`.
 
-Run `./tests.sh test_something --update` to generate the reference snapshot (and don't forget to `git add` it).
+Run `./tests/tests.sh test_something --update` to generate the reference snapshot (and don't forget to `git add` it).
 Finally, add the test case to one of the arrays `posix_tests`, `bsd_tests`, `gnu_tests`, or `bfs_tests`, depending on which `find` implementations it should be compatible with.
