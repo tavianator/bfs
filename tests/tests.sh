@@ -897,7 +897,12 @@ function _realpath() {
 }
 
 TESTS=$(_realpath "$(dirname -- "${BASH_SOURCE[0]}")")
-BIN=$(_realpath "$TESTS/../bin")
+
+if [ "$BUILDDIR" ]; then
+    BIN=$(_realpath "$BUILDDIR/bin")
+else
+    BIN=$(_realpath "$TESTS/../bin")
+fi
 
 # Try to resolve the path to $BFS before we cd, while also supporting
 # --bfs="./bin/bfs -S ids"
