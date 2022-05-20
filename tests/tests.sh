@@ -3375,7 +3375,7 @@ function test_unexpected_operator() {
     fail invoke_bfs \! -o -print
 }
 
-BOL=
+BOL='\n'
 EOL='\n'
 
 function update_eol() {
@@ -3384,7 +3384,10 @@ function update_eol() {
     EOL="\\033[${COLUMNS}G "
 }
 
-if [[ -t 1 && ! "$VERBOSE_TESTS" ]]; then
+
+if [ "$VERBOSE_TESTS" ]; then
+    BOL=''
+elif [ -t 1 ]; then
     BOL='\r\033[K'
 
     # Workaround for bash 4: checkwinsize is off by default.  We can turn it on,
@@ -3402,7 +3405,11 @@ failed=0
 skipped=0
 
 for test in "${enabled_tests[@]}"; do
-    printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
+    if [[ -t 1 || "$VERBOSE_TESTS" ]]; then
+        printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
+    else
+        printf "."
+    fi
 
     if [ "$VERBOSE_ERRORS" ]; then
         ("$test")
@@ -3426,13 +3433,15 @@ for test in "${enabled_tests[@]}"; do
     fi
 done
 
+printf "${BOL}"
+
 if ((passed > 0)); then
-    printf "${BOL}${GRN}tests passed: %d${RST}\n" "$passed"
+    printf "${GRN}tests passed: %d${RST}\n" "$passed"
 fi
 if ((skipped > 0)); then
-    printf "${BOL}${CYN}tests skipped: %s${RST}\n" "$skipped"
+    printf "${CYN}tests skipped: %s${RST}\n" "$skipped"
 fi
 if ((failed > 0)); then
-    printf "${BOL}${RED}tests failed: %s${RST}\n" "$failed"
+    printf "${RED}tests failed: %s${RST}\n" "$failed"
     exit 1
 fi
