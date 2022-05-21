@@ -24,7 +24,7 @@ jobs:
 
       - name: Generate coverage
         run: |
-          make -j$(nproc) gcov check
+          make -j$(nproc) gcov check TEST_FLAGS="--sudo"
           gcov -abcfu obj/*/*.o
 
       - uses: codecov/codecov-action@v2
