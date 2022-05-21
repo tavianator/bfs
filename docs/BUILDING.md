@@ -58,6 +58,7 @@ Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 | `LDFLAGS`<br>`EXTRA_LDFLAGS`     | Override/add to the linker flags            |
 | `WITH_ACL`<br>`WITH_ATTR`<br>... | Enable/disable [optional dependencies]      |
 | `TEST_FLAGS`                     | `tests.sh` flags for `make check`           |
+| `BUILDDIR`                       | The build output directory (default: `.`)   |
 | `DESTDIR`                        | The root directory for `make install`       |
 | `PREFIX`                         | The installation prefix (default: `/usr`)   |
 | `MANDIR`                         | The man page installation directory         |
