@@ -19,7 +19,7 @@ VERSION := $(shell git describe --always 2>/dev/null)
 endif
 
 ifndef VERSION
-VERSION := 2.5
+VERSION := 2.6
 endif
 
 ifndef OS

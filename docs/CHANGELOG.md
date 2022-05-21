@@ -1,6 +1,35 @@
 2.*
 ===
 
+2.6
+---
+
+**May 21, 2022**
+
+- Fixed deleting large NFS directories on FreeBSD ([#67]).
+
+- Added support for a `bfs`-specific `BFS_COLORS` environment variable.
+
+- Refactored the build system, directory structure, and documentation ([#88], [#89], [#91]).
+  Thanks @ElectronicsArchiver!
+
+- Added `zsh` completion ([#86]).
+  Thanks @VorpalBlade!
+
+- Updated the default color scheme to match GNU coreutils 9.1.
+  Files with capabilities set are no longer colored differently by default, resulting in a significant performance improvement.
+
+- Became less aggressive at triggering automounts
+
+- Added support for out-of-tree builds with `BUILDDIR`
+
+[#67]: https://github.com/tavianator/bfs/issues/67
+[#86]: https://github.com/tavianator/bfs/issues/86
+[#88]: https://github.com/tavianator/bfs/issues/88
+[#89]: https://github.com/tavianator/bfs/issues/89
+[#91]: https://github.com/tavianator/bfs/issues/91
+
+
 2.5
 ---
 
