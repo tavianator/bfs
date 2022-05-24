@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
@@ -27,6 +27,6 @@ jobs:
           make -j$(nproc) gcov check TEST_FLAGS="--sudo"
           gcov -abcfu obj/*/*.o
 
-      - uses: codecov/codecov-action@v2
+      - uses: codecov/codecov-action@v3.1.0
         with:
           fail_ci_if_error: true
