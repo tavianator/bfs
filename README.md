@@ -205,6 +205,10 @@ Installation
 <strong><a href="https://packages.debian.org/sid/bfs">Debian</a>/<a href="https://packages.ubuntu.com/kinetic/bfs">Ubuntu</a></strong>
 # apt install bfs
 
+<strong><a href="https://copr.fedorainfracloud.org/coprs/xfgusta/bfs/">Fedora</a></strong>
+# dnf copr enable xfgusta/bfs
+# dnf install bfs
+
 <strong><a href="https://search.nixos.org/packages?channel=unstable&show=bfs&from=0&size=1&sort=relevance&type=packages&query=bfs">NixOS</a></strong>
 # nix-env -i bfs
 
