@@ -858,6 +858,9 @@ bfs_tests=(
 
     test_version
 
+    test_warn
+    test_nowarn
+
     test_xtype_multi
 
     # Optimizer tests
@@ -3243,6 +3246,16 @@ function test_help() {
 
 function test_version() {
     invoke_bfs -version >/dev/null
+}
+
+function test_warn() {
+    local stderr=$(invoke_bfs basic -warn -depth -prune 2>&1 >/dev/null)
+    [ -n "$stderr" ]
+}
+
+function test_nowarn() {
+    local stderr=$(invoke_bfs basic -nowarn -depth -prune 2>&1 >/dev/null)
+    [ -z "$stderr" ]
 }
 
 function test_typo() {
