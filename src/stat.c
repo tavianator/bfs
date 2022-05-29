@@ -310,7 +310,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 	}
 
-#ifdef AT_NO_AUTOMOUNT
+#if defined(AT_NO_AUTOMOUNT) && (!__GNU__ || BFS_GLIBC_PREREQ(2, 35))
 	at_flags |= AT_NO_AUTOMOUNT;
 #endif
 

@@ -90,6 +90,12 @@
 #	define BFS_HAS_UTIL BFS_HAS_INCLUDE(<util.h>, __NetBSD__)
 #endif
 
+#ifdef __GLIBC_PREREQ
+#	define BFS_GLIBC_PREREQ(maj, min) __GLIBC_PREREQ(maj, min)
+#else
+#	define BFS_GLIBC_PREREQ(maj, min) false
+#endif
+
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
 #	define FNM_CASEFOLD FNM_IGNORECASE
 #endif
