@@ -160,6 +160,8 @@ endif
 
 ifneq ($(filter gcov,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += --coverage
+# gcov only intercepts fork()/exec() with -std=gnu*
+LOCAL_CFLAGS := $(patsubst -std=c%,-std=gnu%,$(LOCAL_CFLAGS))
 endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
