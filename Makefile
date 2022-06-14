@@ -289,11 +289,14 @@ install:
 	$(INSTALL) -m644 completions/bfs.bash $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
 	$(MKDIR) $(DESTDIR)$(PREFIX)/share/zsh/site-functions
 	$(INSTALL) -m644 completions/bfs.zsh $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_bfs
+	$(MKDIR) $(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d
+	$(INSTALL) -m644 completions/bfs.fish $(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d/bfs.fish
 .PHONY: install
 
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/share/bash-completion/completions/bfs
 	$(RM) $(DESTDIR)$(PREFIX)/share/zsh/site-functions/_bfs
+	$(RM) $(DESTDIR)$(PREFIX)/share/fish/vendor_completions.d/bfs.fish
 	$(RM) $(DESTDIR)$(MANDIR)/man1/bfs.1
 	$(RM) $(DESTDIR)$(PREFIX)/bin/bfs
 .PHONY: uninstall
