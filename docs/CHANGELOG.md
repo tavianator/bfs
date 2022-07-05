@@ -1,6 +1,19 @@
 2.*
 ===
 
+2.6.1
+-----
+
+**July 7, 2022**
+
+- Fix `stat()` errors on GNU Hurd systems with glibc older than 2.35
+
+- Added fish shell tab completion ([#94]).
+  Thanks @xfgusta!
+
+[#94]: https://github.com/tavianator/bfs/pull/94
+
+
 2.6
 ---
 
