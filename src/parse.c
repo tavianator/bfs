@@ -3189,7 +3189,7 @@ static struct bfs_expr *parse_version(struct parser_state *state, int arg1, int 
 typedef struct bfs_expr *parse_fn(struct parser_state *state, int arg1, int arg2);
 
 /**
- * An entry in the parse table for literals.
+ * An entry in the parse table for primary expressions.
  */
 struct table_entry {
 	char *arg;
@@ -3201,7 +3201,7 @@ struct table_entry {
 };
 
 /**
- * The parse table for literals.
+ * The parse table for primary expressions.
  */
 static const struct table_entry parse_table[] = {
 	{"--", T_FLAG},
@@ -3358,11 +3358,11 @@ static const struct table_entry *table_lookup_fuzzy(const char *arg) {
 }
 
 /**
- * LITERAL : OPTION
+ * PRIMARY : OPTION
  *         | TEST
  *         | ACTION
  */
-static struct bfs_expr *parse_literal(struct parser_state *state) {
+static struct bfs_expr *parse_primary(struct parser_state *state) {
 	// Paths are already skipped at this point
 	const char *arg = state->argv[0];
 
@@ -3423,7 +3423,7 @@ unexpected:
  * FACTOR : "(" EXPR ")"
  *        | "!" FACTOR | "-not" FACTOR
  *        | "-exclude" FACTOR
- *        | LITERAL
+ *        | PRIMARY
  */
 static struct bfs_expr *parse_factor(struct parser_state *state) {
 	if (skip_paths(state) != 0) {
@@ -3489,7 +3489,7 @@ static struct bfs_expr *parse_factor(struct parser_state *state) {
 
 		return new_unary_expr(eval_not, factor, argv);
 	} else {
-		return parse_literal(state);
+		return parse_primary(state);
 	}
 }
 

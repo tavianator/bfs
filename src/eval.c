@@ -15,7 +15,7 @@
  ****************************************************************************/
 
 /**
- * Implementation of all the literal expressions.
+ * Implementation of all the primary expressions.
  */
 
 #include "eval.h"

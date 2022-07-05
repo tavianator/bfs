@@ -15,7 +15,7 @@
  ****************************************************************************/
 
 /**
- * The evaluation functions that implement literal expressions like -name,
+ * The evaluation functions that implement primary expressions like -name,
  * -print, etc.
  */
 
