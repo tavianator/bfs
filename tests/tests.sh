@@ -253,6 +253,7 @@ posix_tests=(
     test_L_depth
 
     test_exec
+    test_exec_nopath
     test_exec_plus
     test_exec_plus_status
     test_exec_plus_semicolon
@@ -1750,6 +1751,16 @@ function test_size_big() {
 
 function test_exec() {
     bfs_diff basic -exec echo {} \;
+}
+
+function test_exec_nopath() {
+    (
+        unset PATH
+        invoke_bfs basic -exec echo {} \; >"$OUT"
+    )
+
+    sort_output
+    diff_output
 }
 
 function test_exec_nothing() {
