@@ -40,6 +40,15 @@ if [ -t 1 ]; then
     MAG=$'\033[01;35m'
     CYN=$'\033[01;36m'
     RST=$'\033[0m'
+else
+    BLD=
+    RED=
+    GRN=
+    YLW=
+    BLU=
+    MAG=
+    CYN=
+    RST=
 fi
 
 UNAME=$(uname)
