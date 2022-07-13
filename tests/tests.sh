@@ -16,7 +16,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
 ############################################################################
 
-set -eP
+set -euP
 umask 022
 
 export LC_ALL=C
@@ -906,7 +906,7 @@ function _realpath() {
 
 TESTS=$(_realpath "$(dirname -- "${BASH_SOURCE[0]}")")
 
-if [ "$BUILDDIR" ]; then
+if [ "${BUILDDIR-}" ]; then
     BIN=$(_realpath "$BUILDDIR/bin")
 else
     BIN=$(_realpath "$TESTS/../bin")
