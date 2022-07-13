@@ -1067,17 +1067,20 @@ function make_deep() {
     name="${name}${name}${name}${name}"
     name="${name:0:255}"
 
-    # 4 * 4 * 256 - 1 == 4095 == PATH_MAX - 1
+    # 4 * 256 - 1 == 1023
     local names="$name/$name/$name/$name"
-    names="$names/$names/$names/$names"
 
     for i in {0..9} A B C D E F; do
         (
             mkdir "$1/$i"
             cd "$1/$i"
 
-            mkdir -p "$names"
-            cd "$names"
+            # 4 * 1024 == 4096 == PATH_MAX
+            for _ in {1..4}; do
+                mkdir -p "$names"
+                cd "$names"
+            done
+
             $TOUCH "$name"
         )
     done
