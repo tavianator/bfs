@@ -1172,6 +1172,20 @@ EX_DIFF=20
 # Return value when a test is skipped
 EX_SKIP=77
 
+function sort_output() {
+    sort -o "$OUT" "$OUT"
+}
+
+function diff_output() {
+    local GOLD="$TESTS/$TEST.out"
+
+    if [ "$UPDATE" ]; then
+        cp "$OUT" "$GOLD"
+    else
+        $DIFF -u "$GOLD" "$OUT" >&2
+    fi
+}
+
 function bfs_diff() (
     bfs_verbose "$@"
 
@@ -1179,26 +1193,10 @@ function bfs_diff() (
     # substitution, even with low ulimit -n
     exec 3>&-
 
-    local CALLER
-    for CALLER in "${FUNCNAME[@]}"; do
-        if [[ $CALLER == test_* ]]; then
-            break
-        fi
-    done
-
-    local EXPECTED="$TESTS/$CALLER.out"
-    if [ "$UPDATE" ]; then
-        local ACTUAL="$EXPECTED"
-    else
-        local ACTUAL="$TMP/$CALLER.out"
-    fi
-
-    "${BFS[@]}" "$@" | sort >"$ACTUAL"
+    "${BFS[@]}" "$@" | sort >"$OUT"
     local STATUS="${PIPESTATUS[0]}"
 
-    if [ ! "$UPDATE" ]; then
-        $DIFF -u "$EXPECTED" "$ACTUAL" >&2 || return $EX_DIFF
-    fi
+    diff_output || return $EX_DIFF
 
     if [ "$STATUS" -eq 0 ]; then
         return 0
@@ -1886,42 +1884,25 @@ function test_follow_comma() {
 }
 
 function test_fprint() {
-    invoke_bfs basic -fprint scratch/test_fprint.out
-    sort -o scratch/test_fprint.out scratch/test_fprint.out
-
-    if [ "$UPDATE" ]; then
-        cp {scratch,"$TESTS"}/test_fprint.out
-    else
-        $DIFF -u {"$TESTS",scratch}/test_fprint.out
-    fi
+    invoke_bfs basic -fprint "$OUT"
+    sort_output
+    diff_output
 }
 
 function test_fprint_duplicate() {
-    touchp scratch/test_fprint_duplicate.out
-    ln scratch/test_fprint_duplicate.out scratch/test_fprint_duplicate.hard
-    ln -s test_fprint_duplicate.out scratch/test_fprint_duplicate.soft
+    touchp scratch/$TEST.out
+    ln scratch/$TEST.out scratch/$TEST.hard
+    ln -s $TEST.out scratch/$TEST.soft
 
-    invoke_bfs basic -fprint scratch/test_fprint_duplicate.out -fprint scratch/test_fprint_duplicate.hard -fprint scratch/test_fprint_duplicate.soft
-    sort -o scratch/test_fprint_duplicate.out scratch/test_fprint_duplicate.out
-
-    if [ "$UPDATE" ]; then
-        cp {scratch,"$TESTS"}/test_fprint_duplicate.out
-    else
-        $DIFF -u {"$TESTS",scratch}/test_fprint_duplicate.out
-    fi
+    invoke_bfs basic -fprint scratch/$TEST.out -fprint scratch/$TEST.hard -fprint scratch/$TEST.soft
+    sort scratch/$TEST.out >"$OUT"
+    diff_output
 }
 
 function test_fprint_duplicate_stdout() {
-    touchp scratch/test_fprint_duplicate_stdout.out
-
-    invoke_bfs basic -fprint scratch/test_fprint_duplicate_stdout.out -print >scratch/test_fprint_duplicate_stdout.out
-    sort -o scratch/test_fprint_duplicate_stdout.out{,}
-
-    if [ "$UPDATE" ]; then
-        cp {scratch,"$TESTS"}/test_fprint_duplicate_stdout.out
-    else
-        $DIFF -u {"$TESTS",scratch}/test_fprint_duplicate_stdout.out
-    fi
+    invoke_bfs basic -fprint "$OUT" -print >"$OUT"
+    sort_output
+    diff_output
 }
 
 function test_fprint_noarg() {
@@ -1933,16 +1914,11 @@ function test_fprint_nonexistent() {
 }
 
 function test_fprint_truncate() {
-    printf "basic\nbasic\n" >scratch/test_fprint_truncate.out
+    printf "basic\nbasic\n" >"$OUT"
 
-    invoke_bfs basic -maxdepth 0 -fprint scratch/test_fprint_truncate.out
-    sort -o scratch/test_fprint_truncate.out scratch/test_fprint_truncate.out
-
-    if [ "$UPDATE" ]; then
-        cp {scratch,"$TESTS"}/test_fprint_truncate.out
-    else
-        $DIFF -u {"$TESTS",scratch}/test_fprint_truncate.out
-    fi
+    invoke_bfs basic -maxdepth 0 -fprint "$OUT"
+    sort_output
+    diff_output
 }
 
 function test_double_dash() {
@@ -2233,13 +2209,8 @@ function test_f() {
 }
 
 function test_s() {
-    invoke_bfs -s weirdnames -maxdepth 1 >"$TMP/test_s.out"
-
-    if [ "$UPDATE" ]; then
-        cp {"$TMP","$TESTS"}/test_s.out
-    else
-        $DIFF -u {"$TESTS","$TMP"}/test_s.out
-    fi
+    invoke_bfs -s weirdnames -maxdepth 1 >"$OUT"
+    diff_output
 }
 
 function test_hidden() {
@@ -2504,14 +2475,9 @@ function test_printf_everything() {
 }
 
 function test_fprintf() {
-    invoke_bfs basic -fprintf scratch/test_fprintf.out '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
-    sort -o scratch/test_fprintf.out scratch/test_fprintf.out
-
-    if [ "$UPDATE" ]; then
-        cp scratch/test_fprintf.out "$TESTS/test_fprintf.out"
-    else
-        $DIFF -u "$TESTS/test_fprintf.out" scratch/test_fprintf.out
-    fi
+    invoke_bfs basic -fprintf "$OUT" '%%p(%p) %%d(%d) %%f(%f) %%h(%h) %%H(%H) %%P(%P) %%m(%m) %%M(%M) %%y(%y)\n'
+    sort_output
+    diff_output
 }
 
 function test_fprintf_nofile() {
@@ -2743,20 +2709,11 @@ function test_color_ls() {
     mkdir scratch/__bfs__
     ln -s /__bfs__/nowhere scratch/absolute
 
-    local EXPECTED="$TESTS/${FUNCNAME[0]}.out"
-    if [ "$UPDATE" ]; then
-        local ACTUAL="$EXPECTED"
-    else
-        local ACTUAL="$TMP/${FUNCNAME[0]}.out"
-    fi
-
     LS_COLORS="or=01;31:" invoke_bfs scratch/{,link,broken,nested,notdir,relative,absolute} -color -type l -ls \
         | sed 's/.* -> //' \
-        | sort -o "$ACTUAL"
+        | sort >"$OUT"
 
-    if [ ! "$UPDATE" ]; then
-        $DIFF -u "$EXPECTED" "$ACTUAL"
-    fi
+    diff_output
 }
 
 function test_deep() {
@@ -2909,13 +2866,8 @@ function test_print0() {
 }
 
 function test_fprint0() {
-    invoke_bfs basic/a basic/b -fprint0 scratch/test_fprint0.out
-
-    if [ "$UPDATE" ]; then
-        cp scratch/test_fprint0.out "$TESTS/test_fprint0.out"
-    else
-        cmp -s scratch/test_fprint0.out "$TESTS/test_fprint0.out"
-    fi
+    invoke_bfs basic/a basic/b -fprint0 "$OUT"
+    diff_output
 }
 
 function test_closed_stdin() {
@@ -3304,13 +3256,8 @@ function test_Ofast() {
 }
 
 function test_S() {
-    invoke_bfs -S "$1" -s basic >"scratch/test_S_$1.out"
-
-    if [ "$UPDATE" ]; then
-        cp {scratch,"$TESTS"}/"test_S_$1.out"
-    else
-        $DIFF -u {"$TESTS",scratch}/"test_S_$1.out"
-    fi
+    invoke_bfs -S "$1" -s basic >"$OUT"
+    diff_output
 }
 
 function test_S_bfs() {
@@ -3430,17 +3377,19 @@ passed=0
 failed=0
 skipped=0
 
-for test in "${enabled_tests[@]}"; do
+for TEST in "${enabled_tests[@]}"; do
     if [[ -t 1 || "$VERBOSE_TESTS" ]]; then
-        printf "${BOL}${YLW}%s${RST}${EOL}" "$test"
+        printf "${BOL}${YLW}%s${RST}${EOL}" "$TEST"
     else
         printf "."
     fi
 
+    OUT="$TMP/$TEST.out"
+
     if [ "$VERBOSE_ERRORS" ]; then
-        ("$test")
+        ("$TEST")
     else
-        ("$test") 2>"$TMP/stderr"
+        ("$TEST") 2>"$TMP/stderr"
     fi
     status=$?
 
@@ -3449,12 +3398,12 @@ for test in "${enabled_tests[@]}"; do
     elif ((status == EX_SKIP)); then
         ((++skipped))
         if [ "$VERBOSE_SKIPPED" ]; then
-            printf "${BOL}${CYN}%s skipped!${RST}\n" "$test"
+            printf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
         fi
     else
         ((++failed))
         [ "$VERBOSE_ERRORS" ] || cat "$TMP/stderr" >&2
-        printf "${BOL}${RED}%s failed!${RST}\n" "$test"
+        printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
         [ "$STOP" ] && break
     fi
 done
