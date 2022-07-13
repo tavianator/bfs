@@ -742,6 +742,9 @@ bfs_tests=(
     test_expr_path_flag
 
     test_unexpected_operator
+    test_and_incomplete
+    test_or_incomplete
+    test_comma_incomplete
 
     test_typo
 
@@ -3357,6 +3360,18 @@ function test_stderr_fails_loudly() {
 
 function test_unexpected_operator() {
     fail invoke_bfs \! -o -print
+}
+
+function test_and_incomplete() {
+    fail invoke_bfs -print -a
+}
+
+function test_or_incomplete() {
+    fail invoke_bfs -print -o
+}
+
+function test_comma_incomplete() {
+    fail invoke_bfs -print ,
 }
 
 BOL='\n'
