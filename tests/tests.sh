@@ -32,14 +32,14 @@ export LS_COLORS=""
 unset BFS_COLORS
 
 if [ -t 1 ]; then
-    BLD=$(printf '\033[01m')
-    RED=$(printf '\033[01;31m')
-    GRN=$(printf '\033[01;32m')
-    YLW=$(printf '\033[01;33m')
-    BLU=$(printf '\033[01;34m')
-    MAG=$(printf '\033[01;35m')
-    CYN=$(printf '\033[01;36m')
-    RST=$(printf '\033[0m')
+    BLD=$'\033[01m'
+    RED=$'\033[01;31m'
+    GRN=$'\033[01;32m'
+    YLW=$'\033[01;33m'
+    BLU=$'\033[01;34m'
+    MAG=$'\033[01;35m'
+    CYN=$'\033[01;36m'
+    RST=$'\033[0m'
 fi
 
 UNAME=$(uname)
@@ -1058,17 +1058,17 @@ function make_deep() {
     name="${name}${name}${name}${name}"
     name="${name:0:255}"
 
+    # 4 * 4 * 256 - 1 == 4095 == PATH_MAX - 1
+    local names="$name/$name/$name/$name"
+    names="$names/$names/$names/$names"
+
     for i in {0..9} A B C D E F; do
         (
             mkdir "$1/$i"
             cd "$1/$i"
 
-            # 16 * 256 == 4096 == PATH_MAX
-            for _ in {1..16}; do
-                mkdir "$name"
-                cd "$name" 2>/dev/null
-            done
-
+            mkdir -p "$names"
+            cd "$names"
             $TOUCH "$name"
         )
     done
