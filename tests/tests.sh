@@ -1808,7 +1808,9 @@ function test_exec_substring() {
 
 function test_exec_flush() {
     # IO streams should be flushed before executing programs
-    bfs_diff basic -print0 -exec echo found \;
+    invoke_bfs basic -print0 -exec echo found \; | tr '\0' ' ' >"$OUT"
+    sort_output
+    diff_output
 }
 
 function test_exec_flush_fail() {
@@ -1828,7 +1830,8 @@ function test_exec_flush_fprint_fail() {
 }
 
 function test_exec_plus_flush() {
-    bfs_diff basic/a -print0 -exec echo found {} +
+    invoke_bfs basic/a -print0 -exec echo found {} + >"$OUT"
+    diff_output
 }
 
 function test_exec_plus_flush_fail() {
@@ -2423,7 +2426,8 @@ function test_printf_leak() {
 
 function test_printf_nul() {
     # NUL byte regression test
-    bfs_diff basic -maxdepth 0 -printf '%h\0%f\n'
+    invoke_bfs basic/a basic/b -maxdepth 0 -printf '%h\0%f\n' >"$OUT"
+    diff_output
 }
 
 function test_printf_w() {
@@ -2608,7 +2612,8 @@ function test_color_escapes() {
 }
 
 function test_color_nul() {
-    LS_COLORS="ec=\33[m\0:" bfs_diff rainbow -color -maxdepth 0
+    LS_COLORS="ec=\33[m\0:" invoke_bfs rainbow -color -maxdepth 0 >"$OUT"
+    diff_output
 }
 
 function test_color_ln_target() {
@@ -2888,7 +2893,8 @@ function test_fprint_error_stderr() {
 }
 
 function test_print0() {
-    bfs_diff basic/a basic/b -print0
+    invoke_bfs basic/a basic/b -print0 >"$OUT"
+    diff_output
 }
 
 function test_fprint0() {
