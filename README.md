@@ -206,7 +206,6 @@ Installation
 # apt install bfs
 
 <strong><a href="https://copr.fedorainfracloud.org/coprs/xfgusta/bfs/">Fedora</a></strong>
-# dnf copr enable xfgusta/bfs
 # dnf install bfs
 
 <strong><a href="https://search.nixos.org/packages?channel=unstable&show=bfs&from=0&size=1&sort=relevance&type=packages&query=bfs">NixOS</a></strong>
