@@ -295,7 +295,6 @@ posix_tests=(
     test_nouser_ulimit
 
     test_ok_stdin
-    test_ok_plus_semicolon
 
     test_path
 
@@ -652,7 +651,6 @@ gnu_tests=(
     test_ok_nothing
 
     test_okdir_closed_stdin
-    test_okdir_plus_semicolon
 
     test_perm_000_slash
     test_perm_222_slash
@@ -846,6 +844,10 @@ bfs_tests=(
 
     test_nohidden
     test_nohidden_depth
+
+    test_ok_plus_semicolon
+
+    test_okdir_plus_semicolon
 
     test_perm_symbolic_trailing_comma
     test_perm_symbolic_double_comma
@@ -2110,6 +2112,13 @@ function test_okdir_stdin() {
 }
 
 function test_ok_plus_semicolon() {
+    #     The -ok primary shall be equivalent to -exec, except that the use of a
+    #     <plus-sign> to punctuate the end of the primary expression need not be
+    #     supported, ...
+    #
+    # bfs chooses not to support it, for compatibility with most other find
+    # implementations.
+
     yes | bfs_diff basic -ok echo {} + \;
 }
 
