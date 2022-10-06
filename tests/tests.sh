@@ -262,8 +262,10 @@ posix_tests=(
     test_L_depth
 
     test_exec
+    test_exec_nonexistent
     test_exec_nopath
     test_exec_plus
+    test_exec_plus_nonexistent
     test_exec_plus_status
     test_exec_plus_semicolon
 
@@ -401,6 +403,7 @@ bsd_tests=(
 
     test_exec_substring
 
+    test_execdir_nonexistent
     test_execdir_pwd
     test_execdir_slash
     test_execdir_slash_pwd
@@ -559,6 +562,7 @@ gnu_tests=(
     test_exec_plus_flush_fail
 
     test_execdir
+    test_execdir_nonexistent
     test_execdir_substring
     test_execdir_plus_semicolon
     test_execdir_pwd
@@ -822,6 +826,7 @@ bfs_tests=(
     test_exec_flush_fprint_fail
 
     test_execdir_plus
+    test_execdir_plus_nonexistent
 
     test_fprint_duplicate_stdout
     test_fprint_error_stdout
@@ -1770,6 +1775,17 @@ function test_exec() {
     bfs_diff basic -exec echo {} \;
 }
 
+function test_exec_nonexistent() {
+    # Failure to execute the command should lead to an error message and
+    # non-zero exit status.  See https://unix.stackexchange.com/q/704522/56202
+
+    local stderr=$(invoke_bfs basic -exec "$TESTS/nonexistent" {} \; 2>&1 >/dev/null)
+    [ -n "$stderr" ] || return 1
+
+    bfs_diff basic -print -exec "$TESTS/nonexistent" {} \; -print
+    (($? == EX_BFS))
+}
+
 function test_exec_nopath() {
     (
         unset PATH
@@ -1787,6 +1803,14 @@ function test_exec_nothing() {
 
 function test_exec_plus() {
     bfs_diff basic -exec "$TESTS/sort-args.sh" {} +
+}
+
+function test_exec_plus_nonexistent() {
+    local stderr=$(invoke_bfs basic -exec "$TESTS/nonexistent" {} + 2>&1 >/dev/null)
+    [ -n "$stderr" ] || return 1
+
+    bfs_diff basic -exec "$TESTS/nonexistent" {} + -print
+    (($? == EX_BFS))
 }
 
 function test_exec_plus_status() {
@@ -1845,6 +1869,14 @@ function test_execdir() {
     bfs_diff basic -execdir echo {} \;
 }
 
+function test_execdir_nonexistent() {
+    local stderr=$(invoke_bfs basic -execdir "$TESTS/nonexistent" {} \; 2>&1 >/dev/null)
+    [ -n "$stderr" ] || return 1
+
+    bfs_diff basic -print -execdir "$TESTS/nonexistent" {} \; -print
+    (($? == EX_BFS))
+}
+
 function test_execdir_plus() {
     local tree=$(invoke_bfs -D tree 2>&1 -quit)
 
@@ -1853,6 +1885,14 @@ function test_execdir_plus() {
     fi
 
     bfs_diff basic -execdir "$TESTS/sort-args.sh" {} +
+}
+
+function test_execdir_plus_nonexistent() {
+    local stderr=$(invoke_bfs basic -execdir "$TESTS/nonexistent" {} + 2>&1 >/dev/null)
+    [ -n "$stderr" ] || return 1
+
+    bfs_diff basic -execdir "$TESTS/nonexistent" {} + -print
+    (($? == EX_BFS))
 }
 
 function test_execdir_substring() {
