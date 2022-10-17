@@ -408,7 +408,7 @@ static void parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
 	}
 }
 
-struct colors *parse_colors() {
+struct colors *parse_colors(void) {
 	struct colors *colors = malloc(sizeof(struct colors));
 	if (!colors) {
 		return NULL;
