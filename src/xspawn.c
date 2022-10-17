@@ -260,11 +260,13 @@ char *bfs_spawn_resolve(const char *exe) {
 	const char *path = getenv("PATH");
 
 	char *confpath = NULL;
+#ifdef _CS_PATH
 	if (!path) {
 		path = confpath = xconfstr(_CS_PATH);
-		if (!path) {
-			return NULL;
-		}
+	}
+#endif
+	if (!path) {
+		return NULL;
 	}
 
 	size_t cap = 0;
