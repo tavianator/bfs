@@ -44,8 +44,8 @@ Features
 <details>
 <summary>
 <code>bfs</code> operates breadth-first, which typically finds the file(s) you're looking for faster.
-<p></p>
 </summary>
+<p></p>
 
 Imagine the following directory tree:
 
@@ -95,8 +95,8 @@ haystack/deep/1/2/3/4
 <details>
 <summary>
 <code>bfs</code> tries to be easier to use than <code>find</code>, while remaining compatible.
-<p></p>
 </summary>
+<p></p>
 
 For example, `bfs` is less picky about where you put its arguments:
 
@@ -140,8 +140,8 @@ haystack/needle
 <details>
 <summary>
 <code>bfs</code> gives helpful errors and warnings.
-<p></p>
 </summary>
+<p></p>
 
 For example, `bfs` will detect and suggest corrections for typos:
 
@@ -165,8 +165,8 @@ $ bfs -print -name 'needle'
 <details>
 <summary>
 <code>bfs</code> adds some options that make common tasks easier.
-<p></p>
 </summary>
+<p></p>
 
 For example, the `-exclude` operator skips over entire subtrees whenever an expression matches.
 `-exclude` is both more powerful and easier to use than the standard `-prune` action; compare
@@ -192,8 +192,8 @@ Installation
 <details open>
 <summary>
 <code>bfs</code> may already be packaged for your operating system.
-<p></p>
 </summary>
+<p></p>
 
 <pre>
 <strong><a href="https://pkgs.alpinelinux.org/packages?name=bfs">Alpine Linux</a></strong>
@@ -228,8 +228,8 @@ $ brew install tavianator/tap/bfs
 <details>
 <summary>
 To build <code>bfs</code> from source, you may need to install some dependencies.
-<p></p>
 </summary>
+<p></p>
 
 The only absolute requirements for building `bfs` are a C compiler, [GNU make](https://www.gnu.org/software/make/), and [Bash](https://www.gnu.org/software/bash/).
 These are installed by default on many systems, and easy to install on most others.
@@ -274,8 +274,8 @@ See the [build documentation](/docs/BUILDING.md#dependencies) for how to disable
 <details>
 <summary>
 Once you have the dependencies, you can build <code>bfs</code>.
-<p></p>
 </summary>
+<p></p>
 
 Download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
 Then run
