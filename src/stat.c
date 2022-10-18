@@ -28,7 +28,7 @@
 #	include <sys/param.h>
 #endif
 
-#ifdef STATX_BASIC_STATS
+#if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
 #	define BFS_LIBC_STATX true
 #elif __linux__
 #	include <linux/stat.h>
