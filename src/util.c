@@ -417,7 +417,7 @@ size_t xwrite(int fd, const void *buf, size_t nbytes) {
 
 char *xconfstr(int name) {
 #if __ANDROID__
-	errno = ENOSYS;
+	errno = ENOTSUP;
 	return NULL;
 #else
 	size_t len = confstr(name, NULL, 0);
