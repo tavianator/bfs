@@ -10,11 +10,11 @@
 
 ***Breadth-first search for your files.***
 
-**[Features](#features)**&emsp;
-**[Installation](#installation)**&emsp;
-**[Usage](/docs/USAGE.md)**&emsp;
-**[Building](/docs/BUILDING.md)**&emsp;
-**[Hacking](/docs/HACKING.md)**&emsp;
+**[Features](#features)** &ensp;&bullet;&ensp;
+**[Installation](#installation)** &ensp;&bullet;&ensp;
+**[Usage](/docs/USAGE.md)** &ensp;&bullet;&ensp;
+**[Building](/docs/BUILDING.md)** &ensp;&bullet;&ensp;
+**[Hacking](/docs/HACKING.md)** &ensp;&bullet;&ensp;
 **[Changelog](/docs/CHANGELOG.md)**
 
 <img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot">
@@ -26,11 +26,11 @@ It is otherwise compatible with many versions of `find`, including
 
 <div align="center">
 
-**[POSIX](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)**&emsp;
-**[GNU](https://www.gnu.org/software/findutils/)**&emsp;
-**[FreeBSD](https://www.freebsd.org/cgi/man.cgi?find(1))**&emsp;
-**[OpenBSD](https://man.openbsd.org/find.1)**&emsp;
-**[NetBSD](https://man.netbsd.org/find.1)**&emsp;
+**[POSIX](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/find.html)** &ensp;&bullet;&ensp;
+**[GNU](https://www.gnu.org/software/findutils/)** &ensp;&bullet;&ensp;
+**[FreeBSD](https://www.freebsd.org/cgi/man.cgi?find(1))** &ensp;&bullet;&ensp;
+**[OpenBSD](https://man.openbsd.org/find.1)** &ensp;&bullet;&ensp;
+**[NetBSD](https://man.netbsd.org/find.1)** &ensp;&bullet;&ensp;
 **[macOS](https://ss64.com/osx/find.html)**
 
 </div>
