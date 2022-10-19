@@ -30,18 +30,26 @@ Tests
 `bfs` includes an extensive test suite.
 See the [build documentation](BUILDING.md#testing) for details on running the tests.
 
+Test cases are grouped by the standard or `find` implementation that supports the tested feature(s):
+
+| Group                           | Description                           |
+|---------------------------------|---------------------------------------|
+| [`tests/posix`](/tests/posix)   | POSIX compatibility tests             |
+| [`tests/bsd`](/tests/bsd)       | BSD `find` features                   |
+| [`tests/gnu`](/tests/gnu)       | GNU `find` features                   |
+| [`tests/common`](/tests/common) | Features common to BSD and GNU `find` |
+| [`tests/bfs`](/tests/bfs)       | `bfs`-specific tests                  |
+
 Both new features and bug fixes should have associated tests.
-To add a test, create a new function in `tests.sh` called `test_<something>`.
+To add a test, create a new `*.sh` file in the appropriate group.
 Snapshot tests use the `bfs_diff` function to automatically compare the generated and expected outputs.
 For example,
 
 ```bash
-function test_something() {
-    bfs_diff basic -name something
-}
+# posix/something.sh
+bfs_diff basic -name something
 ```
 
 `basic` is one of the directory trees generated for test cases; others include `links`, `loops`, `deep`, and `rainbow`.
 
-Run `./tests/tests.sh test_something --update` to generate the reference snapshot (and don't forget to `git add` it).
-Finally, add the test case to one of the arrays `posix_tests`, `bsd_tests`, `gnu_tests`, or `bfs_tests`, depending on which `find` implementations it should be compatible with.
+Run `./tests/tests.sh posix/something --update` to generate the reference snapshot (and don't forget to `git add` it).

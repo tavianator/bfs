@@ -78,17 +78,17 @@ $ bfs -name '*.md' -and -name '*ING'`
 There are other operators like `-or`:
 
 ```console
-$ bfs -name '*.md' -or -name '*.sh'
+$ bfs -name '*.md' -or -name 'bfs.*'
 ./README.md
-./tests/find-color.sh
-./tests/ls-color.sh
-./tests/remove-sibling.sh
-./tests/sort-args.sh
-./tests/tests.sh
+./completions/bfs.bash
+./completions/bfs.fish
+./completions/bfs.zsh
+./docs/BUILDING.md
 ./docs/CHANGELOG.md
 ./docs/HACKING.md
-./docs/BUILDING.md
 ./docs/USAGE.md
+./docs/bfs.1
+./src/bfs.h
 ```
 
 and `-not`:
