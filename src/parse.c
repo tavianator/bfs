@@ -136,6 +136,19 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	expr->successes = 0;
 	expr->elapsed.tv_sec = 0;
 	expr->elapsed.tv_nsec = 0;
+
+	// Prevent bfs_expr_free() from freeing uninitialized pointers on error paths
+	if (bfs_expr_has_children(expr)) {
+		expr->lhs = NULL;
+		expr->rhs = NULL;
+	} else if (eval_fn == eval_exec) {
+		expr->exec = NULL;
+	} else if (eval_fn == eval_fprintf) {
+		expr->printf = NULL;
+	} else if (eval_fn == eval_regex) {
+		expr->regex = NULL;
+	}
+
 	return expr;
 }
 
