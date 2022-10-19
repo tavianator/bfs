@@ -16,8 +16,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
 ############################################################################
 
-shopt -s extdebug
-
 set -euP
 umask 022
 
