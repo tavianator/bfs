@@ -1,4 +1,4 @@
-rm -rf scratch/*
+clean_scratch
 touchp scratch/foo/bar/baz
 
 (cd scratch && invoke_bfs . -rm)

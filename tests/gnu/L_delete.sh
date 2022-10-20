@@ -1,4 +1,4 @@
-rm -rf scratch/*
+clean_scratch
 mkdir scratch/foo
 mkdir scratch/bar
 ln -s ../foo scratch/bar/baz

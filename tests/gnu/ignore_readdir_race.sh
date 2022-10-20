@@ -1,4 +1,4 @@
-rm -rf scratch/*
+clean_scratch
 $TOUCH scratch/{foo,bar}
 
 # -links 1 forces a stat() call, which will fail for the second file

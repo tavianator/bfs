@@ -3,7 +3,7 @@
 skip_unless test "$SUDO"
 skip_unless command -v systemd-mount &>/dev/null
 
-rm -rf scratch/*
+clean_scratch
 mkdir scratch/{foo,mnt}
 skip_unless sudo systemd-mount -A -o bind basic scratch/mnt
 

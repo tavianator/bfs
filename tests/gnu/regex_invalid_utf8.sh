@@ -1,4 +1,4 @@
-rm -rf scratch/*
+clean_scratch
 
 # Incomplete UTF-8 sequences
 skip_unless touch scratch/$'\xC3'

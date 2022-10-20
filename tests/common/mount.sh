@@ -1,7 +1,7 @@
 skip_unless test "$SUDO"
 skip_if test "$UNAME" = "Darwin"
 
-rm -rf scratch/*
+clean_scratch
 mkdir scratch/{foo,mnt}
 sudo mount -t tmpfs tmpfs scratch/mnt
 $TOUCH scratch/foo/bar scratch/mnt/baz

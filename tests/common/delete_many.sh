@@ -1,6 +1,6 @@
 # Test for https://github.com/tavianator/bfs/issues/67
 
-rm -rf scratch/*
+clean_scratch
 mkdir scratch/foo
 $TOUCH scratch/foo/{1..256}
 

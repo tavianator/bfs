@@ -1,7 +1,7 @@
 skip_unless test "$SUDO"
 skip_unless test "$UNAME" = "Linux"
 
-rm -rf scratch/*
+clean_scratch
 
 skip_unless invoke_bfs scratch -quit -capable
 

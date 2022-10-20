@@ -1,4 +1,4 @@
-rm -rf scratch/*
+clean_scratch
 
 skip_unless invoke_bfs scratch -quit -acl
 

@@ -1,7 +1,7 @@
 skip_unless test "$SUDO"
 skip_unless test "$UNAME" = "Linux"
 
-rm -rf scratch/*
+clean_scratch
 $TOUCH scratch/{foo,bar}
 sudo mount --bind scratch/{foo,bar}
 

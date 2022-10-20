@@ -270,6 +270,26 @@ if [ ! "$EXPLICIT" ]; then
     enabled_tests=("${enabled_tests[@]%.sh}")
 fi
 
+function clean_scratch() {
+    if [ -e "$TMP/scratch" ]; then
+        # Try to unmount anything left behind
+        if [ "$SUDO" ] && command -v mountpoint &>/dev/null; then
+            for path in "$TMP"/scratch/*; do
+                if mountpoint -q "$path"; then
+                    sudo umount "$path"
+                fi
+            done
+        fi
+
+        # Reset any modified permissions
+        chmod -R +rX "$TMP/scratch"
+
+        rm -rf "$TMP/scratch"
+    fi
+
+    mkdir "$TMP/scratch"
+}
+
 # Clean up temporary directories on exit
 function cleanup() {
     # Don't force rm to deal with long paths
@@ -280,9 +300,7 @@ function cleanup() {
     done
 
     # In case a test left anything weird in scratch/
-    if [ -e "$TMP"/scratch ]; then
-        chmod -R +rX "$TMP"/scratch
-    fi
+    clean_scratch
 
     rm -rf "$TMP"
 }
@@ -451,12 +469,6 @@ function make_rainbow() {
 }
 make_rainbow "$TMP/rainbow"
 
-# Creates a scratch directory that tests can modify
-function make_scratch() {
-    mkdir -p "$1"
-}
-make_scratch "$TMP/scratch"
-
 # Close stdin so bfs doesn't think we're interactive
 exec </dev/null
 
@@ -617,7 +629,7 @@ function set_acl() {
 }
 
 function make_xattrs() {
-    rm -rf scratch/*
+    clean_scratch
 
     $TOUCH scratch/{normal,xattr,xattr_2}
     ln -s xattr scratch/link

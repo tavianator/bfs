@@ -1,4 +1,4 @@
-rm -rf scratch/*
+clean_scratch
 touchp scratch/foo/bar/baz
 ln -s foo/bar/baz scratch/link
 ln -s foo/bar/nowhere scratch/broken
