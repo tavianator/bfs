@@ -1,6 +1,20 @@
 2.*
 ===
 
+2.6.2
+-----
+
+**October 21, 2022**
+
+- Fixed use of uninitialized memory on parsing errors involving `-fprintf`
+
+- Fixed Android build issues ([#96])
+
+- Refactored the test suite
+
+[#96]: https://github.com/tavianator/bfs/issues/96
+
+
 2.6.1
 -----
 
