@@ -105,6 +105,9 @@ haystack/deep/1/2/3/4
 For example, `bfs` is less picky about where you put its arguments:
 
 <table>
+<thead>
+<tr><th><code>bfs</code></th><th><code>find</code></th></tr>
+</thead>
 <tbody>
 <tr></tr>
 <tr>
