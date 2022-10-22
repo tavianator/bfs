@@ -55,7 +55,7 @@ UNAME=$(uname)
 
 if command -v capsh &>/dev/null; then
     if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
-	if [ -n "$BFS_TRIED_DROP" ]; then
+	if [ -n "${BFS_TRIED_DROP:-}" ]; then
             cat >&2 <<EOF
 ${RED}error:${RST} Failed to drop capabilities.
 EOF
