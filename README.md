@@ -19,8 +19,13 @@
 [Hacking]: /docs/HACKING.md
 [Changelog]: /docs/CHANGELOG.md
 
-<img src="https://tavianator.github.io/bfs/animation.svg" alt="Screenshot">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://tavianator.github.io/bfs/animation-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://tavianator.github.io/bfs/animation-light.svg">
+  <img alt="Screencast" src="https://tavianator.github.io/bfs/animation-light.svg">
+</picture>
 <p></p>
+
 </div>
 
 `bfs` is a variant of the UNIX `find` command that operates [**breadth-first**](https://en.wikipedia.org/wiki/Breadth-first_search) rather than [**depth-first**](https://en.wikipedia.org/wiki/Depth-first_search).
