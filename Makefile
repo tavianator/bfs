@@ -1,4 +1,5 @@
-all: animation.svg
+all: animation-dark.svg animation-light.svg
+.PHONY: all
 
-%.svg: %.cast
-	termtosvg render $< $@ -t $*_template.svg
+animation-%.svg: animation.cast template-%.svg
+	termtosvg render $< $@ -t template-$*.svg
