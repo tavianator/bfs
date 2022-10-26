@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -22,29 +22,29 @@
  * look like
  *
  *       A    A    A    A
- *     *--->*--->*--->*--->$
- *     |    |    | D    D
- *     |    |    +--->*--->$
- *     |    | B    C    D
- *     |    +--->*--->*--->$
- *     | D    D    A    A
- *     +--->*--->*--->*--->$
- *               | D    D
- *               +--->*--->$
+ *     ●───→●───→●───→●───→○
+ *     │    │    │ D    D
+ *     │    │    └───→●───→○
+ *     │    │ B    C    D
+ *     │    └───→●───→●───→○
+ *     │ D    D    A    A
+ *     └───→●───→●───→●───→○
+ *               │ D    D
+ *               └───→●───→○
  *
  * A compressed (PATRICIA) trie collapses internal nodes that have only a single
  * child, like this:
  *
  *       A    A    AA
- *     *--->*--->*---->$
- *     |    |    | DD
- *     |    |    +---->$
- *     |    | BCD
- *     |    +----->$
- *     | DD    AA
- *     +---->*---->$
- *           | DD
- *           +---->$
+ *     ●───→●───→●────→○
+ *     │    │    │ DD
+ *     │    │    └────→○
+ *     │    │ BCD
+ *     │    └─────→○
+ *     │ DD    AA
+ *     └────→●────→○
+ *           │ DD
+ *           └────→○
  *
  * The nodes can be compressed further by dropping the actual compressed
  * sequences from the nodes, storing it only in the leaves.  This is the
@@ -53,21 +53,39 @@
  * branch on, need to be stored in each node.
  *
  *       A    A    A
- *     0--->1--->2--->AAAA
- *     |    |    | D
- *     |    |    +--->AADD
- *     |    | B
- *     |    +--->ABCD
- *     | D    A
- *     +--->2--->DDAA
- *          | D
- *          +--->DDDD
+ *     0───→1───→2───→AAAA
+ *     │    │    │ D
+ *     │    │    └───→AADD
+ *     │    │ B
+ *     │    └───→ABCD
+ *     │ D    A
+ *     └───→2───→DDAA
+ *          │ D
+ *          └───→DDDD
  *
  * Nodes are represented very compactly.  Rather than a dense array of children,
  * a sparse array of only the non-NULL children directly follows the node in
- * memory.  A bitmap is used to track which children exist; the index of a child
- * i is found by counting the number of bits below bit i that are set.  A tag
- * bit is used to tell pointers to internal nodes apart from pointers to leaves.
+ * memory.  A bitmap is used to track which children exist.
+ *
+ * ┌────────────┐
+ * │       [4] [3] [2][1][0] ←─ children
+ * │        ↓   ↓   ↓  ↓  ↓
+ * │       14  10   6  3  0  ←─ sparse index
+ * │        ↓   ↓   ↓  ↓  ↓
+ * │       0100010001001001  ←─ bitmap
+ * │
+ * │ To convert a sparse index to a dense index, mask off the bits above it, and
+ * │ count the remaining bits.
+ * │
+ * │           10            ←─ sparse index
+ * │            ↓
+ * │       0000001111111111  ←─ mask
+ * │     & 0100010001001001  ←─ bitmap
+ * │       ────────────────
+ * │     = 0000000001001001
+ * │                └──┼──┘
+ * │                  [3]    ←─ dense index
+ * └───────────────────┘
  *
  * This implementation tests a whole nibble (half byte/hex digit) at every
  * branch, so the bitmap takes up 16 bits.  The remainder of a machine word is
