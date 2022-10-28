@@ -174,6 +174,11 @@ void trie_init(struct trie *trie) {
 	trie->root = 0;
 }
 
+/** Check if a number is a power of two. */
+static bool is_power_of_two(size_t n) {
+	return (n & (n - 1)) == 0;
+}
+
 /** Compute the popcount (Hamming weight) of a bitmap. */
 static unsigned int trie_popcount(unsigned int n) {
 #if __POPCNT__
@@ -352,7 +357,7 @@ static size_t trie_node_size(unsigned int size) {
 	// Empty nodes aren't supported
 	assert(size > 0);
 	// Node size must be a power of two
-	assert((size & (size - 1)) == 0);
+	assert(is_power_of_two(size));
 
 	return BFS_FLEX_SIZEOF(struct trie_node, children, size);
 }
@@ -410,7 +415,7 @@ static struct trie_leaf *trie_node_insert(uintptr_t *ptr, const void *key, size_
 	unsigned int size = trie_popcount(node->bitmap);
 
 	// Double the capacity every power of two
-	if ((size & (size - 1)) == 0) {
+	if (is_power_of_two(size)) {
 		node = realloc(node, trie_node_size(2*size));
 		if (!node) {
 			return NULL;
@@ -591,7 +596,7 @@ static void trie_free_singletons(uintptr_t ptr) {
 		struct trie_node *node = trie_decode_node(ptr);
 
 		// Make sure the bitmap is a power of two, i.e. it has just one child
-		assert((node->bitmap & (node->bitmap - 1)) == 0);
+		assert(is_power_of_two(node->bitmap));
 
 		ptr = node->children[0];
 		free(node);
@@ -650,7 +655,7 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 		unsigned int index = trie_popcount(bitmap & (bit - 1));
 
 		// Advance the parent pointer, unless this node had only one child
-		if (bitmap & (bitmap - 1)) {
+		if (!is_power_of_two(bitmap)) {
 			parent = child;
 			child_bit = bit;
 			child_index = index;
@@ -682,7 +687,7 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 		memmove(child, child + 1, (parent_size - child_index)*sizeof(*child));
 	}
 
-	if ((parent_size & (parent_size - 1)) == 0) {
+	if (is_power_of_two(parent_size)) {
 		node = realloc(node, trie_node_size(parent_size));
 		if (node) {
 			*parent = trie_encode_node(node);
