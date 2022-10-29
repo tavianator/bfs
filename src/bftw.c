@@ -100,6 +100,9 @@ struct bftw_cache {
 	struct bftw_file *target;
 	/** The remaining capacity of the LRU list. */
 	size_t capacity;
+
+	/** bftw_file arena. */
+	struct varena files;
 };
 
 /** Initialize a cache. */
@@ -107,6 +110,7 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	LIST_INIT(cache);
 	cache->target = NULL;
 	cache->capacity = capacity;
+	VARENA_INIT(&cache->files, struct bftw_file, name);
 }
 
 /** Remove a bftw_file from the LRU list. */
@@ -237,12 +241,14 @@ static void bftw_cache_destroy(struct bftw_cache *cache) {
 	bfs_assert(!cache->head);
 	bfs_assert(!cache->tail);
 	bfs_assert(!cache->target);
+
+	varena_destroy(&cache->files);
 }
 
 /** Create a new bftw_file. */
-static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *name) {
+static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_file *parent, const char *name) {
 	size_t namelen = strlen(name);
-	struct bftw_file *file = ALLOC_FLEX(struct bftw_file, name, namelen + 1);
+	struct bftw_file *file = varena_alloc(&cache->files, namelen + 1);
 	if (!file) {
 		return NULL;
 	}
@@ -419,7 +425,7 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 		bftw_file_close(cache, file);
 	}
 
-	free(file);
+	varena_free(&cache->files, file, file->namelen + 1);
 }
 
 /**
@@ -1212,7 +1218,7 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 	struct bftw_file *file = state->file;
 
 	if (name && (state->flags & BFTW_BUFFER)) {
-		file = bftw_file_new(file, name);
+		file = bftw_file_new(&state->cache, file, name);
 		if (!file) {
 			state->error = errno;
 			return -1;
@@ -1229,7 +1235,7 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 	switch (bftw_call_back(state, name, BFTW_PRE)) {
 	case BFTW_CONTINUE:
 		if (name) {
-			file = bftw_file_new(state->file, name);
+			file = bftw_file_new(&state->cache, state->file, name);
 		} else {
 			state->file = NULL;
 		}
