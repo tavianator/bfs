@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -17,20 +17,19 @@
 #ifndef BFS_TRIE_H
 #define BFS_TRIE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-/**
- * A trie that holds a set of fixed- or variable-length strings.
- */
-struct trie {
-	uintptr_t root;
-};
 
 /**
  * A leaf of a trie.
  */
 struct trie_leaf {
+	/**
+	 * Linked list of leaves, in insertion order.
+	 */
+	struct trie_leaf *prev, *next;
+
 	/**
 	 * An arbitrary value associated with this leaf.
 	 */
@@ -48,19 +47,19 @@ struct trie_leaf {
 };
 
 /**
+ * A trie that holds a set of fixed- or variable-length strings.
+ */
+struct trie {
+	/** Pointer to the root node/leaf. */
+	uintptr_t root;
+	/** Linked list of leaves. */
+	struct trie_leaf *head, *tail;
+};
+
+/**
  * Initialize an empty trie.
  */
 void trie_init(struct trie *trie);
-
-/**
- * Get the first (lexicographically earliest) leaf in the trie.
- *
- * @param trie
- *         The trie to search.
- * @return
- *         The first leaf, or NULL if the trie is empty.
- */
-struct trie_leaf *trie_first_leaf(const struct trie *trie);
 
 /**
  * Find the leaf for a string key.
@@ -152,5 +151,13 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf);
  * Destroy a trie and its contents.
  */
 void trie_destroy(struct trie *trie);
+
+/**
+ * Iterate over the leaves of a trie.
+ */
+#define TRIE_FOR_EACH(trie, leaf)				\
+	for (struct trie_leaf *leaf = (trie)->head, *_next;	\
+	     leaf && (_next = leaf->next, true);		\
+	     leaf = _next)
 
 #endif // BFS_TRIE_H

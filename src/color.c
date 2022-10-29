@@ -486,17 +486,14 @@ struct colors *parse_colors(void) {
 
 void free_colors(struct colors *colors) {
 	if (colors) {
-		struct trie_leaf *leaf;
-		while ((leaf = trie_first_leaf(&colors->ext_colors))) {
+		TRIE_FOR_EACH(&colors->ext_colors, leaf) {
 			dstrfree(leaf->value);
-			trie_remove(&colors->ext_colors, leaf);
 		}
 		trie_destroy(&colors->ext_colors);
 
-		while ((leaf = trie_first_leaf(&colors->names))) {
+		TRIE_FOR_EACH(&colors->names, leaf) {
 			char **field = leaf->value;
 			dstrfree(*field);
-			trie_remove(&colors->names, leaf);
 		}
 		trie_destroy(&colors->names);
 

@@ -270,8 +270,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		bfs_groups_free(ctx->groups);
 		bfs_users_free(ctx->users);
 
-		struct trie_leaf *leaf;
-		while ((leaf = trie_first_leaf(&ctx->files))) {
+		TRIE_FOR_EACH(&ctx->files, leaf) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
 
 			if (bfs_ctx_fclose(ctx, ctx_file) != 0) {
@@ -282,7 +281,6 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 			}
 
 			free(ctx_file);
-			trie_remove(&ctx->files, leaf);
 		}
 		trie_destroy(&ctx->files);
 

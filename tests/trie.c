@@ -82,6 +82,17 @@ int main(void) {
 		assert(leaf->length == strlen(keys[i]) + 1);
 	}
 
+	{
+		size_t i = 0;
+		TRIE_FOR_EACH(&trie, leaf) {
+			assert(leaf == trie_find_str(&trie, keys[i]));
+			assert(!leaf->prev || leaf->prev->next == leaf);
+			assert(!leaf->next || leaf->next->prev == leaf);
+			++i;
+		}
+		assert(i == nkeys);
+	}
+
 	for (size_t i = 0; i < nkeys; ++i) {
 		struct trie_leaf *leaf = trie_find_str(&trie, keys[i]);
 		assert(leaf);
@@ -108,6 +119,10 @@ int main(void) {
 		} else {
 			assert(!leaf);
 		}
+	}
+
+	TRIE_FOR_EACH(&trie, leaf) {
+		assert(false);
 	}
 
 	// This tests the "jump" node handling on 32-bit platforms
