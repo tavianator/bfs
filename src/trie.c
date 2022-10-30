@@ -103,6 +103,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if __GNUC__ && (__i386__ || __x86_64__)
+#	define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
+#else
+#	define TARGET_CLONES_POPCNT
+#endif
+
 #if CHAR_BIT != 8
 #	error "This trie implementation assumes 8-bit bytes."
 #endif
@@ -183,9 +189,7 @@ static bool is_power_of_two(size_t n) {
 
 /** Compute the popcount (Hamming weight) of a bitmap. */
 static unsigned int trie_popcount(unsigned int n) {
-#if __POPCNT__
-	// Use the x86 instruction if we have it.  Otherwise, GCC generates a
-	// library call, so use the below implementation instead.
+#if __GNUC__
 	return __builtin_popcount(n);
 #else
 	// See https://en.wikipedia.org/wiki/Hamming_weight#Efficient_implementation
@@ -219,6 +223,7 @@ static unsigned char trie_key_nibble(const void *key, size_t offset) {
  * that case, the first mismatch between the key and the representative will be
  * the depth at which to make a new branch to insert the key.
  */
+TARGET_CLONES_POPCNT
 static struct trie_leaf *trie_representative(const struct trie *trie, const void *key, size_t length) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
@@ -297,7 +302,8 @@ static bool trie_check_prefix(struct trie_leaf *leaf, size_t skip, const char *k
 	}
 }
 
-struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
+TARGET_CLONES_POPCNT
+static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const char *key) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
 		return NULL;
@@ -337,6 +343,10 @@ struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
 	}
 
 	return best;
+}
+
+struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
+	return trie_find_prefix_impl(trie, key);
 }
 
 /** Create a new leaf, holding a copy of the given key. */
@@ -447,6 +457,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
  *      | Z
  *      +--->...
  */
+TARGET_CLONES_POPCNT
 static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, unsigned char nibble) {
 	struct trie_node *node = trie_decode_node(*ptr);
 	unsigned int size = trie_popcount(node->bitmap);
@@ -569,7 +580,8 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key) {
 	return trie_insert_mem(trie, key, strlen(key) + 1);
 }
 
-struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length) {
+TARGET_CLONES_POPCNT
+static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	size_t mismatch = trie_mismatch(rep, key, length);
 	if (mismatch >= (length << 1)) {
@@ -616,6 +628,10 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 	}
 
 	return trie_split(trie, ptr, leaf, rep, offset, mismatch);
+}
+
+struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length) {
+	return trie_insert_mem_impl(trie, key, length);
 }
 
 /** Free a chain of singleton nodes. */
@@ -666,7 +682,8 @@ static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, 
 	return 0;
 }
 
-void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
+TARGET_CLONES_POPCNT
+static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	uintptr_t *child = &trie->root;
 	uintptr_t *parent = NULL;
 	unsigned int child_bit = 0, child_index = 0;
@@ -723,7 +740,12 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 	}
 }
 
+void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
+	trie_remove_impl(trie, leaf);
+}
+
 /** Free an encoded pointer to a node. */
+TARGET_CLONES_POPCNT
 static void free_trie_ptr(uintptr_t ptr) {
 	if (trie_is_leaf(ptr)) {
 		free(trie_decode_leaf(ptr));
