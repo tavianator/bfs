@@ -392,33 +392,41 @@ static size_t trie_node_size(unsigned int size) {
 }
 
 /** Find the offset of the first nibble that differs between two keys. */
-static size_t trie_key_mismatch(const void *key1, const void *key2, size_t length) {
-	const unsigned char *bytes1 = key1;
-	const unsigned char *bytes2 = key2;
-	size_t i = 0;
-	size_t offset = 0;
+static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t length) {
+	if (!rep) {
+		return 0;
+	}
+
+	if (rep->length < length) {
+		length = rep->length;
+	}
+
+	const unsigned char *rep_bytes = (const unsigned char *)rep->key;
+	const unsigned char *key_bytes = key;
+
+	size_t i;
 	const size_t chunk = sizeof(size_t);
-
-	for (; i + chunk <= length; i += chunk) {
-		if (memcmp(bytes1 + i, bytes2 + i, chunk) != 0) {
+	for (i = 0; i + chunk <= length; i += chunk) {
+		if (memcmp(rep_bytes + i, key_bytes + i, chunk) != 0) {
 			break;
 		}
 	}
 
+	bool high = false;
 	for (; i < length; ++i) {
-		unsigned char b1 = bytes1[i], b2 = bytes2[i];
-		if (b1 != b2) {
-			offset = (b1 & 0xF) == (b2 & 0xF);
+		unsigned char rb = rep_bytes[i];
+		unsigned char kb = key_bytes[i];
+		if (rb != kb) {
+			high = (rb & 0xF) == (kb & 0xF);
 			break;
 		}
 	}
 
-	offset |= i << 1;
-	return offset;
+	return (i << 1) + high;
 }
 
 /**
- * Insert a key into a node.  The node must not have a child in that position
+ * Insert a leaf into a node.  The node must not have a child in that position
  * already.  Effectively takes a subtrie like this:
  *
  *     ptr
@@ -435,41 +443,35 @@ static size_t trie_key_mismatch(const void *key1, const void *key2, size_t lengt
  *      v X
  *      *--->...
  *      | Y
- *      +--->key
+ *      +--->leaf
  *      | Z
  *      +--->...
  */
-static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, const void *key, size_t length, size_t offset) {
+static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, unsigned char nibble) {
 	struct trie_node *node = trie_decode_node(*ptr);
 	unsigned int size = trie_popcount(node->bitmap);
 
 	// Double the capacity every power of two
 	if (is_power_of_two(size)) {
-		node = realloc(node, trie_node_size(2*size));
+		node = realloc(node, trie_node_size(2 * size));
 		if (!node) {
+			trie_leaf_free(trie, leaf);
 			return NULL;
 		}
 		*ptr = trie_encode_node(node);
 	}
 
-	struct trie_leaf *leaf = trie_leaf_alloc(trie, key, length);
-	if (!leaf) {
-		return NULL;
-	}
-
-	unsigned char nibble = trie_key_nibble(key, offset);
 	unsigned int bit = 1U << nibble;
 
 	// The child must not already be present
 	assert(!(node->bitmap & bit));
 	node->bitmap |= bit;
 
-	unsigned int index = trie_popcount(node->bitmap & (bit - 1));
-	uintptr_t *child = &node->children[index];
-	if (index < size) {
-		memmove(child + 1, child, (size - index)*sizeof(*child));
+	unsigned int target = trie_popcount(node->bitmap & (bit - 1));
+	for (size_t i = size; i > target; --i) {
+		node->children[i] = node->children[i - 1];
 	}
-	*child = trie_encode_leaf(leaf);
+	node->children[target] = trie_encode_leaf(leaf);
 	return leaf;
 }
 
@@ -534,21 +536,16 @@ static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
  *      v X
  *      *--->*...>--->rep
  *      | Y
- *      +--->key
+ *      +--->leaf
  */
-static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, const void *key, size_t length, struct trie_leaf *rep, size_t offset, size_t mismatch) {
-	unsigned char key_nibble = trie_key_nibble(key, mismatch);
+static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, struct trie_leaf *rep, size_t offset, size_t mismatch) {
+	unsigned char key_nibble = trie_key_nibble(leaf->key, mismatch);
 	unsigned char rep_nibble = trie_key_nibble(rep->key, mismatch);
 	assert(key_nibble != rep_nibble);
 
 	struct trie_node *node = malloc(trie_node_size(2));
 	if (!node) {
-		return NULL;
-	}
-
-	struct trie_leaf *leaf = trie_leaf_alloc(trie, key, length);
-	if (!leaf) {
-		free(node);
+		trie_leaf_free(trie, leaf);
 		return NULL;
 	}
 
@@ -574,18 +571,19 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key) {
 
 struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
-	if (!rep) {
-		struct trie_leaf *leaf = trie_leaf_alloc(trie, key, length);
-		if (leaf) {
-			trie->root = trie_encode_leaf(leaf);
-		}
-		return leaf;
+	size_t mismatch = trie_mismatch(rep, key, length);
+	if (mismatch >= (length << 1)) {
+		return rep;
 	}
 
-	size_t limit = length < rep->length ? length : rep->length;
-	size_t mismatch = trie_key_mismatch(key, rep->key, limit);
-	if ((mismatch >> 1) >= length) {
-		return rep;
+	struct trie_leaf *leaf = trie_leaf_alloc(trie, key, length);
+	if (!leaf) {
+		return NULL;
+	}
+
+	if (!rep) {
+		trie->root = trie_encode_leaf(leaf);
+		return leaf;
 	}
 
 	size_t offset = 0;
@@ -605,18 +603,19 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 			ptr = &node->children[index];
 		} else {
 			assert(offset == mismatch);
-			return trie_node_insert(trie, ptr, key, length, offset);
+			return trie_node_insert(trie, ptr, leaf, nibble);
 		}
 	}
 
 	while (mismatch - offset > OFFSET_MAX) {
 		ptr = trie_jump(ptr, key, &offset);
 		if (!ptr) {
+			trie_leaf_free(trie, leaf);
 			return NULL;
 		}
 	}
 
-	return trie_split(trie, ptr, key, length, rep, offset, mismatch);
+	return trie_split(trie, ptr, leaf, rep, offset, mismatch);
 }
 
 /** Free a chain of singleton nodes. */
