@@ -401,6 +401,26 @@ static size_t trie_node_size(unsigned int size) {
 	return BFS_FLEX_SIZEOF(struct trie_node, children, size);
 }
 
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#	define TRIE_BSWAP(n) (n)
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#	if __SIZEOF_SIZE_T__ == 8
+#		define TRIE_BSWAP(n) __builtin_bswap64(n)
+#	elif __SIZEOF_SIZE_T__ == 4
+#		define TRIE_BSWAP(n) __builtin_bswap32(n)
+#	endif
+#endif
+
+#ifdef TRIE_BSWAP
+#	if __SIZEOF_SIZE_T__ == __SIZEOF_LONG_LONG__
+#		define TRIE_CTZ(n) __builtin_ctzll(n)
+#	elif __SIZEOF_SIZE_T__ == __SIZEOF_LONG__
+#		define TRIE_CTZ(n) __builtin_ctzl(n)
+#	elif __SIZEOF_SIZE_T__ == __SIZEOF_INT__
+#		define TRIE_CTZ(n) __builtin_ctz(n)
+#	endif
+#endif
+
 /** Find the offset of the first nibble that differs between two keys. */
 static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t length) {
 	if (!rep) {
@@ -411,28 +431,35 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 		length = rep->length;
 	}
 
-	const unsigned char *rep_bytes = (const unsigned char *)rep->key;
-	const unsigned char *key_bytes = key;
+	const char *rep_bytes = rep->key;
+	const char *key_bytes = key;
 
-	size_t i;
-	const size_t chunk = sizeof(size_t);
-	for (i = 0; i + chunk <= length; i += chunk) {
-		if (memcmp(rep_bytes + i, key_bytes + i, chunk) != 0) {
+	size_t i = 0;
+	for (size_t chunk = sizeof(chunk); i + chunk <= length; i += chunk) {
+		size_t rep_chunk, key_chunk;
+		memcpy(&rep_chunk, rep_bytes + i, sizeof(rep_chunk));
+		memcpy(&key_chunk, key_bytes + i, sizeof(key_chunk));
+
+		if (rep_chunk != key_chunk) {
+#ifdef TRIE_CTZ
+			size_t diff = TRIE_BSWAP(rep_chunk ^ key_chunk);
+			i *= 2;
+			i += TRIE_CTZ(diff) / 4;
+			return i;
+#else
 			break;
+#endif
 		}
 	}
 
-	bool high = false;
 	for (; i < length; ++i) {
-		unsigned char rb = rep_bytes[i];
-		unsigned char kb = key_bytes[i];
-		if (rb != kb) {
-			high = (rb & 0xF) == (kb & 0xF);
-			break;
+		unsigned char diff = rep_bytes[i] ^ key_bytes[i];
+		if (diff) {
+			return 2 * i + !(diff & 0xF);
 		}
 	}
 
-	return (i << 1) + high;
+	return 2 * i;
 }
 
 /**
