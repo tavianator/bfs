@@ -131,8 +131,7 @@ static int set_color(struct colors *colors, const char *name, char *value) {
 /**
  * Transform a file extension for fast lookups, by reversing and lowercasing it.
  */
-static void extxfrm(char *ext) {
-	size_t len = strlen(ext);
+static void extxfrm(char *ext, size_t len) {
 	for (size_t i = 0; i < len - i; ++i) {
 		char a = ext[i];
 		char b = ext[len - i - 1];
@@ -153,11 +152,19 @@ static void extxfrm(char *ext) {
 	}
 }
 
+/** Maximum supported extension length. */
+#define EXT_MAX 255
+
 /**
  * Set the color for an extension.
  */
-static int set_ext_color(struct colors *colors, char *key, const char *value) {
-	extxfrm(key);
+static int set_ext_color(struct colors *colors, char *key, char *value) {
+	size_t len = dstrlen(key);
+	if (len > EXT_MAX) {
+		return -1;
+	}
+
+	extxfrm(key, len);
 
 	// A later *.x should override any earlier *.x, *.y.x, etc.
 	struct trie_leaf *match;
@@ -168,7 +175,7 @@ static int set_ext_color(struct colors *colors, char *key, const char *value) {
 
 	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, key);
 	if (leaf) {
-		leaf->value = (char *)value;
+		leaf->value = value;
 		return 0;
 	} else {
 		return -1;
@@ -179,14 +186,15 @@ static int set_ext_color(struct colors *colors, char *key, const char *value) {
  * Find a color by an extension.
  */
 static const char *get_ext_color(const struct colors *colors, const char *filename) {
-	char *xfrm = strdup(filename);
-	if (!xfrm) {
-		return NULL;
-	}
-	extxfrm(xfrm);
+	size_t name_len = strlen(filename);
+	size_t ext_len = name_len < EXT_MAX ? name_len : EXT_MAX;
+	const char *ext = filename + name_len - ext_len;
+
+	char xfrm[ext_len + 1];
+	memcpy(xfrm, ext, sizeof(xfrm));
+	extxfrm(xfrm, ext_len);
 
 	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_colors, xfrm);
-	free(xfrm);
 	if (leaf) {
 		return leaf->value;
 	} else {
