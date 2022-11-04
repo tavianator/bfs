@@ -20,11 +20,10 @@
 [Changelog]: /docs/CHANGELOG.md
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://tavianator.github.io/bfs/animation-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://tavianator.github.io/bfs/animation-light.svg">
-  <img alt="Screencast" src="https://tavianator.github.io/bfs/animation-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tavianator/bfs/gh-pages/animation-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/tavianator/bfs/gh-pages/animation-light.svg">
+  <img alt="Screencast" src="https://raw.githubusercontent.com/tavianator/bfs/gh-pages/animation-light.svg">
 </picture>
-<p></p>
 
 </div>
 
