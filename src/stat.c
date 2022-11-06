@@ -156,7 +156,7 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, struct bf
  * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
  */
 static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int mask, struct statx *buf) {
-#if BFS_HAS_FEATURE(memory_sanitizer, false)
+#if __has_feature(memory_sanitizer)
 	// -fsanitize=memory doesn't know about statx(), so tell it the memory
 	// got initialized
 	memset(buf, 0, sizeof(*buf));
@@ -310,7 +310,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 	}
 
-#if defined(AT_NO_AUTOMOUNT) && (!__GNU__ || BFS_GLIBC_PREREQ(2, 35))
+#if defined(AT_NO_AUTOMOUNT) && (!__GNU__ || __GLIBC_PREREQ(2, 35))
 	at_flags |= AT_NO_AUTOMOUNT;
 #endif
 

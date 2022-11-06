@@ -172,7 +172,7 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 #if __FreeBSD__
 	int trivial;
 
-#if BFS_HAS_FEATURE(memory_sanitizer, false)
+#if __has_feature(memory_sanitizer)
         // msan seems to be missing an interceptor for acl_is_trivial_np()
         trivial = 0;
 #endif

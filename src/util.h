@@ -30,28 +30,22 @@
 
 // Some portability concerns
 
-#ifdef __has_feature
-#	define BFS_HAS_FEATURE(feature, fallback) __has_feature(feature)
-#else
-#	define BFS_HAS_FEATURE(feature, fallback) fallback
+#ifndef __has_feature
+#	define __has_feature(feat) false
+#endif
+
+#ifndef __has_c_attribute
+#	define __has_c_attribute(attr) false
+#endif
+
+#ifndef __has_attribute
+#	define __has_attribute(attr) false
 #endif
 
 #ifdef __has_include
 #	define BFS_HAS_INCLUDE(header, fallback) __has_include(header)
 #else
 #	define BFS_HAS_INCLUDE(header, fallback) fallback
-#endif
-
-#ifdef __has_c_attribute
-#	define BFS_HAS_C_ATTRIBUTE(attr) __has_c_attribute(attr)
-#else
-#	define BFS_HAS_C_ATTRIBUTE(attr) false
-#endif
-
-#if __GNUC__ && defined(__has_attribute)
-#	define BFS_HAS_GNU_ATTRIBUTE(attr) __has_attribute(attr)
-#else
-#	define BFS_HAS_GNU_ATTRIBUTE(attr) false
 #endif
 
 #ifndef BFS_HAS_MNTENT
@@ -94,10 +88,8 @@
 #	define BFS_HAS_UTIL BFS_HAS_INCLUDE(<util.h>, __NetBSD__)
 #endif
 
-#ifdef __GLIBC_PREREQ
-#	define BFS_GLIBC_PREREQ(maj, min) __GLIBC_PREREQ(maj, min)
-#else
-#	define BFS_GLIBC_PREREQ(maj, min) false
+#ifndef __GLIBC_PREREQ
+#	define __GLIBC_PREREQ(maj, min) false
 #endif
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
@@ -108,9 +100,9 @@
 #	define O_DIRECTORY 0
 #endif
 
-#if BFS_HAS_C_ATTRIBUTE(fallthrough)
+#if __has_c_attribute(fallthrough)
 #	define BFS_FALLTHROUGH [[fallthrough]]
-#elif BFS_HAS_GNU_ATTRIBUTE(fallthrough)
+#elif __has_attribute(fallthrough)
 #	define BFS_FALLTHROUGH __attribute__((fallthrough))
 #else
 #	define BFS_FALLTHROUGH ((void)0)
@@ -119,7 +111,7 @@
 /**
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
-#if BFS_HAS_GNU_ATTRIBUTE(format)
+#if __has_attribute(format)
 #	define BFS_FORMATTER(fmt, args) __attribute__((format(printf, fmt, args)))
 #else
 #	define BFS_FORMATTER(fmt, args)

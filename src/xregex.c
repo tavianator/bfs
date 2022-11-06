@@ -188,7 +188,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		cflags |= REG_ICASE;
 	}
 
-#if BFS_HAS_FEATURE(memory_sanitizer, false)
+#if __has_feature(memory_sanitizer)
 	// https://github.com/google/sanitizers/issues/1496
 	memset(&regex->impl, 0, sizeof(regex->impl));
 #endif
