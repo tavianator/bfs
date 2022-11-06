@@ -24,6 +24,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#if BFS_HAS_PATHS
+#	include <paths.h>
+#endif
+
 /**
  * Types of spawn actions.
  */
@@ -260,11 +264,15 @@ char *bfs_spawn_resolve(const char *exe) {
 	const char *path = getenv("PATH");
 
 	char *confpath = NULL;
-#ifdef _CS_PATH
 	if (!path) {
+#if defined(_CS_PATH)
 		path = confpath = xconfstr(_CS_PATH);
-	}
+#elif defined(_PATH_DEFPATH)
+		path = _PATH_DEFPATH;
+#else
+		errno = ENOENT;
 #endif
+	}
 	if (!path) {
 		return NULL;
 	}

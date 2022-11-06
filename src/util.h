@@ -58,6 +58,10 @@
 #	define BFS_HAS_MNTENT BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
 #endif
 
+#ifndef BFS_HAS_PATHS
+#	define BFS_HAS_PATHS BFS_HAS_INCLUDE(<paths.h>, true)
+#endif
+
 #ifndef BFS_HAS_SYS_ACL
 #	define BFS_HAS_SYS_ACL BFS_HAS_INCLUDE(<sys/acl.h>, true)
 #endif
