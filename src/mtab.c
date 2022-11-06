@@ -26,11 +26,11 @@
 #include <string.h>
 #include <sys/types.h>
 
-#if BFS_HAS_SYS_PARAM
+#if BFS_USE_SYS_PARAM_H
 #	include <sys/param.h>
 #endif
 
-#if BFS_HAS_MNTENT
+#if BFS_USE_MNTENT_H
 #	define BFS_MNTENT 1
 #elif BSD
 #	define BFS_MNTINFO 1

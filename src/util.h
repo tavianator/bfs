@@ -43,49 +43,82 @@
 #endif
 
 #ifdef __has_include
-#	define BFS_HAS_INCLUDE(header, fallback) __has_include(header)
-#else
-#	define BFS_HAS_INCLUDE(header, fallback) fallback
+
+#if __has_include(<mntent.h>)
+#	define BFS_HAS_MNTENT_H true
+#endif
+#if __has_include(<paths.h>)
+#	define BFS_HAS_PATHS_H true
+#endif
+#if __has_include(<sys/acl.h>)
+#	define BFS_HAS_SYS_ACL_H true
+#endif
+#if __has_include(<sys/capability.h>)
+#	define BFS_HAS_SYS_CAPABILITY_H true
+#endif
+#if __has_include(<sys/extattr.h>)
+#	define BFS_HAS_SYS_EXTATTR_H true
+#endif
+#if __has_include(<sys/mkdev.h>)
+#	define BFS_HAS_SYS_MKDEV_H true
+#endif
+#if __has_include(<sys/param.h>)
+#	define BFS_HAS_SYS_PARAM_H true
+#endif
+#if __has_include(<sys/sysmacros.h>)
+#	define BFS_HAS_SYS_SYSMACROS_H true
+#endif
+#if __has_include(<sys/xattr.h>)
+#	define BFS_HAS_SYS_XATTR_H true
+#endif
+#if __has_include(<util.h>)
+#	define BFS_HAS_UTIL_H true
 #endif
 
-#ifndef BFS_HAS_MNTENT
-#	define BFS_HAS_MNTENT BFS_HAS_INCLUDE(<mntent.h>, __GLIBC__)
-#endif
+#else // !__has_include
 
-#ifndef BFS_HAS_PATHS
-#	define BFS_HAS_PATHS BFS_HAS_INCLUDE(<paths.h>, true)
-#endif
+#define BFS_HAS_MNTENT_H __GLIBC__
+#define BFS_HAS_PATHS_H true
+#define BFS_HAS_SYS_ACL_H true
+#define BFS_HAS_SYS_CAPABILITY_H __linux__
+#define BFS_HAS_SYS_EXTATTR_H __FreeBSD__
+#define BFS_HAS_SYS_MKDEV_H false
+#define BFS_HAS_SYS_PARAM_H true
+#define BFS_HAS_SYS_SYSMACROS_H __GLIBC__
+#define BFS_HAS_SYS_XATTR_H __linux__
+#define BFS_HAS_UTIL_H __NetBSD__
 
-#ifndef BFS_HAS_SYS_ACL
-#	define BFS_HAS_SYS_ACL BFS_HAS_INCLUDE(<sys/acl.h>, true)
-#endif
+#endif // !__has_include
 
-#ifndef BFS_HAS_SYS_CAPABILITY
-#	define BFS_HAS_SYS_CAPABILITY BFS_HAS_INCLUDE(<sys/capability.h>, __linux__)
+#ifndef BFS_USE_MNTENT_H
+#	define BFS_USE_MNTENT_H BFS_HAS_MNTENT_H
 #endif
-
-#ifndef BFS_HAS_SYS_EXTATTR
-#	define BFS_HAS_SYS_EXTATTR BFS_HAS_INCLUDE(<sys/extattr.h>, __FreeBSD__)
+#ifndef BFS_USE_PATHS_H
+#	define BFS_USE_PATHS_H BFS_HAS_PATHS_H
 #endif
-
-#ifndef BFS_HAS_SYS_MKDEV
-#	define BFS_HAS_SYS_MKDEV BFS_HAS_INCLUDE(<sys/mkdev.h>, false)
+#ifndef BFS_USE_SYS_ACL_H
+#	define BFS_USE_SYS_ACL_H BFS_HAS_SYS_ACL_H
 #endif
-
-#ifndef BFS_HAS_SYS_PARAM
-#	define BFS_HAS_SYS_PARAM BFS_HAS_INCLUDE(<sys/param.h>, true)
+#ifndef BFS_USE_SYS_CAPABILITY_H
+#	define BFS_USE_SYS_CAPABILITY_H BFS_HAS_SYS_CAPABILITY_H
 #endif
-
-#ifndef BFS_HAS_SYS_SYSMACROS
-#	define BFS_HAS_SYS_SYSMACROS BFS_HAS_INCLUDE(<sys/sysmacros.h>, __GLIBC__)
+#ifndef BFS_USE_SYS_EXTATTR_H
+#	define BFS_USE_SYS_EXTATTR_H BFS_HAS_SYS_EXTATTR_H
 #endif
-
-#ifndef BFS_HAS_SYS_XATTR
-#	define BFS_HAS_SYS_XATTR BFS_HAS_INCLUDE(<sys/xattr.h>, __linux__)
+#ifndef BFS_USE_SYS_MKDEV_H
+#	define BFS_USE_SYS_MKDEV_H BFS_HAS_SYS_MKDEV_H
 #endif
-
-#ifndef BFS_HAS_UTIL
-#	define BFS_HAS_UTIL BFS_HAS_INCLUDE(<util.h>, __NetBSD__)
+#ifndef BFS_USE_SYS_PARAM_H
+#	define BFS_USE_SYS_PARAM_H BFS_HAS_SYS_PARAM_H
+#endif
+#ifndef BFS_USE_SYS_SYSMACROS_H
+#	define BFS_USE_SYS_SYSMACROS_H BFS_HAS_SYS_SYSMACROS_H
+#endif
+#ifndef BFS_USE_SYS_XATTR_H
+#	define BFS_USE_SYS_XATTR_H BFS_HAS_SYS_XATTR_H
+#endif
+#ifndef BFS_USE_UTIL_H
+#	define BFS_USE_UTIL_H BFS_HAS_UTIL_H
 #endif
 
 #ifndef __GLIBC_PREREQ

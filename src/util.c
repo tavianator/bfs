@@ -31,17 +31,17 @@
 #include <unistd.h>
 #include <wchar.h>
 
-#if BFS_HAS_SYS_PARAM
+#if BFS_USE_SYS_PARAM_H
 #	include <sys/param.h>
 #endif
 
-#if BFS_HAS_SYS_SYSMACROS
+#if BFS_USE_SYS_SYSMACROS_H
 #	include <sys/sysmacros.h>
-#elif BFS_HAS_SYS_MKDEV
+#elif BFS_USE_SYS_MKDEV_H
 #	include <sys/mkdev.h>
 #endif
 
-#if BFS_HAS_UTIL
+#if BFS_USE_UTIL_H
 #	include <util.h>
 #endif
 

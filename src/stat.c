@@ -24,7 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if BFS_HAS_SYS_PARAM
+#if BFS_USE_SYS_PARAM_H
 #	include <sys/param.h>
 #endif
 

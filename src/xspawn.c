@@ -24,7 +24,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#if BFS_HAS_PATHS
+#if BFS_USE_PATHS_H
 #	include <paths.h>
 #endif
 

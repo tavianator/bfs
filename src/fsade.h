@@ -25,16 +25,16 @@
 #include "util.h"
 #include <stdbool.h>
 
-#define BFS_CAN_CHECK_ACL BFS_HAS_SYS_ACL
+#define BFS_CAN_CHECK_ACL BFS_USE_SYS_ACL_H
 
-#if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_HAS_SYS_CAPABILITY && !__FreeBSD__
+#if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_USE_SYS_CAPABILITY_H && !__FreeBSD__
 #	include <sys/capability.h>
 #	ifdef CAP_CHOWN
 #		define BFS_CAN_CHECK_CAPABILITIES true
 #	endif
 #endif
 
-#define BFS_CAN_CHECK_XATTRS (BFS_HAS_SYS_EXTATTR || BFS_HAS_SYS_XATTR)
+#define BFS_CAN_CHECK_XATTRS (BFS_USE_SYS_EXTATTR_H || BFS_USE_SYS_XATTR_H)
 
 struct BFTW;
 
