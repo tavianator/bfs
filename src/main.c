@@ -33,9 +33,9 @@
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
- *     - bfs.h         (constants about bfs itself)
  *     - bar.[ch]      (a terminal status bar)
  *     - color.[ch]    (for pretty terminal colors)
+ *     - config.h      (configuration and feature/platform detection)
  *     - darray.[ch]   (a dynamic array library)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dir.[ch]      (a directory API facade)
@@ -46,10 +46,10 @@
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
- *     - util.[ch]     (everything else)
  *     - xregex.[ch]   (regular expression support)
  *     - xspawn.[ch]   (spawns processes)
  *     - xtime.[ch]    (date/time handling utilities)
+ *     - util.[ch]     (everything else)
  */
 
 #include "ctx.h"

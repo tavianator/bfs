@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "mtab.h"
+#include "config.h"
 #include "darray.h"
 #include "stat.h"
 #include "trie.h"
@@ -25,10 +26,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-
-#if BFS_USE_SYS_PARAM_H
-#	include <sys/param.h>
-#endif
 
 #if BFS_USE_MNTENT_H
 #	define BFS_MNTENT 1

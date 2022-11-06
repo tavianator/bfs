@@ -21,7 +21,7 @@
 #ifndef BFS_COLOR_H
 #define BFS_COLOR_H
 
-#include "util.h"
+#include "config.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>

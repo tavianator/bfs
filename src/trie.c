@@ -95,7 +95,7 @@
  */
 
 #include "trie.h"
-#include "util.h"
+#include "config.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>

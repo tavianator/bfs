@@ -22,9 +22,9 @@
  */
 
 #include "parse.h"
-#include "bfs.h"
 #include "bftw.h"
 #include "color.h"
+#include "config.h"
 #include "ctx.h"
 #include "darray.h"
 #include "diag.h"
@@ -3852,7 +3852,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	static char* default_argv[] = {"bfs", NULL};
+	static char* default_argv[] = {BFS_COMMAND, NULL};
 	if (argc < 1) {
 		argc = 1;
 		argv = default_argv;

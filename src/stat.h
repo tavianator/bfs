@@ -25,7 +25,7 @@
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
 
-#include "util.h"
+#include "config.h"
 #include <sys/types.h>
 #include <time.h>
 

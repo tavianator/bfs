@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "util.h"
+#include "config.h"
 #include "dstring.h"
 #include "xregex.h"
 #include <assert.h>
@@ -30,10 +31,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <wchar.h>
-
-#if BFS_USE_SYS_PARAM_H
-#	include <sys/param.h>
-#endif
 
 #if BFS_USE_SYS_SYSMACROS_H
 #	include <sys/sysmacros.h>

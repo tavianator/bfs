@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "stat.h"
+#include "config.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
@@ -23,10 +24,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#if BFS_USE_SYS_PARAM_H
-#	include <sys/param.h>
-#endif
 
 #if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
 #	define BFS_LIBC_STATX true

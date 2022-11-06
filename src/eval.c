@@ -22,6 +22,7 @@
 #include "bar.h"
 #include "bftw.h"
 #include "color.h"
+#include "config.h"
 #include "ctx.h"
 #include "darray.h"
 #include "diag.h"

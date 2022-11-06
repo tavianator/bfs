@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "dir.h"
+#include "config.h"
 #include "util.h"
 #include <dirent.h>
 #include <errno.h>
@@ -27,7 +28,7 @@
 
 #if __linux__
 #	include <sys/syscall.h>
-#endif // __linux__
+#endif
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
 	switch (mode & S_IFMT) {
