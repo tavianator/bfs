@@ -34,6 +34,7 @@
  *
  * - Utilities:
  *     - bar.[ch]      (a terminal status bar)
+ *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
  *     - config.h      (configuration and feature/platform detection)
  *     - darray.[ch]   (a dynamic array library)
@@ -49,13 +50,12 @@
  *     - xregex.[ch]   (regular expression support)
  *     - xspawn.[ch]   (spawns processes)
  *     - xtime.[ch]    (date/time handling utilities)
- *     - util.[ch]     (everything else)
  */
 
+#include "bfstd.h"
 #include "ctx.h"
 #include "eval.h"
 #include "parse.h"
-#include "util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <locale.h>

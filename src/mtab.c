@@ -15,11 +15,11 @@
  ****************************************************************************/
 
 #include "mtab.h"
+#include "bfstd.h"
 #include "config.h"
 #include "darray.h"
 #include "stat.h"
 #include "trie.h"
-#include "util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>

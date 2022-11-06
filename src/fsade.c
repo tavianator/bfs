@@ -15,10 +15,11 @@
  ****************************************************************************/
 
 #include "fsade.h"
+#include "config.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "dir.h"
 #include "dstring.h"
-#include "util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>

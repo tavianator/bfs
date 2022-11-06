@@ -15,8 +15,8 @@
  ****************************************************************************/
 
 #include "stat.h"
+#include "bfstd.h"
 #include "config.h"
-#include "util.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -186,7 +186,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 
 	buf->mask = 0;
 
-	buf->dev = bfs_makedev(xbuf.stx_dev_major, xbuf.stx_dev_minor);
+	buf->dev = xmakedev(xbuf.stx_dev_major, xbuf.stx_dev_minor);
 	buf->mask |= BFS_STAT_DEV;
 
 	if (xbuf.stx_mask & STATX_INO) {
@@ -227,7 +227,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 		buf->mask |= BFS_STAT_BLOCKS;
 	}
 
-	buf->rdev = bfs_makedev(xbuf.stx_rdev_major, xbuf.stx_rdev_minor);
+	buf->rdev = xmakedev(xbuf.stx_rdev_major, xbuf.stx_rdev_minor);
 	buf->mask |= BFS_STAT_RDEV;
 
 	buf->attrs = xbuf.stx_attributes;

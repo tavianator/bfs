@@ -20,6 +20,7 @@
 
 #include "eval.h"
 #include "bar.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
 #include "config.h"
@@ -36,7 +37,6 @@
 #include "pwcache.h"
 #include "stat.h"
 #include "trie.h"
-#include "util.h"
 #include "xregex.h"
 #include "xtime.h"
 #include <assert.h>
@@ -686,8 +686,8 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	if (ftwbuf->type == BFS_BLK || ftwbuf->type == BFS_CHR) {
-		int ma = bfs_major(statbuf->rdev);
-		int mi = bfs_minor(statbuf->rdev);
+		int ma = xmajor(statbuf->rdev);
+		int mi = xminor(statbuf->rdev);
 		if (fprintf(file, " %3d, %3d", ma, mi) < 0) {
 			goto error;
 		}

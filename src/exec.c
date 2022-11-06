@@ -15,12 +15,12 @@
  ****************************************************************************/
 
 #include "exec.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "ctx.h"
 #include "color.h"
 #include "diag.h"
 #include "dstring.h"
-#include "util.h"
 #include "xspawn.h"
 #include <assert.h>
 #include <errno.h>

@@ -15,8 +15,8 @@
  ****************************************************************************/
 
 #include "xspawn.h"
+#include "bfstd.h"
 #include "config.h"
-#include "util.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>

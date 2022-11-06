@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "color.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "dir.h"
 #include "dstring.h"
@@ -22,7 +23,6 @@
 #include "fsade.h"
 #include "stat.h"
 #include "trie.h"
-#include "util.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

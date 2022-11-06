@@ -22,7 +22,7 @@
 #define BFS_DIAG_H
 
 #include "ctx.h"
-#include "util.h"
+#include "config.h"
 #include <stdarg.h>
 #include <stdbool.h>
 

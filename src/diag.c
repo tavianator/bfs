@@ -15,10 +15,10 @@
  ****************************************************************************/
 
 #include "diag.h"
+#include "bfstd.h"
 #include "ctx.h"
 #include "color.h"
 #include "expr.h"
-#include "util.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdarg.h>

@@ -22,6 +22,7 @@
  */
 
 #include "parse.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
 #include "config.h"
@@ -38,7 +39,6 @@
 #include "pwcache.h"
 #include "stat.h"
 #include "typo.h"
-#include "util.h"
 #include "xregex.h"
 #include "xspawn.h"
 #include "xtime.h"

@@ -15,8 +15,8 @@
  ****************************************************************************/
 
 #include "dir.h"
+#include "bfstd.h"
 #include "config.h"
-#include "util.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

@@ -15,7 +15,8 @@
  ****************************************************************************/
 
 #include "xregex.h"
-#include "util.h"
+#include "bfstd.h"
+#include "config.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>

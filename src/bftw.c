@@ -31,13 +31,13 @@
  */
 
 #include "bftw.h"
+#include "bfstd.h"
 #include "dir.h"
 #include "darray.h"
 #include "dstring.h"
 #include "mtab.h"
 #include "stat.h"
 #include "trie.h"
-#include "util.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

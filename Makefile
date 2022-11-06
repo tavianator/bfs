@@ -203,6 +203,7 @@ all: $(BIN)/bfs $(BIN)/tests/mksock $(BIN)/tests/trie $(BIN)/tests/xtimegm
 
 $(BIN)/bfs: \
     $(OBJ)/src/bar.o \
+    $(OBJ)/src/bfstd.o \
     $(OBJ)/src/bftw.o \
     $(OBJ)/src/color.o \
     $(OBJ)/src/ctx.o \
@@ -222,7 +223,6 @@ $(BIN)/bfs: \
     $(OBJ)/src/stat.o \
     $(OBJ)/src/trie.o \
     $(OBJ)/src/typo.o \
-    $(OBJ)/src/util.o \
     $(OBJ)/src/xregex.o \
     $(OBJ)/src/xspawn.o \
     $(OBJ)/src/xtime.o

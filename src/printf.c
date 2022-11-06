@@ -15,6 +15,7 @@
  ****************************************************************************/
 
 #include "printf.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
 #include "ctx.h"
@@ -26,7 +27,6 @@
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
-#include "util.h"
 #include "xtime.h"
 #include <assert.h>
 #include <errno.h>
