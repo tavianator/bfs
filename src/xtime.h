@@ -81,6 +81,6 @@ int xtimegm(struct tm *tm, time_t *timep);
  * @return
  *         0 on success, -1 on failure.
  */
-int parse_timestamp(const char *str, struct timespec *result);
+int xgetdate(const char *str, struct timespec *result);
 
 #endif // BFS_XTIME_H

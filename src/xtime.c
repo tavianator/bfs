@@ -184,7 +184,7 @@ overflow:
 }
 
 /** Parse some digits from a timestamp. */
-static int parse_timestamp_part(const char **str, size_t n, int *result) {
+static int xgetpart(const char **str, size_t n, int *result) {
 	char buf[n + 1];
 	for (size_t i = 0; i < n; ++i, ++*str) {
 		char c = **str;
@@ -199,7 +199,7 @@ static int parse_timestamp_part(const char **str, size_t n, int *result) {
 	return 0;
 }
 
-int parse_timestamp(const char *str, struct timespec *result) {
+int xgetdate(const char *str, struct timespec *result) {
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
@@ -210,7 +210,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 	bool local = true;
 
 	// YYYY
-	if (parse_timestamp_part(&str, 4, &tm.tm_year) != 0) {
+	if (xgetpart(&str, 4, &tm.tm_year) != 0) {
 		goto invalid;
 	}
 	tm.tm_year -= 1900;
@@ -219,7 +219,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 	if (*str == '-') {
 		++str;
 	}
-	if (parse_timestamp_part(&str, 2, &tm.tm_mon) != 0) {
+	if (xgetpart(&str, 2, &tm.tm_mon) != 0) {
 		goto invalid;
 	}
 	tm.tm_mon -= 1;
@@ -228,7 +228,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 	if (*str == '-') {
 		++str;
 	}
-	if (parse_timestamp_part(&str, 2, &tm.tm_mday) != 0) {
+	if (xgetpart(&str, 2, &tm.tm_mday) != 0) {
 		goto invalid;
 	}
 
@@ -239,7 +239,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 	}
 
 	// hh
-	if (parse_timestamp_part(&str, 2, &tm.tm_hour) != 0) {
+	if (xgetpart(&str, 2, &tm.tm_hour) != 0) {
 		goto invalid;
 	}
 
@@ -249,7 +249,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 	} else if (*str == ':') {
 		++str;
 	}
-	if (parse_timestamp_part(&str, 2, &tm.tm_min) != 0) {
+	if (xgetpart(&str, 2, &tm.tm_min) != 0) {
 		goto invalid;
 	}
 
@@ -259,7 +259,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 	} else if (*str == ':') {
 		++str;
 	}
-	if (parse_timestamp_part(&str, 2, &tm.tm_sec) != 0) {
+	if (xgetpart(&str, 2, &tm.tm_sec) != 0) {
 		goto invalid;
 	}
 
@@ -274,7 +274,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 		++str;
 
 		// hh
-		if (parse_timestamp_part(&str, 2, &tz_hour) != 0) {
+		if (xgetpart(&str, 2, &tz_hour) != 0) {
 			goto invalid;
 		}
 
@@ -284,7 +284,7 @@ int parse_timestamp(const char *str, struct timespec *result) {
 		} else if (*str == ':') {
 			++str;
 		}
-		if (parse_timestamp_part(&str, 2, &tz_min) != 0) {
+		if (xgetpart(&str, 2, &tz_min) != 0) {
 			goto invalid;
 		}
 	} else {

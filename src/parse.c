@@ -1898,7 +1898,7 @@ static enum bfs_stat_field parse_newerxy_field(char c) {
 
 /** Parse an explicit reference timestamp for -newerXt and -*since. */
 static int parse_reftime(const struct parser_state *state, struct bfs_expr *expr) {
-	if (parse_timestamp(expr->argv[1], &expr->reftime) == 0) {
+	if (xgetdate(expr->argv[1], &expr->reftime) == 0) {
 		return 0;
 	} else if (errno != EINVAL) {
 		parse_expr_error(state, expr, "%m.\n");
