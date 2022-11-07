@@ -198,7 +198,12 @@ DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
 bfs: $(BIN)/bfs
 .PHONY: bfs
 
-all: $(BIN)/bfs $(BIN)/tests/mksock $(BIN)/tests/trie $(BIN)/tests/xtimegm
+all: \
+    $(BIN)/bfs \
+    $(BIN)/tests/mksock \
+    $(BIN)/tests/trie \
+    $(BIN)/tests/xtimegm \
+    $(BIN)/tests/xtouch
 .PHONY: all
 
 $(BIN)/bfs: \
@@ -230,6 +235,7 @@ $(BIN)/bfs: \
 $(BIN)/tests/mksock: $(OBJ)/tests/mksock.o
 $(BIN)/tests/trie: $(OBJ)/src/trie.o $(OBJ)/tests/trie.o
 $(BIN)/tests/xtimegm: $(OBJ)/src/xtime.o $(OBJ)/tests/xtimegm.o
+$(BIN)/tests/xtouch: $(OBJ)/src/xtime.o $(OBJ)/tests/xtouch.o
 
 $(BIN)/%:
 	@$(MKDIR) $(@D)
@@ -257,7 +263,7 @@ $(FLAG_GOALS): $(FLAG_PREREQS)
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
 
-$(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(BIN)/tests/mksock
+$(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(BIN)/tests/mksock $(BIN)/tests/xtouch
 	./tests/tests.sh --bfs="$(BIN)/bfs -S $*" $(TEST_FLAGS)
 
 check-trie check-xtimegm: check-%: $(BIN)/tests/%

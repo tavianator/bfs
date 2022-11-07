@@ -1,4 +1,4 @@
-touchp scratch/foo.out
+"$XTOUCH" -p scratch/foo.out
 ln scratch/foo.out scratch/foo.hard
 ln -s foo.out scratch/foo.soft
 

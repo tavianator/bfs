@@ -1,5 +1,5 @@
 clean_scratch
-touchp scratch/foo/bar/baz
+"$XTOUCH" -p scratch/foo/bar/baz
 ln -s foo/bar/baz scratch/link
 ln -s foo/bar/nowhere scratch/broken
 ln -s foo/bar/nowhere/nothing scratch/nested

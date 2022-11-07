@@ -5,7 +5,7 @@ clean_scratch
 
 skip_unless invoke_bfs scratch -quit -capable
 
-$TOUCH scratch/{normal,capable}
+"$XTOUCH" scratch/{normal,capable}
 sudo setcap all+ep scratch/capable
 ln -s capable scratch/link
 

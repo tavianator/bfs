@@ -1,5 +1,5 @@
 clean_scratch
-touchp scratch/foo/bar/baz
+"$XTOUCH" -p scratch/foo/bar/baz
 
 (cd scratch && invoke_bfs . -rm)
 

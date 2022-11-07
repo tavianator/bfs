@@ -1,5 +1,5 @@
 clean_scratch
-touchp scratch/foo/bar
+"$XTOUCH" -p scratch/foo/bar
 chmod a-r scratch/foo
 
 bfs_diff scratch -depth

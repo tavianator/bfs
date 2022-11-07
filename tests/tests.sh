@@ -248,6 +248,8 @@ if [ "${BUILDDIR-}" ]; then
 else
     BIN=$(_realpath "$TESTS/../bin")
 fi
+MKSOCK="$BIN/tests/mksock"
+XTOUCH="$BIN/tests/xtouch"
 
 # Try to resolve the path to $BFS before we cd, while also supporting
 # --bfs="./bin/bfs -S ids"
@@ -311,63 +313,34 @@ else
     echo "Test files saved to $TMP"
 fi
 
-# Install a file, creating any parent directories
-function installp() {
-    local target="${@: -1}"
-    mkdir -p "${target%/*}"
-    install "$@"
-}
-
-# Prefer GNU touch to work around https://apple.stackexchange.com/a/425730/397839
-if command -v gtouch &>/dev/null; then
-    TOUCH=gtouch
-else
-    TOUCH=touch
-fi
-
-# Like a mythical touch -p
-function touchp() {
-    for arg; do
-        installp -m644 /dev/null "$arg"
-    done
-}
-
 # Creates a simple file+directory structure for tests
 function make_basic() {
-    touchp "$1/a"
-    touchp "$1/b"
-    touchp "$1/c/d"
-    touchp "$1/e/f"
-    mkdir -p "$1/g/h"
-    mkdir -p "$1/i"
-    touchp "$1/j/foo"
-    touchp "$1/k/foo/bar"
-    touchp "$1/l/foo/bar/baz"
+    "$XTOUCH" -p "$1"/{a,b,c/d,e/f,g/h/,i/}
+    "$XTOUCH" -p "$1"/{j/foo,k/foo/bar,l/foo/bar/baz}
     echo baz >"$1/l/foo/bar/baz"
 }
 make_basic "$TMP/basic"
 
 # Creates a file+directory structure with various permissions for tests
 function make_perms() {
-    installp -m000 /dev/null "$1/0"
-    installp -m444 /dev/null "$1/r"
-    installp -m222 /dev/null "$1/w"
-    installp -m644 /dev/null "$1/rw"
-    installp -m555 /dev/null "$1/rx"
-    installp -m311 /dev/null "$1/wx"
-    installp -m755 /dev/null "$1/rwx"
+    "$XTOUCH" -p -M000 "$1/0"
+    "$XTOUCH" -p -M444 "$1/r"
+    "$XTOUCH" -p -M222 "$1/w"
+    "$XTOUCH" -p -M644 "$1/rw"
+    "$XTOUCH" -p -M555 "$1/rx"
+    "$XTOUCH" -p -M311 "$1/wx"
+    "$XTOUCH" -p -M755 "$1/rwx"
 }
 make_perms "$TMP/perms"
 
 # Creates a file+directory structure with various symbolic and hard links
 function make_links() {
-    touchp "$1/file"
+    "$XTOUCH" -p "$1/file"
     ln -s file "$1/symlink"
     ln "$1/file" "$1/hardlink"
     ln -s nowhere "$1/broken"
     ln -s symlink/file "$1/notdir"
-    mkdir -p "$1/deeply/nested/dir"
-    touchp "$1/deeply/nested/file"
+    "$XTOUCH" -p "$1/deeply/nested"/{dir/,file}
     ln -s file "$1/deeply/nested/link"
     ln -s nowhere "$1/deeply/nested/broken"
     ln -s deeply/nested "$1/skip"
@@ -376,7 +349,7 @@ make_links "$TMP/links"
 
 # Creates a file+directory structure with symbolic link loops
 function make_loops() {
-    touchp "$1/file"
+    "$XTOUCH" -p "$1/file"
     ln -s file "$1/symlink"
     ln -s nowhere "$1/broken"
     ln -s symlink/file "$1/notdir"
@@ -389,29 +362,28 @@ make_loops "$TMP/loops"
 
 # Creates a file+directory structure with varying timestamps
 function make_times() {
-    mkdir -p "$1"
-    $TOUCH -t 199112140000 "$1/a"
-    $TOUCH -t 199112140001 "$1/b"
-    $TOUCH -t 199112140002 "$1/c"
+    "$XTOUCH" -p -t 199112140000 "$1/a"
+    "$XTOUCH" -p -t 199112140001 "$1/b"
+    "$XTOUCH" -p -t 199112140002 "$1/c"
     ln -s a "$1/l"
-    $TOUCH -h -t 199112140003 "$1/l"
-    $TOUCH -t 199112140004 "$1"
+    "$XTOUCH" -p -h -t 199112140003 "$1/l"
+    "$XTOUCH" -p -t 199112140004 "$1"
 }
 make_times "$TMP/times"
 
 # Creates a file+directory structure with various weird file/directory names
 function make_weirdnames() {
-    touchp "$1/-/a"
-    touchp "$1/(/b"
-    touchp "$1/(-/c"
-    touchp "$1/!/d"
-    touchp "$1/!-/e"
-    touchp "$1/,/f"
-    touchp "$1/)/g"
-    touchp "$1/.../h"
-    touchp "$1/\\/i"
-    touchp "$1/ /j"
-    touchp "$1/[/k"
+    "$XTOUCH" -p "$1/-/a"
+    "$XTOUCH" -p "$1/(/b"
+    "$XTOUCH" -p "$1/(-/c"
+    "$XTOUCH" -p "$1/!/d"
+    "$XTOUCH" -p "$1/!-/e"
+    "$XTOUCH" -p "$1/,/f"
+    "$XTOUCH" -p "$1/)/g"
+    "$XTOUCH" -p "$1/.../h"
+    "$XTOUCH" -p "$1/\\/i"
+    "$XTOUCH" -p "$1/ /j"
+    "$XTOUCH" -p "$1/[/k"
 }
 make_weirdnames "$TMP/weirdnames"
 
@@ -439,7 +411,7 @@ function make_deep() {
                 cd "$names"
             done
 
-            $TOUCH "$name"
+            "$XTOUCH" "$name"
         )
     done
 }
@@ -447,24 +419,24 @@ make_deep "$TMP/deep"
 
 # Creates a directory structure with many different types, and therefore colors
 function make_rainbow() {
-    touchp "$1/file.txt"
-    touchp "$1/file.dat"
-    touchp "$1/star".{gz,tar,tar.gz}
+    "$XTOUCH" -p "$1/file.txt"
+    "$XTOUCH" -p "$1/file.dat"
+    "$XTOUCH" -p "$1/star".{gz,tar,tar.gz}
     ln -s file.txt "$1/link.txt"
-    touchp "$1/mh1"
+    "$XTOUCH" -p "$1/mh1"
     ln "$1/mh1" "$1/mh2"
     mkfifo "$1/pipe"
     # TODO: block
     ln -s /dev/null "$1/chardev_link"
     ln -s nowhere "$1/broken"
-    "$BIN/tests/mksock" "$1/socket"
-    touchp "$1"/s{u,g,ug}id
+    "$MKSOCK" "$1/socket"
+    "$XTOUCH" -p "$1"/s{u,g,ug}id
     chmod u+s "$1"/su{,g}id
     chmod g+s "$1"/s{u,}gid
     mkdir "$1/ow" "$1"/sticky{,_ow}
     chmod o+w "$1"/*ow
     chmod +t "$1"/sticky*
-    touchp "$1"/exec.sh
+    "$XTOUCH" -p "$1"/exec.sh
     chmod +x "$1"/exec.sh
 }
 make_rainbow "$TMP/rainbow"
@@ -631,7 +603,7 @@ function set_acl() {
 function make_xattrs() {
     clean_scratch
 
-    $TOUCH scratch/{normal,xattr,xattr_2}
+    "$XTOUCH" scratch/{normal,xattr,xattr_2}
     ln -s xattr scratch/link
     ln -s normal scratch/xattr_link
 

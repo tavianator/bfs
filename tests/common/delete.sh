@@ -1,5 +1,5 @@
 clean_scratch
-touchp scratch/foo/bar/baz
+"$XTOUCH" -p scratch/foo/bar/baz
 
 # Don't try to delete '.'
 (cd scratch && invoke_bfs . -delete)

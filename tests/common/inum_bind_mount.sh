@@ -2,7 +2,7 @@ skip_unless test "$SUDO"
 skip_unless test "$UNAME" = "Linux"
 
 clean_scratch
-$TOUCH scratch/{foo,bar}
+"$XTOUCH" scratch/{foo,bar}
 sudo mount --bind scratch/{foo,bar}
 
 bfs_diff scratch -inum "$(inum scratch/bar)"
