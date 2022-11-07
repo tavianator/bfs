@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stddef.h>
 
 void bfs_perror(const struct bfs_ctx *ctx, const char *str) {
 	bfs_error(ctx, "%s: %m.\n", str);

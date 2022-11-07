@@ -32,8 +32,8 @@
 
 #include "bftw.h"
 #include "bfstd.h"
+#include "config.h"
 #include "dir.h"
-#include "darray.h"
 #include "dstring.h"
 #include "mtab.h"
 #include "stat.h"
@@ -45,7 +45,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 /**
  * A file.

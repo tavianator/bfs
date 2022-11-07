@@ -16,6 +16,7 @@
 
 #include "bar.h"
 #include "bfstd.h"
+#include "config.h"
 #include "dstring.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -25,7 +26,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
 
 struct bfs_bar {
 	int fd;

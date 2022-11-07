@@ -41,6 +41,7 @@
 
 #include "opt.h"
 #include "color.h"
+#include "config.h"
 #include "ctx.h"
 #include "diag.h"
 #include "eval.h"
@@ -50,9 +51,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 
 static char *fake_and_arg = "-a";

@@ -19,6 +19,7 @@
 #include "bftw.h"
 #include "ctx.h"
 #include "color.h"
+#include "config.h"
 #include "diag.h"
 #include "dstring.h"
 #include "xspawn.h"

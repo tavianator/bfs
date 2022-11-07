@@ -16,7 +16,6 @@
 
 #include "bfstd.h"
 #include "config.h"
-#include "dstring.h"
 #include "xregex.h"
 #include <assert.h>
 #include <errno.h>

@@ -153,7 +153,7 @@ int xmajor(dev_t dev);
  */
 int xminor(dev_t dev);
 
-#include <unistd.h>
+// #include <unistd.h>
 
 /**
  * Like dup(), but set the FD_CLOEXEC flag.

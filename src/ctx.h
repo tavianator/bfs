@@ -24,6 +24,7 @@
 #include "bftw.h"
 #include "trie.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <sys/resource.h>
 
 /**
