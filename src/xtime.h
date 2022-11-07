@@ -83,4 +83,14 @@ int xtimegm(struct tm *tm, time_t *timep);
  */
 int xgetdate(const char *str, struct timespec *result);
 
+/**
+ * Get the current time.
+ *
+ * @param[out] result
+ *         A pointer to the result.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int xgettime(struct timespec *result);
+
 #endif // BFS_XTIME_H

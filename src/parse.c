@@ -3822,29 +3822,6 @@ static void dump_costs(const struct bfs_ctx *ctx) {
 	bfs_debug(ctx, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
 }
 
-/**
- * Get the current time.
- */
-static int parse_gettime(const struct bfs_ctx *ctx, struct timespec *ts) {
-#if _POSIX_TIMERS > 0
-	int ret = clock_gettime(CLOCK_REALTIME, ts);
-	if (ret != 0) {
-		bfs_perror(ctx, "clock_gettime()");
-	}
-	return ret;
-#else
-	struct timeval tv;
-	int ret = gettimeofday(&tv, NULL);
-	if (ret == 0) {
-		ts->tv_sec = tv.tv_sec;
-		ts->tv_nsec = tv.tv_usec * 1000L;
-	} else {
-		bfs_perror(ctx, "gettimeofday()");
-	}
-	return ret;
-#endif
-}
-
 struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	struct bfs_ctx *ctx = bfs_ctx_new();
 	if (!ctx) {
@@ -3933,7 +3910,8 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		ctx->strategy = BFTW_DFS;
 	}
 
-	if (parse_gettime(ctx, &state.now) != 0) {
+	if (xgettime(&state.now) != 0) {
+		parse_perror(&state, "xgettime()");
 		goto fail;
 	}
 
