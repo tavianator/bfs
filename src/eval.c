@@ -1231,6 +1231,7 @@ static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, con
 	DEBUG_FLAG(flags, BFS_STAT_FOLLOW);
 	DEBUG_FLAG(flags, BFS_STAT_NOFOLLOW);
 	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
+	DEBUG_FLAG(flags, BFS_STAT_NOSYNC);
 
 	fprintf(stderr, ") == %d", cache->buf ? 0 : -1);
 
