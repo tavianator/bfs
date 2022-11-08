@@ -1,6 +1,6 @@
 name: codecov.io
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build:
@@ -27,6 +27,7 @@ jobs:
           make -j$(nproc) gcov check TEST_FLAGS="--sudo"
           gcov -abcfpu obj/*/*.o
 
-      - uses: codecov/codecov-action@v3.1.0
+      - uses: codecov/codecov-action@v3
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
