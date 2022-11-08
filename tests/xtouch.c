@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
+#include "../src/bfstd.h"
 #include "../src/xtime.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -25,10 +26,36 @@
 #include <time.h>
 #include <unistd.h>
 
-/** Check if a path has a trailing slash. */
-static bool trailing_slash(const char *path) {
-	size_t len = strlen(path);
-	return len > 0 && path[len - 1] == '/';
+/** Parsed xtouch arguments. */
+struct args {
+	/** Simple flags. */
+	enum {
+		/** Don't create nonexistent files (-c). */
+		NO_CREATE = 1 << 0,
+		/** Don't follow symlinks (-h). */
+		NO_FOLLOW = 1 << 1,
+		/** Create any missing parent directories (-p). */
+		CREATE_PARENTS = 1 << 2,
+	} flags;
+
+	/** Timestamps (-r|-t|-d). */
+	struct timespec times[2];
+
+	/** File creation mode (-M; default 0666 & ~umask). */
+	mode_t fmode;
+	/** Directory creation mode (-M; default 0777 & ~umask). */
+	mode_t dmode;
+	/** Parent directory creation mode (0777 & ~umask). */
+	mode_t pmode;
+};
+
+/** Compute flags for fstatat()/utimensat(). */
+static int at_flags(const struct args *args) {
+	if (args->flags & NO_FOLLOW) {
+		return AT_SYMLINK_NOFOLLOW;
+	} else {
+		return 0;
+	}
 }
 
 /** Create any parent directories of the given path. */
@@ -62,29 +89,34 @@ static int mkdirs(const char *path, mode_t mode) {
 }
 
 /** Touch one path. */
-static int xtouch(const char *path, const struct timespec times[2], int flags, mode_t mode, bool parents, mode_t pmode) {
-	int ret = utimensat(AT_FDCWD, path, times, flags);
+static int xtouch(const struct args *args, const char *path) {
+	int ret = utimensat(AT_FDCWD, path, args->times, at_flags(args));
 	if (ret == 0 || errno != ENOENT) {
 		return ret;
 	}
 
-	if (parents && mkdirs(path, pmode) != 0) {
-		return -1;
+	if (args->flags & NO_CREATE) {
+		return 0;
+	} else if (args->flags & CREATE_PARENTS) {
+		if (mkdirs(path, args->pmode) != 0) {
+			return -1;
+		}
 	}
 
-	if (trailing_slash(path)) {
-		if (mkdir(path, mode) != 0) {
+	size_t len = strlen(path);
+	if (len > 0 && path[len - 1] == '/') {
+		if (mkdir(path, args->dmode) != 0) {
 			return -1;
 		}
 
-		return utimensat(AT_FDCWD, path, times, flags);
+		return utimensat(AT_FDCWD, path, args->times, at_flags(args));
 	} else {
-		int fd = open(path, O_WRONLY | O_CREAT, mode);
+		int fd = open(path, O_WRONLY | O_CREAT, args->fmode);
 		if (fd < 0) {
 			return -1;
 		}
 
-		if (futimens(fd, times) != 0) {
+		if (futimens(fd, args->times) != 0) {
 			int error = errno;
 			close(fd);
 			errno = error;
@@ -96,33 +128,52 @@ static int xtouch(const char *path, const struct timespec times[2], int flags, m
 }
 
 int main(int argc, char *argv[]) {
-	int flags = 0;
+	mode_t mask = umask(0);
+
+	struct args args = {
+		.flags = 0,
+		.times = {
+			{ .tv_nsec = UTIME_OMIT },
+			{ .tv_nsec = UTIME_OMIT },
+		},
+		.fmode = 0666 & ~mask,
+		.dmode = 0777 & ~mask,
+		.pmode = 0777 & ~mask,
+	};
+
 	bool atime = false, mtime = false;
-	bool parents = false;
-	const char *mstr = NULL;
-	const char *tstr = NULL;
+	const char *darg = NULL;
+	const char *marg = NULL;
+	const char *rarg = NULL;
 
 	const char *cmd = argc > 0 ? argv[0] : "xtouch";
 	int c;
-	while (c = getopt(argc, argv, ":M:ahmpt:"), c != -1) {
+	while (c = getopt(argc, argv, ":M:acd:hmpr:t:"), c != -1) {
 		switch (c) {
 		case 'M':
-			mstr = optarg;
+			marg = optarg;
 			break;
 		case 'a':
 			atime = true;
 			break;
+		case 'c':
+			args.flags |= NO_CREATE;
+			break;
+		case 'd':
+		case 't':
+			darg = optarg;
+			break;
 		case 'h':
-			flags = AT_SYMLINK_NOFOLLOW;
+			args.flags |= NO_FOLLOW;
 			break;
 		case 'm':
 			mtime = true;
 			break;
 		case 'p':
-			parents = true;
+			args.flags |= CREATE_PARENTS;
 			break;
-		case 't':
-			tstr = optarg;
+		case 'r':
+			rarg = optarg;
 			break;
 		case ':':
 			fprintf(stderr, "%s: Missing argument to -%c\n", cmd, optopt);
@@ -133,48 +184,51 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	mode_t mask = umask(0);
-	mode_t fmode = 0666 & ~mask;
-	mode_t dmode = 0777 & ~mask;
-	mode_t pmode = 0777 & ~mask;
-	if (mstr) {
+	if (marg) {
 		char *end;
-		long mode = strtol(mstr, &end, 8);
-		if (*mstr && !*end && mode >= 0 && mode < 01000) {
-			fmode = dmode = mode;
+		long mode = strtol(marg, &end, 8);
+		if (*marg && !*end && mode >= 0 && mode < 01000) {
+			args.fmode = args.dmode = mode;
 		} else {
-			fprintf(stderr, "%s: Invalid mode '%s'\n", cmd, mstr);
+			fprintf(stderr, "%s: Invalid mode '%s'\n", cmd, marg);
 			return EXIT_FAILURE;
 		}
 	}
 
-	struct timespec ts;
-	if (tstr) {
-		if (xgetdate(tstr, &ts) != 0) {
-			fprintf(stderr, "%s: Parsing time '%s' failed: %s\n", cmd, tstr, strerror(errno));
+	struct timespec times[2];
+
+	if (rarg) {
+		struct stat buf;
+		if (fstatat(AT_FDCWD, rarg, &buf, at_flags(&args)) != 0) {
+			fprintf(stderr, "%s: '%s': %s\n", cmd, rarg, strerror(errno));
 			return EXIT_FAILURE;
 		}
+		times[0] = buf.st_atim;
+		times[1] = buf.st_mtim;
+	} else if (darg) {
+		if (xgetdate(darg, &times[0]) != 0) {
+			fprintf(stderr, "%s: Parsing time '%s' failed: %s\n", cmd, darg, strerror(errno));
+			return EXIT_FAILURE;
+		}
+		times[1] = times[0];
 	} else {
 		// Don't use UTIME_NOW, so that multiple paths all get the same timestamp
-		if (xgettime(&ts) != 0) {
+		if (xgettime(&times[0]) != 0) {
 			perror("xgettime()");
 			return EXIT_FAILURE;
 		}
+		times[1] = times[0];
 	}
 
-	struct timespec times[2] = {
-		{ .tv_nsec = UTIME_OMIT },
-		{ .tv_nsec = UTIME_OMIT },
-	};
 	if (!atime && !mtime) {
 		atime = true;
 		mtime = true;
 	}
 	if (atime) {
-		times[0] = ts;
+		args.times[0] = times[0];
 	}
 	if (mtime) {
-		times[1] = ts;
+		args.times[1] = times[1];
 	}
 
 	if (optind >= argc) {
@@ -185,9 +239,8 @@ int main(int argc, char *argv[]) {
 	int ret = EXIT_SUCCESS;
 	for (; optind < argc; ++optind) {
 		const char *path = argv[optind];
-		bool isdir = trailing_slash(path);
-		if (xtouch(path, times, flags, isdir ? dmode : fmode, parents, pmode) != 0) {
-			fprintf(stderr, "%s: Touching '%s' failed: %s\n", cmd, path, strerror(errno));
+		if (xtouch(&args, path) != 0) {
+			fprintf(stderr, "%s: '%s': %s\n", cmd, path, strerror(errno));
 			ret = EXIT_FAILURE;
 		}
 	}

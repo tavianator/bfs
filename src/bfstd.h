@@ -153,6 +153,15 @@ int xmajor(dev_t dev);
  */
 int xminor(dev_t dev);
 
+// #include <sys/stat.h>
+
+#if __APPLE__
+#	define st_atim st_atimespec
+#	define st_ctim st_ctimespec
+#	define st_mtim st_mtimespec
+#	define st_birthtim st_birthtimespec
+#endif
+
 // #include <unistd.h>
 
 /**

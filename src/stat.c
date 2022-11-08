@@ -37,13 +37,6 @@
 #	define BFS_STATX true
 #endif
 
-#if __APPLE__
-#	define st_atim st_atimespec
-#	define st_ctim st_ctimespec
-#	define st_mtim st_mtimespec
-#	define st_birthtim st_birthtimespec
-#endif
-
 const char *bfs_stat_field_name(enum bfs_stat_field field) {
 	switch (field) {
 	case BFS_STAT_DEV:

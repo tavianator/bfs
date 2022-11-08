@@ -236,7 +236,7 @@ int xgetdate(const char *str, struct timespec *result) {
 
 	if (!*str) {
 		goto end;
-	} else if (*str == 'T') {
+	} else if (*str == 'T' || *str == ' ') {
 		++str;
 	}
 

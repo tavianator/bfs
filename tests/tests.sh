@@ -362,12 +362,12 @@ make_loops "$TMP/loops"
 
 # Creates a file+directory structure with varying timestamps
 function make_times() {
-    "$XTOUCH" -p -t 199112140000 "$1/a"
-    "$XTOUCH" -p -t 199112140001 "$1/b"
-    "$XTOUCH" -p -t 199112140002 "$1/c"
+    "$XTOUCH" -p -t "1991-12-14 00:00" "$1/a"
+    "$XTOUCH" -p -t "1991-12-14 00:01" "$1/b"
+    "$XTOUCH" -p -t "1991-12-14 00:02" "$1/c"
     ln -s a "$1/l"
-    "$XTOUCH" -p -h -t 199112140003 "$1/l"
-    "$XTOUCH" -p -t 199112140004 "$1"
+    "$XTOUCH" -p -h -t "1991-12-14 00:03" "$1/l"
+    "$XTOUCH" -p -t "1991-12-14 00:04" "$1"
 }
 make_times "$TMP/times"
 
