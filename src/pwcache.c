@@ -1,6 +1,6 @@
 /****************************************************************************
  * bfs                                                                      *
- * Copyright (C) 2020 Tavian Barnes <tavianator@tavianator.com>             *
+ * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
  *                                                                          *
  * Permission to use, copy, modify, and/or distribute this software for any *
  * purpose with or without fee is hereby granted.                           *
@@ -23,270 +23,200 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+/** Represents cache hits for negative results. */
+static void *MISSING = &MISSING;
+
+/** Callback type for bfs_getent(). */
+typedef void *bfs_getent_fn(const void *key, void *ent, void *buf, size_t bufsize);
+
+/** Shared scaffolding for get{pw,gr}{nam,?id}_r(). */
+static void *bfs_getent(struct trie_leaf *leaf, bfs_getent_fn *fn, const void *key, size_t entsize, size_t bufsize) {
+	if (leaf->value) {
+		errno = 0;
+		return leaf->value == MISSING ? NULL : leaf->value;
+	}
+
+	void *buf = NULL;
+	while (true) {
+		void *result = buf;
+		buf = realloc(buf, entsize + bufsize);
+		if (!buf) {
+			free(result);
+			return NULL;
+		}
+
+		result = fn(key, buf, (char *)buf + entsize, bufsize);
+		if (result) {
+			leaf->value = result;
+			return result;
+		} else if (errno == 0) {
+			free(buf);
+			leaf->value = MISSING;
+			return NULL;
+		} else if (errno == ERANGE) {
+			bufsize *= 2;
+		} else {
+			free(buf);
+			return NULL;
+		}
+	}
+}
 
 struct bfs_users {
-	/** The array of passwd entries. */
-	struct passwd *entries;
+	/** Initial buffer size for getpw*_r(). */
+	size_t bufsize;
 	/** A map from usernames to entries. */
 	struct trie by_name;
 	/** A map from UIDs to entries. */
 	struct trie by_uid;
 };
 
-struct bfs_users *bfs_users_parse(void) {
-	int error;
-
+struct bfs_users *bfs_users_new(void) {
 	struct bfs_users *users = malloc(sizeof(*users));
 	if (!users) {
 		return NULL;
 	}
 
-	users->entries = NULL;
+	long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+	if (bufsize > 0) {
+		users->bufsize = bufsize;
+	} else {
+		users->bufsize = 1024;
+	}
+
 	trie_init(&users->by_name);
 	trie_init(&users->by_uid);
-
-	setpwent();
-
-	while (true) {
-		errno = 0;
-		struct passwd *ent = getpwent();
-		if (!ent) {
-			if (errno) {
-				error = errno;
-				goto fail_end;
-			} else {
-				break;
-			}
-		}
-
-		if (DARRAY_PUSH(&users->entries, ent) != 0) {
-			error = errno;
-			goto fail_end;
-		}
-
-		ent = users->entries + darray_length(users->entries) - 1;
-		ent->pw_name = strdup(ent->pw_name);
-		ent->pw_dir = strdup(ent->pw_dir);
-		ent->pw_shell = strdup(ent->pw_shell);
-		if (!ent->pw_name || !ent->pw_dir || !ent->pw_shell) {
-			error = ENOMEM;
-			goto fail_end;
-		}
-	}
-
-	endpwent();
-
-	for (size_t i = 0; i < darray_length(users->entries); ++i) {
-		struct passwd *entry = &users->entries[i];
-		struct trie_leaf *leaf = trie_insert_str(&users->by_name, entry->pw_name);
-		if (leaf) {
-			if (!leaf->value) {
-				leaf->value = entry;
-			}
-		} else {
-			error = errno;
-			goto fail_free;
-		}
-
-		leaf = trie_insert_mem(&users->by_uid, &entry->pw_uid, sizeof(entry->pw_uid));
-		if (leaf) {
-			if (!leaf->value) {
-				leaf->value = entry;
-			}
-		} else {
-			error = errno;
-			goto fail_free;
-		}
-	}
-
 	return users;
-
-fail_end:
-	endpwent();
-fail_free:
-	bfs_users_free(users);
-	errno = error;
-	return NULL;
 }
 
-const struct passwd *bfs_getpwnam(const struct bfs_users *users, const char *name) {
-	const struct trie_leaf *leaf = trie_find_str(&users->by_name, name);
-	if (leaf) {
-		return leaf->value;
-	} else {
-		return NULL;
-	}
+/** bfs_getent() callback for getpwnam_r(). */
+static void *bfs_getpwnam_impl(const void *key, void *ent, void *buf, size_t bufsize) {
+	struct passwd *result;
+	errno = getpwnam_r(key, ent, buf, bufsize, &result);
+	return result;
 }
 
-const struct passwd *bfs_getpwuid(const struct bfs_users *users, uid_t uid) {
-	const struct trie_leaf *leaf = trie_find_mem(&users->by_uid, &uid, sizeof(uid));
-	if (leaf) {
-		return leaf->value;
-	} else {
+const struct passwd *bfs_getpwnam(struct bfs_users *users, const char *name) {
+	struct trie_leaf *leaf = trie_insert_str(&users->by_name, name);
+	if (!leaf) {
 		return NULL;
 	}
+
+	return bfs_getent(leaf, bfs_getpwnam_impl, name, sizeof(struct passwd), users->bufsize);
+}
+
+/** bfs_getent() callback for getpwuid_r(). */
+static void *bfs_getpwuid_impl(const void *key, void *ent, void *buf, size_t bufsize) {
+	struct passwd *result;
+	errno = getpwuid_r(*(const uid_t *)key, ent, buf, bufsize, &result);
+	return result;
+}
+
+const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid) {
+	struct trie_leaf *leaf = trie_insert_mem(&users->by_uid, &uid, sizeof(uid));
+	if (!leaf) {
+		return NULL;
+	}
+
+	return bfs_getent(leaf, bfs_getpwuid_impl, &uid, sizeof(struct passwd), users->bufsize);
 }
 
 void bfs_users_free(struct bfs_users *users) {
 	if (users) {
-		trie_destroy(&users->by_uid);
-		trie_destroy(&users->by_name);
-
-		for (size_t i = 0; i < darray_length(users->entries); ++i) {
-			struct passwd *entry = &users->entries[i];
-			free(entry->pw_shell);
-			free(entry->pw_dir);
-			free(entry->pw_name);
+		TRIE_FOR_EACH(&users->by_uid, leaf) {
+			if (leaf->value != MISSING) {
+				free(leaf->value);
+			}
 		}
-		darray_free(users->entries);
+		trie_destroy(&users->by_uid);
+
+		TRIE_FOR_EACH(&users->by_name, leaf) {
+			if (leaf->value != MISSING) {
+				free(leaf->value);
+			}
+		}
+		trie_destroy(&users->by_name);
 
 		free(users);
 	}
 }
 
 struct bfs_groups {
-	/** The array of group entries. */
-	struct group *entries;
+	/** Initial buffer size for getgr*_r(). */
+	size_t bufsize;
 	/** A map from group names to entries. */
 	struct trie by_name;
 	/** A map from GIDs to entries. */
 	struct trie by_gid;
 };
 
-/**
- * struct group::gr_mem isn't properly aligned on macOS, so do this to avoid
- * ASAN warnings.
- */
-static char *next_gr_mem(void **gr_mem) {
-	char *mem;
-	memcpy(&mem, *gr_mem, sizeof(mem));
-	*gr_mem = (char *)*gr_mem + sizeof(mem);
-	return mem;
-}
-
-struct bfs_groups *bfs_groups_parse(void) {
-	int error;
-
+struct bfs_groups *bfs_groups_new(void) {
 	struct bfs_groups *groups = malloc(sizeof(*groups));
 	if (!groups) {
 		return NULL;
 	}
 
-	groups->entries = NULL;
+	long bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+	if (bufsize > 0) {
+		groups->bufsize = bufsize;
+	} else {
+		groups->bufsize = 1024;
+	}
+
 	trie_init(&groups->by_name);
 	trie_init(&groups->by_gid);
-
-	setgrent();
-
-	while (true) {
-		errno = 0;
-		struct group *ent = getgrent();
-		if (!ent) {
-			if (errno) {
-				error = errno;
-				goto fail_end;
-			} else {
-				break;
-			}
-		}
-
-		if (DARRAY_PUSH(&groups->entries, ent) != 0) {
-			error = errno;
-			goto fail_end;
-		}
-		ent = groups->entries + darray_length(groups->entries) - 1;
-
-		void *members = ent->gr_mem;
-		ent->gr_mem = NULL;
-
-		ent->gr_name = strdup(ent->gr_name);
-		if (!ent->gr_name) {
-			error = errno;
-			goto fail_end;
-		}
-
-		for (char *mem = next_gr_mem(&members); mem; mem = next_gr_mem(&members)) {
-			char *dup = strdup(mem);
-			if (!dup) {
-				error = errno;
-				goto fail_end;
-			}
-
-			if (DARRAY_PUSH(&ent->gr_mem, &dup) != 0) {
-				error = errno;
-				free(dup);
-				goto fail_end;
-			}
-		}
-	}
-
-	endgrent();
-
-	for (size_t i = 0; i < darray_length(groups->entries); ++i) {
-		struct group *entry = &groups->entries[i];
-		struct trie_leaf *leaf = trie_insert_str(&groups->by_name, entry->gr_name);
-		if (leaf) {
-			if (!leaf->value) {
-				leaf->value = entry;
-			}
-		} else {
-			error = errno;
-			goto fail_free;
-		}
-
-		leaf = trie_insert_mem(&groups->by_gid, &entry->gr_gid, sizeof(entry->gr_gid));
-		if (leaf) {
-			if (!leaf->value) {
-				leaf->value = entry;
-			}
-		} else {
-			error = errno;
-			goto fail_free;
-		}
-	}
-
 	return groups;
-
-fail_end:
-	endgrent();
-fail_free:
-	bfs_groups_free(groups);
-	errno = error;
-	return NULL;
 }
 
-const struct group *bfs_getgrnam(const struct bfs_groups *groups, const char *name) {
-	const struct trie_leaf *leaf = trie_find_str(&groups->by_name, name);
-	if (leaf) {
-		return leaf->value;
-	} else {
-		return NULL;
-	}
+/** bfs_getent() callback for getgrnam_r(). */
+static void *bfs_getgrnam_impl(const void *key, void *ent, void *buf, size_t bufsize) {
+	struct group *result;
+	errno = getgrnam_r(key, ent, buf, bufsize, &result);
+	return result;
 }
 
-const struct group *bfs_getgrgid(const struct bfs_groups *groups, gid_t gid) {
-	const struct trie_leaf *leaf = trie_find_mem(&groups->by_gid, &gid, sizeof(gid));
-	if (leaf) {
-		return leaf->value;
-	} else {
+const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name) {
+	struct trie_leaf *leaf = trie_insert_str(&groups->by_name, name);
+	if (!leaf) {
 		return NULL;
 	}
+
+	return bfs_getent(leaf, bfs_getgrnam_impl, name, sizeof(struct group), groups->bufsize);
+}
+
+/** bfs_getent() callback for getgrgid_r(). */
+static void *bfs_getgrgid_impl(const void *key, void *ent, void *buf, size_t bufsize) {
+	struct group *result;
+	errno = getgrgid_r(*(const gid_t *)key, ent, buf, bufsize, &result);
+	return result;
+}
+
+const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid) {
+	struct trie_leaf *leaf = trie_insert_mem(&groups->by_gid, &gid, sizeof(gid));
+	if (!leaf) {
+		return NULL;
+	}
+
+	return bfs_getent(leaf, bfs_getgrgid_impl, &gid, sizeof(struct group), groups->bufsize);
 }
 
 void bfs_groups_free(struct bfs_groups *groups) {
 	if (groups) {
-		trie_destroy(&groups->by_gid);
-		trie_destroy(&groups->by_name);
-
-		for (size_t i = 0; i < darray_length(groups->entries); ++i) {
-			struct group *entry = &groups->entries[i];
-			for (size_t j = 0; j < darray_length(entry->gr_mem); ++j) {
-				free(entry->gr_mem[j]);
+		TRIE_FOR_EACH(&groups->by_gid, leaf) {
+			if (leaf->value != MISSING) {
+				free(leaf->value);
 			}
-			darray_free(entry->gr_mem);
-			free(entry->gr_name);
 		}
-		darray_free(groups->entries);
+		trie_destroy(&groups->by_gid);
+
+		TRIE_FOR_EACH(&groups->by_name, leaf) {
+			if (leaf->value != MISSING) {
+				free(leaf->value);
+			}
+		}
+		trie_destroy(&groups->by_name);
 
 		free(groups);
 	}

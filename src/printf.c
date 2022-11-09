@@ -59,7 +59,7 @@ struct bfs_printf {
 	/** Character data associated with this directive. */
 	char c;
 	/** Some data used by the directive. */
-	const void *ptr;
+	void *ptr;
 };
 
 /** Print some text as-is. */
@@ -259,8 +259,8 @@ static int bfs_printf_g(CFILE *cfile, const struct bfs_printf *directive, const 
 		return -1;
 	}
 
-	const struct bfs_groups *groups = directive->ptr;
-	const struct group *grp = groups ? bfs_getgrgid(groups, statbuf->gid) : NULL;
+	struct bfs_groups *groups = directive->ptr;
+	const struct group *grp = bfs_getgrgid(groups, statbuf->gid);
 	if (!grp) {
 		return bfs_printf_G(cfile, directive, ftwbuf);
 	}
@@ -469,8 +469,8 @@ static int bfs_printf_u(CFILE *cfile, const struct bfs_printf *directive, const 
 		return -1;
 	}
 
-	const struct bfs_users *users = directive->ptr;
-	const struct passwd *pwd = users ? bfs_getpwuid(users, statbuf->uid) : NULL;
+	struct bfs_users *users = directive->ptr;
+	const struct passwd *pwd = bfs_getpwuid(users, statbuf->uid);
 	if (!pwd) {
 		return bfs_printf_U(cfile, directive, ftwbuf);
 	}
@@ -733,24 +733,18 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 				directive.fn = bfs_printf_f;
 				break;
 			case 'F':
-				directive.ptr = bfs_ctx_mtab(ctx);
+				directive.fn = bfs_printf_F;
+				directive.ptr = (void *)bfs_ctx_mtab(ctx);
 				if (!directive.ptr) {
 					int error = errno;
 					bfs_expr_error(ctx, expr);
 					bfs_error(ctx, "Couldn't parse the mount table: %s.\n", strerror(error));
 					goto directive_error;
 				}
-				directive.fn = bfs_printf_F;
 				break;
 			case 'g':
-				directive.ptr = bfs_ctx_groups(ctx);
-				if (!directive.ptr) {
-					int error = errno;
-					bfs_expr_error(ctx, expr);
-					bfs_error(ctx, "Couldn't parse the group table: %s.\n", strerror(error));
-					goto directive_error;
-				}
 				directive.fn = bfs_printf_g;
+				directive.ptr = ctx->groups;
 				break;
 			case 'G':
 				directive.fn = bfs_printf_G;
@@ -798,14 +792,8 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 				directive.stat_field = BFS_STAT_MTIME;
 				break;
 			case 'u':
-				directive.ptr = bfs_ctx_users(ctx);
-				if (!directive.ptr) {
-					int error = errno;
-					bfs_expr_error(ctx, expr);
-					bfs_error(ctx, "Couldn't parse the user table: %s.\n", strerror(error));
-					goto directive_error;
-				}
 				directive.fn = bfs_printf_u;
+				directive.ptr = ctx->users;
 				break;
 			case 'U':
 				directive.fn = bfs_printf_U;

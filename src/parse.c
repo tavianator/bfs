@@ -1526,12 +1526,6 @@ static struct bfs_expr *parse_fls(struct parser_state *state, int arg1, int arg2
 	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
 	expr->reftime = state->now;
-
-	// We'll need these for user/group names, so initialize them now to
-	// avoid EMFILE later
-	bfs_ctx_users(state->ctx);
-	bfs_ctx_groups(state->ctx);
-
 	return expr;
 
 fail:
@@ -1647,13 +1641,7 @@ static struct bfs_expr *parse_group(struct parser_state *state, int arg1, int ar
 		return NULL;
 	}
 
-	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
-	if (!groups) {
-		parse_expr_error(state, expr, "Couldn't parse the group table: %m.\n");
-		goto fail;
-	}
-
-	const struct group *grp = bfs_getgrnam(groups, expr->argv[1]);
+	const struct group *grp = bfs_getgrnam(state->ctx->groups, expr->argv[1]);
 	if (grp) {
 		expr->num = grp->gr_gid;
 		expr->int_cmp = BFS_INT_EQUAL;
@@ -1661,13 +1649,15 @@ static struct bfs_expr *parse_group(struct parser_state *state, int arg1, int ar
 		if (!parse_icmp(state, expr, 0)) {
 			goto fail;
 		}
+	} else if (errno) {
+		parse_expr_error(state, expr, "%m.\n");
+		goto fail;
 	} else {
 		parse_expr_error(state, expr, "No such group.\n");
 		goto fail;
 	}
 
 	expr->cost = STAT_COST;
-
 	return expr;
 
 fail:
@@ -1703,13 +1693,7 @@ static struct bfs_expr *parse_user(struct parser_state *state, int arg1, int arg
 		return NULL;
 	}
 
-	const struct bfs_users *users = bfs_ctx_users(state->ctx);
-	if (!users) {
-		parse_expr_error(state, expr, "Couldn't parse the user table: %m.\n");
-		goto fail;
-	}
-
-	const struct passwd *pwd = bfs_getpwnam(users, expr->argv[1]);
+	const struct passwd *pwd = bfs_getpwnam(state->ctx->users, expr->argv[1]);
 	if (pwd) {
 		expr->num = pwd->pw_uid;
 		expr->int_cmp = BFS_INT_EQUAL;
@@ -1717,13 +1701,15 @@ static struct bfs_expr *parse_user(struct parser_state *state, int arg1, int arg
 		if (!parse_icmp(state, expr, 0)) {
 			goto fail;
 		}
+	} else if (errno) {
+		parse_expr_error(state, expr, "%m.\n");
+		goto fail;
 	} else {
 		parse_expr_error(state, expr, "No such user.\n");
 		goto fail;
 	}
 
 	expr->cost = STAT_COST;
-
 	return expr;
 
 fail:
@@ -1785,12 +1771,6 @@ static struct bfs_expr *parse_ls(struct parser_state *state, int arg1, int arg2)
 
 	init_print_expr(state, expr);
 	expr->reftime = state->now;
-
-	// We'll need these for user/group names, so initialize them now to
-	// avoid EMFILE later
-	bfs_ctx_users(state->ctx);
-	bfs_ctx_groups(state->ctx);
-
 	return expr;
 }
 
@@ -2005,16 +1985,18 @@ fail:
  * Parse -nogroup.
  */
 static struct bfs_expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
-	if (!bfs_ctx_groups(state->ctx)) {
-		parse_error(state, "Couldn't parse the group table: %m.\n");
+	struct bfs_expr *expr = parse_nullary_test(state, eval_nogroup);
+	if (!expr) {
 		return NULL;
 	}
 
-	struct bfs_expr *expr = parse_nullary_test(state, eval_nogroup);
-	if (expr) {
-		expr->cost = STAT_COST;
-		expr->probability = 0.01;
-	}
+	expr->cost = STAT_COST;
+	expr->probability = 0.01;
+
+	// Who knows how many FDs getgrgid_r() needs?  Probably at least one for
+	// /etc/group
+	expr->ephemeral_fds = 1;
+
 	return expr;
 }
 
@@ -2051,16 +2033,18 @@ static struct bfs_expr *parse_noleaf(struct parser_state *state, int arg1, int a
  * Parse -nouser.
  */
 static struct bfs_expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
-	if (!bfs_ctx_users(state->ctx)) {
-		parse_error(state, "Couldn't parse the user table: %m.\n");
+	struct bfs_expr *expr = parse_nullary_test(state, eval_nouser);
+	if (!expr) {
 		return NULL;
 	}
 
-	struct bfs_expr *expr = parse_nullary_test(state, eval_nouser);
-	if (expr) {
-		expr->cost = STAT_COST;
-		expr->probability = 0.01;
-	}
+	expr->cost = STAT_COST;
+	expr->probability = 0.01;
+
+	// Who knows how many FDs getpwuid_r() needs?  Probably at least one for
+	// /etc/passwd
+	expr->ephemeral_fds = 1;
+
 	return expr;
 }
 

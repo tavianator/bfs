@@ -309,13 +309,11 @@ bool eval_nogroup(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
-	if (!groups) {
+	const struct group *grp = bfs_getgrgid(state->ctx->groups, statbuf->gid);
+	if (errno != 0) {
 		eval_report_error(state);
-		return false;
 	}
-
-	return bfs_getgrgid(groups, statbuf->gid) == NULL;
+	return grp == NULL;
 }
 
 /**
@@ -327,13 +325,11 @@ bool eval_nouser(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	const struct bfs_users *users = bfs_ctx_users(state->ctx);
-	if (!users) {
+	const struct passwd *pwd = bfs_getpwuid(state->ctx->users, statbuf->uid);
+	if (errno != 0) {
 		eval_report_error(state);
-		return false;
 	}
-
-	return bfs_getpwuid(users, statbuf->uid) == NULL;
+	return pwd == NULL;
 }
 
 /**
@@ -642,8 +638,7 @@ bool eval_perm(const struct bfs_expr *expr, struct bfs_eval *state) {
 bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	CFILE *cfile = expr->cfile;
 	FILE *file = cfile->file;
-	const struct bfs_users *users = bfs_ctx_users(state->ctx);
-	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
+	const struct bfs_ctx *ctx = state->ctx;
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	const struct bfs_stat *statbuf = eval_stat(state);
 	if (!statbuf) {
@@ -651,7 +646,7 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	uintmax_t ino = statbuf->ino;
-	uintmax_t block_size = state->ctx->posixly_correct ? 512 : 1024;
+	uintmax_t block_size = ctx->posixly_correct ? 512 : 1024;
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + block_size - 1)/block_size;
 	char mode[11];
 	xstrmode(statbuf->mode, mode);
@@ -662,7 +657,7 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	uintmax_t uid = statbuf->uid;
-	const struct passwd *pwd = users ? bfs_getpwuid(users, uid) : NULL;
+	const struct passwd *pwd = bfs_getpwuid(ctx->users, uid);
 	if (pwd) {
 		if (fprintf(file, " %-8s", pwd->pw_name) < 0) {
 			goto error;
@@ -674,7 +669,7 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	uintmax_t gid = statbuf->gid;
-	const struct group *grp = groups ? bfs_getgrgid(groups, gid) : NULL;
+	const struct group *grp = bfs_getgrgid(ctx->groups, gid);
 	if (grp) {
 		if (fprintf(file, " %-8s", grp->gr_name) < 0) {
 			goto error;

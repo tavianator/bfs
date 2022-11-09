@@ -106,10 +106,8 @@ struct bfs_ctx {
 	/** Colored stderr. */
 	struct CFILE *cerr;
 
-	/** User table. */
+	/** User cache. */
 	struct bfs_users *users;
-	/** The error that occurred parsing the user table, if any. */
-	int users_error;
 	/** Group table. */
 	struct bfs_groups *groups;
 	/** The error that occurred parsing the group table, if any. */
@@ -136,26 +134,6 @@ struct bfs_ctx {
  *         A new bfs context, or NULL on failure.
  */
 struct bfs_ctx *bfs_ctx_new(void);
-
-/**
- * Get the users table.
- *
- * @param ctx
- *         The bfs context.
- * @return
- *         The cached users table, or NULL on failure.
- */
-const struct bfs_users *bfs_ctx_users(const struct bfs_ctx *ctx);
-
-/**
- * Get the groups table.
- *
- * @param ctx
- *         The bfs context.
- * @return
- *         The cached groups table, or NULL on failure.
- */
-const struct bfs_groups *bfs_ctx_groups(const struct bfs_ctx *ctx);
 
 /**
  * Get the mount table.

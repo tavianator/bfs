@@ -84,9 +84,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->cerr = NULL;
 
 	ctx->users = NULL;
-	ctx->users_error = 0;
 	ctx->groups = NULL;
-	ctx->groups_error = 0;
 
 	ctx->mtab = NULL;
 	ctx->mtab_error = 0;
@@ -95,45 +93,27 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->nfiles = 0;
 
 	struct rlimit rl;
-	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-		ctx->nofile_soft = rl.rlim_cur;
-		ctx->nofile_hard = rl.rlim_max;
-	} else {
-		ctx->nofile_soft = 1024;
-		ctx->nofile_hard = RLIM_INFINITY;
+	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		goto fail;
+	}
+	ctx->nofile_soft = rl.rlim_cur;
+	ctx->nofile_hard = rl.rlim_max;
+
+	ctx->users = bfs_users_new();
+	if (!ctx->users) {
+		goto fail;
+	}
+
+	ctx->groups = bfs_groups_new();
+	if (!ctx->groups) {
+		goto fail;
 	}
 
 	return ctx;
-}
 
-const struct bfs_users *bfs_ctx_users(const struct bfs_ctx *ctx) {
-	struct bfs_ctx *mut = (struct bfs_ctx *)ctx;
-
-	if (mut->users_error) {
-		errno = mut->users_error;
-	} else if (!mut->users) {
-		mut->users = bfs_users_parse();
-		if (!mut->users) {
-			mut->users_error = errno;
-		}
-	}
-
-	return mut->users;
-}
-
-const struct bfs_groups *bfs_ctx_groups(const struct bfs_ctx *ctx) {
-	struct bfs_ctx *mut = (struct bfs_ctx *)ctx;
-
-	if (mut->groups_error) {
-		errno = mut->groups_error;
-	} else if (!mut->groups) {
-		mut->groups = bfs_groups_parse();
-		if (!mut->groups) {
-			mut->groups_error = errno;
-		}
-	}
-
-	return mut->groups;
+fail:
+	bfs_ctx_free(ctx);
+	return NULL;
 }
 
 const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx) {

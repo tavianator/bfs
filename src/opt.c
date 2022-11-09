@@ -48,6 +48,7 @@
 #include "expr.h"
 #include "pwcache.h"
 #include <assert.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -789,12 +790,13 @@ static void infer_icmp_facts(struct opt_state *state, const struct bfs_expr *exp
 static void infer_gid_facts(struct opt_state *state, const struct bfs_expr *expr) {
 	infer_icmp_facts(state, expr, GID_RANGE);
 
-	const struct bfs_groups *groups = bfs_ctx_groups(state->ctx);
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
-	if (groups && range->min == range->max) {
+	if (range->min == range->max) {
 		gid_t gid = range->min;
-		bool nogroup = !bfs_getgrgid(groups, gid);
-		constrain_pred(&state->facts_when_true.preds[NOGROUP_PRED], nogroup);
+		bool nogroup = !bfs_getgrgid(state->ctx->groups, gid);
+		if (errno == 0) {
+			constrain_pred(&state->facts_when_true.preds[NOGROUP_PRED], nogroup);
+		}
 	}
 }
 
@@ -802,12 +804,13 @@ static void infer_gid_facts(struct opt_state *state, const struct bfs_expr *expr
 static void infer_uid_facts(struct opt_state *state, const struct bfs_expr *expr) {
 	infer_icmp_facts(state, expr, UID_RANGE);
 
-	const struct bfs_users *users = bfs_ctx_users(state->ctx);
 	struct range *range = &state->facts_when_true.ranges[UID_RANGE];
-	if (users && range->min == range->max) {
+	if (range->min == range->max) {
 		uid_t uid = range->min;
-		bool nouser = !bfs_getpwuid(users, uid);
-		constrain_pred(&state->facts_when_true.preds[NOUSER_PRED], nouser);
+		bool nouser = !bfs_getpwuid(state->ctx->users, uid);
+		if (errno == 0) {
+			constrain_pred(&state->facts_when_true.preds[NOUSER_PRED], nouser);
+		}
 	}
 }
 
