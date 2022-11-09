@@ -64,6 +64,16 @@ static void *bfs_getent(struct trie_leaf *leaf, bfs_getent_fn *fn, const void *k
 	}
 }
 
+/** Flush a single cache. */
+static void bfs_pwcache_flush(struct trie *trie) {
+	TRIE_FOR_EACH(trie, leaf) {
+		if (leaf->value != MISSING) {
+			free(leaf->value);
+		}
+		trie_remove(trie, leaf);
+	}
+}
+
 struct bfs_users {
 	/** Initial buffer size for getpw*_r(). */
 	size_t bufsize;
@@ -123,22 +133,16 @@ const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid) {
 	return bfs_getent(leaf, bfs_getpwuid_impl, &uid, sizeof(struct passwd), users->bufsize);
 }
 
+void bfs_users_flush(struct bfs_users *users) {
+	bfs_pwcache_flush(&users->by_name);
+	bfs_pwcache_flush(&users->by_uid);
+}
+
 void bfs_users_free(struct bfs_users *users) {
 	if (users) {
-		TRIE_FOR_EACH(&users->by_uid, leaf) {
-			if (leaf->value != MISSING) {
-				free(leaf->value);
-			}
-		}
+		bfs_users_flush(users);
 		trie_destroy(&users->by_uid);
-
-		TRIE_FOR_EACH(&users->by_name, leaf) {
-			if (leaf->value != MISSING) {
-				free(leaf->value);
-			}
-		}
 		trie_destroy(&users->by_name);
-
 		free(users);
 	}
 }
@@ -202,22 +206,16 @@ const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid) {
 	return bfs_getent(leaf, bfs_getgrgid_impl, &gid, sizeof(struct group), groups->bufsize);
 }
 
+void bfs_groups_flush(struct bfs_groups *groups) {
+	bfs_pwcache_flush(&groups->by_name);
+	bfs_pwcache_flush(&groups->by_gid);
+}
+
 void bfs_groups_free(struct bfs_groups *groups) {
 	if (groups) {
-		TRIE_FOR_EACH(&groups->by_gid, leaf) {
-			if (leaf->value != MISSING) {
-				free(leaf->value);
-			}
-		}
+		bfs_groups_flush(groups);
 		trie_destroy(&groups->by_gid);
-
-		TRIE_FOR_EACH(&groups->by_name, leaf) {
-			if (leaf->value != MISSING) {
-				free(leaf->value);
-			}
-		}
 		trie_destroy(&groups->by_name);
-
 		free(groups);
 	}
 }

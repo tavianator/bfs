@@ -186,6 +186,11 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 	// We do not check errors here, but they will be caught at cleanup time
 	// with ferror().
 	fflush(NULL);
+
+	// Flush the user/group caches, in case the executed command edits the
+	// user/group tables
+	bfs_users_flush(ctx->users);
+	bfs_groups_flush(ctx->groups);
 }
 
 /** Flush a file and report any errors. */

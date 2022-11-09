@@ -64,6 +64,14 @@ const struct passwd *bfs_getpwnam(struct bfs_users *users, const char *name);
 const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid);
 
 /**
+ * Flush a user cache.
+ *
+ * @param users
+ *         The cache to flush.
+ */
+void bfs_users_flush(struct bfs_users *users);
+
+/**
  * Free a user cache.
  *
  * @param users
@@ -109,6 +117,14 @@ const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name);
  *         occurred (errno != 0).
  */
 const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid);
+
+/**
+ * Flush a group cache.
+ *
+ * @param groups
+ *         The cache to flush.
+ */
+void bfs_groups_flush(struct bfs_groups *groups);
 
 /**
  * Free a group cache.
