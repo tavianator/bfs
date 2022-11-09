@@ -3341,7 +3341,7 @@ static const struct table_entry *table_lookup(const char *arg) {
 /** Search for a fuzzy match in the parse table. */
 static const struct table_entry *table_lookup_fuzzy(const char *arg) {
 	const struct table_entry *best = NULL;
-	int best_dist;
+	int best_dist = INT_MAX;
 
 	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
 		int dist = typo_distance(arg, entry->arg);
