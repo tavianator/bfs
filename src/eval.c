@@ -109,6 +109,20 @@ static void eval_report_error(struct bfs_eval *state) {
 }
 
 /**
+ * Report an I/O error that occurs during evaluation.
+ */
+static void eval_io_error(const struct bfs_expr *expr, struct bfs_eval *state) {
+	if (expr->path) {
+		eval_error(state, "'%s': %m.\n", expr->path);
+	} else {
+		eval_error(state, "(standard output): %m.\n");
+	}
+
+	// Don't report the error again in bfs_ctx_free()
+	clearerr(expr->cfile->file);
+}
+
+/**
  * Perform a bfs_stat() call if necessary.
  */
 static const struct bfs_stat *eval_stat(struct bfs_eval *state) {
@@ -732,7 +746,7 @@ done:
 	return true;
 
 error:
-	eval_report_error(state);
+	eval_io_error(expr, state);
 	return true;
 }
 
@@ -741,7 +755,7 @@ error:
  */
 bool eval_fprint(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (cfprintf(expr->cfile, "%pP\n", state->ftwbuf) < 0) {
-		eval_report_error(state);
+		eval_io_error(expr, state);
 	}
 	return true;
 }
@@ -753,7 +767,7 @@ bool eval_fprint0(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const char *path = state->ftwbuf->path;
 	size_t length = strlen(path) + 1;
 	if (fwrite(path, 1, length, expr->cfile->file) != length) {
-		eval_report_error(state);
+		eval_io_error(expr, state);
 	}
 	return true;
 }
@@ -763,7 +777,7 @@ bool eval_fprint0(const struct bfs_expr *expr, struct bfs_eval *state) {
  */
 bool eval_fprintf(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (bfs_printf(expr->cfile, expr->printf, state->ftwbuf) != 0) {
-		eval_report_error(state);
+		eval_io_error(expr, state);
 	}
 
 	return true;
@@ -803,7 +817,7 @@ bool eval_fprintx(const struct bfs_expr *expr, struct bfs_eval *state) {
 	return true;
 
 error:
-	eval_report_error(state);
+	eval_io_error(expr, state);
 	return true;
 }
 

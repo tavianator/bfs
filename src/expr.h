@@ -162,6 +162,8 @@ struct bfs_expr {
 		struct {
 			/** The output stream. */
 			CFILE *cfile;
+			/** Optional file path. */
+			const char *path;
 			/** Optional -printf format. */
 			struct bfs_printf *printf;
 		};

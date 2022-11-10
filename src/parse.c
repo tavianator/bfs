@@ -481,6 +481,7 @@ static void init_print_expr(struct parser_state *state, struct bfs_expr *expr) {
 	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
 	expr->cfile = state->ctx->cout;
+	expr->path = NULL;
 }
 
 /**
@@ -512,6 +513,7 @@ static int expr_open(struct parser_state *state, struct bfs_expr *expr, const ch
 	}
 
 	expr->cfile = dedup;
+	expr->path = path;
 	return 0;
 
 fail:

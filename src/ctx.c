@@ -139,6 +139,8 @@ struct bfs_ctx_file {
 	CFILE *cfile;
 	/** The path to the file (for diagnostics). */
 	const char *path;
+	/** Remembers I/O errors, to propagate them to the exit status. */
+	int error;
 };
 
 CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
@@ -169,6 +171,7 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 
 	ctx_file->cfile = cfile;
 	ctx_file->path = path;
+	ctx_file->error = 0;
 
 	if (cfile != ctx->cout && cfile != ctx->cerr) {
 		++ctx->nfiles;
@@ -182,10 +185,24 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 	// - the user sees everything relevant before an -ok[dir] prompt
 	// - output from commands is interleaved consistently with bfs
 	// - executed commands can rely on I/O from other bfs actions
-	//
-	// We do not check errors here, but they will be caught at cleanup time
-	// with ferror().
-	fflush(NULL);
+	TRIE_FOR_EACH(&ctx->files, leaf) {
+		struct bfs_ctx_file *ctx_file = leaf->value;
+		CFILE *cfile = ctx_file->cfile;
+		if (fflush(cfile->file) == 0) {
+			continue;
+		}
+
+		ctx_file->error = errno;
+		clearerr(cfile->file);
+
+		const char *path = ctx_file->path;
+		if (path) {
+			bfs_error(ctx, "'%s': %m.\n", path);
+		} else if (cfile == ctx->cout) {
+			bfs_error(ctx, "(standard output): %m.\n");
+		}
+
+	}
 
 	// Flush the user/group caches, in case the executed command edits the
 	// user/group tables
@@ -258,6 +275,11 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		TRIE_FOR_EACH(&ctx->files, leaf) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
 
+			if (ctx_file->error) {
+				// An error was previously reported during bfs_ctx_flush()
+				ret = -1;
+			}
+
 			if (bfs_ctx_fclose(ctx, ctx_file) != 0) {
 				if (cerr) {
 					bfs_error(ctx, "'%s': %m.\n", ctx_file->path);
@@ -271,7 +293,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		if (cout && bfs_ctx_fflush(cout) != 0) {
 			if (cerr) {
-				bfs_error(ctx, "standard output: %m.\n");
+				bfs_error(ctx, "(standard output): %m.\n");
 			}
 			ret = -1;
 		}
