@@ -21,7 +21,6 @@ $ bfs
 ./docs/HACKING.md
 ./docs/USAGE.md
 ./docs/bfs.1
-./src/bfs.h
 ...
 ```
 
@@ -88,7 +87,6 @@ $ bfs -name '*.md' -or -name 'bfs.*'
 ./docs/HACKING.md
 ./docs/USAGE.md
 ./docs/bfs.1
-./src/bfs.h
 ```
 
 and `-not`:
