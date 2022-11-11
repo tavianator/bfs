@@ -272,7 +272,7 @@ check-trie check-xtimegm: check-%: $(BIN)/tests/%
 distcheck:
 	+$(MAKE) -B asan ubsan check $(DISTCHECK_FLAGS)
 ifneq ($(OS),Darwin)
-	+$(MAKE) -B msan check CC=clang $(DISTCHECK_FLAGS)
+	+$(MAKE) -B msan ubsan check CC=clang $(DISTCHECK_FLAGS)
 endif
 ifeq ($(OS) $(ARCH),Linux x86_64)
 	+$(MAKE) -B check EXTRA_CFLAGS="-m32" ONIG_CONFIG= $(DISTCHECK_FLAGS)
