@@ -20,7 +20,7 @@
 #include <string.h>
 
 // Assume QWERTY layout for now
-static const int key_coords[UCHAR_MAX][3] = {
+static const int key_coords[UCHAR_MAX + 1][3] = {
 	['`']  = { 0,  0, 0},
 	['~']  = { 0,  0, 1},
 	['1']  = { 3,  0, 0},
