@@ -173,7 +173,7 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 			goto fail;
 		} else if (strcmp(arg, ";") == 0) {
 			break;
-		} else if (strcmp(arg, "+") == 0) {
+		} else if (execbuf->tmpl_argc > 0 && strcmp(arg, "+") == 0) {
 			const char *prev = execbuf->tmpl_argv[execbuf->tmpl_argc - 1];
 			if (!(execbuf->flags & BFS_EXEC_CONFIRM) && strcmp(prev, "{}") == 0) {
 				execbuf->flags |= BFS_EXEC_MULTI;
