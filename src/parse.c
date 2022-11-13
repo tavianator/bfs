@@ -2027,7 +2027,8 @@ static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int
  * Parse -noleaf.
  */
 static struct bfs_expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
-	parse_warning(state, "${ex}bfs${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n", state->argv[0]);
+	parse_warning(state, "${ex}%s${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n",
+	              BFS_COMMAND, state->argv[0]);
 	return parse_nullary_option(state);
 }
 
@@ -2924,9 +2925,10 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
 	cfprintf(cout, "Usage: ${ex}%s${rs} [${cyn}flags${rs}...] [${mag}paths${rs}...] [${blu}expression${rs}...]\n\n",
 		 state->command);
 
-	cfprintf(cout, "${ex}bfs${rs} is compatible with ${ex}find${rs}, with some extensions. "
+	cfprintf(cout, "${ex}%s${rs} is compatible with ${ex}find${rs}, with some extensions. "
 		       "${cyn}Flags${rs} (${cyn}-H${rs}/${cyn}-L${rs}/${cyn}-P${rs} etc.), ${mag}paths${rs},\n"
-		       "and ${blu}expressions${rs} may be freely mixed in any order.\n\n");
+		       "and ${blu}expressions${rs} may be freely mixed in any order.\n\n",
+		 BFS_COMMAND);
 
 	cfprintf(cout, "${bld}Flags:${rs}\n\n");
 
@@ -2995,7 +2997,8 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
 	cfprintf(cout, "      Follow all symbolic links (same as ${cyn}-L${rs})\n");
 	cfprintf(cout, "  ${blu}-ignore_readdir_race${rs}\n");
 	cfprintf(cout, "  ${blu}-noignore_readdir_race${rs}\n");
-	cfprintf(cout, "      Whether to report an error if ${ex}bfs${rs} detects that the file tree is modified\n");
+	cfprintf(cout, "      Whether to report an error if ${ex}%s${rs} detects that the file tree is modified\n",
+	         BFS_COMMAND);
 	cfprintf(cout, "      during the search (default: ${blu}-noignore_readdir_race${rs})\n");
 	cfprintf(cout, "  ${blu}-maxdepth${rs} ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
@@ -3177,7 +3180,7 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
  * "Parse" -version.
  */
 static struct bfs_expr *parse_version(struct parser_state *state, int arg1, int arg2) {
-	cfprintf(state->ctx->cout, "${ex}bfs${rs} ${bld}%s${rs}\n\n", BFS_VERSION);
+	cfprintf(state->ctx->cout, "${ex}%s${rs} ${bld}%s${rs}\n\n", BFS_COMMAND, BFS_VERSION);
 
 	printf("%s\n", BFS_HOMEPAGE);
 
