@@ -195,18 +195,18 @@ CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
 # Custom test flags for distcheck
 DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
 
-bfs: $(BIN)/bfs
+bfs: $(BIN)/find2fd
 .PHONY: bfs
 
 all: \
-    $(BIN)/bfs \
+    $(BIN)/find2fd \
     $(BIN)/tests/mksock \
     $(BIN)/tests/trie \
     $(BIN)/tests/xtimegm \
     $(BIN)/tests/xtouch
 .PHONY: all
 
-$(BIN)/bfs: \
+$(BIN)/find2fd: \
     $(OBJ)/src/bar.o \
     $(OBJ)/src/bfstd.o \
     $(OBJ)/src/bftw.o \

@@ -253,7 +253,7 @@ XTOUCH="$BIN/tests/xtouch"
 
 # Try to resolve the path to $BFS before we cd, while also supporting
 # --bfs="./bin/bfs -S ids"
-read -a BFS <<<"${BFS:-$BIN/bfs}"
+read -a BFS <<<"${BFS:-$BIN/find2fd}"
 BFS[0]=$(_realpath "$(command -v "${BFS[0]}")")
 
 # The temporary directory that will hold our test data
@@ -480,6 +480,7 @@ function bfs_verbose() {
 }
 
 function invoke_bfs() {
+    skip
     bfs_verbose "$@"
     "${BFS[@]}" "$@"
 }
@@ -526,15 +527,19 @@ function diff_output() {
     fi
 }
 
-function bfs_diff() (
+function bfs_diff() {
     bfs_verbose "$@"
 
-    # Close the dup()'d stdout to make sure we have enough fd's for the process
-    # substitution, even with low ulimit -n
-    exec 3>&-
+    FD=$("${BFS[@]}" "$@")
+    if [ "$?" -ne 0 ]; then
+        skip
+    fi
 
-    "${BFS[@]}" "$@" | sort >"$OUT"
+    eval "$FD" | sed 's|/$||' | sort >"$OUT"
     local STATUS="${PIPESTATUS[0]}"
+    if [ "$STATUS" -ne 0 ]; then
+        skip
+    fi
 
     diff_output || return $EX_DIFF
 
@@ -543,7 +548,7 @@ function bfs_diff() (
     else
         return $EX_BFS
     fi
-)
+}
 
 function skip() {
     exit $EX_SKIP

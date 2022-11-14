@@ -54,14 +54,21 @@
 
 #include "bfstd.h"
 #include "ctx.h"
+#include "darray.h"
+#include "diag.h"
+#include "dstring.h"
 #include "eval.h"
+#include "exec.h"
+#include "expr.h"
 #include "parse.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 /**
@@ -113,6 +120,32 @@ static int open_std_streams(void) {
 	return 0;
 }
 
+static int find2fd_flatten(struct bfs_expr ***chain, struct bfs_expr *expr) {
+	if (!expr) {
+		return 0;
+	} else if (expr->eval_fn == eval_and) {
+		if (find2fd_flatten(chain, expr->lhs) != 0) {
+			return -1;
+		}
+		return find2fd_flatten(chain, expr->rhs);
+	} else {
+		return DARRAY_PUSH(chain, &expr);
+	}
+}
+
+static void shellesc(char **cmdline, const char *str) {
+	// https://stackoverflow.com/a/3669819/502399
+	dstrcat(cmdline, " '");
+	for (const char *c = str; *c; ++c) {
+		if (*c == '\'') {
+			dstrcat(cmdline, "'\\''");
+		} else {
+			dstrapp(cmdline, *c);
+		}
+	}
+	dstrcat(cmdline, "'");
+}
+
 /**
  * bfs entry point.
  */
@@ -130,11 +163,212 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	int ret = bfs_eval(ctx);
-
-	if (bfs_ctx_free(ctx) != 0 && ret == EXIT_SUCCESS) {
-		ret = EXIT_FAILURE;
+	bool hidden = true;
+	if (ctx->exclude != &bfs_false) {
+		if (ctx->exclude->eval_fn == eval_hidden) {
+			hidden = false;
+		} else {
+			bfs_expr_error(ctx, ctx->exclude);
+			bfs_error(ctx, "${ex}fd${rs} does not support ${red}-exclude${rs}.\n");
+			return EXIT_FAILURE;
+		}
 	}
 
-	return ret;
+	struct bfs_expr **exprs = NULL;
+	if (find2fd_flatten(&exprs, ctx->expr) != 0) {
+		return EXIT_FAILURE;
+	}
+
+	struct bfs_expr *pattern = NULL;
+	struct bfs_expr *type = NULL;
+	struct bfs_expr *executable = NULL;
+	struct bfs_expr *empty = NULL;
+	struct bfs_expr *action = NULL;
+	for (size_t i = 0; i < darray_length(exprs); ++i) {
+		struct bfs_expr *expr = exprs[i];
+		struct bfs_expr **target = NULL;
+		if (expr->eval_fn == eval_name
+		    || expr->eval_fn == eval_path
+		    || expr->eval_fn == eval_regex) {
+			target = &pattern;
+		} else if (expr->eval_fn == eval_type) {
+			target = &type;
+		} else if (expr->eval_fn == eval_access && expr->num == X_OK) {
+			target = &executable;
+		} else if (expr->eval_fn == eval_empty) {
+			target = &empty;
+		} else if ((expr->eval_fn == eval_fprint
+			    || expr->eval_fn == eval_fprint0
+			    || expr->eval_fn == eval_fls)
+			   && expr->cfile == ctx->cout) {
+			target = &action;
+		} else if (expr->eval_fn == eval_exec
+			   && !(expr->exec->flags & (BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR))) {
+			target = &action;
+		}
+
+		if (!target) {
+			bfs_expr_error(ctx, expr);
+			if (bfs_expr_has_children(expr)) {
+				bfs_error(ctx, "Too complicated to convert to ${ex}fd${rs}.\n");
+			} else {
+				bfs_error(ctx, "No equivalent ${ex}fd${rs} option.\n");
+			}
+			return EXIT_FAILURE;
+		}
+
+		if (*target) {
+			bfs_expr_error(ctx, *target);
+			bfs_expr_error(ctx, expr);
+			bfs_error(ctx, "${ex}fd${rs} doesn't support both of these at once.\n");
+			return EXIT_FAILURE;
+		}
+
+		if (action && target != &action) {
+			bfs_expr_error(ctx, expr);
+			bfs_error(ctx, "${ex}fd${rs} doesn't support this ...\n");
+			bfs_expr_error(ctx, *target);
+			bfs_error(ctx, "... after this.\n");
+			return EXIT_FAILURE;
+		}
+
+		*target = expr;
+	}
+
+	if (!action) {
+		bfs_expr_error(ctx, ctx->expr);
+		bfs_error(ctx, "Missing action.\n");
+		return EXIT_FAILURE;
+	}
+
+	char *cmdline = dstralloc(0);
+
+	dstrcat(&cmdline, "fd --no-ignore");
+
+	if (hidden) {
+		dstrcat(&cmdline, " --hidden");
+	}
+
+	if (ctx->flags & BFTW_POST_ORDER) {
+		bfs_error(ctx, "${ex}fd${rs} doesn't support ${blu}-depth${rs}.\n");
+		return EXIT_FAILURE;
+	}
+	if (ctx->flags & BFTW_SORT) {
+		bfs_error(ctx, "${ex}fd${rs} doesn't support ${cyn}-s${rs}.\n");
+		return EXIT_FAILURE;
+	}
+	if (ctx->flags & BFTW_FOLLOW_ALL) {
+		dstrcat(&cmdline, " --follow");
+	}
+	if (ctx->flags & (BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) {
+		dstrcat(&cmdline, " --one-file-system");
+	}
+
+	if (ctx->mindepth == ctx->maxdepth) {
+		dstrcatf(&cmdline, " --exact-depth %d", ctx->mindepth);
+	} else {
+		if (ctx->mindepth > 0) {
+			dstrcatf(&cmdline, " --min-depth %d", ctx->mindepth);
+		}
+		if (ctx->maxdepth < INT_MAX) {
+			dstrcatf(&cmdline, " --max-depth %d", ctx->mindepth);
+		}
+	}
+
+	if (type) {
+		unsigned int types = type->num;
+		if (types & (1 << BFS_REG)) {
+			dstrcat(&cmdline, " --type file");
+			types ^= (1 << BFS_REG);
+		}
+		if (types & (1 << BFS_DIR)) {
+			dstrcat(&cmdline, " --type directory");
+			types ^= (1 << BFS_DIR);
+		}
+		if (types & (1 << BFS_LNK)) {
+			dstrcat(&cmdline, " --type symlink");
+			types ^= (1 << BFS_LNK);
+		}
+		if (types & (1 << BFS_SOCK)) {
+			dstrcat(&cmdline, " --type socket");
+			types ^= (1 << BFS_SOCK);
+		}
+		if (types & (1 << BFS_FIFO)) {
+			dstrcat(&cmdline, " --type pipe");
+			types ^= (1 << BFS_FIFO);
+		}
+		if (types) {
+			bfs_expr_error(ctx, type);
+			bfs_error(ctx, "${ex}fd${rs} doesn't support this type.\n");
+			return EXIT_FAILURE;
+		}
+	}
+
+	if (executable) {
+		dstrcat(&cmdline, " --type executable");
+	}
+
+	if (empty) {
+		dstrcat(&cmdline, " --type empty");
+	}
+
+	if (action->eval_fn == eval_fprint0) {
+		dstrcat(&cmdline, " --print0");
+	} else if (action->eval_fn == eval_fls) {
+		dstrcat(&cmdline, " --list-details");
+	}
+
+	if (pattern) {
+		if (pattern->eval_fn != eval_name) {
+			dstrcat(&cmdline, " --full-path");
+		}
+		if (pattern->eval_fn != eval_regex) {
+			dstrcat(&cmdline, " --glob");
+		}
+		if (pattern->argv[0][1] == 'i') {
+			dstrcat(&cmdline, " --ignore-case");
+		} else {
+			dstrcat(&cmdline, " --case-sensitive");
+		}
+		shellesc(&cmdline, pattern->argv[1]);
+	}
+
+	for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+		const char *path = ctx->paths[i];
+		if (!pattern || path[0] == '-') {
+			dstrcat(&cmdline, " --search-path");
+		}
+		shellesc(&cmdline, path);
+	}
+
+	if (action->eval_fn == eval_exec) {
+		struct bfs_exec *execbuf = action->exec;
+
+		dstrcat(&cmdline, " --exec");
+		if (execbuf->flags & BFS_EXEC_MULTI) {
+			dstrcat(&cmdline, "-batch");
+		}
+
+		bool placeholder = false;
+		for (size_t i = 0; i < execbuf->tmpl_argc; ++i) {
+			const char *arg = execbuf->tmpl_argv[i];
+			if (strstr(arg, "{}")) {
+				placeholder = true;
+				if (i == execbuf->tmpl_argc - 1 && strcmp(arg, "{}") == 0) {
+					// fd adds it automatically
+					break;
+				}
+			}
+			shellesc(&cmdline, arg);
+		}
+
+		if (!placeholder) {
+			bfs_expr_error(ctx, action);
+			bfs_error(ctx, "${ex}fd${rs} doesn't support ${blu}%s${rs} without a placeholder.\n", action->argv[0]);
+			return EXIT_FAILURE;
+		}
+	}
+
+	printf("%s\n", cmdline);
+	return EXIT_SUCCESS;
 }
