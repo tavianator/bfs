@@ -269,7 +269,7 @@ Here's how to install them on some common platforms:
 # apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev libonig-dev
 
 <strong>Fedora</strong>
-# dnf install libacl-devel libattr-devel libcap-devel oniguruma-devel
+# dnf install acl libacl-devel libattr-devel libcap-devel oniguruma-devel
 
 <strong>NixOS</strong>
 # nix-env -i acl attr libcap oniguruma
