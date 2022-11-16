@@ -103,14 +103,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if __has_attribute(target_clones) && (__i386__ || __x86_64__)
+#if CHAR_BIT != 8
+#	error "This trie implementation assumes 8-bit bytes."
+#endif
+
+#if __GLIBC__ && __has_attribute(target_clones) && (__i386__ || __x86_64__)
 #	define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
 #else
 #	define TARGET_CLONES_POPCNT
-#endif
-
-#if CHAR_BIT != 8
-#	error "This trie implementation assumes 8-bit bytes."
 #endif
 
 /** Number of bits for the sparse array bitmap, aka the range of a nibble. */
