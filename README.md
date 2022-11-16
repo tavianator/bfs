@@ -71,34 +71,44 @@ haystack
 </pre>
 
 `find` will explore the entire `deep` directory tree before it ever gets to the `shallow` one that contains what you're looking for.
-
-<pre>
-$ <strong>find</strong> haystack
-haystack
-haystack/deep
-haystack/deep/1
-haystack/deep/1/2
-haystack/deep/1/2/3
-haystack/deep/1/2/3/4
-...
-haystack/shallow
-<strong>haystack/shallow/needle</strong>
-</pre>
-
 On the other hand, `bfs` lists files from shallowest to deepest, so you never have to wait for it to explore an entire unrelated subtree.
 
-<pre>
-$ <strong>bfs</strong> haystack
+<table>
+<tbody>
+<tr><th><code>bfs</code></th><th><code>find</code></th></tr>
+<tr>
+<td width="506" valign="top">
+
+```console
+$ find haystack
 haystack
 haystack/deep
-haystack/shallow
 haystack/deep/1
-<strong>haystack/shallow/needle</strong>
 haystack/deep/1/2
 haystack/deep/1/2/3
 haystack/deep/1/2/3/4
 ...
-</pre>
+haystack/shallow
+haystack/shallow/needle
+```
+
+</td>
+<td width="506" valign="top">
+
+```console
+$ bfs haystack
+haystack
+haystack/deep
+haystack/shallow
+haystack/deep/1
+haystack/shallow/needle
+...
+```
+
+</td>
+</tr>
+</tbody>
+</table>
 </details>
 
 <details>
@@ -154,21 +164,22 @@ haystack/needle
 
 For example, `bfs` will detect and suggest corrections for typos:
 
-<pre>
+```console
 $ bfs -nam needle
-<strong>bfs: error:</strong> bfs <strong>-nam</strong> needle
-<strong>bfs: error:</strong>     <strong>~~~~</strong>
-<strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
-</pre>
+bfs: error: bfs -nam needle
+bfs: error:     ~~~~
+bfs: error: Unknown argument; did you mean -name?
+```
 
 `bfs` also includes a powerful static analysis to help catch mistakes:
 
-<pre>
+```console
 $ bfs -print -name 'needle'
-<strong>bfs: warning:</strong> bfs -print <strong>-name needle</strong>
-<strong>bfs: warning:</strong>            <strong>~~~~~~~~~~~~</strong>
-<strong>bfs: warning:</strong> The result of this expression is ignored.
-</pre>
+bfs: warning: bfs -print -name needle
+bfs: warning:            ~~~~~~~~~~~~
+bfs: warning: The result of this expression is ignored.
+```
+
 </details>
 
 <details>
