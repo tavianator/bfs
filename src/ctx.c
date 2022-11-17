@@ -23,6 +23,7 @@
 #include "pwcache.h"
 #include "stat.h"
 #include "trie.h"
+#include "xtime.h"
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -106,6 +107,10 @@ struct bfs_ctx *bfs_ctx_new(void) {
 
 	ctx->groups = bfs_groups_new();
 	if (!ctx->groups) {
+		goto fail;
+	}
+
+	if (xgettime(&ctx->now) != 0) {
 		goto fail;
 	}
 

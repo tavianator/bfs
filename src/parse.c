@@ -284,7 +284,7 @@ struct parser_state {
 	/** An "-ok"-type expression, if any. */
 	const struct bfs_expr *ok_expr;
 
-	/** The current time. */
+	/** The current time (maybe modified by -daystart). */
 	struct timespec now;
 };
 
@@ -1527,7 +1527,6 @@ static struct bfs_expr *parse_fls(struct parser_state *state, int arg1, int arg2
 
 	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
-	expr->reftime = state->now;
 	return expr;
 
 fail:
@@ -1772,7 +1771,6 @@ static struct bfs_expr *parse_ls(struct parser_state *state, int arg1, int arg2)
 	}
 
 	init_print_expr(state, expr);
-	expr->reftime = state->now;
 	return expr;
 }
 
@@ -3892,16 +3890,12 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.files0_arg = NULL,
 		.files0_stdin_arg = NULL,
 		.ok_expr = NULL,
+		.now = ctx->now,
 	};
 
 	if (strcmp(xbasename(state.command), "find") == 0) {
 		// Operate depth-first when invoked as "find"
 		ctx->strategy = BFTW_DFS;
-	}
-
-	if (xgettime(&state.now) != 0) {
-		parse_perror(&state, "xgettime()");
-		goto fail;
 	}
 
 	ctx->exclude = &bfs_false;

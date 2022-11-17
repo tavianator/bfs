@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/resource.h>
+#include <time.h>
 
 /**
  * Various debugging flags.
@@ -127,6 +128,9 @@ struct bfs_ctx {
 	rlim_t nofile_soft;
 	/** The initial RLIMIT_NOFILE hard limit. */
 	rlim_t nofile_hard;
+
+	/** The current time. */
+	struct timespec now;
 };
 
 /**
