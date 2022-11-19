@@ -22,11 +22,11 @@ umask 022
 export LC_ALL=C
 export TZ=UTC0
 
-export ASAN_OPTIONS="abort_on_error=1"
-export LSAN_OPTIONS="abort_on_error=1"
-export MSAN_OPTIONS="abort_on_error=1"
-export TSAN_OPTIONS="abort_on_error=1"
-export UBSAN_OPTIONS="abort_on_error=1"
+export ASAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
+export LSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
+export MSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
+export TSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
+export UBSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
 
 export LS_COLORS=""
 unset BFS_COLORS
@@ -52,6 +52,17 @@ else
 fi
 
 UNAME=$(uname)
+
+if [ "$UNAME" = Darwin ]; then
+    # ASan on macOS likes to report
+    #
+    #     malloc: nano zone abandoned due to inability to preallocate reserved vm space.
+    #
+    # to syslog, which as a side effect opens a socket which might take the
+    # place of one of the standard streams if the process is launched with it
+    # closed.  This environment variable avoids the message.
+    export MallocNanoZone=0
+fi
 
 if command -v capsh &>/dev/null; then
     if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
