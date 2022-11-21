@@ -107,7 +107,7 @@
 #	error "This trie implementation assumes 8-bit bytes."
 #endif
 
-#if __GLIBC__ && __has_attribute(target_clones) && (__i386__ || __x86_64__)
+#if BFS_TARGET_CLONES && (__i386__ || __x86_64__)
 #	define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
 #else
 #	define TARGET_CLONES_POPCNT
