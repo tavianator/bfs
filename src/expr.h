@@ -110,8 +110,6 @@ struct bfs_expr {
 	bool always_true;
 	/** Whether this expression always evaluates to false. */
 	bool always_false;
-	/** Whether this expression doesn't appear on the command line. */
-	bool synthetic;
 
 	/** Estimated cost. */
 	float cost;

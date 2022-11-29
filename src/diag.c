@@ -114,12 +114,14 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 
 	bool ret = false;
 
-	if (!expr->synthetic) {
-		size_t i = expr->argv - ctx->argv;
-		for (size_t j = 0; j < expr->argc; ++j) {
-			assert(i + j < ctx->argc);
-			args[i + j] = true;
-			ret = true;
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		if (&ctx->argv[i] == expr->argv) {
+			for (size_t j = 0; j < expr->argc; ++j) {
+				assert(i + j < ctx->argc);
+				args[i + j] = true;
+				ret = true;
+			}
+			break;
 		}
 	}
 

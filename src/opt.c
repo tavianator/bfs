@@ -366,10 +366,6 @@ static struct bfs_expr *negate_expr(struct bfs_expr *rhs, char **argv) {
 		return NULL;
 	}
 
-	if (argv == &fake_not_arg) {
-		expr->synthetic = true;
-	}
-
 	expr->lhs = NULL;
 	expr->rhs = rhs;
 	return expr;
@@ -404,7 +400,6 @@ static struct bfs_expr *de_morgan(const struct opt_state *state, struct bfs_expr
 		expr->eval_fn = eval_and;
 		expr->argv = &fake_and_arg;
 	}
-	expr->synthetic = true;
 
 	expr->lhs = negate_expr(expr->lhs, argv);
 	expr->rhs = negate_expr(expr->rhs, argv);
