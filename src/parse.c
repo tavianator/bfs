@@ -3682,6 +3682,49 @@ fail:
 	return NULL;
 }
 
+static const char *bftw_strategy_name(enum bftw_strategy strategy) {
+	switch (strategy) {
+	case BFTW_BFS:
+		return "bfs";
+	case BFTW_DFS:
+		return "dfs";
+	case BFTW_IDS:
+		return "ids";
+	case BFTW_EDS:
+		return "eds";
+	}
+
+	assert(!"Invalid strategy");
+	return "???";
+}
+
+static void dump_expr_multiline(const struct bfs_ctx *ctx, enum debug_flags flag, const struct bfs_expr *expr, int indent, int rparens) {
+	bfs_debug_prefix(ctx, flag);
+
+	for (int i = 0; i < indent; ++i) {
+		cfprintf(ctx->cerr, "  ");
+	}
+
+	if (bfs_expr_has_children(expr)) {
+		cfprintf(ctx->cerr, "(${red}%s${rs}\n", expr->argv[0]);
+		if (expr->lhs) {
+			dump_expr_multiline(ctx, flag, expr->lhs, indent + 1, 0);
+		}
+		dump_expr_multiline(ctx, flag, expr->rhs, indent + 1, rparens + 1);
+	} else {
+		if (flag == DEBUG_RATES) {
+			cfprintf(ctx->cerr, "%pE", expr);
+		} else {
+			cfprintf(ctx->cerr, "%pe", expr);
+		}
+
+		for (int i = 0; i < rparens; ++i) {
+			cfprintf(ctx->cerr, ")");
+		}
+		cfprintf(ctx->cerr, "\n");
+	}
+}
+
 void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 	if (!bfs_debug_prefix(ctx, flag)) {
 		return;
@@ -3689,51 +3732,35 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 
 	CFILE *cerr = ctx->cerr;
 
-	cfprintf(cerr, "${ex}%s${rs} ", ctx->argv[0]);
+	cfprintf(cerr, "${ex}%s${rs}", ctx->argv[0]);
 
 	if (ctx->flags & BFTW_FOLLOW_ALL) {
-		cfprintf(cerr, "${cyn}-L${rs} ");
+		cfprintf(cerr, " ${cyn}-L${rs}");
 	} else if (ctx->flags & BFTW_FOLLOW_ROOTS) {
-		cfprintf(cerr, "${cyn}-H${rs} ");
+		cfprintf(cerr, " ${cyn}-H${rs}");
 	} else {
-		cfprintf(cerr, "${cyn}-P${rs} ");
+		cfprintf(cerr, " ${cyn}-P${rs}");
 	}
 
 	if (ctx->xargs_safe) {
-		cfprintf(cerr, "${cyn}-X${rs} ");
+		cfprintf(cerr, " ${cyn}-X${rs}");
 	}
 
 	if (ctx->flags & BFTW_SORT) {
-		cfprintf(cerr, "${cyn}-s${rs} ");
+		cfprintf(cerr, " ${cyn}-s${rs}");
 	}
 
 	if (ctx->optlevel != 3) {
-		cfprintf(cerr, "${cyn}-O${bld}%d${rs} ", ctx->optlevel);
+		cfprintf(cerr, " ${cyn}-O${bld}%d${rs}", ctx->optlevel);
 	}
 
-	const char *strategy = NULL;
-	switch (ctx->strategy) {
-	case BFTW_BFS:
-		strategy = "bfs";
-		break;
-	case BFTW_DFS:
-		strategy = "dfs";
-		break;
-	case BFTW_IDS:
-		strategy = "ids";
-		break;
-	case BFTW_EDS:
-		strategy = "eds";
-		break;
-	}
-	assert(strategy);
-	cfprintf(cerr, "${cyn}-S${rs} ${bld}%s${rs} ", strategy);
+	cfprintf(cerr, " ${cyn}-S${rs} ${bld}%s${rs}", bftw_strategy_name(ctx->strategy));
 
 	enum debug_flags debug = ctx->debug;
 	if (debug == DEBUG_ALL) {
-		cfprintf(cerr, "${cyn}-D${rs} ${bld}all${rs} ");
+		cfprintf(cerr, " ${cyn}-D${rs} ${bld}all${rs}");
 	} else if (debug) {
-		cfprintf(cerr, "${cyn}-D${rs} ");
+		cfprintf(cerr, " ${cyn}-D${rs} ");
 		for (enum debug_flags i = 1; DEBUG_ALL & i; i <<= 1) {
 			if (debug & i) {
 				cfprintf(cerr, "${bld}%s${rs}", debug_flag_name(i));
@@ -3743,61 +3770,55 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 				}
 			}
 		}
-		cfprintf(cerr, " ");
 	}
 
 	for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
 		const char *path = ctx->paths[i];
 		char c = path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
-			cfprintf(cerr, "${cyn}-f${rs} ");
+			cfprintf(cerr, " ${cyn}-f${rs}");
 		}
-		cfprintf(cerr, "${mag}%s${rs} ", path);
+		cfprintf(cerr, " ${mag}%s${rs}", path);
 	}
 
 	if (ctx->cout->colors) {
-		cfprintf(cerr, "${blu}-color${rs} ");
+		cfprintf(cerr, " ${blu}-color${rs}");
 	} else {
-		cfprintf(cerr, "${blu}-nocolor${rs} ");
+		cfprintf(cerr, " ${blu}-nocolor${rs}");
 	}
 	if (ctx->flags & BFTW_POST_ORDER) {
-		cfprintf(cerr, "${blu}-depth${rs} ");
+		cfprintf(cerr, " ${blu}-depth${rs}");
 	}
 	if (ctx->ignore_races) {
-		cfprintf(cerr, "${blu}-ignore_readdir_race${rs} ");
+		cfprintf(cerr, " ${blu}-ignore_readdir_race${rs}");
 	}
 	if (ctx->mindepth != 0) {
-		cfprintf(cerr, "${blu}-mindepth${rs} ${bld}%d${rs} ", ctx->mindepth);
+		cfprintf(cerr, " ${blu}-mindepth${rs} ${bld}%d${rs}", ctx->mindepth);
 	}
 	if (ctx->maxdepth != INT_MAX) {
-		cfprintf(cerr, "${blu}-maxdepth${rs} ${bld}%d${rs} ", ctx->maxdepth);
+		cfprintf(cerr, " ${blu}-maxdepth${rs} ${bld}%d${rs}", ctx->maxdepth);
 	}
 	if (ctx->flags & BFTW_SKIP_MOUNTS) {
-		cfprintf(cerr, "${blu}-mount${rs} ");
+		cfprintf(cerr, " ${blu}-mount${rs}");
 	}
 	if (ctx->status) {
-		cfprintf(cerr, "${blu}-status${rs} ");
+		cfprintf(cerr, " ${blu}-status${rs}");
 	}
 	if (ctx->unique) {
-		cfprintf(cerr, "${blu}-unique${rs} ");
+		cfprintf(cerr, " ${blu}-unique${rs}");
 	}
 	if ((ctx->flags & (BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) == BFTW_PRUNE_MOUNTS) {
-		cfprintf(cerr, "${blu}-xdev${rs} ");
-	}
-
-	if (flag == DEBUG_RATES) {
-		if (ctx->exclude != &bfs_false) {
-			cfprintf(cerr, "(${red}-exclude${rs} %pE) ", ctx->exclude);
-		}
-		cfprintf(cerr, "%pE", ctx->expr);
-	} else {
-		if (ctx->exclude != &bfs_false) {
-			cfprintf(cerr, "(${red}-exclude${rs} %pe) ", ctx->exclude);
-		}
-		cfprintf(cerr, "%pe", ctx->expr);
+		cfprintf(cerr, " ${blu}-xdev${rs}");
 	}
 
 	fputs("\n", stderr);
+
+	if (ctx->exclude != &bfs_false) {
+		bfs_debug(ctx, flag, "(${red}-exclude${rs}\n");
+		dump_expr_multiline(ctx, flag, ctx->exclude, 1, 1);
+	}
+
+	dump_expr_multiline(ctx, flag, ctx->expr, 0, 0);
 }
 
 /**
