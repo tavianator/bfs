@@ -1802,7 +1802,7 @@ static struct bfs_expr *parse_mount(struct parser_state *state, int arg1, int ar
 	bfs_warning(state->ctx, "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n");
 
 	state->ctx->flags |= BFTW_PRUNE_MOUNTS;
-	state->mount_arg = state->argv;
+	state->mount_arg = expr->argv;
 	return expr;
 }
 
