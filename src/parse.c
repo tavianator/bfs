@@ -1016,7 +1016,7 @@ static struct bfs_expr *parse_optlevel(struct parser_state *state, int arg1, int
 	}
 
 	if (*optlevel > 4) {
-		parse_expr_warning(state, expr, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", state->argv[0] + 2);
+		parse_expr_warning(state, expr, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", expr->argv[0] + 2);
 	}
 
 	return expr;
