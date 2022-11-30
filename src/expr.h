@@ -202,11 +202,6 @@ struct bfs_expr {
 	};
 };
 
-/** Singleton true expression instance. */
-extern struct bfs_expr bfs_true;
-/** Singleton false expression instance. */
-extern struct bfs_expr bfs_false;
-
 /**
  * Create a new expression.
  */

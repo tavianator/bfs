@@ -877,6 +877,10 @@ static int cbuff(CFILE *cfile, const char *format, ...);
 
 /** Dump a parsed expression tree, for debugging. */
 static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
+	if (!expr) {
+		return dstrcat(&cfile->buffer, "(null)");
+	}
+
 	if (dstrcat(&cfile->buffer, "(") != 0) {
 		return -1;
 	}
