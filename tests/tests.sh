@@ -138,16 +138,11 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
       This message
 
   ${BLD}TEST${RST}
-      Select individual test cases to run (e.g. ${BLD}posix/basic${RST})
+      Select individual test cases to run (e.g. ${BLD}posix/basic${RST}, ${BLD}"*exec*"${RST}, ...)
 EOF
 }
 
-DEFAULT=yes
-POSIX=
-COMMON=
-BSD=
-GNU=
-ALL=
+PATTERNS=()
 SUDO=
 STOP=
 CLEAN=yes
@@ -156,9 +151,6 @@ VERBOSE_COMMANDS=
 VERBOSE_ERRORS=
 VERBOSE_SKIPPED=
 VERBOSE_TESTS=
-EXPLICIT=
-
-enabled_tests=()
 
 for arg; do
     case "$arg" in
@@ -166,28 +158,16 @@ for arg; do
             BFS="${arg#*=}"
             ;;
         --posix)
-            DEFAULT=
-            POSIX=yes
+            PATTERNS+=("posix/*")
             ;;
         --bsd)
-            DEFAULT=
-            POSIX=yes
-            COMMON=yes
-            BSD=yes
+            PATTERNS+=("posix/*" "common/*" "bsd/*")
             ;;
         --gnu)
-            DEFAULT=
-            POSIX=yes
-            COMMON=yes
-            GNU=yes
+            PATTERNS+=("posix/*" "common/*" "gnu/*")
             ;;
         --all)
-            DEFAULT=
-            POSIX=yes
-            COMMON=yes
-            BSD=yes
-            GNU=yes
-            ALL=yes
+            PATTERNS+=("*")
             ;;
         --sudo)
             SUDO=yes
@@ -224,26 +204,16 @@ for arg; do
             usage
             exit 0
             ;;
-        */*)
-            EXPLICIT=yes
-            SUDO=yes
-            enabled_tests+=("$arg")
-            ;;
-        *)
+        -*)
             printf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
             usage >&2
             exit 1
             ;;
+        *)
+            PATTERNS+=("$arg")
+            ;;
     esac
 done
-
-if [ "$DEFAULT" ]; then
-    POSIX=yes
-    COMMON=yes
-    BSD=yes
-    GNU=yes
-    ALL=yes
-fi
 
 function _realpath() {
     (
@@ -273,14 +243,27 @@ chown "$(id -u):$(id -g)" "$TMP"
 
 cd "$TESTS"
 
-if [ ! "$EXPLICIT" ]; then
-    [ "$POSIX" ] && enabled_tests+=(posix/*.sh)
-    [ "$COMMON" ] && enabled_tests+=(common/*.sh)
-    [ "$BSD" ] && enabled_tests+=(bsd/*.sh)
-    [ "$GNU" ] && enabled_tests+=(gnu/*.sh)
-    [ "$ALL" ] && enabled_tests+=(bfs/*.sh)
+if (( ${#PATTERNS[@]} == 0 )); then
+    PATTERNS=("*")
+fi
 
-    enabled_tests=("${enabled_tests[@]%.sh}")
+TEST_CASES=()
+for TEST in {posix,common,bsd,gnu,bfs}/*.sh; do
+    TEST="${TEST%.sh}"
+    for PATTERN in "${PATTERNS[@]}"; do
+        if [[ $TEST == $PATTERN ]]; then
+            TEST_CASES+=("$TEST")
+            break
+        fi
+    done
+done
+
+if (( ${#TEST_CASES[@]} == 0 )); then
+    printf "${RED}error:${RST} No tests matched" >&2
+    printf " ${BLD}%s${RST}" "${PATTERNS[@]}" >&2
+    printf ".\n\n" >&2
+    usage >&2
+    exit 1
 fi
 
 function clean_scratch() {
@@ -671,7 +654,7 @@ passed=0
 failed=0
 skipped=0
 
-for TEST in "${enabled_tests[@]}"; do
+for TEST in "${TEST_CASES[@]}"; do
     if [[ -t 1 || "$VERBOSE_TESTS" ]]; then
         printf "${BOL}${YLW}%s${RST}${EOL}" "$TEST"
     else
