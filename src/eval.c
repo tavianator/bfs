@@ -387,7 +387,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 			}
 			ret = -1;
 		}
-	} else if (bfs_expr_has_children(expr)) {
+	} else if (bfs_expr_is_parent(expr)) {
 		if (expr->lhs && eval_exec_finish(expr->lhs, ctx) != 0) {
 			ret = -1;
 		}
@@ -1557,7 +1557,7 @@ static bool eval_must_buffer(const struct bfs_expr *expr) {
 		return true;
 	}
 
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		if (expr->lhs && eval_must_buffer(expr->lhs)) {
 			return true;
 		}

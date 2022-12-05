@@ -125,7 +125,7 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 		}
 	}
 
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		ret |= highlight_expr_recursive(ctx, expr->lhs, args);
 		ret |= highlight_expr_recursive(ctx, expr->rhs, args);
 	}

@@ -210,7 +210,7 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval, size_t argc, char **argv);
 /**
  * @return Whether the expression has child expressions.
  */
-bool bfs_expr_has_children(const struct bfs_expr *expr);
+bool bfs_expr_is_parent(const struct bfs_expr *expr);
 
 /**
  * @return Whether expr is known to always quit.

@@ -847,7 +847,7 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		return ret;
 	}
 
-	if (!bfs_expr_has_children(expr) && !expr->pure) {
+	if (!bfs_expr_is_parent(expr) && !expr->pure) {
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
@@ -901,7 +901,7 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		return NULL;
 	}
 
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		struct bfs_expr *lhs = expr->lhs;
 		struct bfs_expr *rhs = expr->rhs;
 		if (rhs) {
@@ -980,7 +980,7 @@ static bool reorder_expr(const struct opt_state *state, struct bfs_expr *expr, f
  *         Whether any subexpression was reordered.
  */
 static bool reorder_expr_recursive(const struct opt_state *state, struct bfs_expr *expr) {
-	if (!bfs_expr_has_children(expr)) {
+	if (!bfs_expr_is_parent(expr)) {
 		return false;
 	}
 

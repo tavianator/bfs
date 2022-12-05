@@ -888,7 +888,7 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 	const struct bfs_expr *lhs = NULL;
 	const struct bfs_expr *rhs = NULL;
 
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		lhs = expr->lhs;
 		rhs = expr->rhs;
 

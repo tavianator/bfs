@@ -109,7 +109,7 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	}
 
 	// Prevent bfs_expr_free() from freeing uninitialized pointers on error paths
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		expr->lhs = NULL;
 		expr->rhs = NULL;
 	} else if (eval_fn == eval_exec) {
@@ -123,7 +123,7 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	return expr;
 }
 
-bool bfs_expr_has_children(const struct bfs_expr *expr) {
+bool bfs_expr_is_parent(const struct bfs_expr *expr) {
 	return expr->eval_fn == eval_and
 		|| expr->eval_fn == eval_or
 		|| expr->eval_fn == eval_not
@@ -140,7 +140,7 @@ void bfs_expr_free(struct bfs_expr *expr) {
 		return;
 	}
 
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		bfs_expr_free(expr->rhs);
 		bfs_expr_free(expr->lhs);
 	} else if (expr->eval_fn == eval_exec) {
@@ -166,7 +166,7 @@ static struct bfs_expr *new_unary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *rh
 
 	expr->lhs = NULL;
 	expr->rhs = rhs;
-	assert(bfs_expr_has_children(expr));
+	assert(bfs_expr_is_parent(expr));
 
 	expr->persistent_fds = rhs->persistent_fds;
 	expr->ephemeral_fds = rhs->ephemeral_fds;
@@ -186,7 +186,7 @@ static struct bfs_expr *new_binary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *l
 
 	expr->lhs = lhs;
 	expr->rhs = rhs;
-	assert(bfs_expr_has_children(expr));
+	assert(bfs_expr_is_parent(expr));
 
 	expr->persistent_fds = lhs->persistent_fds + rhs->persistent_fds;
 	if (lhs->ephemeral_fds > rhs->ephemeral_fds) {
@@ -3722,7 +3722,7 @@ static void dump_expr_multiline(const struct bfs_ctx *ctx, enum debug_flags flag
 		cfprintf(ctx->cerr, "  ");
 	}
 
-	if (bfs_expr_has_children(expr)) {
+	if (bfs_expr_is_parent(expr)) {
 		cfprintf(ctx->cerr, "(${red}%s${rs}\n", expr->argv[0]);
 		if (expr->lhs) {
 			dump_expr_multiline(ctx, flag, expr->lhs, indent + 1, 0);
