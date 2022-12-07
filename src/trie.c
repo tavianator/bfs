@@ -103,9 +103,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if CHAR_BIT != 8
-#	error "This trie implementation assumes 8-bit bytes."
-#endif
+static_assert(CHAR_BIT == 8, "This trie implementation assumes 8-bit bytes.");
 
 #if BFS_TARGET_CLONES && (__i386__ || __x86_64__)
 #	define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
