@@ -17,6 +17,7 @@
 #undef NDEBUG
 
 #include "../src/trie.h"
+#include "../src/config.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +51,7 @@ const char *keys[] = {
 	">>>",
 };
 
-const size_t nkeys = sizeof(keys) / sizeof(keys[0]);
+const size_t nkeys = BFS_COUNTOF(keys);
 
 int main(void) {
 	struct trie trie;
