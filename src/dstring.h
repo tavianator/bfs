@@ -152,6 +152,7 @@ char *dstrprintf(const char *format, ...);
  * @return
  *         The created string, or NULL on failure.
  */
+BFS_FORMATTER(1, 0)
 char *dstrvprintf(const char *format, va_list args);
 
 /**
@@ -181,6 +182,7 @@ int dstrcatf(char **str, const char *format, ...);
  * @return
  *         0 on success, -1 on failure.
  */
+BFS_FORMATTER(2, 0)
 int dstrvcatf(char **str, const char *format, va_list args);
 
 /**

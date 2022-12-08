@@ -115,6 +115,7 @@ int cfprintf(CFILE *cfile, const char *format, ...);
 /**
  * cfprintf() variant that takes a va_list.
  */
+BFS_FORMATTER(2, 0)
 int cvfprintf(CFILE *cfile, const char *format, va_list args);
 
 #endif // BFS_COLOR_H

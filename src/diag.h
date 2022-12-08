@@ -58,16 +58,19 @@ bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *for
 /**
  * bfs_error() variant that takes a va_list.
  */
+BFS_FORMATTER(2, 0)
 void bfs_verror(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_warning() variant that takes a va_list.
  */
+BFS_FORMATTER(2, 0)
 bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_debug() variant that takes a va_list.
  */
+BFS_FORMATTER(3, 0)
 bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, va_list args);
 
 /**

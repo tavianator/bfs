@@ -17,6 +17,7 @@
 #include "color.h"
 #include "bfstd.h"
 #include "bftw.h"
+#include "config.h"
 #include "dir.h"
 #include "dstring.h"
 #include "expr.h"
@@ -944,6 +945,7 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 	return 0;
 }
 
+BFS_FORMATTER(2, 0)
 static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	const struct colors *colors = cfile->colors;
 	int error = errno;
