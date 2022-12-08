@@ -339,7 +339,7 @@ static void opt_warning(const struct opt_state *state, const struct bfs_expr *ex
 	if (bfs_expr_warning(state->ctx, expr)) {
 		va_list args;
 		va_start(args, format);
-		bfs_warning(state->ctx, format, args);
+		bfs_vwarning(state->ctx, format, args);
 		va_end(args);
 	}
 }
