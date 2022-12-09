@@ -2121,9 +2121,9 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 		MODE_EQUALS,
 	} op;
 
-	mode_t who;
-	mode_t file_change;
-	mode_t dir_change;
+	mode_t BFS_UNINIT(who, 0);
+	mode_t BFS_UNINIT(file_change, 0);
+	mode_t BFS_UNINIT(dir_change, 0);
 
 	const char *i = mode;
 	while (true) {

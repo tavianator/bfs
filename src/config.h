@@ -213,4 +213,13 @@
 #	define BFS_UNSUPPRESS()
 #endif
 
+/**
+ * Initialize a variable, unless sanitizers would detect uninitialized uses.
+ */
+#if __has_feature(memory_sanitizer)
+#	define BFS_UNINIT(var, value) var = var
+#else
+#	define BFS_UNINIT(var, value) var = value
+#endif
+
 #endif // BFS_CONFIG_H
