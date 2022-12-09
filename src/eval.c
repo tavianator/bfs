@@ -716,11 +716,13 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 		goto error;
 	}
 	char time_str[256];
-	const char *time_format = "%b %e %H:%M";
+	size_t time_ret;
 	if (time <= six_months_ago || time >= tomorrow) {
-		time_format = "%b %e  %Y";
+		time_ret = strftime(time_str, sizeof(time_str), "%b %e  %Y", &tm);
+	} else {
+		time_ret = strftime(time_str, sizeof(time_str), "%b %e %H:%M", &tm);
 	}
-	if (!strftime(time_str, sizeof(time_str), time_format, &tm)) {
+	if (time_ret == 0) {
 		errno = EOVERFLOW;
 		goto error;
 	}

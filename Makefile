@@ -46,11 +46,12 @@ OBJ := $(BUILDDIR)/obj
 DEFAULT_CFLAGS := \
     -g \
     -Wall \
+    -Wformat=2 \
+    -Wimplicit-fallthrough \
     -Wmissing-declarations \
     -Wshadow \
     -Wsign-compare \
-    -Wstrict-prototypes \
-    -Wimplicit-fallthrough
+    -Wstrict-prototypes
 
 CFLAGS ?= $(DEFAULT_CFLAGS)
 LDFLAGS ?=

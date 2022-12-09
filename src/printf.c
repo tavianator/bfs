@@ -91,6 +91,21 @@ static bool should_color(CFILE *cfile, const struct bfs_printf *directive) {
 	assert(ret >= 0 && (size_t)ret < sizeof(buf));			\
 	(void)ret
 
+/**
+ * Common entry point for fprintf() with a dynamic format string.
+ */
+static int dyn_fprintf(FILE *file, const struct bfs_printf *directive, ...) {
+	va_list args;
+	va_start(args, directive);
+
+	BFS_SUPPRESS("-Wformat-nonliteral");
+	int ret = vfprintf(file, directive->str, args);
+	BFS_UNSUPPRESS();
+
+	va_end(args);
+	return ret;
+}
+
 /** %a, %c, %t: ctime() */
 static int bfs_printf_ctime(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
 	// Not using ctime() itself because GNU find adds nanoseconds
@@ -122,7 +137,7 @@ static int bfs_printf_ctime(CFILE *cfile, const struct bfs_printf *directive, co
 	               (long)ts->tv_nsec,
 	               1900 + tm.tm_year);
 
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %A, %B/%W, %C, %T: strftime() */
@@ -183,14 +198,16 @@ static int bfs_printf_strftime(CFILE *cfile, const struct bfs_printf *directive,
 	// POSIX strftime() features
 	default:
 		format[1] = directive->c;
+		BFS_SUPPRESS("-Wformat-nonliteral");
 		ret = strftime(buf, sizeof(buf), format, &tm);
+		BFS_UNSUPPRESS();
 		break;
 	}
 
 	assert(ret >= 0 && (size_t)ret < sizeof(buf));
 	(void)ret;
 
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %b: blocks */
@@ -202,12 +219,12 @@ static int bfs_printf_b(CFILE *cfile, const struct bfs_printf *directive, const 
 
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 511)/512;
 	BFS_PRINTF_BUF(buf, "%ju", blocks);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %d: depth */
 static int bfs_printf_d(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
-	return fprintf(cfile->file, directive->str, (intmax_t)ftwbuf->depth);
+	return dyn_fprintf(cfile->file, directive, (intmax_t)ftwbuf->depth);
 }
 
 /** %D: device */
@@ -218,7 +235,7 @@ static int bfs_printf_D(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->dev);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %f: file name */
@@ -226,7 +243,7 @@ static int bfs_printf_f(CFILE *cfile, const struct bfs_printf *directive, const 
 	if (should_color(cfile, directive)) {
 		return cfprintf(cfile, "%pF", ftwbuf);
 	} else {
-		return fprintf(cfile->file, directive->str, ftwbuf->path + ftwbuf->nameoff);
+		return dyn_fprintf(cfile->file, directive, ftwbuf->path + ftwbuf->nameoff);
 	}
 }
 
@@ -238,7 +255,7 @@ static int bfs_printf_F(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	const char *type = bfs_fstype(directive->ptr, statbuf);
-	return fprintf(cfile->file, directive->str, type);
+	return dyn_fprintf(cfile->file, directive, type);
 }
 
 /** %G: gid */
@@ -249,7 +266,7 @@ static int bfs_printf_G(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->gid);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %g: group name */
@@ -265,7 +282,7 @@ static int bfs_printf_g(CFILE *cfile, const struct bfs_printf *directive, const 
 		return bfs_printf_G(cfile, directive, ftwbuf);
 	}
 
-	return fprintf(cfile->file, directive->str, grp->gr_name);
+	return dyn_fprintf(cfile->file, directive, grp->gr_name);
 }
 
 /** %h: leading directories */
@@ -294,7 +311,7 @@ static int bfs_printf_h(CFILE *cfile, const struct bfs_printf *directive, const 
 	if (should_color(cfile, directive)) {
 		ret = cfprintf(cfile, "${di}%s${rs}", buf);
 	} else {
-		ret = fprintf(cfile->file, directive->str, buf);
+		ret = dyn_fprintf(cfile->file, directive, buf);
 	}
 
 	free(copy);
@@ -310,7 +327,7 @@ static int bfs_printf_H(CFILE *cfile, const struct bfs_printf *directive, const 
 			return cfprintf(cfile, "${di}%s${rs}", ftwbuf->root);
 		}
 	} else {
-		return fprintf(cfile->file, directive->str, ftwbuf->root);
+		return dyn_fprintf(cfile->file, directive, ftwbuf->root);
 	}
 }
 
@@ -322,7 +339,7 @@ static int bfs_printf_i(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->ino);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %k: 1K blocks */
@@ -334,7 +351,7 @@ static int bfs_printf_k(CFILE *cfile, const struct bfs_printf *directive, const 
 
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 1023)/1024;
 	BFS_PRINTF_BUF(buf, "%ju", blocks);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %l: link target */
@@ -356,7 +373,7 @@ static int bfs_printf_l(CFILE *cfile, const struct bfs_printf *directive, const 
 		}
 	}
 
-	int ret = fprintf(cfile->file, directive->str, target);
+	int ret = dyn_fprintf(cfile->file, directive, target);
 	free(buf);
 	return ret;
 }
@@ -368,7 +385,7 @@ static int bfs_printf_m(CFILE *cfile, const struct bfs_printf *directive, const 
 		return -1;
 	}
 
-	return fprintf(cfile->file, directive->str, (unsigned int)(statbuf->mode & 07777));
+	return dyn_fprintf(cfile->file, directive, (unsigned int)(statbuf->mode & 07777));
 }
 
 /** %M: symbolic mode */
@@ -380,7 +397,7 @@ static int bfs_printf_M(CFILE *cfile, const struct bfs_printf *directive, const 
 
 	char buf[11];
 	xstrmode(statbuf->mode, buf);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %n: link count */
@@ -391,7 +408,7 @@ static int bfs_printf_n(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->nlink);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %p: full path */
@@ -399,7 +416,7 @@ static int bfs_printf_p(CFILE *cfile, const struct bfs_printf *directive, const 
 	if (should_color(cfile, directive)) {
 		return cfprintf(cfile, "%pP", ftwbuf);
 	} else {
-		return fprintf(cfile->file, directive->str, ftwbuf->path);
+		return dyn_fprintf(cfile->file, directive, ftwbuf->path);
 	}
 }
 
@@ -420,7 +437,7 @@ static int bfs_printf_P(CFILE *cfile, const struct bfs_printf *directive, const 
 		copybuf.nameoff -= offset;
 		return cfprintf(cfile, "%pP", &copybuf);
 	} else {
-		return fprintf(cfile->file, directive->str, ftwbuf->path + offset);
+		return dyn_fprintf(cfile->file, directive, ftwbuf->path + offset);
 	}
 }
 
@@ -432,7 +449,7 @@ static int bfs_printf_s(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->size);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %S: sparseness */
@@ -448,7 +465,7 @@ static int bfs_printf_S(CFILE *cfile, const struct bfs_printf *directive, const 
 	} else {
 		sparsity = (double)BFS_STAT_BLKSIZE*statbuf->blocks/statbuf->size;
 	}
-	return fprintf(cfile->file, directive->str, sparsity);
+	return dyn_fprintf(cfile->file, directive, sparsity);
 }
 
 /** %U: uid */
@@ -459,7 +476,7 @@ static int bfs_printf_U(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->uid);
-	return fprintf(cfile->file, directive->str, buf);
+	return dyn_fprintf(cfile->file, directive, buf);
 }
 
 /** %u: user name */
@@ -475,7 +492,7 @@ static int bfs_printf_u(CFILE *cfile, const struct bfs_printf *directive, const 
 		return bfs_printf_U(cfile, directive, ftwbuf);
 	}
 
-	return fprintf(cfile->file, directive->str, pwd->pw_name);
+	return dyn_fprintf(cfile->file, directive, pwd->pw_name);
 }
 
 static const char *bfs_printf_type(enum bfs_type type) {
@@ -504,7 +521,7 @@ static const char *bfs_printf_type(enum bfs_type type) {
 /** %y: type */
 static int bfs_printf_y(CFILE *cfile, const struct bfs_printf *directive, const struct BFTW *ftwbuf) {
 	const char *type = bfs_printf_type(ftwbuf->type);
-	return fprintf(cfile->file, directive->str, type);
+	return dyn_fprintf(cfile->file, directive, type);
 }
 
 /** %Y: target type */
@@ -536,7 +553,7 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_printf *directive, const 
 		}
 	}
 
-	int ret = fprintf(cfile->file, directive->str, type);
+	int ret = dyn_fprintf(cfile->file, directive, type);
 	if (error != 0) {
 		ret = -1;
 		errno = error;
