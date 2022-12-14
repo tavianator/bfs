@@ -630,9 +630,15 @@ BOL='\n'
 EOL='\n'
 
 function update_eol() {
+    # Bash gets $COLUMNS from stderr, so if it's redirected use tput instead
+    local cols="${COLUMNS-}"
+    if [ -z "$cols" ]; then
+        cols=$(tput cols)
+    fi
+
     # Put the cursor at the last column, then write a space so the next
     # character will wrap
-    EOL="\\033[${COLUMNS}G "
+    EOL="\\033[${cols}G "
 }
 
 if [ "$VERBOSE_TESTS" ]; then
