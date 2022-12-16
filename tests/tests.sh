@@ -666,7 +666,7 @@ for TEST in "${TEST_CASES[@]}"; do
     if [ "$VERBOSE_ERRORS" ]; then
         (set -e; . "$TESTS/$TEST.sh")
     else
-        (set -e; . "$TESTS/$TEST.sh") 2>"$TMP/stderr"
+        (set -e; . "$TESTS/$TEST.sh") 2>"$TMP/$TEST.err"
     fi
     status=$?
 
@@ -676,7 +676,7 @@ for TEST in "${TEST_CASES[@]}"; do
         ((++skipped))
     else
         ((++failed))
-        [ "$VERBOSE_ERRORS" ] || cat "$TMP/stderr" >&2
+        [ "$VERBOSE_ERRORS" ] || cat "$TMP/$TEST.err" >&2
         printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
         [ "$STOP" ] && break
     fi
