@@ -543,16 +543,6 @@ function skip() {
     exit $EX_SKIP
 }
 
-function skip_if() {
-    if "$@"; then
-        skip
-    fi
-}
-
-function skip_unless() {
-    skip_if fail "$@"
-}
-
 function closefrom() {
     if [ -d /proc/self/fd ]; then
         local fds=/proc/self/fd

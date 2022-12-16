@@ -1,3 +1,3 @@
 # Regression test: /dev/full should not fail until actually written to
-skip_unless test -e /dev/full
+test -e /dev/full || skip
 invoke_bfs basic -false -fprint /dev/full

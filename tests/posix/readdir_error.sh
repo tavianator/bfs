@@ -1,4 +1,4 @@
-skip_unless test "$UNAME" = "Linux"
+test "$UNAME" = "Linux" || skip
 
 clean_scratch
 mkfifo scratch/{fever,pid,wait,running}
@@ -33,5 +33,5 @@ while [ "$state" != "Z" ]; do
 done
 
 # On Linux, open(/proc/$pid/net) will succeed but readdir() will fail
-skip_unless test -r "/proc/$pid/net"
+test -r "/proc/$pid/net" || skip
 fail invoke_bfs "/proc/$pid/net" >/dev/null

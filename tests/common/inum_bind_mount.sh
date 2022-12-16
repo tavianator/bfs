@@ -1,5 +1,5 @@
-skip_unless test "$SUDO"
-skip_unless test "$UNAME" = "Linux"
+test "$SUDO" || skip
+test "$UNAME" = "Linux" || skip
 
 clean_scratch
 "$XTOUCH" scratch/{foo,bar}

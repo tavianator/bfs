@@ -1,9 +1,9 @@
-skip_unless test "$SUDO"
-skip_unless test "$UNAME" = "Linux"
+test "$SUDO" || skip
+test "$UNAME" = "Linux" || skip
 
 clean_scratch
 
-skip_unless invoke_bfs scratch -quit -capable
+invoke_bfs scratch -quit -capable || skip
 
 "$XTOUCH" scratch/{normal,capable}
 sudo setcap all+ep scratch/capable

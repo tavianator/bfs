@@ -1,3 +1,3 @@
-skip_unless invoke_bfs scratch -quit -xattr
-skip_unless make_xattrs
+invoke_bfs scratch -quit -xattr || skip
+make_xattrs || skip
 bfs_diff -L scratch -xattr

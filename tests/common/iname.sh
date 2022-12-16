@@ -1,2 +1,2 @@
-skip_unless invoke_bfs -quit -iname PATTERN
+invoke_bfs -quit -iname PATTERN || skip
 bfs_diff basic -iname '*F*'

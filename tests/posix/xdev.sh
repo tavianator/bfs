@@ -1,5 +1,5 @@
-skip_unless test "$SUDO"
-skip_if test "$UNAME" = "Darwin"
+test "$SUDO" || skip
+test "$UNAME" = "Darwin" && skip
 
 clean_scratch
 mkdir scratch/{foo,mnt}
