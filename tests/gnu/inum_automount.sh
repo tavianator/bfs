@@ -5,13 +5,11 @@ command -v systemd-mount &>/dev/null || skip
 
 clean_scratch
 mkdir scratch/{foo,automnt}
+
 sudo systemd-mount -A -o bind basic scratch/automnt || skip
+trap "sudo systemd-umount scratch/automnt" EXIT
 
 before=$(inum scratch/automnt)
 bfs_diff scratch -inum "$before" -prune
-ret=$?
 after=$(inum scratch/automnt)
-
-sudo systemd-umount scratch/automnt
-
-((ret == 0 && before == after))
+((before == after))

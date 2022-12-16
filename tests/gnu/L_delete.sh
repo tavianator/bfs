@@ -4,6 +4,6 @@ mkdir scratch/bar
 ln -s ../foo scratch/bar/baz
 
 # Don't try to rmdir() a symlink
-invoke_bfs -L scratch/bar -delete || return 1
+invoke_bfs -L scratch/bar -delete
 
 bfs_diff scratch

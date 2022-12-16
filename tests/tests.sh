@@ -476,14 +476,22 @@ function bfs_verbose() {
 function invoke_bfs() {
     bfs_verbose "$@"
     "${BFS[@]}" "$@"
-    local status=$?
+    local status="$?"
 
     # Allow bfs to fail, but not crash
     if ((status > 125)); then
-        exit $status
+        exit "$status"
     else
-        return $status
+        return "$status"
     fi
+}
+
+function check_exit() {
+    local expected="$1"
+    local actual="0"
+    shift
+    "$@" || actual="$?"
+    ((actual == expected))
 }
 
 # Detect colored diff support
@@ -655,9 +663,9 @@ for TEST in "${TEST_CASES[@]}"; do
     mkdir -p "${OUT%/*}"
 
     if [ "$VERBOSE_ERRORS" ]; then
-        (. "$TESTS/$TEST.sh")
+        (set -e; . "$TESTS/$TEST.sh")
     else
-        (. "$TESTS/$TEST.sh") 2>"$TMP/stderr"
+        (set -e; . "$TESTS/$TEST.sh") 2>"$TMP/stderr"
     fi
     status=$?
 

@@ -29,7 +29,7 @@ kill -9 "$pid"
 # Wait until it's really a zombie
 state=R
 while [ "$state" != "Z" ]; do
-    read -r _ _ state _ <"/proc/$pid/stat" || exit 1
+    read -r _ _ state _ <"/proc/$pid/stat"
 done
 
 # On Linux, open(/proc/$pid/net) will succeed but readdir() will fail

@@ -1,5 +1,4 @@
-stderr=$(invoke_bfs basic -exec "$TESTS/nonexistent" {} + 2>&1 >/dev/null)
-[ -n "$stderr" ] || return 1
+! stderr=$(invoke_bfs basic -exec "$TESTS/nonexistent" {} + 2>&1 >/dev/null)
+[ -n "$stderr" ]
 
-bfs_diff basic -exec "$TESTS/nonexistent" {} + -print
-(($? == EX_BFS))
+check_exit $EX_BFS bfs_diff basic -exec "$TESTS/nonexistent" {} + -print
