@@ -4,4 +4,4 @@ clean_scratch
 chmod a-r scratch/foo
 trap "chmod +r scratch/foo" EXIT
 
-check_exit $EX_BFS bfs_diff scratch -depth
+! bfs_diff scratch -depth

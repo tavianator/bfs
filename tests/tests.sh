@@ -500,8 +500,6 @@ else
     DIFF="diff"
 fi
 
-# Return value when bfs fails
-EX_BFS=10
 # Return value when a difference is detected
 EX_DIFF=20
 # Return value when a test is skipped
@@ -529,15 +527,10 @@ function bfs_diff() (
     exec 3>&-
 
     "${BFS[@]}" "$@" | sort >"$OUT"
-    local STATUS="${PIPESTATUS[0]}"
+    local status="${PIPESTATUS[0]}"
 
-    diff_output || return $EX_DIFF
-
-    if [ "$STATUS" -eq 0 ]; then
-        return 0
-    else
-        return $EX_BFS
-    fi
+    diff_output || exit $EX_DIFF
+    return "$status"
 )
 
 function skip() {
