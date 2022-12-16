@@ -34,4 +34,4 @@ done
 
 # On Linux, open(/proc/$pid/net) will succeed but readdir() will fail
 test -r "/proc/$pid/net" || skip
-fail invoke_bfs "/proc/$pid/net" >/dev/null
+! invoke_bfs "/proc/$pid/net" >/dev/null

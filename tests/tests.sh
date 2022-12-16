@@ -476,19 +476,13 @@ function bfs_verbose() {
 function invoke_bfs() {
     bfs_verbose "$@"
     "${BFS[@]}" "$@"
-}
+    local status=$?
 
-# Expect a command to fail, but not crash
-function fail() {
-    "$@"
-    local STATUS="$?"
-
-    if ((STATUS > 125)); then
-        exit "$STATUS"
-    elif ((STATUS > 0)); then
-        return 0
+    # Allow bfs to fail, but not crash
+    if ((status > 125)); then
+        exit $status
     else
-        return 1
+        return $status
     fi
 }
 

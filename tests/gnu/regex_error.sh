@@ -1,1 +1,1 @@
-fail invoke_bfs basic -regex '['
+! invoke_bfs basic -regex '['

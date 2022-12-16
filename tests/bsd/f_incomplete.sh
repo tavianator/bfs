@@ -1,2 +1,2 @@
-fail invoke_bfs -f
+! invoke_bfs -f
 

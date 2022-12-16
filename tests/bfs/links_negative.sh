@@ -1,1 +1,1 @@
-fail invoke_bfs links -links +-1
+! invoke_bfs links -links +-1

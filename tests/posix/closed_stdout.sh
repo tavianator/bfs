@@ -1,1 +1,1 @@
-fail invoke_bfs basic >&-
+! invoke_bfs basic >&-

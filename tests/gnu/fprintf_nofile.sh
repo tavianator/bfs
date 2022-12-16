@@ -1,1 +1,1 @@
-fail invoke_bfs basic -fprintf
+! invoke_bfs basic -fprintf

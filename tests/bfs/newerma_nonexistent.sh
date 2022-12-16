@@ -1,1 +1,1 @@
-fail invoke_bfs times -newerma basic/nonexistent
+! invoke_bfs times -newerma basic/nonexistent
