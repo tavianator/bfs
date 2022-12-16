@@ -1,7 +1,4 @@
 tree=$(invoke_bfs -D tree 2>&1 -quit)
-
-if [[ "$tree" == *"-S dfs"* ]]; then
-    skip
-fi
+[[ "$tree" == *"-S dfs"* ]] && skip
 
 bfs_diff basic -execdir "$TESTS/sort-args.sh" {} +

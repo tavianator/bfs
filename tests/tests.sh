@@ -191,7 +191,6 @@ for arg; do
             VERBOSE_SKIPPED=yes
             ;;
         --verbose=tests)
-            VERBOSE_SKIPPED=yes
             VERBOSE_TESTS=yes
             ;;
         --verbose)
@@ -542,6 +541,15 @@ function bfs_diff() (
 )
 
 function skip() {
+    if [ "$VERBOSE_SKIPPED" ]; then
+        caller | {
+            read -r line file
+            printf "${BOL}${CYN}%s skipped!${RST} (%s)\n" "$TEST" "$(awk "NR == $line" "$file")"
+        }
+    elif [ "$VERBOSE_TESTS" ]; then
+        printf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
+    fi
+
     exit $EX_SKIP
 }
 
@@ -673,9 +681,6 @@ for TEST in "${TEST_CASES[@]}"; do
         ((++passed))
     elif ((status == EX_SKIP)); then
         ((++skipped))
-        if [ "$VERBOSE_SKIPPED" ]; then
-            printf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
-        fi
     else
         ((++failed))
         [ "$VERBOSE_ERRORS" ] || cat "$TMP/stderr" >&2
