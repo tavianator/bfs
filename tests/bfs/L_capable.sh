@@ -1,4 +1,3 @@
-test "$SUDO" || skip
 test "$UNAME" = "Linux" || skip
 
 clean_scratch
@@ -6,7 +5,7 @@ clean_scratch
 invoke_bfs scratch -quit -capable || skip
 
 "$XTOUCH" scratch/{normal,capable}
-sudo setcap all+ep scratch/capable
+bfs_sudo setcap all+ep scratch/capable || skip
 ln -s capable scratch/link
 
 bfs_diff -L scratch -capable

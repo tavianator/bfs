@@ -101,18 +101,15 @@ fi
 function usage() {
     local pad=$(printf "%*s" ${#0} "")
     cat <<EOF
-Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLU}--sudo${RST}]
-       $pad [${BLU}--stop${RST}] [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
-       $pad [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
+Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
+       $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
+       $pad [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
       Set the path to the bfs executable to test (default: ${MAG}./bin/bfs${RST})
 
-  ${BLU}--posix${RST}, ${BLU}--bsd${RST}, ${BLU}--gnu${RST}, ${BLU}--all${RST}
-      Choose which test cases to run (default: ${BLU}--all${RST})
-
-  ${BLU}--sudo${RST}
-      Run tests that require root
+  ${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]
+      Run tests that require root using ${GRN}sudo${RST} or the given ${BLD}COMMAND${RST}
 
   ${BLU}--stop${RST}
       Stop when the first error occurs
@@ -137,13 +134,16 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--posix
   ${BLU}--help${RST}
       This message
 
+  ${BLU}--posix${RST}, ${BLU}--bsd${RST}, ${BLU}--gnu${RST}, ${BLU}--all${RST}
+      Choose which test cases to run (default: ${BLU}--all${RST})
+
   ${BLD}TEST${RST}
       Select individual test cases to run (e.g. ${BLD}posix/basic${RST}, ${BLD}"*exec*"${RST}, ...)
 EOF
 }
 
 PATTERNS=()
-SUDO=
+SUDO=()
 STOP=
 CLEAN=yes
 UPDATE=
@@ -170,7 +170,10 @@ for arg; do
             PATTERNS+=("*")
             ;;
         --sudo)
-            SUDO=yes
+            SUDO=(sudo)
+            ;;
+        --sudo=*)
+            read -a SUDO <<<"${arg#*=}"
             ;;
         --stop)
             STOP=yes
@@ -265,10 +268,18 @@ if (( ${#TEST_CASES[@]} == 0 )); then
     exit 1
 fi
 
+function bfs_sudo() {
+    if ((${#SUDO[@]})); then
+        "${SUDO[@]}" "$@"
+    else
+        return 1
+    fi
+}
+
 function clean_scratch() {
     if [ -e "$TMP/scratch" ]; then
         # Try to unmount anything left behind
-        if [ "$SUDO" ] && command -v mountpoint &>/dev/null; then
+        if ((${#SUDO[@]})) && command -v mountpoint &>/dev/null; then
             for path in "$TMP"/scratch/*; do
                 if mountpoint -q "$path"; then
                     sudo umount "$path"
@@ -608,10 +619,9 @@ function make_xattrs() {
         *)
             # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
             # namespace, which is writable by root and readable by others
-            [ "$SUDO" ] \
-                && sudo setfattr -n security.bfs_test scratch/xattr \
-                && sudo setfattr -n security.bfs_test_2 scratch/xattr_2 \
-                && sudo setfattr -h -n security.bfs_test scratch/xattr_link
+            bfs_sudo setfattr -n security.bfs_test scratch/xattr \
+                && bfs_sudo setfattr -n security.bfs_test_2 scratch/xattr_2 \
+                && bfs_sudo setfattr -h -n security.bfs_test scratch/xattr_link
             ;;
     esac
 }
