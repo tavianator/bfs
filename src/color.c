@@ -809,7 +809,7 @@ static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW 
 	if (path == ftwbuf->path) {
 		nameoff = ftwbuf->nameoff;
 	} else {
-		nameoff = xbasename(path) - path;
+		nameoff = xbaseoff(path);
 	}
 
 	if (print_dirs_colored(cfile, path, ftwbuf, flags, nameoff) != 0) {

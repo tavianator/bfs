@@ -19,8 +19,8 @@
  * program does the job.
  */
 
+#include "../src/bfstd.h"
 #include <errno.h>
-#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -41,18 +41,13 @@ static void errmsg(const char *cmd, const char *path) {
  * file name is not.
  */
 static int chdir_parent(const char *path) {
-	char *copy = strdup(path);
-	if (!copy) {
+	char *dir = xdirname(path);
+	if (!dir) {
 		return -1;
 	}
-	const char *dir = dirname(copy);
 
 	int ret = chdir(dir);
-
-	int error = errno;
-	free(copy);
-	errno = error;
-
+	free(dir);
 	return ret;
 }
 
@@ -66,22 +61,21 @@ static int init_sun(struct sockaddr_un *sock, const char *path) {
 		return -1;
 	}
 
-	char *copy = strdup(path);
-	if (!copy) {
+	char *base = xbasename(path);
+	if (!base) {
 		return -1;
 	}
-	const char *base = basename(copy);
 
 	len = strlen(base);
 	if (len >= sizeof(sock->sun_path)) {
-		free(copy);
+		free(base);
 		errno = ENAMETOOLONG;
 		return -1;
 	}
 
 	sock->sun_family = AF_UNIX;
 	memcpy(sock->sun_path, base, len + 1);
-	free(copy);
+	free(base);
 	return 0;
 }
 

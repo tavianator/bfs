@@ -197,6 +197,7 @@ $(FLAG_GOALS): $(FLAG_PREREQS)
 
 all: \
     $(BIN)/bfs \
+    $(BIN)/tests/bfstd \
     $(BIN)/tests/mksock \
     $(BIN)/tests/trie \
     $(BIN)/tests/xtimegm \
@@ -250,22 +251,26 @@ LIBBFS := \
 # The main executable
 $(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
 
+# Standalone binary tests
+STANDALONE_CHECKS := check-bfstd check-trie check-xtimegm
+
 # The different search strategies that we test
 STRATEGIES := bfs dfs ids eds
 STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 
 # All the different checks we run
-CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
+CHECKS := $(STANDALONE_CHECKS) $(STRATEGY_CHECKS)
 
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
 
+$(STANDALONE_CHECKS): check-%: $(BIN)/tests/%
+	$<
+
 $(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(BIN)/tests/mksock $(BIN)/tests/xtouch
 	./tests/tests.sh --bfs="$(BIN)/bfs -S $*" $(TEST_FLAGS)
 
-check-trie check-xtimegm: check-%: $(BIN)/tests/%
-	$<
-
+$(BIN)/tests/bfstd: $(OBJ)/tests/bfstd.o $(LIBBFS)
 $(BIN)/tests/mksock: $(OBJ)/tests/mksock.o $(LIBBFS)
 $(BIN)/tests/trie: $(OBJ)/tests/trie.o $(LIBBFS)
 $(BIN)/tests/xtimegm: $(OBJ)/tests/xtimegm.o $(LIBBFS)

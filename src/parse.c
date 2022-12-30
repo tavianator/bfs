@@ -2888,7 +2888,8 @@ static CFILE *launch_pager(pid_t *pid, CFILE *cout) {
 		NULL,
 	};
 
-	if (strcmp(xbasename(exe), "less") == 0) {
+	const char *cmd = exe + xbaseoff(exe);
+	if (strcmp(cmd, "less") == 0) {
 		// We know less supports colors, other pagers may not
 		ret->colors = cout->colors;
 		argv[1] = "-FKRX";
@@ -3931,7 +3932,8 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.now = ctx->now,
 	};
 
-	if (strcmp(xbasename(state.command), "find") == 0) {
+	const char *cmd = state.command + xbaseoff(state.command);
+	if (strcmp(cmd, "find") == 0) {
 		// Operate depth-first when invoked as "find"
 		ctx->strategy = BFTW_DFS;
 	}

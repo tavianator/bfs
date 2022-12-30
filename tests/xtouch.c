@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
  ****************************************************************************/
 
-#include "../src/bfstd.h"
 #include "../src/xtime.h"
 #include <errno.h>
 #include <fcntl.h>

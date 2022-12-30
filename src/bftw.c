@@ -793,7 +793,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 
 	if (ftwbuf->depth == 0) {
 		// Compute the name offset for root paths like "foo/bar"
-		ftwbuf->nameoff = xbasename(ftwbuf->path) - ftwbuf->path;
+		ftwbuf->nameoff = xbaseoff(ftwbuf->path);
 	}
 
 	if (ftwbuf->error != 0) {

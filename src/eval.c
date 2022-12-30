@@ -590,15 +590,7 @@ bool eval_name(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (ftwbuf->depth == 0) {
 		// Any trailing slashes are not part of the name.  This can only
 		// happen for the root path.
-		const char *slash = strchr(name, '/');
-		if (slash && slash > name) {
-			copy = strndup(name, slash - name);
-			if (!copy) {
-				eval_report_error(state);
-				return false;
-			}
-			name = copy;
-		}
+		name = copy = xbasename(name);
 	}
 
 	bool ret = fnmatch(expr->argv[1], name, expr->num) == 0;

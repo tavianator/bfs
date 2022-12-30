@@ -295,7 +295,7 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 
 	if (ftwbuf->at_fd != AT_FDCWD) {
 		// Rely on at_fd being the immediate parent
-		assert(ftwbuf->at_path == xbasename(ftwbuf->at_path));
+		assert(xbaseoff(ftwbuf->at_path) == 0);
 
 		execbuf->wd_fd = ftwbuf->at_fd;
 		if (!(execbuf->flags & BFS_EXEC_MULTI)) {

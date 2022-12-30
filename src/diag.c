@@ -84,13 +84,18 @@ bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *fo
 	}
 }
 
+/** Get the command name without any leading directories. */
+static const char *bfs_cmd(const struct bfs_ctx *ctx) {
+	return ctx->argv[0] + xbaseoff(ctx->argv[0]);
+}
+
 void bfs_error_prefix(const struct bfs_ctx *ctx) {
-	cfprintf(ctx->cerr, "${bld}%s:${rs} ${err}error:${rs} ", xbasename(ctx->argv[0]));
+	cfprintf(ctx->cerr, "${bld}%s:${rs} ${err}error:${rs} ", bfs_cmd(ctx));
 }
 
 bool bfs_warning_prefix(const struct bfs_ctx *ctx) {
 	if (ctx->warn) {
-		cfprintf(ctx->cerr, "${bld}%s:${rs} ${wrn}warning:${rs} ", xbasename(ctx->argv[0]));
+		cfprintf(ctx->cerr, "${bld}%s:${rs} ${wrn}warning:${rs} ", bfs_cmd(ctx));
 		return true;
 	} else {
 		return false;
@@ -99,7 +104,7 @@ bool bfs_warning_prefix(const struct bfs_ctx *ctx) {
 
 bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag) {
 	if (ctx->debug & flag) {
-		cfprintf(ctx->cerr, "${bld}%s:${rs} ${cyn}-D %s${rs}: ", xbasename(ctx->argv[0]), debug_flag_name(flag));
+		cfprintf(ctx->cerr, "${bld}%s:${rs} ${cyn}-D %s${rs}: ", bfs_cmd(ctx), debug_flag_name(flag));
 		return true;
 	} else {
 		return false;

@@ -22,6 +22,7 @@
 #define BFS_BFSTD_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 // #include <errno.h>
 
@@ -45,13 +46,34 @@ bool is_nonexistence_error(int error);
 // #include <libgen.h>
 
 /**
- * basename() variant that doesn't modify the input.
+ * Re-entrant dirname() variant that always allocates a copy.
  *
  * @param path
  *         The path in question.
- * @return A pointer into path at the base name offset.
+ * @return
+ *         The parent directory of the path.
  */
-const char *xbasename(const char *path);
+char *xdirname(const char *path);
+
+/**
+ * Re-entrant basename() variant that always allocates a copy.
+ *
+ * @param path
+ *         The path in question.
+ * @return
+ *         The final component of the path.
+ */
+char *xbasename(const char *path);
+
+/**
+ * Find the offset of the final component of a path.
+ *
+ * @param path
+ *         The path in question.
+ * @return
+ *         The offset of the basename.
+ */
+size_t xbaseoff(const char *path);
 
 #include <stdio.h>
 

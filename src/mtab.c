@@ -86,7 +86,8 @@ static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *typ
 		goto fail_entry;
 	}
 
-	if (!trie_insert_str(&mtab->names, xbasename(path))) {
+	const char *name = path + xbaseoff(path);
+	if (!trie_insert_str(&mtab->names, name)) {
 		goto fail;
 	}
 
@@ -223,7 +224,7 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 }
 
 bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path) {
-	const char *name = xbasename(path);
+	const char *name = path + xbaseoff(path);
 	return trie_find_str(&mtab->names, name);
 }
 

@@ -45,17 +45,52 @@ bool is_nonexistence_error(int error) {
 	return error == ENOENT || errno == ENOTDIR;
 }
 
-const char *xbasename(const char *path) {
-	const char *i;
+char *xdirname(const char *path) {
+	size_t i = xbaseoff(path);
 
 	// Skip trailing slashes
-	for (i = path + strlen(path); i > path && i[-1] == '/'; --i);
+	while (i > 0 && path[i - 1] == '/') {
+		--i;
+	}
+
+	if (i > 0) {
+		return strndup(path, i);
+	} else if (path[i] == '/') {
+		return strdup("/");
+	} else {
+		return strdup(".");
+	}
+}
+
+char *xbasename(const char *path) {
+	size_t i = xbaseoff(path);
+	size_t len = strcspn(path + i, "/");
+	if (len > 0) {
+		return strndup(path + i, len);
+	} else if (path[i] == '/') {
+		return strdup("/");
+	} else {
+		return strdup(".");
+	}
+}
+
+size_t xbaseoff(const char *path) {
+	size_t i = strlen(path);
+
+	// Skip trailing slashes
+	while (i > 0 && path[i - 1] == '/') {
+		--i;
+	}
 
 	// Find the beginning of the name
-	for (; i > path && i[-1] != '/'; --i);
+	while (i > 0 && path[i - 1] != '/') {
+		--i;
+	}
 
 	// Skip leading slashes
-	for (; i[0] == '/' && i[1]; ++i);
+	while (path[i] == '/' && path[i + 1]) {
+		++i;
+	}
 
 	return i;
 }
