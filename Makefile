@@ -1,6 +1,6 @@
 ############################################################################
 # bfs                                                                      #
-# Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        #
+# Copyright (C) 2015-2023 Tavian Barnes <tavianator@tavianator.com>        #
 #                                                                          #
 # Permission to use, copy, modify, and/or distribute this software for any #
 # purpose with or without fee is hereby granted.                           #
@@ -174,6 +174,10 @@ ALL_CFLAGS = $(ALL_CPPFLAGS) $(LOCAL_CFLAGS) $(CFLAGS) $(EXTRA_CFLAGS) $(DEPFLAG
 ALL_LDFLAGS = $(ALL_CFLAGS) $(LOCAL_LDFLAGS) $(LDFLAGS) $(EXTRA_LDFLAGS)
 ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS) $(EXTRA_LDLIBS)
 
+# Default make target
+bfs: $(BIN)/bfs
+.PHONY: bfs
+
 # Goals that are treated like flags by this Makefile
 FLAG_GOALS := asan lsan msan tsan ubsan gcov release
 
@@ -186,18 +190,10 @@ ifndef GOALS
 FLAG_PREREQS += bfs
 endif
 
-# The different search strategies that we test
-STRATEGIES := bfs dfs ids eds
-STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
-
-# All the different checks we run
-CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
-
-# Custom test flags for distcheck
-DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
-
-bfs: $(BIN)/bfs
-.PHONY: bfs
+# Make sure that "make release" builds everything, but "make release obj/src/main.o" doesn't
+$(FLAG_GOALS): $(FLAG_PREREQS)
+	@:
+.PHONY: $(FLAG_GOALS)
 
 all: \
     $(BIN)/bfs \
@@ -206,37 +202,6 @@ all: \
     $(BIN)/tests/xtimegm \
     $(BIN)/tests/xtouch
 .PHONY: all
-
-$(BIN)/bfs: \
-    $(OBJ)/src/bar.o \
-    $(OBJ)/src/bfstd.o \
-    $(OBJ)/src/bftw.o \
-    $(OBJ)/src/color.o \
-    $(OBJ)/src/ctx.o \
-    $(OBJ)/src/darray.o \
-    $(OBJ)/src/diag.o \
-    $(OBJ)/src/dir.o \
-    $(OBJ)/src/dstring.o \
-    $(OBJ)/src/eval.o \
-    $(OBJ)/src/exec.o \
-    $(OBJ)/src/fsade.o \
-    $(OBJ)/src/main.o \
-    $(OBJ)/src/mtab.o \
-    $(OBJ)/src/opt.o \
-    $(OBJ)/src/parse.o \
-    $(OBJ)/src/printf.o \
-    $(OBJ)/src/pwcache.o \
-    $(OBJ)/src/stat.o \
-    $(OBJ)/src/trie.o \
-    $(OBJ)/src/typo.o \
-    $(OBJ)/src/xregex.o \
-    $(OBJ)/src/xspawn.o \
-    $(OBJ)/src/xtime.o
-
-$(BIN)/tests/mksock: $(OBJ)/tests/mksock.o
-$(BIN)/tests/trie: $(OBJ)/src/trie.o $(OBJ)/tests/trie.o
-$(BIN)/tests/xtimegm: $(OBJ)/src/xtime.o $(OBJ)/tests/xtimegm.o
-$(BIN)/tests/xtouch: $(OBJ)/src/xtime.o $(OBJ)/tests/xtouch.o
 
 $(BIN)/%:
 	@$(MKDIR) $(@D)
@@ -256,10 +221,41 @@ $(OBJ)/FLAGS.new:
 $(OBJ)/FLAGS: $(OBJ)/FLAGS.new
 	@test -e $@ && cmp -s $@ $< && rm $< || mv $< $@
 
-# Make sure that "make release" builds everything, but "make release obj/src/main.o" doesn't
-$(FLAG_GOALS): $(FLAG_PREREQS)
-	@:
-.PHONY: $(FLAG_GOALS)
+# All object files except the entry point
+LIBBFS := \
+    $(OBJ)/src/bar.o \
+    $(OBJ)/src/bfstd.o \
+    $(OBJ)/src/bftw.o \
+    $(OBJ)/src/color.o \
+    $(OBJ)/src/ctx.o \
+    $(OBJ)/src/darray.o \
+    $(OBJ)/src/diag.o \
+    $(OBJ)/src/dir.o \
+    $(OBJ)/src/dstring.o \
+    $(OBJ)/src/eval.o \
+    $(OBJ)/src/exec.o \
+    $(OBJ)/src/fsade.o \
+    $(OBJ)/src/mtab.o \
+    $(OBJ)/src/opt.o \
+    $(OBJ)/src/parse.o \
+    $(OBJ)/src/printf.o \
+    $(OBJ)/src/pwcache.o \
+    $(OBJ)/src/stat.o \
+    $(OBJ)/src/trie.o \
+    $(OBJ)/src/typo.o \
+    $(OBJ)/src/xregex.o \
+    $(OBJ)/src/xspawn.o \
+    $(OBJ)/src/xtime.o
+
+# The main executable
+$(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
+
+# The different search strategies that we test
+STRATEGIES := bfs dfs ids eds
+STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
+
+# All the different checks we run
+CHECKS := $(STRATEGY_CHECKS) check-trie check-xtimegm
 
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
@@ -269,6 +265,14 @@ $(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(BIN)/tests/mksock $(BIN)/tests/xtouch
 
 check-trie check-xtimegm: check-%: $(BIN)/tests/%
 	$<
+
+$(BIN)/tests/mksock: $(OBJ)/tests/mksock.o $(LIBBFS)
+$(BIN)/tests/trie: $(OBJ)/tests/trie.o $(LIBBFS)
+$(BIN)/tests/xtimegm: $(OBJ)/tests/xtimegm.o $(LIBBFS)
+$(BIN)/tests/xtouch: $(OBJ)/tests/xtouch.o $(LIBBFS)
+
+# Custom test flags for distcheck
+DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
 
 distcheck:
 	+$(MAKE) -B asan ubsan check $(DISTCHECK_FLAGS)
