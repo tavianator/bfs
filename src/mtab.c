@@ -193,17 +193,50 @@ fail:
 }
 
 static void bfs_mtab_fill_types(struct bfs_mtab *mtab) {
+	const enum bfs_stat_flags flags = BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC;
+
 	for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
 		struct bfs_mtab_entry *entry = &mtab->entries[i];
 
+		// It's possible that /path/to/mount was unmounted between bfs_mtab_parse() and bfs_mtab_fill_types().
+		// In that case, the dev_t of /path/to/mount will be the same as /path/to, which should not get its
+		// fstype from the old mount record of /path/to/mount.
+		int fd = -1;
+		const char *path = entry->path;
+		char *dir = xdirname(path);
+		if (dir) {
+			fd = open(dir, O_SEARCH | O_CLOEXEC | O_DIRECTORY);
+		}
+		if (fd >= 0) {
+			path += xbaseoff(path);
+		} else {
+			fd = AT_FDCWD;
+		}
+
 		struct bfs_stat sb;
-		if (bfs_stat(AT_FDCWD, entry->path, BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC, &sb) != 0) {
-			continue;
+		if (bfs_stat(fd, path, flags, &sb) != 0) {
+			goto next;
+		}
+
+		if (fd >= 0) {
+			struct bfs_stat parent;
+			if (bfs_stat(fd, NULL, flags, &parent) == 0) {
+				if (parent.dev == sb.dev) {
+					// Not a mount point any more (or a bind mount, but with the same fstype)
+					goto next;
+				}
+			}
 		}
 
 		struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
 		if (leaf) {
 			leaf->value = entry->type;
+		}
+
+	next:
+		free(dir);
+		if (fd >= 0) {
+			xclose(fd);
 		}
 	}
 
