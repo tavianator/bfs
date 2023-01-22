@@ -33,6 +33,22 @@ bool is_nonexistence_error(int error);
 
 #include <fcntl.h>
 
+#ifndef O_EXEC
+#	ifdef O_PATH
+#		define O_EXEC O_PATH
+#	else
+#		define O_EXEC O_RDONLY
+#	endif
+#endif
+
+#ifndef O_SEARCH
+#	ifdef O_PATH
+#		define O_SEARCH O_PATH
+#	else
+#		define O_SEARCH O_RDONLY
+#	endif
+#endif
+
 #ifndef O_DIRECTORY
 #	define O_DIRECTORY 0
 #endif
