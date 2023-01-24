@@ -86,25 +86,14 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	expr->persistent_fds = 0;
 	expr->ephemeral_fds = 0;
 	expr->pure = false;
+	expr->always_true = false;
+	expr->always_false = false;
 	expr->cost = FAST_COST;
+	expr->probability = 0.5;
 	expr->evaluations = 0;
 	expr->successes = 0;
 	expr->elapsed.tv_sec = 0;
 	expr->elapsed.tv_nsec = 0;
-
-	if (eval_fn == eval_true) {
-		expr->always_true = true;
-		expr->always_false = false;
-		expr->probability = 1.0;
-	} else if (eval_fn == eval_false) {
-		expr->always_true = false;
-		expr->always_false = true;
-		expr->probability = 0.0;
-	} else {
-		expr->always_true = false;
-		expr->always_false = false;
-		expr->probability = 0.5;
-	}
 
 	// Prevent bfs_expr_free() from freeing uninitialized pointers on error paths
 	if (bfs_expr_is_parent(expr)) {
@@ -194,21 +183,6 @@ static struct bfs_expr *new_binary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *l
 	}
 
 	return expr;
-}
-
-/**
- * Set an expression to always return true.
- */
-static void expr_set_always_true(struct bfs_expr *expr) {
-	expr->always_true = true;
-	expr->probability = 1.0;
-}
-
-/**
- * Set an expression to never return.
- */
-static void expr_set_never_returns(struct bfs_expr *expr) {
-	expr->always_true = expr->always_false = true;
 }
 
 /**
@@ -462,7 +436,6 @@ static bool parse_expr_warning(const struct parser_state *state, const struct bf
  * Fill in a "-print"-type expression.
  */
 static void init_print_expr(struct parser_state *state, struct bfs_expr *expr) {
-	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
 	expr->cfile = state->ctx->cout;
 	expr->path = NULL;
@@ -1359,9 +1332,7 @@ static struct bfs_expr *parse_exec(struct parser_state *state, int flags, int ar
 
 	expr->exec = execbuf;
 
-	if (execbuf->flags & BFS_EXEC_MULTI) {
-		expr_set_always_true(expr);
-	} else {
+	if (!(execbuf->flags & BFS_EXEC_MULTI)) {
 		expr->cost = 1000000.0;
 	}
 
@@ -1395,7 +1366,6 @@ static struct bfs_expr *parse_exit(struct parser_state *state, int arg1, int arg
 
 	struct bfs_expr *expr = parse_action(state, eval_exit, argc);
 	if (expr) {
-		expr_set_never_returns(expr);
 		expr->num = status;
 	}
 	return expr;
@@ -1525,7 +1495,6 @@ static struct bfs_expr *parse_fls(struct parser_state *state, int arg1, int arg2
 		goto fail;
 	}
 
-	expr_set_always_true(expr);
 	expr->cost = PRINT_COST;
 	return expr;
 
@@ -1540,7 +1509,6 @@ fail:
 static struct bfs_expr *parse_fprint(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_unary_action(state, eval_fprint);
 	if (expr) {
-		expr_set_always_true(expr);
 		expr->cost = PRINT_COST;
 		if (expr_open(state, expr, expr->argv[1]) != 0) {
 			goto fail;
@@ -1559,7 +1527,6 @@ fail:
 static struct bfs_expr *parse_fprint0(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_unary_action(state, eval_fprint0);
 	if (expr) {
-		expr_set_always_true(expr);
 		expr->cost = PRINT_COST;
 		if (expr_open(state, expr, expr->argv[1]) != 0) {
 			goto fail;
@@ -1594,8 +1561,6 @@ static struct bfs_expr *parse_fprintf(struct parser_state *state, int arg1, int 
 	if (!expr) {
 		return NULL;
 	}
-
-	expr_set_always_true(expr);
 
 	expr->cost = PRINT_COST;
 
@@ -2373,23 +2338,14 @@ static struct bfs_expr *parse_printx(struct parser_state *state, int arg1, int a
  */
 static struct bfs_expr *parse_prune(struct parser_state *state, int arg1, int arg2) {
 	state->prune_arg = state->argv;
-
-	struct bfs_expr *expr = parse_nullary_action(state, eval_prune);
-	if (expr) {
-		expr_set_always_true(expr);
-	}
-	return expr;
+	return parse_nullary_action(state, eval_prune);
 }
 
 /**
  * Parse -quit.
  */
 static struct bfs_expr *parse_quit(struct parser_state *state, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_action(state, eval_quit);
-	if (expr) {
-		expr_set_never_returns(expr);
-	}
-	return expr;
+	return parse_nullary_action(state, eval_quit);
 }
 
 /**

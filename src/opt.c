@@ -45,6 +45,7 @@
 #include "ctx.h"
 #include "diag.h"
 #include "eval.h"
+#include "exec.h"
 #include "expr.h"
 #include "pwcache.h"
 #include <assert.h>
@@ -799,6 +800,15 @@ static struct bfs_expr *optimize_empty(struct opt_state *state, struct bfs_expr 
 	return expr;
 }
 
+/** Optimize -{exec,ok}{,dir}. */
+static struct bfs_expr *optimize_exec(struct opt_state *state, struct bfs_expr *expr) {
+	if (expr->exec->flags & BFS_EXEC_MULTI) {
+		expr->always_true = true;
+	}
+
+	return expr;
+}
+
 /** Optimize -gid. */
 static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *expr) {
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
@@ -892,6 +902,34 @@ static bfs_eval_fn *const opt_pure[] = {
 };
 
 /**
+ * Table of always-true expressions.
+ */
+static bfs_eval_fn *const opt_always_true[] = {
+	eval_fls,
+	eval_fprint,
+	eval_fprint0,
+	eval_fprintf,
+	eval_fprintx,
+	eval_prune,
+	eval_true,
+
+	// Non-returning
+	eval_exit,
+	eval_quit,
+};
+
+/**
+ * Table of always-false expressions.
+ */
+static bfs_eval_fn *const opt_always_false[] = {
+	eval_false,
+
+	// Non-returning
+	eval_exit,
+	eval_quit,
+};
+
+/**
  * Table of simple predicates.
  */
 static const struct {
@@ -940,6 +978,7 @@ static const struct {
 	// Primaries
 	{eval_access,   optimize_access},
 	{eval_empty,    optimize_empty},
+	{eval_exec,     optimize_exec},
 	{eval_gid,      optimize_gid},
 	{eval_samefile, optimize_samefile},
 	{eval_type,     optimize_type},
@@ -960,6 +999,20 @@ static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs
 	for (size_t i = 0; i < BFS_COUNTOF(opt_pure); ++i) {
 		if (opt_pure[i] == expr->eval_fn) {
 			expr->pure = true;
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < BFS_COUNTOF(opt_always_true); ++i) {
+		if (opt_always_true[i] == expr->eval_fn) {
+			expr->always_true = true;
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < BFS_COUNTOF(opt_always_false); ++i) {
+		if (opt_always_false[i] == expr->eval_fn) {
+			expr->always_false = true;
 			break;
 		}
 	}
@@ -1026,9 +1079,11 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 	}
 
 	if (expr->always_true) {
+		expr->probability = 1.0;
 		set_facts_impossible(&state->facts_when_false);
 	}
 	if (expr->always_false) {
+		expr->probability = 0.0;
 		set_facts_impossible(&state->facts_when_true);
 	}
 
