@@ -841,6 +841,25 @@ static struct bfs_expr *optimize_xtype(struct opt_state *state, struct bfs_expr 
 	return expr;
 }
 
+/**
+ * Table of simple predicates.
+ */
+static const struct {
+	/** The evaluation function this optimizer applies to. */
+	bfs_eval_fn *eval_fn;
+	/** The corresponding predicate. */
+	enum pred_type pred;
+} opt_preds[] = {
+	{eval_acl,         ACL_PRED},
+	{eval_capable, CAPABLE_PRED},
+	{eval_empty,     EMPTY_PRED},
+	{eval_hidden,   HIDDEN_PRED},
+	{eval_nogroup, NOGROUP_PRED},
+	{eval_nouser,   NOUSER_PRED},
+	{eval_sparse,   SPARSE_PRED},
+	{eval_xattr,     XATTR_PRED},
+};
+
 /** Signature for custom optimizer functions. */
 typedef struct bfs_expr *bfs_opt_fn(struct opt_state *state, struct bfs_expr *expr);
 
@@ -870,6 +889,13 @@ static const struct {
  * Look up the appropriate optimizer for an expression and call it.
  */
 static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs_expr *expr) {
+	for (size_t i = 0; i < BFS_COUNTOF(opt_preds); ++i) {
+		if (opt_preds[i].eval_fn == expr->eval_fn) {
+			infer_pred_facts(state, opt_preds[i].pred);
+			break;
+		}
+	}
+
 	for (size_t i = 0; i < BFS_COUNTOF(opt_fns); ++i) {
 		if (opt_fns[i].eval_fn == expr->eval_fn) {
 			return opt_fns[i].opt_fn(state, expr);
@@ -897,30 +923,14 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
-	if (expr->eval_fn == eval_acl) {
-		infer_pred_facts(state, ACL_PRED);
-	} else if (expr->eval_fn == eval_capable) {
-		infer_pred_facts(state, CAPABLE_PRED);
-	} else if (expr->eval_fn == eval_depth) {
+	if (expr->eval_fn == eval_depth) {
 		infer_icmp_facts(state, expr, DEPTH_RANGE);
-	} else if (expr->eval_fn == eval_empty) {
-		infer_pred_facts(state, EMPTY_PRED);
-	} else if (expr->eval_fn == eval_hidden) {
-		infer_pred_facts(state, HIDDEN_PRED);
 	} else if (expr->eval_fn == eval_inum) {
 		infer_icmp_facts(state, expr, INUM_RANGE);
 	} else if (expr->eval_fn == eval_links) {
 		infer_icmp_facts(state, expr, LINKS_RANGE);
-	} else if (expr->eval_fn == eval_nogroup) {
-		infer_pred_facts(state, NOGROUP_PRED);
-	} else if (expr->eval_fn == eval_nouser) {
-		infer_pred_facts(state, NOUSER_PRED);
 	} else if (expr->eval_fn == eval_size) {
 		infer_icmp_facts(state, expr, SIZE_RANGE);
-	} else if (expr->eval_fn == eval_sparse) {
-		infer_pred_facts(state, SPARSE_PRED);
-	} else if (expr->eval_fn == eval_xattr) {
-		infer_pred_facts(state, XATTR_PRED);
 	}
 
 	expr = optimize_expr_lookup(state, expr);
