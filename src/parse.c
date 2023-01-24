@@ -68,11 +68,6 @@ static char *fake_or_arg = "-o";
 static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
 
-// Cost estimation constants
-#define FAST_COST     40.0
-#define STAT_COST   1000.0
-#define PRINT_COST 20000.0
-
 struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	struct bfs_expr *expr = malloc(sizeof(*expr));
 	if (!expr) {
@@ -88,7 +83,7 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	expr->pure = false;
 	expr->always_true = false;
 	expr->always_false = false;
-	expr->cost = FAST_COST;
+	expr->cost = 0.0;
 	expr->probability = 0.5;
 	expr->evaluations = 0;
 	expr->successes = 0;
@@ -436,7 +431,6 @@ static bool parse_expr_warning(const struct parser_state *state, const struct bf
  * Fill in a "-print"-type expression.
  */
 static void init_print_expr(struct parser_state *state, struct bfs_expr *expr) {
-	expr->cost = PRINT_COST;
 	expr->cfile = state->ctx->cout;
 	expr->path = NULL;
 }
@@ -1021,7 +1015,6 @@ static struct bfs_expr *parse_access(struct parser_state *state, int flag, int a
 	}
 
 	expr->num = flag;
-	expr->cost = STAT_COST;
 
 	switch (flag) {
 	case R_OK:
@@ -1045,7 +1038,6 @@ static struct bfs_expr *parse_acl(struct parser_state *state, int flag, int arg2
 #if BFS_CAN_CHECK_ACL
 	struct bfs_expr *expr = parse_nullary_test(state, eval_acl);
 	if (expr) {
-		expr->cost = STAT_COST;
 		expr->probability = 0.00002;
 	}
 	return expr;
@@ -1069,7 +1061,6 @@ static struct bfs_expr *parse_newer(struct parser_state *state, int field, int a
 		goto fail;
 	}
 
-	expr->cost = STAT_COST;
 	expr->reftime = sb.mtime;
 	expr->stat_field = field;
 	return expr;
@@ -1088,7 +1079,6 @@ static struct bfs_expr *parse_min(struct parser_state *state, int field, int arg
 		return NULL;
 	}
 
-	expr->cost = STAT_COST;
 	expr->reftime = state->now;
 	expr->stat_field = field;
 	expr->time_unit = BFS_MINUTES;
@@ -1104,7 +1094,6 @@ static struct bfs_expr *parse_time(struct parser_state *state, int field, int ar
 		return NULL;
 	}
 
-	expr->cost = STAT_COST;
 	expr->reftime = state->now;
 	expr->stat_field = field;
 
@@ -1173,7 +1162,6 @@ static struct bfs_expr *parse_capable(struct parser_state *state, int flag, int 
 #if BFS_CAN_CHECK_CAPABILITIES
 	struct bfs_expr *expr = parse_nullary_test(state, eval_capable);
 	if (expr) {
-		expr->cost = STAT_COST;
 		expr->probability = 0.000002;
 	}
 	return expr;
@@ -1309,7 +1297,6 @@ static struct bfs_expr *parse_empty(struct parser_state *state, int arg1, int ar
 		return NULL;
 	}
 
-	expr->cost = 2000.0;
 	expr->probability = 0.01;
 	expr->ephemeral_fds = 1;
 	return expr;
@@ -1331,10 +1318,6 @@ static struct bfs_expr *parse_exec(struct parser_state *state, int flags, int ar
 	}
 
 	expr->exec = execbuf;
-
-	if (!(execbuf->flags & BFS_EXEC_MULTI)) {
-		expr->cost = 1000000.0;
-	}
 
 	expr->ephemeral_fds = 2;
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
@@ -1495,7 +1478,6 @@ static struct bfs_expr *parse_fls(struct parser_state *state, int arg1, int arg2
 		goto fail;
 	}
 
-	expr->cost = PRINT_COST;
 	return expr;
 
 fail:
@@ -1509,7 +1491,6 @@ fail:
 static struct bfs_expr *parse_fprint(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_unary_action(state, eval_fprint);
 	if (expr) {
-		expr->cost = PRINT_COST;
 		if (expr_open(state, expr, expr->argv[1]) != 0) {
 			goto fail;
 		}
@@ -1527,7 +1508,6 @@ fail:
 static struct bfs_expr *parse_fprint0(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_unary_action(state, eval_fprint0);
 	if (expr) {
-		expr->cost = PRINT_COST;
 		if (expr_open(state, expr, expr->argv[1]) != 0) {
 			goto fail;
 		}
@@ -1562,8 +1542,6 @@ static struct bfs_expr *parse_fprintf(struct parser_state *state, int arg1, int 
 		return NULL;
 	}
 
-	expr->cost = PRINT_COST;
-
 	if (expr_open(state, expr, file) != 0) {
 		goto fail;
 	}
@@ -1594,7 +1572,6 @@ static struct bfs_expr *parse_fstype(struct parser_state *state, int arg1, int a
 		return NULL;
 	}
 
-	expr->cost = STAT_COST;
 	return expr;
 }
 
@@ -1623,7 +1600,6 @@ static struct bfs_expr *parse_group(struct parser_state *state, int arg1, int ar
 		goto fail;
 	}
 
-	expr->cost = STAT_COST;
 	return expr;
 
 fail:
@@ -1643,11 +1619,7 @@ static struct bfs_expr *parse_unique(struct parser_state *state, int arg1, int a
  * Parse -used N.
  */
 static struct bfs_expr *parse_used(struct parser_state *state, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_test_icmp(state, eval_used);
-	if (expr) {
-		expr->cost = STAT_COST;
-	}
-	return expr;
+	return parse_test_icmp(state, eval_used);
 }
 
 /**
@@ -1675,7 +1647,6 @@ static struct bfs_expr *parse_user(struct parser_state *state, int arg1, int arg
 		goto fail;
 	}
 
-	expr->cost = STAT_COST;
 	return expr;
 
 fail:
@@ -1708,7 +1679,6 @@ static struct bfs_expr *parse_ignore_races(struct parser_state *state, int ignor
 static struct bfs_expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_test_icmp(state, eval_inum);
 	if (expr) {
-		expr->cost = STAT_COST;
 		expr->probability = expr->int_cmp == BFS_INT_EQUAL ? 0.01 : 0.50;
 	}
 	return expr;
@@ -1720,7 +1690,6 @@ static struct bfs_expr *parse_inum(struct parser_state *state, int arg1, int arg
 static struct bfs_expr *parse_links(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_test_icmp(state, eval_links);
 	if (expr) {
-		expr->cost = STAT_COST;
 		expr->probability = bfs_expr_cmp(expr, 1) ? 0.99 : 0.01;
 	}
 	return expr;
@@ -1794,8 +1763,6 @@ static struct bfs_expr *parse_fnmatch(const struct parser_state *state, struct b
 		expr->eval_fn = eval_false;
 		return expr;
 	}
-
-	expr->cost = 400.0;
 
 	if (strchr(pattern, '*')) {
 		expr->probability = 0.5;
@@ -1942,8 +1909,6 @@ static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int 
 		expr->reftime = *reftime;
 	}
 
-	expr->cost = STAT_COST;
-
 	return expr;
 
 fail:
@@ -1960,7 +1925,6 @@ static struct bfs_expr *parse_nogroup(struct parser_state *state, int arg1, int 
 		return NULL;
 	}
 
-	expr->cost = STAT_COST;
 	expr->probability = 0.01;
 
 	// Who knows how many FDs getgrgid_r() needs?  Probably at least one for
@@ -2006,7 +1970,6 @@ static struct bfs_expr *parse_nouser(struct parser_state *state, int arg1, int a
 		return NULL;
 	}
 
-	expr->cost = STAT_COST;
 	expr->probability = 0.01;
 
 	// Who knows how many FDs getpwuid_r() needs?  Probably at least one for
@@ -2272,8 +2235,6 @@ static struct bfs_expr *parse_perm(struct parser_state *state, int field, int ar
 		goto fail;
 	}
 
-	expr->cost = STAT_COST;
-
 	return expr;
 
 fail:
@@ -2468,7 +2429,6 @@ static struct bfs_expr *parse_samefile(struct parser_state *state, int arg1, int
 	expr->dev = sb.dev;
 	expr->ino = sb.ino;
 
-	expr->cost = STAT_COST;
 	expr->probability = 0.01;
 
 	return expr;
@@ -2531,7 +2491,6 @@ static struct bfs_expr *parse_since(struct parser_state *state, int field, int a
 		goto fail;
 	}
 
-	expr->cost = STAT_COST;
 	expr->stat_field = field;
 	return expr;
 
@@ -2589,7 +2548,6 @@ static struct bfs_expr *parse_size(struct parser_state *state, int arg1, int arg
 		goto bad_unit;
 	}
 
-	expr->cost = STAT_COST;
 	expr->probability = expr->int_cmp == BFS_INT_EQUAL ? 0.01 : 0.50;
 
 	return expr;
@@ -2605,11 +2563,7 @@ fail:
  * Parse -sparse.
  */
 static struct bfs_expr *parse_sparse(struct parser_state *state, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_test(state, eval_sparse);
-	if (expr) {
-		expr->cost = STAT_COST;
-	}
-	return expr;
+	return parse_nullary_test(state, eval_sparse);
 }
 
 /**
@@ -2728,7 +2682,6 @@ static struct bfs_expr *parse_xattr(struct parser_state *state, int arg1, int ar
 #if BFS_CAN_CHECK_XATTRS
 	struct bfs_expr *expr = parse_nullary_test(state, eval_xattr);
 	if (expr) {
-		expr->cost = STAT_COST;
 		expr->probability = 0.01;
 	}
 	return expr;
@@ -2745,7 +2698,6 @@ static struct bfs_expr *parse_xattrname(struct parser_state *state, int arg1, in
 #if BFS_CAN_CHECK_XATTRS
 	struct bfs_expr *expr = parse_unary_test(state, eval_xattrname);
 	if (expr) {
-		expr->cost = STAT_COST;
 		expr->probability = 0.01;
 	}
 	return expr;

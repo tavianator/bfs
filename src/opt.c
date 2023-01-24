@@ -804,6 +804,8 @@ static struct bfs_expr *optimize_empty(struct opt_state *state, struct bfs_expr 
 static struct bfs_expr *optimize_exec(struct opt_state *state, struct bfs_expr *expr) {
 	if (expr->exec->flags & BFS_EXEC_MULTI) {
 		expr->always_true = true;
+	} else {
+		expr->cost = 1000000.0;
 	}
 
 	return expr;
@@ -929,6 +931,50 @@ static bfs_eval_fn *const opt_always_false[] = {
 	eval_quit,
 };
 
+#define FAST_COST       40.0
+#define FNMATCH_COST   400.0
+#define STAT_COST     1000.0
+#define PRINT_COST   20000.0
+
+/**
+ * Table of expression costs.
+ */
+static const struct {
+	/** The evaluation function with this cost. */
+	bfs_eval_fn *eval_fn;
+	/** The matching cost. */
+	float cost;
+} opt_costs[] = {
+	{eval_access,    STAT_COST},
+	{eval_acl,       STAT_COST},
+	{eval_capable,   STAT_COST},
+	{eval_empty, 2 * STAT_COST}, // readdir() is worse than stat()
+	{eval_fls,      PRINT_COST},
+	{eval_fprint,   PRINT_COST},
+	{eval_fprint0,  PRINT_COST},
+	{eval_fprintf,  PRINT_COST},
+	{eval_fprintx,  PRINT_COST},
+	{eval_fstype,    STAT_COST},
+	{eval_gid,       STAT_COST},
+	{eval_inum,      STAT_COST},
+	{eval_links,     STAT_COST},
+	{eval_lname,  FNMATCH_COST},
+	{eval_name,   FNMATCH_COST},
+	{eval_newer,     STAT_COST},
+	{eval_nogroup,   STAT_COST},
+	{eval_nouser,    STAT_COST},
+	{eval_path,   FNMATCH_COST},
+	{eval_perm,      STAT_COST},
+	{eval_samefile,  STAT_COST},
+	{eval_size,      STAT_COST},
+	{eval_sparse,    STAT_COST},
+	{eval_time,      STAT_COST},
+	{eval_uid,       STAT_COST},
+	{eval_used,      STAT_COST},
+	{eval_xattr,     STAT_COST},
+	{eval_xattrname, STAT_COST},
+};
+
 /**
  * Table of simple predicates.
  */
@@ -1013,6 +1059,14 @@ static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs
 	for (size_t i = 0; i < BFS_COUNTOF(opt_always_false); ++i) {
 		if (opt_always_false[i] == expr->eval_fn) {
 			expr->always_false = true;
+			break;
+		}
+	}
+
+	expr->cost = FAST_COST;
+	for (size_t i = 0; i < BFS_COUNTOF(opt_costs); ++i) {
+		if (opt_costs[i].eval_fn == expr->eval_fn) {
+			expr->cost = opt_costs[i].cost;
 			break;
 		}
 	}
