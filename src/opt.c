@@ -746,19 +746,6 @@ static void infer_pred_facts(struct opt_state *state, enum pred_type pred) {
 	constrain_pred(&state->facts_when_false.preds[pred], false);
 }
 
-/** Infer data flow facts about an -{execut,read,writ}able expression. */
-static void infer_access_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	if (expr->num & R_OK) {
-		infer_pred_facts(state, READABLE_PRED);
-	}
-	if (expr->num & W_OK) {
-		infer_pred_facts(state, WRITABLE_PRED);
-	}
-	if (expr->num & X_OK) {
-		infer_pred_facts(state, EXECUTABLE_PRED);
-	}
-}
-
 /** Infer data flow facts about an icmp-style ([+-]N) expression. */
 static void infer_icmp_facts(struct opt_state *state, const struct bfs_expr *expr, enum range_type type) {
 	struct range *range_when_true = &state->facts_when_true.ranges[type];
@@ -786,8 +773,22 @@ static void infer_icmp_facts(struct opt_state *state, const struct bfs_expr *exp
 	}
 }
 
-/** Infer data flow facts about a -gid expression. */
-static void infer_gid_facts(struct opt_state *state, const struct bfs_expr *expr) {
+/** Optimize -{execut,read,writ}able. */
+static struct bfs_expr *optimize_access(struct opt_state *state, struct bfs_expr *expr) {
+	if (expr->num & R_OK) {
+		infer_pred_facts(state, READABLE_PRED);
+	}
+	if (expr->num & W_OK) {
+		infer_pred_facts(state, WRITABLE_PRED);
+	}
+	if (expr->num & X_OK) {
+		infer_pred_facts(state, EXECUTABLE_PRED);
+	}
+	return expr;
+}
+
+/** Optimize -gid. */
+static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *expr) {
 	infer_icmp_facts(state, expr, GID_RANGE);
 
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
@@ -798,10 +799,12 @@ static void infer_gid_facts(struct opt_state *state, const struct bfs_expr *expr
 			constrain_pred(&state->facts_when_true.preds[NOGROUP_PRED], nogroup);
 		}
 	}
+
+	return expr;
 }
 
-/** Infer data flow facts about a -uid expression. */
-static void infer_uid_facts(struct opt_state *state, const struct bfs_expr *expr) {
+/** Optimize -uid. */
+static struct bfs_expr *optimize_uid(struct opt_state *state, struct bfs_expr *expr) {
 	infer_icmp_facts(state, expr, UID_RANGE);
 
 	struct range *range = &state->facts_when_true.ranges[UID_RANGE];
@@ -812,25 +815,68 @@ static void infer_uid_facts(struct opt_state *state, const struct bfs_expr *expr
 			constrain_pred(&state->facts_when_true.preds[NOUSER_PRED], nouser);
 		}
 	}
+
+	return expr;
 }
 
-/** Infer data flow facts about a -samefile expression. */
-static void infer_samefile_facts(struct opt_state *state, const struct bfs_expr *expr) {
+/** Optimize -samefile. */
+static struct bfs_expr *optimize_samefile(struct opt_state *state, struct bfs_expr *expr) {
 	struct range *range_when_true = &state->facts_when_true.ranges[INUM_RANGE];
 	constrain_min(range_when_true, expr->ino);
 	constrain_max(range_when_true, expr->ino);
+	return expr;
 }
 
-/** Infer data flow facts about a -type expression. */
-static void infer_type_facts(struct opt_state *state, const struct bfs_expr *expr) {
+/** Optimize -type. */
+static struct bfs_expr *optimize_type(struct opt_state *state, struct bfs_expr *expr) {
 	state->facts_when_true.types &= expr->num;
 	state->facts_when_false.types &= ~expr->num;
+	return expr;
 }
 
-/** Infer data flow facts about an -xtype expression. */
-static void infer_xtype_facts(struct opt_state *state, const struct bfs_expr *expr) {
+/** Optimize -xtype. */
+static struct bfs_expr *optimize_xtype(struct opt_state *state, struct bfs_expr *expr) {
 	state->facts_when_true.xtypes &= expr->num;
 	state->facts_when_false.xtypes &= ~expr->num;
+	return expr;
+}
+
+/** Signature for custom optimizer functions. */
+typedef struct bfs_expr *bfs_opt_fn(struct opt_state *state, struct bfs_expr *expr);
+
+/** Table of custom optimizer functions. */
+static const struct {
+	/** The evaluation function this optimizer applies to. */
+	bfs_eval_fn *eval_fn;
+	/** The corresponding optimizer function. */
+	bfs_opt_fn *opt_fn;
+} opt_fns[] = {
+	// Primaries
+	{eval_access,   optimize_access},
+	{eval_gid,      optimize_gid},
+	{eval_samefile, optimize_samefile},
+	{eval_type,     optimize_type},
+	{eval_uid,      optimize_uid},
+	{eval_xtype,    optimize_xtype},
+
+	// Operators
+	{eval_and,   optimize_and_expr_recursive},
+	{eval_comma, optimize_comma_expr_recursive},
+	{eval_not,   optimize_not_expr_recursive},
+	{eval_or,    optimize_or_expr_recursive},
+};
+
+/**
+ * Look up the appropriate optimizer for an expression and call it.
+ */
+static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs_expr *expr) {
+	for (size_t i = 0; i < BFS_COUNTOF(opt_fns); ++i) {
+		if (opt_fns[i].eval_fn == expr->eval_fn) {
+			return opt_fns[i].opt_fn(state, expr);
+		}
+	}
+
+	return expr;
 }
 
 static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
@@ -851,9 +897,7 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
-	if (expr->eval_fn == eval_access) {
-		infer_access_facts(state, expr);
-	} else if (expr->eval_fn == eval_acl) {
+	if (expr->eval_fn == eval_acl) {
 		infer_pred_facts(state, ACL_PRED);
 	} else if (expr->eval_fn == eval_capable) {
 		infer_pred_facts(state, CAPABLE_PRED);
@@ -861,8 +905,6 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		infer_icmp_facts(state, expr, DEPTH_RANGE);
 	} else if (expr->eval_fn == eval_empty) {
 		infer_pred_facts(state, EMPTY_PRED);
-	} else if (expr->eval_fn == eval_gid) {
-		infer_gid_facts(state, expr);
 	} else if (expr->eval_fn == eval_hidden) {
 		infer_pred_facts(state, HIDDEN_PRED);
 	} else if (expr->eval_fn == eval_inum) {
@@ -873,30 +915,15 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		infer_pred_facts(state, NOGROUP_PRED);
 	} else if (expr->eval_fn == eval_nouser) {
 		infer_pred_facts(state, NOUSER_PRED);
-	} else if (expr->eval_fn == eval_samefile) {
-		infer_samefile_facts(state, expr);
 	} else if (expr->eval_fn == eval_size) {
 		infer_icmp_facts(state, expr, SIZE_RANGE);
 	} else if (expr->eval_fn == eval_sparse) {
 		infer_pred_facts(state, SPARSE_PRED);
-	} else if (expr->eval_fn == eval_type) {
-		infer_type_facts(state, expr);
-	} else if (expr->eval_fn == eval_uid) {
-		infer_uid_facts(state, expr);
 	} else if (expr->eval_fn == eval_xattr) {
 		infer_pred_facts(state, XATTR_PRED);
-	} else if (expr->eval_fn == eval_xtype) {
-		infer_xtype_facts(state, expr);
-	} else if (expr->eval_fn == eval_not) {
-		expr = optimize_not_expr_recursive(state, expr);
-	} else if (expr->eval_fn == eval_and) {
-		expr = optimize_and_expr_recursive(state, expr);
-	} else if (expr->eval_fn == eval_or) {
-		expr = optimize_or_expr_recursive(state, expr);
-	} else if (expr->eval_fn == eval_comma) {
-		expr = optimize_comma_expr_recursive(state, expr);
 	}
 
+	expr = optimize_expr_lookup(state, expr);
 	if (!expr) {
 		return NULL;
 	}
