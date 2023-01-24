@@ -789,8 +789,6 @@ static struct bfs_expr *optimize_access(struct opt_state *state, struct bfs_expr
 
 /** Optimize -gid. */
 static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *expr) {
-	infer_icmp_facts(state, expr, GID_RANGE);
-
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
 	if (range->min == range->max) {
 		gid_t gid = range->min;
@@ -805,8 +803,6 @@ static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *e
 
 /** Optimize -uid. */
 static struct bfs_expr *optimize_uid(struct opt_state *state, struct bfs_expr *expr) {
-	infer_icmp_facts(state, expr, UID_RANGE);
-
 	struct range *range = &state->facts_when_true.ranges[UID_RANGE];
 	if (range->min == range->max) {
 		uid_t uid = range->min;
@@ -860,6 +856,23 @@ static const struct {
 	{eval_xattr,     XATTR_PRED},
 };
 
+/**
+ * Table of simple range comparisons.
+ */
+static const struct {
+	/** The evaluation function this optimizer applies to. */
+	bfs_eval_fn *eval_fn;
+	/** The corresponding range. */
+	enum range_type range;
+} opt_ranges[] = {
+	{eval_depth, DEPTH_RANGE},
+	{eval_gid,     GID_RANGE},
+	{eval_inum,   INUM_RANGE},
+	{eval_links, LINKS_RANGE},
+	{eval_size,   SIZE_RANGE},
+	{eval_uid,     UID_RANGE},
+};
+
 /** Signature for custom optimizer functions. */
 typedef struct bfs_expr *bfs_opt_fn(struct opt_state *state, struct bfs_expr *expr);
 
@@ -896,6 +909,13 @@ static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs
 		}
 	}
 
+	for (size_t i = 0; i < BFS_COUNTOF(opt_ranges); ++i) {
+		if (opt_ranges[i].eval_fn == expr->eval_fn) {
+			infer_icmp_facts(state, expr, opt_ranges[i].range);
+			break;
+		}
+	}
+
 	for (size_t i = 0; i < BFS_COUNTOF(opt_fns); ++i) {
 		if (opt_fns[i].eval_fn == expr->eval_fn) {
 			return opt_fns[i].opt_fn(state, expr);
@@ -921,16 +941,6 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 
 	if (!bfs_expr_is_parent(expr) && !expr->pure) {
 		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
-	}
-
-	if (expr->eval_fn == eval_depth) {
-		infer_icmp_facts(state, expr, DEPTH_RANGE);
-	} else if (expr->eval_fn == eval_inum) {
-		infer_icmp_facts(state, expr, INUM_RANGE);
-	} else if (expr->eval_fn == eval_links) {
-		infer_icmp_facts(state, expr, LINKS_RANGE);
-	} else if (expr->eval_fn == eval_size) {
-		infer_icmp_facts(state, expr, SIZE_RANGE);
 	}
 
 	expr = optimize_expr_lookup(state, expr);
