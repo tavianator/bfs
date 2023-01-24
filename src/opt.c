@@ -787,6 +787,18 @@ static struct bfs_expr *optimize_access(struct opt_state *state, struct bfs_expr
 	return expr;
 }
 
+/** Optimize -empty. */
+static struct bfs_expr *optimize_empty(struct opt_state *state, struct bfs_expr *expr) {
+	if (state->ctx->optlevel >= 4) {
+		// Since -empty attempts to open and read directories, it may
+		// have side effects such as reporting permission errors, and
+		// thus shouldn't be re-ordered without aggressive optimizations
+		expr->pure = true;
+	}
+
+	return expr;
+}
+
 /** Optimize -gid. */
 static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *expr) {
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
@@ -832,10 +844,52 @@ static struct bfs_expr *optimize_type(struct opt_state *state, struct bfs_expr *
 
 /** Optimize -xtype. */
 static struct bfs_expr *optimize_xtype(struct opt_state *state, struct bfs_expr *expr) {
+	if (state->ctx->optlevel >= 4) {
+		// Since -xtype dereferences symbolic links, it may have side
+		// effects such as reporting permission errors, and thus
+		// shouldn't be re-ordered without aggressive optimizations
+		expr->pure = true;
+	}
+
 	state->facts_when_true.xtypes &= expr->num;
 	state->facts_when_false.xtypes &= ~expr->num;
 	return expr;
 }
+
+/**
+ * Table of pure expressions.
+ */
+static bfs_eval_fn *const opt_pure[] = {
+	eval_access,
+	eval_acl,
+	eval_capable,
+	eval_depth,
+	eval_false,
+	eval_flags,
+	eval_fstype,
+	eval_gid,
+	eval_hidden,
+	eval_inum,
+	eval_links,
+	eval_lname,
+	eval_name,
+	eval_newer,
+	eval_nogroup,
+	eval_nouser,
+	eval_path,
+	eval_perm,
+	eval_regex,
+	eval_samefile,
+	eval_size,
+	eval_sparse,
+	eval_time,
+	eval_true,
+	eval_type,
+	eval_uid,
+	eval_used,
+	eval_xattr,
+	eval_xattrname,
+};
 
 /**
  * Table of simple predicates.
@@ -885,6 +939,7 @@ static const struct {
 } opt_fns[] = {
 	// Primaries
 	{eval_access,   optimize_access},
+	{eval_empty,    optimize_empty},
 	{eval_gid,      optimize_gid},
 	{eval_samefile, optimize_samefile},
 	{eval_type,     optimize_type},
@@ -902,6 +957,13 @@ static const struct {
  * Look up the appropriate optimizer for an expression and call it.
  */
 static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs_expr *expr) {
+	for (size_t i = 0; i < BFS_COUNTOF(opt_pure); ++i) {
+		if (opt_pure[i] == expr->eval_fn) {
+			expr->pure = true;
+			break;
+		}
+	}
+
 	for (size_t i = 0; i < BFS_COUNTOF(opt_preds); ++i) {
 		if (opt_preds[i].eval_fn == expr->eval_fn) {
 			infer_pred_facts(state, opt_preds[i].pred);

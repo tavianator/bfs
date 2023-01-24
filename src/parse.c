@@ -85,6 +85,7 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	expr->argv = argv;
 	expr->persistent_fds = 0;
 	expr->ephemeral_fds = 0;
+	expr->pure = false;
 	expr->cost = FAST_COST;
 	expr->evaluations = 0;
 	expr->successes = 0;
@@ -92,17 +93,14 @@ struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
 	expr->elapsed.tv_nsec = 0;
 
 	if (eval_fn == eval_true) {
-		expr->pure = true;
 		expr->always_true = true;
 		expr->always_false = false;
 		expr->probability = 1.0;
 	} else if (eval_fn == eval_false) {
-		expr->pure = true;
 		expr->always_true = false;
 		expr->always_false = true;
 		expr->probability = 0.0;
 	} else {
-		expr->pure = false;
 		expr->always_true = false;
 		expr->always_false = false;
 		expr->probability = 0.5;
@@ -814,11 +812,7 @@ static struct bfs_expr *parse_unary_option(struct parser_state *state) {
  */
 static struct bfs_expr *parse_test(struct parser_state *state, bfs_eval_fn *eval_fn, size_t argc) {
 	char **argv = parser_advance(state, T_TEST, argc);
-	struct bfs_expr *expr = bfs_expr_new(eval_fn, argc, argv);
-	if (expr) {
-		expr->pure = true;
-	}
-	return expr;
+	return bfs_expr_new(eval_fn, argc, argv);
 }
 
 /**
@@ -1344,16 +1338,7 @@ static struct bfs_expr *parse_empty(struct parser_state *state, int arg1, int ar
 
 	expr->cost = 2000.0;
 	expr->probability = 0.01;
-
-	if (state->ctx->optlevel < 4) {
-		// Since -empty attempts to open and read directories, it may
-		// have side effects such as reporting permission errors, and
-		// thus shouldn't be re-ordered without aggressive optimizations
-		expr->pure = false;
-	}
-
 	expr->ephemeral_fds = 1;
-
 	return expr;
 }
 
@@ -2030,7 +2015,6 @@ static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int
 	}
 
 	hidden->probability = 0.01;
-	hidden->pure = true;
 
 	if (parse_exclude(state, hidden) != 0) {
 		return NULL;
@@ -2765,13 +2749,6 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 
 	expr->num = types;
 	expr->probability = probability;
-
-	if (x && state->ctx->optlevel < 4) {
-		// Since -xtype dereferences symbolic links, it may have side
-		// effects such as reporting permission errors, and thus
-		// shouldn't be re-ordered without aggressive optimizations
-		expr->pure = false;
-	}
 
 	return expr;
 
