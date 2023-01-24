@@ -1010,24 +1010,9 @@ static struct bfs_expr *parse_xargs_safe(struct parser_state *state, int arg1, i
  */
 static struct bfs_expr *parse_access(struct parser_state *state, int flag, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_access);
-	if (!expr) {
-		return NULL;
+	if (expr) {
+		expr->num = flag;
 	}
-
-	expr->num = flag;
-
-	switch (flag) {
-	case R_OK:
-		expr->probability = 0.99;
-		break;
-	case W_OK:
-		expr->probability = 0.8;
-		break;
-	case X_OK:
-		expr->probability = 0.2;
-		break;
-	}
-
 	return expr;
 }
 
@@ -1036,11 +1021,7 @@ static struct bfs_expr *parse_access(struct parser_state *state, int flag, int a
  */
 static struct bfs_expr *parse_acl(struct parser_state *state, int flag, int arg2) {
 #if BFS_CAN_CHECK_ACL
-	struct bfs_expr *expr = parse_nullary_test(state, eval_acl);
-	if (expr) {
-		expr->probability = 0.00002;
-	}
-	return expr;
+	return parse_nullary_test(state, eval_acl);
 #else
 	parse_error(state, "Missing platform support.\n");
 	return NULL;
@@ -1160,11 +1141,7 @@ fail:
  */
 static struct bfs_expr *parse_capable(struct parser_state *state, int flag, int arg2) {
 #if BFS_CAN_CHECK_CAPABILITIES
-	struct bfs_expr *expr = parse_nullary_test(state, eval_capable);
-	if (expr) {
-		expr->probability = 0.000002;
-	}
-	return expr;
+	return parse_nullary_test(state, eval_capable);
 #else
 	parse_error(state, "Missing platform support.\n");
 	return NULL;
@@ -1293,12 +1270,9 @@ static struct bfs_expr *parse_depth_limit(struct parser_state *state, int is_min
  */
 static struct bfs_expr *parse_empty(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_empty);
-	if (!expr) {
-		return NULL;
+	if (expr) {
+		expr->ephemeral_fds = 1;
 	}
-
-	expr->probability = 0.01;
-	expr->ephemeral_fds = 1;
 	return expr;
 }
 
@@ -1658,11 +1632,7 @@ fail:
  * Parse -hidden.
  */
 static struct bfs_expr *parse_hidden(struct parser_state *state, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_test(state, eval_hidden);
-	if (expr) {
-		expr->probability = 0.01;
-	}
-	return expr;
+	return parse_nullary_test(state, eval_hidden);
 }
 
 /**
@@ -1677,22 +1647,14 @@ static struct bfs_expr *parse_ignore_races(struct parser_state *state, int ignor
  * Parse -inum N.
  */
 static struct bfs_expr *parse_inum(struct parser_state *state, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_test_icmp(state, eval_inum);
-	if (expr) {
-		expr->probability = expr->int_cmp == BFS_INT_EQUAL ? 0.01 : 0.50;
-	}
-	return expr;
+	return parse_test_icmp(state, eval_inum);
 }
 
 /**
  * Parse -links N.
  */
 static struct bfs_expr *parse_links(struct parser_state *state, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_test_icmp(state, eval_links);
-	if (expr) {
-		expr->probability = bfs_expr_cmp(expr, 1) ? 0.99 : 0.01;
-	}
-	return expr;
+	return parse_test_icmp(state, eval_links);
 }
 
 /**
@@ -1762,12 +1724,6 @@ static struct bfs_expr *parse_fnmatch(const struct parser_state *state, struct b
 		parse_expr_warning(state, expr, "Unescaped trailing backslash.\n\n");
 		expr->eval_fn = eval_false;
 		return expr;
-	}
-
-	if (strchr(pattern, '*')) {
-		expr->probability = 0.5;
-	} else {
-		expr->probability = 0.1;
 	}
 
 	return expr;
@@ -1921,16 +1877,11 @@ fail:
  */
 static struct bfs_expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_nogroup);
-	if (!expr) {
-		return NULL;
+	if (expr) {
+		// Who knows how many FDs getgrgid_r() needs?  Probably at least
+		// one for /etc/group
+		expr->ephemeral_fds = 1;
 	}
-
-	expr->probability = 0.01;
-
-	// Who knows how many FDs getgrgid_r() needs?  Probably at least one for
-	// /etc/group
-	expr->ephemeral_fds = 1;
-
 	return expr;
 }
 
@@ -1942,8 +1893,6 @@ static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int
 	if (!hidden) {
 		return NULL;
 	}
-
-	hidden->probability = 0.01;
 
 	if (parse_exclude(state, hidden) != 0) {
 		return NULL;
@@ -1966,16 +1915,11 @@ static struct bfs_expr *parse_noleaf(struct parser_state *state, int arg1, int a
  */
 static struct bfs_expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_nouser);
-	if (!expr) {
-		return NULL;
+	if (expr) {
+		// Who knows how many FDs getpwuid_r() needs?  Probably at least
+		// one for /etc/passwd
+		expr->ephemeral_fds = 1;
 	}
-
-	expr->probability = 0.01;
-
-	// Who knows how many FDs getpwuid_r() needs?  Probably at least one for
-	// /etc/passwd
-	expr->ephemeral_fds = 1;
-
 	return expr;
 }
 
@@ -2428,9 +2372,6 @@ static struct bfs_expr *parse_samefile(struct parser_state *state, int arg1, int
 
 	expr->dev = sb.dev;
 	expr->ino = sb.ino;
-
-	expr->probability = 0.01;
-
 	return expr;
 }
 
@@ -2548,8 +2489,6 @@ static struct bfs_expr *parse_size(struct parser_state *state, int arg1, int arg
 		goto bad_unit;
 	}
 
-	expr->probability = expr->int_cmp == BFS_INT_EQUAL ? 0.01 : 0.50;
-
 	return expr;
 
 bad_unit:
@@ -2584,50 +2523,37 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 		return NULL;
 	}
 
-	unsigned int types = 0;
-	float probability = 0.0;
+	expr->num = 0;
 
 	const char *c = expr->argv[1];
 	while (true) {
-		enum bfs_type type;
-		float type_prob;
-
 		switch (*c) {
 		case 'b':
-			type = BFS_BLK;
-			type_prob = 0.00000721183;
+			expr->num |= 1 << BFS_BLK;
 			break;
 		case 'c':
-			type = BFS_CHR;
-			type_prob = 0.0000499855;
+			expr->num |= 1 << BFS_CHR;
 			break;
 		case 'd':
-			type = BFS_DIR;
-			type_prob = 0.114475;
+			expr->num |= 1 << BFS_DIR;
 			break;
 		case 'D':
-			type = BFS_DOOR;
-			type_prob = 0.000001;
+			expr->num |= 1 << BFS_DOOR;
 			break;
 		case 'p':
-			type = BFS_FIFO;
-			type_prob = 0.00000248684;
+			expr->num |= 1 << BFS_FIFO;
 			break;
 		case 'f':
-			type = BFS_REG;
-			type_prob = 0.859772;
+			expr->num |= 1 << BFS_REG;
 			break;
 		case 'l':
-			type = BFS_LNK;
-			type_prob = 0.0256816;
+			expr->num |= 1 << BFS_LNK;
 			break;
 		case 's':
-			type = BFS_SOCK;
-			type_prob = 0.0000116881;
+			expr->num |= 1 << BFS_SOCK;
 			break;
 		case 'w':
-			type = BFS_WHT;
-			type_prob = 0.000001;
+			expr->num |= 1 << BFS_WHT;
 			break;
 
 		case '\0':
@@ -2637,12 +2563,6 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 		default:
 			parse_expr_error(state, expr, "Unknown type flag ${err}%c${rs}; expected one of [${bld}bcdpflsD${rs}].\n", *c);
 			goto fail;
-		}
-
-		unsigned int flag = 1 << type;
-		if (!(types & flag)) {
-			types |= flag;
-			probability += type_prob;
 		}
 
 		++c;
@@ -2656,9 +2576,6 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 			goto fail;
 		}
 	}
-
-	expr->num = types;
-	expr->probability = probability;
 
 	return expr;
 
@@ -2680,11 +2597,7 @@ static struct bfs_expr *parse_warn(struct parser_state *state, int warn, int arg
  */
 static struct bfs_expr *parse_xattr(struct parser_state *state, int arg1, int arg2) {
 #if BFS_CAN_CHECK_XATTRS
-	struct bfs_expr *expr = parse_nullary_test(state, eval_xattr);
-	if (expr) {
-		expr->probability = 0.01;
-	}
-	return expr;
+	return parse_nullary_test(state, eval_xattr);
 #else
 	parse_error(state, "Missing platform support.\n");
 	return NULL;
@@ -2696,11 +2609,7 @@ static struct bfs_expr *parse_xattr(struct parser_state *state, int arg1, int ar
  */
 static struct bfs_expr *parse_xattrname(struct parser_state *state, int arg1, int arg2) {
 #if BFS_CAN_CHECK_XATTRS
-	struct bfs_expr *expr = parse_unary_test(state, eval_xattrname);
-	if (expr) {
-		expr->probability = 0.01;
-	}
-	return expr;
+	return parse_unary_test(state, eval_xattrname);
 #else
 	parse_error(state, "Missing platform support.\n");
 	return NULL;

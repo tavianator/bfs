@@ -54,6 +54,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 static char *fake_and_arg = "-a";
@@ -776,15 +777,23 @@ static void infer_icmp_facts(struct opt_state *state, const struct bfs_expr *exp
 
 /** Optimize -{execut,read,writ}able. */
 static struct bfs_expr *optimize_access(struct opt_state *state, struct bfs_expr *expr) {
+	expr->probability = 1.0;
+
 	if (expr->num & R_OK) {
 		infer_pred_facts(state, READABLE_PRED);
+		expr->probability *= 0.99;
 	}
+
 	if (expr->num & W_OK) {
 		infer_pred_facts(state, WRITABLE_PRED);
+		expr->probability *= 0.8;
 	}
+
 	if (expr->num & X_OK) {
 		infer_pred_facts(state, EXECUTABLE_PRED);
+		expr->probability *= 0.2;
 	}
+
 	return expr;
 }
 
@@ -811,6 +820,17 @@ static struct bfs_expr *optimize_exec(struct opt_state *state, struct bfs_expr *
 	return expr;
 }
 
+/** Optimize -name/-lname/-path. */
+static struct bfs_expr *optimize_fnmatch(struct opt_state *state, struct bfs_expr *expr) {
+	if (strchr(expr->argv[1], '*')) {
+		expr->probability = 0.5;
+	} else {
+		expr->probability = 0.1;
+	}
+
+	return expr;
+}
+
 /** Optimize -gid. */
 static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *expr) {
 	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
@@ -820,6 +840,30 @@ static struct bfs_expr *optimize_gid(struct opt_state *state, struct bfs_expr *e
 		if (errno == 0) {
 			constrain_pred(&state->facts_when_true.preds[NOGROUP_PRED], nogroup);
 		}
+	}
+
+	return expr;
+}
+
+/** Optimize -inum. */
+static struct bfs_expr *optimize_inum(struct opt_state *state, struct bfs_expr *expr) {
+	struct range *range = &state->facts_when_true.ranges[INUM_RANGE];
+	if (range->min == range->max) {
+		expr->probability = 0.01;
+	} else {
+		expr->probability = 0.5;
+	}
+
+	return expr;
+}
+
+/** Optimize -links. */
+static struct bfs_expr *optimize_links(struct opt_state *state, struct bfs_expr *expr) {
+	struct range *range = &state->facts_when_true.ranges[LINKS_RANGE];
+	if (1 >= range->min && 1 <= range->max) {
+		expr->probability = 0.99;
+	} else {
+		expr->probability = 0.5;
 	}
 
 	return expr;
@@ -847,10 +891,59 @@ static struct bfs_expr *optimize_samefile(struct opt_state *state, struct bfs_ex
 	return expr;
 }
 
+/** Optimize -size. */
+static struct bfs_expr *optimize_size(struct opt_state *state, struct bfs_expr *expr) {
+	struct range *range = &state->facts_when_true.ranges[SIZE_RANGE];
+	if (range->min == range->max) {
+		expr->probability = 0.01;
+	} else {
+		expr->probability = 0.5;
+	}
+
+	return expr;
+}
+
+/** Estimate probability for -x?type. */
+static void estimate_type_probability(struct bfs_expr *expr) {
+	unsigned int types = expr->num;
+
+	expr->probability = 0.0;
+	if (types & (1 << BFS_BLK)) {
+		expr->probability += 0.00000721183;
+	}
+	if (types & (1 << BFS_CHR)) {
+		expr->probability += 0.0000499855;
+	}
+	if (types & (1 << BFS_DIR)) {
+		expr->probability += 0.114475;
+	}
+	if (types & (1 << BFS_DOOR)) {
+		expr->probability += 0.000001;
+	}
+	if (types & (1 << BFS_FIFO)) {
+		expr->probability += 0.00000248684;
+	}
+	if (types & (1 << BFS_REG)) {
+		expr->probability += 0.859772;
+	}
+	if (types & (1 << BFS_LNK)) {
+		expr->probability += 0.0256816;
+	}
+	if (types & (1 << BFS_SOCK)) {
+		expr->probability += 0.0000116881;
+	}
+	if (types & (1 << BFS_WHT)) {
+		expr->probability += 0.000001;
+	}
+}
+
 /** Optimize -type. */
 static struct bfs_expr *optimize_type(struct opt_state *state, struct bfs_expr *expr) {
 	state->facts_when_true.types &= expr->num;
 	state->facts_when_false.types &= ~expr->num;
+
+	estimate_type_probability(expr);
+
 	return expr;
 }
 
@@ -865,6 +958,9 @@ static struct bfs_expr *optimize_xtype(struct opt_state *state, struct bfs_expr 
 
 	state->facts_when_true.xtypes &= expr->num;
 	state->facts_when_false.xtypes &= ~expr->num;
+
+	estimate_type_probability(expr);
+
 	return expr;
 }
 
@@ -976,6 +1072,29 @@ static const struct {
 };
 
 /**
+ * Table of expression probabilities.
+ */
+static const struct {
+	/** The evaluation function with this cost. */
+	bfs_eval_fn *eval_fn;
+	/** The matching probability. */
+	float probability;
+} opt_probs[] = {
+	{eval_acl,       0.00002},
+	{eval_capable,   0.000002},
+	{eval_empty,     0.01},
+	{eval_false,     0.0},
+	{eval_hidden,    0.01},
+	{eval_nogroup,   0.01},
+	{eval_nouser,    0.01},
+	{eval_samefile,  0.01},
+	{eval_true,      1.0},
+	{eval_xattr,     0.01},
+	{eval_xattrname, 0.01},
+};
+
+
+/**
  * Table of simple predicates.
  */
 static const struct {
@@ -1026,7 +1145,13 @@ static const struct {
 	{eval_empty,    optimize_empty},
 	{eval_exec,     optimize_exec},
 	{eval_gid,      optimize_gid},
+	{eval_inum,     optimize_inum},
+	{eval_links,    optimize_links},
+	{eval_lname,    optimize_fnmatch},
+	{eval_name,     optimize_fnmatch},
+	{eval_path,     optimize_fnmatch},
 	{eval_samefile, optimize_samefile},
+	{eval_size,     optimize_size},
 	{eval_type,     optimize_type},
 	{eval_uid,      optimize_uid},
 	{eval_xtype,    optimize_xtype},
@@ -1067,6 +1192,13 @@ static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs
 	for (size_t i = 0; i < BFS_COUNTOF(opt_costs); ++i) {
 		if (opt_costs[i].eval_fn == expr->eval_fn) {
 			expr->cost = opt_costs[i].cost;
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < BFS_COUNTOF(opt_probs); ++i) {
+		if (opt_probs[i].eval_fn == expr->eval_fn) {
+			expr->probability = opt_probs[i].probability;
 			break;
 		}
 	}
