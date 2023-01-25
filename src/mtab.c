@@ -221,7 +221,7 @@ static void bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 		if (fd >= 0) {
 			struct bfs_stat parent;
 			if (bfs_stat(fd, NULL, flags, &parent) == 0) {
-				if (parent.dev == sb.dev) {
+				if (parent.dev == sb.dev && parent.ino != sb.ino) {
 					// Not a mount point any more (or a bind mount, but with the same fstype)
 					goto next;
 				}
