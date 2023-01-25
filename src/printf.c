@@ -255,6 +255,10 @@ static int bfs_printf_F(CFILE *cfile, const struct bfs_printf *directive, const 
 	}
 
 	const char *type = bfs_fstype(directive->ptr, statbuf);
+	if (!type) {
+		return -1;
+	}
+
 	return dyn_fprintf(cfile->file, directive, type);
 }
 

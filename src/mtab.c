@@ -192,60 +192,89 @@ fail:
 	return NULL;
 }
 
-static void bfs_mtab_fill_types(struct bfs_mtab *mtab) {
+static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 	const enum bfs_stat_flags flags = BFS_STAT_NOFOLLOW | BFS_STAT_NOSYNC;
+	int ret = -1;
+
+	// It's possible that /path/to/mount was unmounted between bfs_mtab_parse() and bfs_mtab_fill_types().
+	// In that case, the dev_t of /path/to/mount will be the same as /path/to, which should not get its
+	// fstype from the old mount record of /path/to/mount.
+	//
+	// Detect this by comparing the st_dev of the parent (/path/to) and child (/path/to/mount).  Only when
+	// they differ can the filesystem type actually change between them.  As a minor optimization, we keep
+	// the parent directory open in case multiple mounts have the same parent (e.g. /mnt).
+	char *parent_dir = NULL;
+	int parent_fd = -1;
+	struct bfs_stat parent_stat;
+	int parent_ret;
 
 	for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
 		struct bfs_mtab_entry *entry = &mtab->entries[i];
-
-		// It's possible that /path/to/mount was unmounted between bfs_mtab_parse() and bfs_mtab_fill_types().
-		// In that case, the dev_t of /path/to/mount will be the same as /path/to, which should not get its
-		// fstype from the old mount record of /path/to/mount.
-		int fd = -1;
 		const char *path = entry->path;
+		int fd = AT_FDCWD;
+
 		char *dir = xdirname(path);
-		if (dir) {
-			fd = open(dir, O_SEARCH | O_CLOEXEC | O_DIRECTORY);
+		if (!dir) {
+			goto fail;
 		}
-		if (fd >= 0) {
-			path += xbaseoff(path);
+
+		if (parent_dir && strcmp(parent_dir, dir) == 0) {
+			// Same parent
+			free(dir);
 		} else {
-			fd = AT_FDCWD;
+			free(parent_dir);
+			parent_dir = dir;
+
+			if (parent_fd >= 0) {
+				xclose(parent_fd);
+			}
+			parent_fd = open(parent_dir, O_SEARCH, O_CLOEXEC, O_DIRECTORY);
+
+			parent_ret = -1;
+			if (parent_fd >= 0) {
+				parent_ret = bfs_stat(parent_fd, NULL, flags, &parent_stat);
+			}
+		}
+
+		if (parent_fd >= 0) {
+			fd = parent_fd;
+			path += xbaseoff(path);
 		}
 
 		struct bfs_stat sb;
 		if (bfs_stat(fd, path, flags, &sb) != 0) {
-			goto next;
+			continue;
 		}
 
-		if (fd >= 0) {
-			struct bfs_stat parent;
-			if (bfs_stat(fd, NULL, flags, &parent) == 0) {
-				if (parent.dev == sb.dev && parent.ino != sb.ino) {
-					// Not a mount point any more (or a bind mount, but with the same fstype)
-					goto next;
-				}
-			}
+		if (parent_ret == 0 && parent_stat.dev == sb.dev && parent_stat.ino != sb.ino) {
+			// Not a mount point any more (or a bind mount, but with the same fstype)
+			continue;
 		}
 
 		struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
 		if (leaf) {
 			leaf->value = entry->type;
-		}
-
-	next:
-		free(dir);
-		if (fd >= 0) {
-			xclose(fd);
+		} else {
+			goto fail;
 		}
 	}
 
 	mtab->types_filled = true;
+	ret = 0;
+
+fail:
+	if (parent_fd >= 0) {
+		xclose(parent_fd);
+	}
+	free(parent_dir);
+	return ret;
 }
 
 const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statbuf) {
 	if (!mtab->types_filled) {
-		bfs_mtab_fill_types((struct bfs_mtab *)mtab);
+		if (bfs_mtab_fill_types((struct bfs_mtab *)mtab) != 0) {
+			return NULL;
+		}
 	}
 
 	const struct trie_leaf *leaf = trie_find_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));

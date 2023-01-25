@@ -509,6 +509,11 @@ bool eval_fstype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	const char *type = bfs_fstype(mtab, statbuf);
+	if (!type) {
+		eval_report_error(state);
+		return false;
+	}
+
 	return strcmp(type, expr->argv[1]) == 0;
 }
 
