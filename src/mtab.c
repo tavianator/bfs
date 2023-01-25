@@ -228,7 +228,7 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 			if (parent_fd >= 0) {
 				xclose(parent_fd);
 			}
-			parent_fd = open(parent_dir, O_SEARCH, O_CLOEXEC, O_DIRECTORY);
+			parent_fd = open(parent_dir, O_SEARCH | O_CLOEXEC | O_DIRECTORY);
 
 			parent_ret = -1;
 			if (parent_fd >= 0) {
