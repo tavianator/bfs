@@ -192,8 +192,8 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 	// the parent directory open in case multiple mounts have the same parent (e.g. /mnt).
 	char *parent_dir = NULL;
 	int parent_fd = -1;
+	int parent_ret = -1;
 	struct bfs_stat parent_stat;
-	int parent_ret;
 
 	for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
 		struct bfs_mtab_entry *entry = &mtab->entries[i];
