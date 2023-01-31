@@ -104,13 +104,11 @@ static int xtouch(const struct args *args, const char *path) {
 		}
 
 		if (futimens(fd, args->times) != 0) {
-			int error = errno;
-			close(fd);
-			errno = error;
+			close_quietly(fd);
 			return -1;
 		}
 
-		return close(fd);
+		return xclose(fd);
 	}
 }
 

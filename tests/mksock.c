@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
 		ret = EXIT_FAILURE;
 	}
 
-	if (close(fd) != 0) {
+	if (xclose(fd) != 0) {
 		errmsg(cmd, path);
 		ret = EXIT_FAILURE;
 	}
