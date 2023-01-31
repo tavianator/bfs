@@ -1,6 +1,46 @@
 2.*
 ===
 
+2.6.3
+-----
+
+**January 31, 2023**
+
+- Fixed running the tests as root on Linux [`8b24de3`]
+
+- Fixed some tests on Android [`2724dfb`] [`0a5a80c`]
+
+- Stopped relying on non-POSIX touch(1) features in the tests.
+  This should fix the tests on at least OpenBSD.
+  [`2d5edb3`]
+
+- User/group caches are now filled lazily instead of eagerly [`b41dca5`]
+
+- More caches and I/O streams are flushed before -exec/-ok [`f98a1c4`]
+
+- Fixed various memory safety issues found by fuzzing \
+  [`712b137`] [`5ce883d`] [`da02def`] [`c55e855`]
+
+- Fixed a test failure on certain macOS versions [`8b24de3`]
+
+- Mitigated a race condition when determining filesystem types ([#97])
+
+- Lots of refactoring and optimization
+
+[`8b24de3`]: https://github.com/tavianator/bfs/commit/8b24de3882ff5a3e33b82ab20bb4eadf134cf559
+[`2724dfb`]: https://github.com/tavianator/bfs/commit/2724dfbd17552f892a0d8b39b96cbe9e49d66fdb
+[`0a5a80c`]: https://github.com/tavianator/bfs/commit/0a5a80c98cc7e5d8735b615fa197a6cff2bb08cc
+[`2d5edb3`]: https://github.com/tavianator/bfs/commit/2d5edb37b924715b4fbee4d917ac334c773fca61
+[`b41dca5`]: https://github.com/tavianator/bfs/commit/b41dca52762c5188638236ae81b9f4597bb29ac9
+[`f98a1c4`]: https://github.com/tavianator/bfs/commit/f98a1c4a1cf61ff7d6483388ca1fac365fb0b31b
+[`712b137`]: https://github.com/tavianator/bfs/commit/712b13756a09014ef730c8f9b96da4dc2f09b762
+[`5ce883d`]: https://github.com/tavianator/bfs/commit/5ce883daaafc69f83b01dac5db0647e9662a6e87
+[`da02def`]: https://github.com/tavianator/bfs/commit/da02defb91c3a1bda0ea7e653d81f997f1c8884a
+[`c55e855`]: https://github.com/tavianator/bfs/commit/c55e85580df10c5afdc6fc0710e756a456aa8e93
+[`8b24de3`]: https://github.com/tavianator/bfs/commit/8b24de3882ff5a3e33b82ab20bb4eadf134cf559
+[#97]: https://github.com/tavianator/bfs/issues/97
+
+
 2.6.2
 -----
 
