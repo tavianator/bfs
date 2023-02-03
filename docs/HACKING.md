@@ -7,6 +7,12 @@ License
 `bfs` is licensed under the [Zero-Clause BSD License](https://opensource.org/licenses/0BSD), a maximally permissive license.
 Contributions must use the same license.
 
+Individual files contain the following tag instead of the full license text:
+
+    SPDX-License-Identifier: 0BSD
+
+This enables machine processing of license information based on the SPDX License Identifiers that are available here: https://spdx.org/licenses/
+
 
 Implementation
 --------------

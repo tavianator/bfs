@@ -9,13 +9,3 @@ SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL D
 ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
 OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
 USE OR PERFORMANCE OF THIS SOFTWARE.
-
----
-
-bfs is licensed under the Zero Clause BSD License.  Individual files contain the following
-tag instead of the full license text:
-
-    SPDX-License-Identifier: 0BSD
-
-This enables machine processing of license information based on the SPDX License
-Identifiers that are available here: https://spdx.org/licenses/
