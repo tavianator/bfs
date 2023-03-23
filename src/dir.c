@@ -107,7 +107,10 @@ struct bfs_dir {
 	// sys_dirent buf[];
 #else
 	DIR *dir;
+	struct dirent *de;
 #endif
+
+	bool eof;
 };
 
 #if BFS_GETDENTS
@@ -152,8 +155,10 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 		free(dir);
 		return NULL;
 	}
+	dir->de = NULL;
 #endif
 
+	dir->eof = false;
 	return dir;
 }
 
@@ -165,43 +170,73 @@ int bfs_dirfd(const struct bfs_dir *dir) {
 #endif
 }
 
-/** Convert de->d_type to a bfs_type, if it exists. */
-static enum bfs_type bfs_d_type(const sys_dirent *de) {
-#ifdef DTTOIF
-	return bfs_mode_to_type(DTTOIF(de->d_type));
-#else
-	return BFS_UNKNOWN;
-#endif
-}
-
-/** Read a single directory entry. */
-static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
+int bfs_polldir(struct bfs_dir *dir) {
 #if BFS_GETDENTS
-	char *buf = (char *)(dir + 1);
-
-	if (dir->pos >= dir->size) {
-		ssize_t ret = bfs_getdents(dir->fd, buf, BUF_SIZE);
-		if (ret <= 0) {
-			return ret;
-		}
-		dir->pos = 0;
-		dir->size = ret;
+	if (dir->pos < dir->size) {
+		return 1;
+	} else if (dir->eof) {
+		return 0;
 	}
 
-	*de = (void *)(buf + dir->pos);
-	dir->pos += (*de)->d_reclen;
+	char *buf = (char *)(dir + 1);
+	ssize_t size = bfs_getdents(dir->fd, buf, BUF_SIZE);
+	if (size == 0) {
+		dir->eof = true;
+		return 0;
+	} else if (size < 0) {
+		return -1;
+	}
+
+	dir->pos = 0;
+	dir->size = size;
+
+	// Like read(), getdents() doesn't indicate EOF until another call returns zero.
+	// Check that eagerly here to hopefully avoid a syscall in the last bfs_readdir().
+	size_t rest = BUF_SIZE - size;
+	if (rest >= sizeof(sys_dirent)) {
+		size = bfs_getdents(dir->fd, buf + size, rest);
+		if (size > 0) {
+			dir->size += size;
+		} else if (size == 0) {
+			dir->eof = true;
+		}
+	}
+
 	return 1;
-#else
+#else // !BFS_GETDENTS
+	if (dir->de) {
+		return 1;
+	} else if (dir->eof) {
+		return 0;
+	}
+
 	errno = 0;
-	*de = readdir(dir->dir);
-	if (*de) {
+	dir->de = readdir(dir->dir);
+	if (dir->de) {
 		return 1;
 	} else if (errno == 0) {
+		dir->eof = true;
 		return 0;
 	} else {
 		return -1;
 	}
 #endif
+}
+
+/** Read a single directory entry. */
+static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
+	int ret = bfs_polldir(dir);
+	if (ret > 0) {
+#if BFS_GETDENTS
+		char *buf = (char *)(dir + 1);
+		*de = (const sys_dirent *)(buf + dir->pos);
+		dir->pos += (*de)->d_reclen;
+#else
+		*de = dir->de;
+		dir->de = NULL;
+#endif
+	}
+	return ret;
 }
 
 /** Skip ".", "..", and deleted/empty dirents. */
@@ -215,6 +250,15 @@ static bool skip_dirent(const sys_dirent *de) {
 
 	const char *name = de->d_name;
 	return name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'));
+}
+
+/** Convert de->d_type to a bfs_type, if it exists. */
+static enum bfs_type bfs_d_type(const sys_dirent *de) {
+#ifdef DTTOIF
+	return bfs_mode_to_type(DTTOIF(de->d_type));
+#else
+	return BFS_UNKNOWN;
+#endif
 }
 
 int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {

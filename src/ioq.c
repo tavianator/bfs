@@ -158,6 +158,10 @@ static void *ioq_work(void *ptr) {
 		res->ptr = req.ptr;
 		res->dir = bfs_opendir(req.dfd, req.path);
 		res->error = errno;
+		if (res->dir) {
+			bfs_polldir(res->dir);
+		}
+
 		ioqq_push(ioq->ready, cmd);
 	}
 

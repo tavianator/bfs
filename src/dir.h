@@ -80,6 +80,16 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path);
 int bfs_dirfd(const struct bfs_dir *dir);
 
 /**
+ * Performs any I/O necessary for the next bfs_readdir() call.
+ *
+ * @param dir
+ *         The directory to poll.
+ * @return
+ *         1 on success, 0 on EOF, or -1 on failure.
+ */
+int bfs_polldir(struct bfs_dir *dir);
+
+/**
  * Read a directory entry.
  *
  * @param dir
