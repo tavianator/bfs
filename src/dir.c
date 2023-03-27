@@ -14,7 +14,39 @@
 #include <unistd.h>
 
 #if __linux__
-#	include <sys/syscall.h>
+
+#include <sys/syscall.h>
+
+#if __has_feature(memory_sanitizer)
+#	include <sanitizer/msan_interface.h>
+#endif
+
+/** Directory entry type for bfs_getdents() */
+typedef struct dirent64 sys_dirent;
+
+/** getdents() syscall wrapper. */
+static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
+#if __has_feature(memory_sanitizer)
+	__msan_allocated_memory(buf, size);
+#endif
+
+#if __GLIBC__ && !__GLIBC_PREREQ(2, 30)
+	ssize_t ret = syscall(__NR_getdents64, fd, buf, size);
+#else
+	ssize_t ret = getdents64(fd, buf, size);
+#endif
+
+#if __has_feature(memory_sanitizer)
+	if (ret > 0) {
+		__msan_unpoison(buf, ret);
+	}
+#endif
+
+	return ret;
+}
+
+#else // !__linux__
+typedef struct dirent sys_dirent;
 #endif
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
@@ -65,23 +97,6 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
 	}
 }
 
-#if __linux__
-/**
- * This is not defined in the kernel headers for some reason, callers have to
- * define it themselves.
- */
-struct linux_dirent64 {
-	ino64_t d_ino;
-	off64_t d_off;
-	unsigned short d_reclen;
-	unsigned char d_type;
-	char d_name[];
-};
-
-// Make the whole allocation 64k
-#define BUF_SIZE ((64 << 10) - 8)
-#endif
-
 struct bfs_dir {
 #if __linux__
 	int fd;
@@ -92,6 +107,10 @@ struct bfs_dir {
 	struct dirent *de;
 #endif
 };
+
+#if __linux__
+#	define BUF_SIZE ((64 << 10) - sizeof(struct bfs_dir))
+#endif
 
 struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 #if __linux__
@@ -147,64 +166,44 @@ int bfs_dirfd(const struct bfs_dir *dir) {
 #endif
 }
 
-/** Convert a dirent type to a bfs_type. */
-static enum bfs_type translate_type(int d_type) {
-	switch (d_type) {
-#ifdef DT_BLK
-	case DT_BLK:
-		return BFS_BLK;
-#endif
-#ifdef DT_CHR
-	case DT_CHR:
-		return BFS_CHR;
-#endif
-#ifdef DT_DIR
-	case DT_DIR:
-		return BFS_DIR;
-#endif
-#ifdef DT_DOOR
-	case DT_DOOR:
-		return BFS_DOOR;
-#endif
-#ifdef DT_FIFO
-	case DT_FIFO:
-		return BFS_FIFO;
-#endif
-#ifdef DT_LNK
-	case DT_LNK:
-		return BFS_LNK;
-#endif
-#ifdef DT_PORT
-	case DT_PORT:
-		return BFS_PORT;
-#endif
-#ifdef DT_REG
-	case DT_REG:
-		return BFS_REG;
-#endif
-#ifdef DT_SOCK
-	case DT_SOCK:
-		return BFS_SOCK;
-#endif
-#ifdef DT_WHT
-	case DT_WHT:
-		return BFS_WHT;
-#endif
-	}
-
-	return BFS_UNKNOWN;
-}
-
-#if !__linux__
-/** Get the type from a struct dirent if it exists, and convert it. */
-static enum bfs_type dirent_type(const struct dirent *de) {
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
-	return translate_type(de->d_type);
+/** Convert de->d_type to a bfs_type, if it exists. */
+static enum bfs_type bfs_d_type(const sys_dirent *de) {
+#ifdef DTTOIF
+	return bfs_mode_to_type(DTTOIF(de->d_type));
 #else
 	return BFS_UNKNOWN;
 #endif
 }
+
+/** Read a single directory entry. */
+static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
+#if __linux__
+	char *buf = (char *)(dir + 1);
+
+	if (dir->pos >= dir->size) {
+		ssize_t ret = bfs_getdents(dir->fd, buf, BUF_SIZE);
+		if (ret <= 0) {
+			return ret;
+		}
+		dir->pos = 0;
+		dir->size = ret;
+	}
+
+	*de = (void *)(buf + dir->pos);
+	dir->pos += (*de)->d_reclen;
+	return 1;
+#else
+	errno = 0;
+	*de = readdir(dir->dir);
+	if (*de) {
+		return 1;
+	} else if (errno == 0) {
+		return 0;
+	} else {
+		return -1;
+	}
 #endif
+}
 
 /** Check if a name is . or .. */
 static bool is_dot(const char *name) {
@@ -213,54 +212,22 @@ static bool is_dot(const char *name) {
 
 int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 	while (true) {
-#if __linux__
-		char *buf = (char *)(dir + 1);
-
-		if (dir->pos >= dir->size) {
-#if __has_feature(memory_sanitizer)
-			// Make sure msan knows the buffer is initialized
-			memset(buf, 0, BUF_SIZE);
-#endif
-
-			ssize_t size = syscall(__NR_getdents64, dir->fd, buf, BUF_SIZE);
-			if (size <= 0) {
-				return size;
-			}
-			dir->pos = 0;
-			dir->size = size;
+		const sys_dirent *sysde;
+		int ret = bfs_getdent(dir, &sysde);
+		if (ret <= 0) {
+			return ret;
 		}
 
-		const struct linux_dirent64 *lde = (void *)(buf + dir->pos);
-		dir->pos += lde->d_reclen;
-
-		if (is_dot(lde->d_name)) {
+		if (is_dot(sysde->d_name)) {
 			continue;
 		}
 
 		if (de) {
-			de->type = translate_type(lde->d_type);
-			de->name = lde->d_name;
+			de->type = bfs_d_type(sysde);
+			de->name = sysde->d_name;
 		}
 
 		return 1;
-#else // !__linux__
-		errno = 0;
-		dir->de = readdir(dir->dir);
-		if (dir->de) {
-			if (is_dot(dir->de->d_name)) {
-				continue;
-			}
-			if (de) {
-				de->type = dirent_type(dir->de);
-				de->name = dir->de->d_name;
-			}
-			return 1;
-		} else if (errno != 0) {
-			return -1;
-		} else {
-			return 0;
-		}
-#endif // !__linux__
 	}
 }
 
