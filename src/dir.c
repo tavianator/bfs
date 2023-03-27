@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,9 +106,10 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
 
 struct bfs_dir {
 #if BFS_GETDENTS
-	int fd;
+	alignas(sys_dirent) int fd;
 	unsigned short pos;
 	unsigned short size;
+	// sys_dirent buf[];
 #else
 	DIR *dir;
 	struct dirent *de;
