@@ -216,7 +216,7 @@ static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
 static bool skip_dirent(const sys_dirent *de) {
 #if __FreeBSD__
 	// NFS mounts on FreeBSD can return empty dirents with inode number 0
-	if (de->d_fileno == 0) {
+	if (de->d_ino == 0) {
 		return true;
 	}
 #endif
