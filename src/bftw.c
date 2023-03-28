@@ -10,8 +10,6 @@
  * - struct bftw_cache: An LRU list of bftw_file's with open file descriptors,
  *   used for openat() to minimize the amount of path re-traversals.
  *
- * - struct bftw_queue: A linked list of bftw_file's left to explore.
- *
  * - struct bftw_state: Represents the current state of the traversal, allowing
  *   various helper functions to take fewer parameters.
  */
@@ -21,6 +19,7 @@
 #include "config.h"
 #include "dir.h"
 #include "dstring.h"
+#include "list.h"
 #include "mtab.h"
 #include "stat.h"
 #include "trie.h"
@@ -40,13 +39,11 @@ struct bftw_file {
 	struct bftw_file *parent;
 	/** The root under which this file was found. */
 	struct bftw_file *root;
-	/** The next file in the queue, if any. */
-	struct bftw_file *next;
 
-	/** The previous file in the LRU list. */
-	struct bftw_file *lru_prev;
-	/** The next file in the LRU list. */
-	struct bftw_file *lru_next;
+	/** Queue link. */
+	struct slink link;
+	/** LRU link. */
+	struct link lru;
 
 	/** This file's depth in the walk. */
 	size_t depth;
@@ -71,143 +68,89 @@ struct bftw_file {
 	char name[];
 };
 
+/** Move from a list entry to a bftw_file. */
+static struct bftw_file *bftw_file_entry(struct slink *link) {
+	return BFS_CONTAINER_OF(link, struct bftw_file, link);
+}
+
+/** Move from an LRU entry to a bftw_file. */
+static struct bftw_file *bftw_lru_file(struct link *link) {
+	return BFS_CONTAINER_OF(link, struct bftw_file, lru);
+}
+
 /**
  * A cache of open directories.
  */
 struct bftw_cache {
-	/** The head of the LRU list. */
-	struct bftw_file *head;
+	/** The LRU list. */
+	struct list list;
 	/** The insertion target for the LRU list. */
-	struct bftw_file *target;
-	/** The tail of the LRU list. */
-	struct bftw_file *tail;
+	struct link *target;
 	/** The remaining capacity of the LRU list. */
 	size_t capacity;
 };
 
 /** Initialize a cache. */
 static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
-	cache->head = NULL;
+	list_init(&cache->list);
 	cache->target = NULL;
-	cache->tail = NULL;
 	cache->capacity = capacity;
-}
-
-/** Destroy a cache. */
-static void bftw_cache_destroy(struct bftw_cache *cache) {
-	assert(!cache->tail);
-	assert(!cache->target);
-	assert(!cache->head);
-}
-
-/** Add a bftw_file to the cache. */
-static void bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(cache->capacity > 0);
-	assert(file->fd >= 0);
-	assert(!file->lru_prev);
-	assert(!file->lru_next);
-
-	if (cache->target) {
-		file->lru_prev = cache->target;
-		file->lru_next = cache->target->lru_next;
-	} else {
-		file->lru_next = cache->head;
-	}
-
-	if (file->lru_prev) {
-		file->lru_prev->lru_next = file;
-	} else {
-		cache->head = file;
-	}
-
-	if (file->lru_next) {
-		file->lru_next->lru_prev = file;
-	} else {
-		cache->tail = file;
-	}
-
-	// Prefer to keep the root paths open by keeping them at the head of the list
-	if (file->depth == 0) {
-		cache->target = file;
-	}
-
-	--cache->capacity;
 }
 
 /** Remove a bftw_file from the cache. */
 static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
-	if (cache->target == file) {
-		cache->target = file->lru_prev;
+	if (cache->target == &file->lru) {
+		cache->target = cache->target->prev;
 	}
 
-	if (file->lru_prev) {
-		assert(cache->head != file);
-		file->lru_prev->lru_next = file->lru_next;
-	} else {
-		assert(cache->head == file);
-		cache->head = file->lru_next;
-	}
+	list_remove(&cache->list, &file->lru);
 
-	if (file->lru_next) {
-		assert(cache->tail != file);
-		file->lru_next->lru_prev = file->lru_prev;
-	} else {
-		assert(cache->tail == file);
-		cache->tail = file->lru_prev;
-	}
-
-	file->lru_prev = NULL;
-	file->lru_next = NULL;
 	++cache->capacity;
-}
-
-/** Mark a cache entry as recently used. */
-static void bftw_cache_use(struct bftw_cache *cache, struct bftw_file *file) {
-	bftw_cache_remove(cache, file);
-	bftw_cache_add(cache, file);
 }
 
 /** Close a bftw_file. */
 static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 	assert(file->fd >= 0);
 
-	bftw_cache_remove(cache, file);
+	if (list_attached(&cache->list, &file->lru)) {
+		bftw_cache_remove(cache, file);
+	}
 
 	xclose(file->fd);
 	file->fd = -1;
 }
 
-/** Pop a directory from the cache. */
-static void bftw_cache_pop(struct bftw_cache *cache) {
-	assert(cache->tail);
-	bftw_file_close(cache, cache->tail);
-}
-
-/**
- * Shrink the cache, to recover from EMFILE.
- *
- * @param cache
- *         The cache in question.
- * @param saved
- *         A bftw_file that must be preserved.
- * @return
- *         0 if successfully shrunk, otherwise -1.
- */
-static int bftw_cache_shrink(struct bftw_cache *cache, const struct bftw_file *saved) {
-	struct bftw_file *file = cache->tail;
-	if (!file) {
+/** Pop the least recently used directory from the cache. */
+static int bftw_cache_pop(struct bftw_cache *cache) {
+	if (list_is_empty(&cache->list)) {
 		return -1;
 	}
 
-	if (file == saved) {
-		file = file->lru_prev;
-		if (!file) {
-			return -1;
-		}
+	struct bftw_file *file = bftw_lru_file(cache->list.tail);
+	bftw_file_close(cache, file);
+	return 0;
+}
+
+/** Add a bftw_file to the cache. */
+static int bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
+	assert(file->fd >= 0);
+
+	if (cache->capacity == 0 && bftw_cache_pop(cache) != 0) {
+		bftw_file_close(cache, file);
+		errno = EMFILE;
+		return -1;
 	}
 
-	bftw_file_close(cache, file);
-	cache->capacity = 0;
+	assert(cache->capacity > 0);
+	--cache->capacity;
+
+	list_insert_after(&cache->list, cache->target, &file->lru);
+
+	// Prefer to keep the root paths open by keeping them at the head of the list
+	if (file->depth == 0) {
+		cache->target = &file->lru;
+	}
+
 	return 0;
 }
 
@@ -218,6 +161,12 @@ static size_t bftw_child_nameoff(const struct bftw_file *parent) {
 		++ret;
 	}
 	return ret;
+}
+
+/** Destroy a cache. */
+static void bftw_cache_destroy(struct bftw_cache *cache) {
+	assert(!cache->target);
+	assert(list_is_empty(&cache->list));
 }
 
 /** Create a new bftw_file. */
@@ -243,10 +192,8 @@ static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *nam
 		file->nameoff = 0;
 	}
 
-	file->next = NULL;
-
-	file->lru_prev = NULL;
-	file->lru_next = NULL;
+	slink_init(&file->link);
+	link_init(&file->lru);
 
 	file->refcount = 1;
 	file->fd = -1;
@@ -282,7 +229,8 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, st
 
 	int at_fd = AT_FDCWD;
 	if (base) {
-		bftw_cache_use(cache, base);
+		// Remove base from the cache temporarily so it stays open
+		bftw_cache_remove(cache, base);
 		at_fd = base->fd;
 	}
 
@@ -290,21 +238,22 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, st
 	int fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && errno == EMFILE) {
-		if (bftw_cache_shrink(cache, base) == 0) {
+		if (bftw_cache_pop(cache) == 0) {
 			fd = openat(at_fd, at_path, flags);
 		}
+		cache->capacity = 1;
+	}
+
+	if (base) {
+		bftw_cache_add(cache, base);
 	}
 
 	if (fd >= 0) {
-		if (cache->capacity == 0) {
-			bftw_cache_pop(cache);
-		}
-
 		file->fd = fd;
 		bftw_cache_add(cache, file);
 	}
 
-	return fd;
+	return file->fd;
 }
 
 /**
@@ -337,28 +286,19 @@ static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, cons
 	}
 
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component
-
-	// Use the ->next linked list to temporarily hold the reversed parent
-	// chain between base and file
-	struct bftw_file *cur;
-	for (cur = file; cur->parent != base; cur = cur->parent) {
-		cur->parent->next = cur;
+	struct slist parents;
+	slist_init(&parents);
+	for (struct bftw_file *cur = file; cur != base; cur = cur->parent) {
+		slist_prepend(&parents, &cur->link);
 	}
 
-	// Open the files in the chain one by one
-	for (base = cur; base; base = base->next) {
-		fd = bftw_file_openat(cache, base, base->parent, base->name);
-		if (fd < 0 || base == file) {
-			break;
+	LIST_DRAIN(&parents, struct bftw_file, cur) {
+		if (!cur->parent || cur->parent->fd >= 0) {
+			bftw_file_openat(cache, cur, cur->parent, cur->name);
 		}
 	}
 
-	// Clear out the linked list
-	for (struct bftw_file *next = cur->next; cur != file; cur = next, next = next->next) {
-		cur->next = NULL;
-	}
-
-	return fd;
+	return file->fd;
 }
 
 /**
@@ -394,79 +334,6 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 }
 
 /**
- * A queue of bftw_file's.
- */
-struct bftw_queue {
-	struct bftw_file *head;
-	struct bftw_file **tail;
-};
-
-/** Initialize a bftw_queue. */
-static void bftw_queue_init(struct bftw_queue *queue) {
-	queue->head = NULL;
-	queue->tail = &queue->head;
-}
-
-/** Add a file to a bftw_queue. */
-static void bftw_queue_push(struct bftw_queue *queue, struct bftw_file *file) {
-	assert(file->next == NULL);
-	*queue->tail = file;
-	queue->tail = &file->next;
-}
-
-/** Append a whole queue to the tail of another. */
-static void bftw_queue_extend(struct bftw_queue *dest, struct bftw_queue *src) {
-	if (src->head) {
-		*dest->tail = src->head;
-		dest->tail = src->tail;
-		bftw_queue_init(src);
-	}
-}
-
-/** Pop the next file from the head of the queue. */
-static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
-	struct bftw_file *file = queue->head;
-	queue->head = file->next;
-	file->next = NULL;
-	if (!queue->head) {
-		queue->tail = &queue->head;
-	}
-	return file;
-}
-
-/** Sort a queue by filename. */
-static void bftw_queue_sort(struct bftw_queue *queue) {
-	if (!queue->head || !queue->head->next) {
-		return;
-	}
-
-	struct bftw_queue left, right;
-	bftw_queue_init(&left);
-	bftw_queue_init(&right);
-
-	// Split
-	for (struct bftw_file *hare = queue->head; hare && (hare = hare->next); hare = hare->next) {
-		bftw_queue_push(&left, bftw_queue_pop(queue));
-	}
-	bftw_queue_extend(&right, queue);
-
-	// Recurse
-	bftw_queue_sort(&left);
-	bftw_queue_sort(&right);
-
-	// Merge
-	while (left.head && right.head) {
-		if (strcoll(left.head->name, right.head->name) <= 0) {
-			bftw_queue_push(queue, bftw_queue_pop(&left));
-		} else {
-			bftw_queue_push(queue, bftw_queue_pop(&right));
-		}
-	}
-	bftw_queue_extend(queue, &left);
-	bftw_queue_extend(queue, &right);
-}
-
-/**
  * Holds the current state of the bftw() traversal.
  */
 struct bftw_state {
@@ -487,9 +354,9 @@ struct bftw_state {
 	/** The cache of open directories. */
 	struct bftw_cache cache;
 	/** The queue of files left to explore. */
-	struct bftw_queue queue;
+	struct slist queue;
 	/** A batch of files to enqueue. */
-	struct bftw_queue batch;
+	struct slist batch;
 
 	/** The current path. */
 	char *path;
@@ -534,8 +401,9 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 
 	bftw_cache_init(&state->cache, args->nopenfd);
-	bftw_queue_init(&state->queue);
-	bftw_queue_init(&state->batch);
+
+	slist_init(&state->queue);
+	slist_init(&state->batch);
 
 	state->file = NULL;
 	state->previous = NULL;
@@ -895,7 +763,7 @@ static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
 		bftw_fill_id(file, &state->ftwbuf);
 	}
 
-	bftw_queue_push(&state->batch, file);
+	slist_append(&state->batch, &file->link);
 	return 0;
 }
 
@@ -942,7 +810,7 @@ static int bftw_pop(struct bftw_state *state) {
 		return 0;
 	}
 
-	state->file = bftw_queue_pop(&state->queue);
+	state->file = bftw_file_entry(slist_pop(&state->queue));
 
 	if (bftw_build_path(state) != 0) {
 		return -1;
@@ -1078,8 +946,8 @@ static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flag
  * Drain all the files from the queue.
  */
 static void bftw_drain_queue(struct bftw_state *state) {
-	while (state->queue.head) {
-		state->file = bftw_queue_pop(&state->queue);
+	LIST_DRAIN(&state->queue, struct bftw_file, file) {
+		state->file = file;
 		bftw_gc_file(state, BFTW_VISIT_NONE);
 	}
 }
@@ -1104,16 +972,23 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	return state->error ? -1 : 0;
 }
 
+/** Comparison function for BFTW_SORT. */
+static bool bftw_file_cmp(struct slink *left, struct slink *right, const void *ptr) {
+	struct bftw_file *lfile = bftw_file_entry(left);
+	struct bftw_file *rfile = bftw_file_entry(right);
+	return strcoll(lfile->name, rfile->name) <= 0;
+}
+
 /** Finish adding a batch of files. */
 static void bftw_batch_finish(struct bftw_state *state) {
 	if (state->flags & BFTW_SORT) {
-		bftw_queue_sort(&state->batch);
+		slist_sort(&state->batch, bftw_file_cmp, NULL);
 	}
 
 	if (state->strategy == BFTW_DFS) {
-		bftw_queue_extend(&state->batch, &state->queue);
+		slist_extend(&state->batch, &state->queue);
 	}
-	bftw_queue_extend(&state->queue, &state->batch);
+	slist_extend(&state->queue, &state->batch);
 }
 
 /**
