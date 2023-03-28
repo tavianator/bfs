@@ -163,8 +163,7 @@ static uintptr_t trie_encode_node(const struct trie_node *node) {
 
 void trie_init(struct trie *trie) {
 	trie->root = 0;
-	trie->head = NULL;
-	trie->tail = NULL;
+	list_init(&trie->leaves);
 }
 
 /** Check if a number is a power of two. */
@@ -341,16 +340,8 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 		return NULL;
 	}
 
-	leaf->prev = trie->tail;
-	leaf->next = NULL;
-
-	if (leaf->prev) {
-		leaf->prev->next = leaf;
-	} else {
-		trie->head = leaf;
-	}
-
-	trie->tail = leaf;
+	link_init(&leaf->link);
+	list_append(&trie->leaves, &leaf->link);
 
 	leaf->value = NULL;
 	leaf->length = length;
@@ -361,18 +352,7 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 
 /** Free a leaf. */
 static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
-	if (leaf->prev) {
-		leaf->prev->next = leaf->next;
-	} else {
-		trie->head = leaf->next;
-	}
-
-	if (leaf->next) {
-		leaf->next->prev = leaf->prev;
-	} else {
-		trie->tail = leaf->prev;
-	}
-
+	list_remove(&trie->leaves, &leaf->link);
 	free(leaf);
 }
 
