@@ -107,10 +107,67 @@ struct link *list_pop(struct list *list);
 /** Check if a link is attached to a list. */
 bool list_attached(const struct list *list, const struct link *link);
 
+// LIST_ITEM() helper
+#define LIST_ITEM_IMPL(type, entry, member, ...) \
+	BFS_CONTAINER_OF(entry, type, member)
+
+/**
+ * Convert a list entry to its container.
+ *
+ * @param type
+ *         The type of the list entries.
+ * @param entry
+ *         The list entry to convert.
+ * @param member
+ *         The name of the list link field (default: link).
+ * @return
+ *         The item that contains the given entry.
+ */
+#define LIST_ITEM(...) \
+	LIST_ITEM_IMPL(__VA_ARGS__, link,)
+
+// LIST_NEXT() helper
+#define LIST_NEXT_IMPL(type, entry, member, ...) \
+	LIST_ITEM(type, (entry)->member.next, member)
+
+/**
+ * Get the next item in a list.
+ *
+ * @param type
+ *         The type of the list entries.
+ * @param entry
+ *         The current entry.
+ * @param member
+ *         The name of the list link field (default: link).
+ * @return
+ *         The next item in the list.
+ */
+#define LIST_NEXT(...) \
+	LIST_NEXT_IMPL(__VA_ARGS__, link,)
+
+// LIST_PREV() helper
+#define LIST_PREV_IMPL(type, entry, member, ...) \
+	LIST_ITEM(type, (entry)->member.prev, member)
+
+/**
+ * Get the previous entry in a list.
+ *
+ * @param type
+ *         The type of the list entries.
+ * @param entry
+ *         The current entry.
+ * @param member
+ *         The name of the list link field (default: link).
+ * @return
+ *         The previous item in the list.
+ */
+#define LIST_PREV(...) \
+	LIST_PREV_IMPL(__VA_ARGS__, link,)
+
 // Helper for LIST_FOR_EACH_*()
 #define LIST_FOR_EACH_IMPL(entry, type, i, member, ...) \
-	for (type *_next, *i = BFS_CONTAINER_OF(entry, type, member); \
-	     i && (_next = BFS_CONTAINER_OF(i->member.next, type, member), true); \
+	for (type *_next, *i = LIST_ITEM(type, entry, member);	\
+	     i && (_next = LIST_NEXT(type, i, member), true); \
 	     i = _next)
 
 /**
@@ -150,7 +207,7 @@ bool list_attached(const struct list *list, const struct link *link);
 
 // Helper for LIST_DRAIN()
 #define LIST_DRAIN_IMPL(list, type, i, member, ...) \
-	for (type *i; (i = BFS_CONTAINER_OF(LIST_POP(list), type, member));)
+	for (type *i; (i = LIST_ITEM(type, LIST_POP(list), member));)
 
 /**
  * Drain the entries from a list.

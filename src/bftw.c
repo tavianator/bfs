@@ -69,14 +69,8 @@ struct bftw_file {
 };
 
 /** Move from a list entry to a bftw_file. */
-static struct bftw_file *bftw_file_entry(struct slink *link) {
-	return BFS_CONTAINER_OF(link, struct bftw_file, link);
-}
-
-/** Move from an LRU entry to a bftw_file. */
-static struct bftw_file *bftw_lru_file(struct link *link) {
-	return BFS_CONTAINER_OF(link, struct bftw_file, lru);
-}
+#define BFTW_FILE(...) \
+	LIST_ITEM(struct bftw_file, __VA_ARGS__)
 
 /**
  * A cache of open directories.
@@ -126,7 +120,7 @@ static int bftw_cache_pop(struct bftw_cache *cache) {
 		return -1;
 	}
 
-	struct bftw_file *file = bftw_lru_file(cache->list.tail);
+	struct bftw_file *file = BFTW_FILE(cache->list.tail, lru);
 	bftw_file_close(cache, file);
 	return 0;
 }
@@ -810,7 +804,7 @@ static int bftw_pop(struct bftw_state *state) {
 		return 0;
 	}
 
-	state->file = bftw_file_entry(slist_pop(&state->queue));
+	state->file = BFTW_FILE(slist_pop(&state->queue));
 
 	if (bftw_build_path(state) != 0) {
 		return -1;
@@ -974,9 +968,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 
 /** Comparison function for BFTW_SORT. */
 static bool bftw_file_cmp(struct slink *left, struct slink *right, const void *ptr) {
-	struct bftw_file *lfile = bftw_file_entry(left);
-	struct bftw_file *rfile = bftw_file_entry(right);
-	return strcoll(lfile->name, rfile->name) <= 0;
+	return strcoll(BFTW_FILE(left)->name, BFTW_FILE(right)->name) <= 0;
 }
 
 /** Finish adding a batch of files. */
