@@ -51,11 +51,15 @@ struct bftw_file {
 
 	/** This file's depth in the walk. */
 	size_t depth;
-	/** Reference count. */
+	/** Reference count (for ->parent). */
 	size_t refcount;
 
+	/** Pin count (for ->fd). */
+	size_t pincount;
 	/** An open descriptor to this file, or -1. */
 	int fd;
+	/** An open directory for this file, if any. */
+	struct bfs_dir *dir;
 
 	/** This file's type, if known. */
 	enum bfs_type type;
@@ -101,27 +105,58 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	cache->capacity = capacity;
 }
 
-/** Remove a bftw_file from the cache. */
-static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
+/** Remove a bftw_file from the LRU list. */
+static void bftw_lru_remove(struct bftw_cache *cache, struct bftw_file *file) {
 	if (cache->target == file) {
 		cache->target = file->lru.prev;
 	}
 
 	LIST_REMOVE(cache, file, lru);
+}
 
+/** Remove a bftw_file from the cache. */
+static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) {
+	bftw_lru_remove(cache, file);
 	++cache->capacity;
 }
 
 /** Close a bftw_file. */
 static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 	bfs_assert(file->fd >= 0);
+	bfs_assert(file->pincount == 0);
 
-	if (LIST_ATTACHED(cache, file, lru)) {
-		bftw_cache_remove(cache, file);
+	if (file->dir) {
+		bfs_assert(file->fd == bfs_dirfd(file->dir));
+		bfs_closedir(file->dir);
+		file->dir = NULL;
+	} else {
+		xclose(file->fd);
 	}
 
-	xclose(file->fd);
 	file->fd = -1;
+	bftw_cache_remove(cache, file);
+}
+
+/** Free an open directory. */
+static void bftw_file_freedir(struct bftw_cache *cache, struct bftw_file *file) {
+	if (!file->dir) {
+		return;
+	}
+
+	// Try to keep an open fd if any children exist
+	bool reffed = file->refcount > 1;
+	// Keep the fd the same if it's pinned
+	bool pinned = file->pincount > 0;
+
+	if (reffed || pinned) {
+		int fd = bfs_freedir(file->dir, pinned);
+		if (fd >= 0) {
+			file->fd = fd;
+			file->dir = NULL;
+		}
+	} else {
+		bftw_file_close(cache, file);
+	}
 }
 
 /** Pop the least recently used directory from the cache. */
@@ -133,6 +168,18 @@ static int bftw_cache_pop(struct bftw_cache *cache) {
 
 	bftw_file_close(cache, file);
 	return 0;
+}
+
+/** Add a bftw_file to the LRU list. */
+static void bftw_lru_add(struct bftw_cache *cache, struct bftw_file *file) {
+	bfs_assert(file->fd >= 0);
+
+	LIST_INSERT(cache, cache->target, file, lru);
+
+	// Prefer to keep the root paths open by keeping them at the head of the list
+	if (file->depth == 0) {
+		cache->target = file;
+	}
 }
 
 /** Add a bftw_file to the cache. */
@@ -148,14 +195,28 @@ static int bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
 	bfs_assert(cache->capacity > 0);
 	--cache->capacity;
 
-	LIST_INSERT(cache, cache->target, file, lru);
-
-	// Prefer to keep the root paths open by keeping them at the head of the list
-	if (file->depth == 0) {
-		cache->target = file;
-	}
-
+	bftw_lru_add(cache, file);
 	return 0;
+}
+
+/** Pin a cache entry so it won't be closed. */
+static void bftw_cache_pin(struct bftw_cache *cache, struct bftw_file *file) {
+	bfs_assert(file->fd >= 0);
+
+	if (file->pincount++ == 0) {
+		bftw_lru_remove(cache, file);
+	}
+}
+
+/** Unpin a cache entry. */
+static void bftw_cache_unpin(struct bftw_cache *cache, struct bftw_file *file) {
+	bfs_assert(file->fd >= 0);
+	bfs_assert(file->pincount > 0);
+
+	if (--file->pincount == 0) {
+		bftw_lru_add(cache, file);
+		bftw_file_freedir(cache, file);
+	}
 }
 
 /** Compute the name offset of a child path. */
@@ -201,7 +262,9 @@ static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *nam
 	file->lru.prev = file->lru.next = NULL;
 
 	file->refcount = 1;
+	file->pincount = 0;
 	file->fd = -1;
+	file->dir = NULL;
 
 	file->type = BFS_UNKNOWN;
 	file->dev = -1;
@@ -234,8 +297,7 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, st
 
 	int at_fd = AT_FDCWD;
 	if (base) {
-		// Remove base from the cache temporarily so it stays open
-		bftw_cache_remove(cache, base);
+		bftw_cache_pin(cache, base);
 		at_fd = base->fd;
 	}
 
@@ -250,7 +312,7 @@ static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, st
 	}
 
 	if (base) {
-		bftw_cache_add(cache, base);
+		bftw_cache_unpin(cache, base);
 	}
 
 	if (fd >= 0) {
@@ -309,6 +371,19 @@ static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, cons
 }
 
 /**
+ * Associate an open directory with a bftw_file.
+ */
+static void bftw_file_set_dir(struct bftw_cache *cache, struct bftw_file *file, struct bfs_dir *dir) {
+	bfs_assert(!file->dir);
+	file->dir = dir;
+
+	if (file->fd < 0) {
+		file->fd = bfs_dirfd(dir);
+		bftw_cache_add(cache, file);
+	}
+}
+
+/**
  * Open a bftw_file as a directory.
  *
  * @param cache
@@ -326,7 +401,11 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_cache *cache, struct bftw_f
 		return NULL;
 	}
 
-	return bfs_opendir(fd, NULL);
+	struct bfs_dir *dir = bfs_opendir(fd, NULL);
+	if (dir) {
+		bftw_file_set_dir(cache, file, dir);
+	}
+	return dir;
 }
 
 /** Free a bftw_file. */
@@ -798,7 +877,9 @@ static int bftw_opendir(struct bftw_state *state) {
 	}
 
 	state->dir = bftw_file_opendir(&state->cache, state->file, state->path);
-	if (!state->dir) {
+	if (state->dir) {
+		bftw_cache_pin(&state->cache, state->file);
+	} else {
 		state->direrror = errno;
 	}
 	return 0;
@@ -848,22 +929,9 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	int ret = 0;
 
 	if (state->dir) {
-		struct bftw_file *file = state->file;
-		bfs_assert(file && file->fd >= 0);
-
-		if (file->refcount > 1) {
-			// Keep the fd around if any subdirectories exist
-			file->fd = bfs_freedir(state->dir, false);
-		} else {
-			file->fd = -1;
-		}
-
-		if (file->fd < 0) {
-			bfs_closedir(state->dir);
-			bftw_cache_remove(&state->cache, file);
-		}
+		bftw_cache_unpin(&state->cache, state->file);
+		bftw_file_freedir(&state->cache, state->file);
 	}
-
 	state->dir = NULL;
 	state->de = NULL;
 
@@ -876,8 +944,8 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 		} else {
 			state->error = state->direrror;
 		}
-		state->direrror = 0;
 	}
+	state->direrror = 0;
 
 	enum bftw_gc_flags visit = BFTW_VISIT_FILE;
 	while (state->file) {
