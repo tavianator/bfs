@@ -74,6 +74,8 @@ int main(void) {
 		size_t i = 0;
 		TRIE_FOR_EACH(&trie, leaf) {
 			assert(leaf == trie_find_str(&trie, keys[i]));
+			assert(!leaf->prev || leaf->prev->next == leaf);
+			assert(!leaf->next || leaf->next->prev == leaf);
 			++i;
 		}
 		assert(i == nkeys);

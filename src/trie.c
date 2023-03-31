@@ -83,6 +83,7 @@
 
 #include "trie.h"
 #include "config.h"
+#include "list.h"
 #include <assert.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -163,7 +164,7 @@ static uintptr_t trie_encode_node(const struct trie_node *node) {
 
 void trie_init(struct trie *trie) {
 	trie->root = 0;
-	list_init(&trie->leaves);
+	LIST_INIT(trie);
 }
 
 /** Check if a number is a power of two. */
@@ -340,8 +341,7 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 		return NULL;
 	}
 
-	link_init(&leaf->link);
-	list_append(&trie->leaves, &leaf->link);
+	LIST_APPEND(trie, leaf);
 
 	leaf->value = NULL;
 	leaf->length = length;
@@ -352,7 +352,7 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 
 /** Free a leaf. */
 static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
-	list_remove(&trie->leaves, &leaf->link);
+	LIST_REMOVE(trie, leaf);
 	free(leaf);
 }
 

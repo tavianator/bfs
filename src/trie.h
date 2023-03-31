@@ -5,7 +5,6 @@
 #define BFS_TRIE_H
 
 #include "config.h"
-#include "list.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,7 +14,7 @@
  */
 struct trie_leaf {
 	/** Linked list of leaves, in insertion order. */
-	struct link link;
+	struct trie_leaf *prev, *next;
 	/** An arbitrary value associated with this leaf. */
 	void *value;
 	/** The length of the key in bytes. */
@@ -31,7 +30,7 @@ struct trie {
 	/** Pointer to the root node/leaf. */
 	uintptr_t root;
 	/** Linked list of leaves. */
-	struct list leaves;
+	struct trie_leaf *head, *tail;
 };
 
 /**
@@ -134,6 +133,8 @@ void trie_destroy(struct trie *trie);
  * Iterate over the leaves of a trie.
  */
 #define TRIE_FOR_EACH(trie, leaf) \
-	LIST_FOR_EACH(&(trie)->leaves, struct trie_leaf, leaf)
+	for (struct trie_leaf *leaf = (trie)->head, *_next; \
+	     leaf && (_next = leaf->next, true); \
+	     leaf = _next)
 
 #endif // BFS_TRIE_H

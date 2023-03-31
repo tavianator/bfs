@@ -33,7 +33,7 @@ enum bfs_spawn_op {
  * A spawn action.
  */
 struct bfs_spawn_action {
-	struct slink link;
+	struct bfs_spawn_action *next;
 
 	enum bfs_spawn_op op;
 	int in_fd;
@@ -44,12 +44,14 @@ struct bfs_spawn_action {
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
 	ctx->flags = 0;
-	slist_init(&ctx->actions);
+	SLIST_INIT(ctx);
 	return 0;
 }
 
 int bfs_spawn_destroy(struct bfs_spawn *ctx) {
-	LIST_DRAIN(&ctx->actions, struct bfs_spawn_action, action) {
+	while (ctx->head) {
+		struct bfs_spawn_action *action = ctx->head;
+		SLIST_POP(ctx);
 		free(action);
 	}
 
@@ -68,12 +70,12 @@ static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_sp
 		return NULL;
 	}
 
-	slink_init(&action->link);
+	action->next = NULL;
 	action->op = op;
 	action->in_fd = -1;
 	action->out_fd = -1;
 
-	slist_append(&ctx->actions, &action->link);
+	SLIST_APPEND(ctx, action);
 	return action;
 }
 
@@ -138,8 +140,7 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
 static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	xclose(pipefd[0]);
 
-	const struct slink *head = ctx ? ctx->actions.head : NULL;
-	LIST_FOR_EACH_FROM(head, struct bfs_spawn_action, action) {
+	for (const struct bfs_spawn_action *action = ctx ? ctx->head : NULL; action; action = action->next) {
 		// Move the error-reporting pipe out of the way if necessary...
 		if (action->out_fd == pipefd[1]) {
 			int fd = dup_cloexec(pipefd[1]);

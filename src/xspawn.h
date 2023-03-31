@@ -8,7 +8,6 @@
 #ifndef BFS_XSPAWN_H
 #define BFS_XSPAWN_H
 
-#include "list.h"
 #include <sys/resource.h>
 #include <sys/types.h>
 
@@ -25,7 +24,8 @@ enum bfs_spawn_flags {
  */
 struct bfs_spawn {
 	enum bfs_spawn_flags flags;
-	struct slist actions;
+	struct bfs_spawn_action *head;
+	struct bfs_spawn_action **tail;
 };
 
 /**

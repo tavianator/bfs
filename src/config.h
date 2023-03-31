@@ -147,17 +147,6 @@
  */
 #define BFS_COUNTOF(array) (sizeof(array) / sizeof(0[array]))
 
-// BFS_CONTAINER_OF() helper
-static inline char *bfs_container_offset(char *ptr, ptrdiff_t offset, size_t unused) {
-	return ptr ? ptr - offset : NULL;
-}
-
-/**
- * Move a pointer from a field to its outer struct.
- */
-#define BFS_CONTAINER_OF(ptr, type, member) \
-	((type *)bfs_container_offset((char *)(ptr), offsetof(type, member), sizeof((ptr) - &((type *)NULL)->member)))
-
 // Lower bound on BFS_FLEX_SIZEOF()
 #define BFS_FLEX_LB(type, member, length) (offsetof(type, member) + sizeof(((type *)NULL)->member[0]) * (length))
 
