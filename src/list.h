@@ -230,6 +230,27 @@
 	}
 
 /**
+ * Remove an item from a singly-linked list.
+ *
+ * @param list
+ *         The list to remove from.
+ * @param ptr
+ *         A pointer to the item to remove, either &list->head or &prev->next.
+ * @param link (optional)
+ *         If specified, use item->link.next rather than item->next.
+ */
+#define SLIST_REMOVE(list, ...) SLIST_REMOVE_(__VA_ARGS__, )
+
+#define SLIST_REMOVE_(list, ptr, ...) \
+	LIST_BLOCK_(SLIST_REMOVE__((list), (ptr), LIST_NEXT_(__VA_ARGS__)))
+
+#define SLIST_REMOVE__(list, ptr, next) \
+	void *_next = (void *)(*ptr)->next; \
+	(*ptr)->next = NULL; \
+	*ptr = _next; \
+	list->tail = list->head ? list->tail : &list->head;
+
+/**
  * Pop the head off a singly-linked list.
  *
  * @param list
@@ -239,14 +260,9 @@
  */
 #define SLIST_POP(...) SLIST_POP_(__VA_ARGS__, )
 
-#define SLIST_POP_(list, ...) \
-	LIST_BLOCK_(SLIST_POP__((list), LIST_NEXT_(__VA_ARGS__)))
+#define SLIST_POP_(list, ...) SLIST_POP__((list), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_POP__(list, next) \
-	void *_next = (void *)list->head->next; \
-	list->head->next = NULL; \
-	list->head = _next; \
-	list->tail = list->head ? list->tail : &list->head;
+#define SLIST_POP__(list, next) SLIST_REMOVE__(list, (&list->head), next)
 
 /**
  * Initialize a doubly-linked list.
