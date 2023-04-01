@@ -234,21 +234,21 @@
  *
  * @param list
  *         The list to remove from.
- * @param ptr
+ * @param cursor
  *         A pointer to the item to remove, either &list->head or &prev->next.
  * @param link (optional)
  *         If specified, use item->link.next rather than item->next.
  */
 #define SLIST_REMOVE(list, ...) SLIST_REMOVE_(list, __VA_ARGS__, )
 
-#define SLIST_REMOVE_(list, ptr, ...) \
-	LIST_BLOCK_(SLIST_REMOVE__((list), (ptr), LIST_NEXT_(__VA_ARGS__)))
+#define SLIST_REMOVE_(list, cursor, ...) \
+	LIST_BLOCK_(SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__)))
 
-#define SLIST_REMOVE__(list, ptr, next) \
-	void *_next = (void *)(*ptr)->next; \
-	(*ptr)->next = NULL; \
-	*ptr = _next; \
-	list->tail = list->head ? list->tail : &list->head;
+#define SLIST_REMOVE__(list, cursor, next) \
+	void *_next = (void *)(*cursor)->next; \
+	(*cursor)->next = NULL; \
+	*cursor = _next; \
+	list->tail = _next ? list->tail : cursor;
 
 /**
  * Pop the head off a singly-linked list.
