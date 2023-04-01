@@ -96,8 +96,8 @@
 	LIST_BLOCK_(SLIST_INIT_((list)))
 
 #define SLIST_INIT_(list) \
-	(list)->head = NULL; \
-	(list)->tail = &(list)->head;
+	list->head = NULL; \
+	list->tail = &list->head;
 
 /**
  * Wraps a group of statements in a block.
@@ -160,22 +160,22 @@
 /**
  * LIST_LINK_() dispatches to yet another macro:
  *
- *     LIST_LINK_(next, )       => LIST_LINK__(next,     , , . ,   , )
- *     LIST_LINK_(next, link, ) => LIST_LINK__(next, link, ,   , . , , )
+ *     LIST_LINK_(next, )       => LIST_LINK__(next,     , . ,   , )
+ *     LIST_LINK_(next, link, ) => LIST_LINK__(next, link,   , . , , )
  */
-#define LIST_LINK_(dir, ...) LIST_LINK__(dir, __VA_ARGS__, , . , , )
+#define LIST_LINK_(dir, ...) LIST_LINK__(dir, __VA_ARGS__, . , , )
 
 /**
  * And finally, LIST_LINK__() adds the link and the dot if necessary.
  *
- *                 dir   link blank ignored dot
- *                  v     v     v      v     v
- *     LIST_LINK__(next,     ,     ,   .   ,   , )   => next
- *     LIST_LINK__(next, link,     ,       , . , , ) => link . next
- *                  ^     ^     ^      ^     ^
- *                 dir   link blank ignored dot
+ *                 dir   link ignored dot
+ *                  v     v      v     v
+ *     LIST_LINK__(next,     ,   .   ,   , )   => next
+ *     LIST_LINK__(next, link,       , . , , ) => link . next
+ *                  ^     ^      ^     ^
+ *                 dir   link ignored dot
  */
-#define LIST_LINK__(dir, link, blank, ignored, dot, ...) link dot dir
+#define LIST_LINK__(dir, link, ignored, dot, ...) link dot dir
 
 /**
  * SLIST_APPEND_() uses LIST_NEXT_() to generate the right name for the list
