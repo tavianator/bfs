@@ -239,7 +239,7 @@
  * @param link (optional)
  *         If specified, use item->link.next rather than item->next.
  */
-#define SLIST_REMOVE(list, ...) SLIST_REMOVE_(__VA_ARGS__, )
+#define SLIST_REMOVE(list, ...) SLIST_REMOVE_(list, __VA_ARGS__, )
 
 #define SLIST_REMOVE_(list, ptr, ...) \
 	LIST_BLOCK_(SLIST_REMOVE__((list), (ptr), LIST_NEXT_(__VA_ARGS__)))
