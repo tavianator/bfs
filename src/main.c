@@ -31,6 +31,7 @@
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
+ *     - ioq.[ch]      (an async I/O queue)
  *     - list.h        (linked list macros)
  *     - lock.h        (mutexes, condition variables, etc.)
  *     - mtab.[ch]     (parses the system's mount table)
