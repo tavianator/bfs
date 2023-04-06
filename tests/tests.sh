@@ -9,11 +9,12 @@ umask 022
 export LC_ALL=C
 export TZ=UTC0
 
-export ASAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
-export LSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
-export MSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
-export TSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
-export UBSAN_OPTIONS="abort_on_error=1:log_to_syslog=0"
+SAN_OPTIONS="halt_on_error=1:log_to_syslog=0"
+export ASAN_OPTIONS="$SAN_OPTIONS"
+export LSAN_OPTIONS="$SAN_OPTIONS"
+export MSAN_OPTIONS="$SAN_OPTIONS"
+export TSAN_OPTIONS="$SAN_OPTIONS"
+export UBSAN_OPTIONS="$SAN_OPTIONS"
 
 export LS_COLORS=""
 unset BFS_COLORS

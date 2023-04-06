@@ -65,7 +65,42 @@ MSAN := $(filter msan,$(MAKECMDGOALS))
 TSAN := $(filter tsan,$(MAKECMDGOALS))
 UBSAN := $(filter ubsan,$(MAKECMDGOALS))
 
-ifndef MSAN
+ifdef ASAN
+LOCAL_CFLAGS += -fsanitize=address
+SANITIZE := y
+endif
+
+ifdef LSAN
+LOCAL_CFLAGS += -fsanitize=leak
+SANITIZE := y
+endif
+
+ifdef MSAN
+# msan needs all code instrumented
+NOLIBS := y
+LOCAL_CFLAGS += -fsanitize=memory -fsanitize-memory-track-origins
+SANITIZE := y
+endif
+
+ifdef TSAN
+# tsan needs all code instrumented
+NOLIBS := y
+# https://github.com/google/sanitizers/issues/342
+LOCAL_CPPFLAGS += -DBFS_TARGET_CLONES=false
+LOCAL_CFLAGS += -fsanitize=thread
+SANITIZE := y
+endif
+
+ifdef UBSAN
+LOCAL_CFLAGS += -fsanitize=undefined
+SANITIZE := y
+endif
+
+ifdef SANITIZE
+LOCAL_CFLAGS += -fno-sanitize-recover=all
+endif
+
+ifndef NOLIBS
 WITH_ONIGURUMA := y
 endif
 
@@ -82,10 +117,10 @@ endif
 
 LOCAL_CFLAGS += $(ONIG_CFLAGS)
 LOCAL_LDLIBS += $(ONIG_LDLIBS)
-endif
+endif # WITH_ONIGURUMA
 
 ifeq ($(OS),Linux)
-ifndef MSAN # These libraries are not built with msan
+ifndef NOLIBS
 WITH_ACL := y
 WITH_ATTR := y
 WITH_LIBCAP := y
@@ -111,39 +146,10 @@ endif
 
 LOCAL_LDFLAGS += -Wl,--as-needed
 LOCAL_LDLIBS += -lrt
-endif
+endif # Linux
 
 ifeq ($(OS),NetBSD)
 LOCAL_LDLIBS += -lutil
-endif
-
-ifdef ASAN
-LOCAL_CFLAGS += -fsanitize=address
-SANITIZE := y
-endif
-
-ifdef LSAN
-LOCAL_CFLAGS += -fsanitize=leak
-SANITIZE := y
-endif
-
-ifdef MSAN
-LOCAL_CFLAGS += -fsanitize=memory -fsanitize-memory-track-origins
-SANITIZE := y
-endif
-
-ifdef TSAN
-LOCAL_CFLAGS += -fsanitize=thread
-SANITIZE := y
-endif
-
-ifdef UBSAN
-LOCAL_CFLAGS += -fsanitize=undefined
-SANITIZE := y
-endif
-
-ifdef SANITIZE
-LOCAL_CFLAGS += -fno-sanitize-recover=all
 endif
 
 ifneq ($(filter gcov,$(MAKECMDGOALS)),)
