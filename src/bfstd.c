@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "bfstd.h"
+#include "bit.h"
 #include "config.h"
 #include "diag.h"
 #include "xregex.h"
@@ -140,6 +141,19 @@ char *xgetdelim(FILE *file, char delim) {
 		}
 		return NULL;
 	}
+}
+
+void *xmemalign(size_t align, size_t size) {
+	bfs_assert(has_single_bit(align));
+	bfs_assert((size & (align - 1)) == 0);
+
+#if __APPLE__
+	void *ptr = NULL;
+	errno = posix_memalign(&ptr, align, size);
+	return ptr;
+#else
+	return aligned_alloc(align, size);
+#endif
 }
 
 /** Compile and execute a regular expression for xrpmatch(). */
