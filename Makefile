@@ -196,6 +196,9 @@ all: bfs tests
 $(BIN)/%:
 	@$(MKDIR) $(@D)
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
+ifeq ($(OS) $(TSAN),FreeBSD tsan)
+	elfctl -e +noaslr $@
+endif
 
 $(OBJ)/%.o: %.c $(OBJ)/FLAGS
 	@$(MKDIR) $(@D)
@@ -279,6 +282,7 @@ distcheck:
 ifneq ($(OS),Darwin)
 	+$(MAKE) -B msan ubsan check CC=clang $(DISTCHECK_FLAGS)
 endif
+	+$(MAKE) -B tsan ubsan check CC=clang $(DISTCHECK_FLAGS)
 ifeq ($(OS) $(ARCH),Linux x86_64)
 	+$(MAKE) -B check EXTRA_CFLAGS="-m32" ONIG_CONFIG= $(DISTCHECK_FLAGS)
 endif
