@@ -20,6 +20,7 @@
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
+ *     - atomic.h      (atomic operations)
  *     - bar.[ch]      (a terminal status bar)
  *     - bit.h         (bit manipulation)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
