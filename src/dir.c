@@ -4,6 +4,7 @@
 #include "dir.h"
 #include "bfstd.h"
 #include "config.h"
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -14,22 +15,17 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#if __has_feature(memory_sanitizer)
-#	include <sanitizer/msan_interface.h>
+#ifndef BFS_GETDENTS
+#	define BFS_GETDENTS (__linux__ || __FreeBSD__)
 #endif
-
-#if __linux__
-#	include <sys/syscall.h>
-
-/** Directory entry type for bfs_getdents() */
-typedef struct dirent64 sys_dirent;
-#else
-typedef struct dirent sys_dirent;
-#endif
-
-#define BFS_GETDENTS (__linux__ || __FreeBSD__)
 
 #if BFS_GETDENTS
+#	if __has_feature(memory_sanitizer)
+#		include <sanitizer/msan_interface.h>
+#	endif
+#	if __linux__
+#		include <sys/syscall.h>
+#	endif
 
 /** getdents() syscall wrapper. */
 static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
@@ -55,6 +51,13 @@ static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 }
 
 #endif // BFS_GETDENTS
+
+#if BFS_GETDENTS && __linux__
+/** Directory entry type for bfs_getdents() */
+typedef struct dirent64 sys_dirent;
+#else
+typedef struct dirent sys_dirent;
+#endif
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
 	switch (mode & S_IFMT) {
@@ -112,7 +115,6 @@ struct bfs_dir {
 	// sys_dirent buf[];
 #else
 	DIR *dir;
-	struct dirent *de;
 #endif
 };
 
@@ -158,8 +160,6 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 		free(dir);
 		return NULL;
 	}
-
-	dir->de = NULL;
 #endif
 
 	return dir;
@@ -251,6 +251,7 @@ int bfs_closedir(struct bfs_dir *dir) {
 	int ret = xclose(dir->fd);
 #else
 	int ret = closedir(dir->dir);
+	assert(ret == 0 || errno != EBADF);
 #endif
 	free(dir);
 	return ret;
@@ -260,10 +261,14 @@ int bfs_freedir(struct bfs_dir *dir) {
 #if BFS_GETDENTS
 	int ret = dir->fd;
 	free(dir);
-	return ret;
+#elif __FreeBSD__
+	int ret = fdclosedir(dir->dir);
+	free(dir);
 #else
 	int ret = dup_cloexec(dirfd(dir->dir));
+	int error = errno;
 	bfs_closedir(dir);
-	return ret;
+	errno = error;
 #endif
+	return ret;
 }
