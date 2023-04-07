@@ -81,24 +81,6 @@ size_t xbaseoff(const char *path);
 #include <stdio.h>
 
 /**
- * close() variant that preserves errno.
- *
- * @param fd
- *         The file descriptor to close.
- */
-void close_quietly(int fd);
-
-/**
- * close() wrapper that asserts the file descriptor is valid.
- *
- * @param fd
- *         The file descriptor to close.
- * @return
- *         0 on success, or -1 on error.
- */
-int xclose(int fd);
-
-/**
  * fopen() variant that takes open() style flags.
  *
  * @param path
@@ -120,25 +102,6 @@ FILE *xfopen(const char *path, int flags);
  *         NULL is returned on error (errno != 0) or end of file (errno == 0).
  */
 char *xgetdelim(FILE *file, char delim);
-
-/**
- * A safe version of read() that handles interrupted system calls and partial
- * reads.
- *
- * @return
- *         The number of bytes read.  A value != nbytes indicates an error
- *         (errno != 0) or end of file (errno == 0).
- */
-size_t xread(int fd, void *buf, size_t nbytes);
-
-/**
- * A safe version of write() that handles interrupted system calls and partial
- * writes.
- *
- * @return
-           The number of bytes written.  A value != nbytes indicates an error.
- */
-size_t xwrite(int fd, const void *buf, size_t nbytes);
 
 // #include <stdlib.h>
 
@@ -210,14 +173,41 @@ int dup_cloexec(int fd);
 int pipe_cloexec(int pipefd[2]);
 
 /**
- * Wrapper for confstr() that allocates with malloc().
+ * A safe version of read() that handles interrupted system calls and partial
+ * reads.
  *
- * @param name
- *         The ID of the confstr to look up.
  * @return
- *         The value of the confstr, or NULL on failure.
+ *         The number of bytes read.  A value != nbytes indicates an error
+ *         (errno != 0) or end of file (errno == 0).
  */
-char *xconfstr(int name);
+size_t xread(int fd, void *buf, size_t nbytes);
+
+/**
+ * A safe version of write() that handles interrupted system calls and partial
+ * writes.
+ *
+ * @return
+           The number of bytes written.  A value != nbytes indicates an error.
+ */
+size_t xwrite(int fd, const void *buf, size_t nbytes);
+
+/**
+ * close() variant that preserves errno.
+ *
+ * @param fd
+ *         The file descriptor to close.
+ */
+void close_quietly(int fd);
+
+/**
+ * close() wrapper that asserts the file descriptor is valid.
+ *
+ * @param fd
+ *         The file descriptor to close.
+ * @return
+ *         0 on success, or -1 on error.
+ */
+int xclose(int fd);
 
 /**
  * Wrapper for faccessat() that handles some portability issues.
@@ -237,6 +227,16 @@ int xfaccessat(int fd, const char *path, int amode);
  *         The target of the link, allocated with malloc(), or NULL on failure.
  */
 char *xreadlinkat(int fd, const char *path, size_t size);
+
+/**
+ * Wrapper for confstr() that allocates with malloc().
+ *
+ * @param name
+ *         The ID of the confstr to look up.
+ * @return
+ *         The value of the confstr, or NULL on failure.
+ */
+char *xconfstr(int name);
 
 /**
  * Portability wrapper for strtofflags().

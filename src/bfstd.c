@@ -82,20 +82,6 @@ size_t xbaseoff(const char *path) {
 	return i;
 }
 
-void close_quietly(int fd) {
-	int error = errno;
-	xclose(fd);
-	errno = error;
-}
-
-int xclose(int fd) {
-	int ret = close(fd);
-	if (ret != 0) {
-		assert(errno != EBADF);
-	}
-	return ret;
-}
-
 FILE *xfopen(const char *path, int flags) {
 	char mode[4];
 
@@ -155,52 +141,6 @@ char *xgetdelim(FILE *file, char delim) {
 		}
 		return NULL;
 	}
-}
-
-size_t xread(int fd, void *buf, size_t nbytes) {
-	size_t count = 0;
-
-	while (count < nbytes) {
-		ssize_t ret = read(fd, (char *)buf + count, nbytes - count);
-		if (ret < 0) {
-			if (errno == EINTR) {
-				continue;
-			} else {
-				break;
-			}
-		} else if (ret == 0) {
-			// EOF
-			errno = 0;
-			break;
-		} else {
-			count += ret;
-		}
-	}
-
-	return count;
-}
-
-size_t xwrite(int fd, const void *buf, size_t nbytes) {
-	size_t count = 0;
-
-	while (count < nbytes) {
-		ssize_t ret = write(fd, (const char *)buf + count, nbytes - count);
-		if (ret < 0) {
-			if (errno == EINTR) {
-				continue;
-			} else {
-				break;
-			}
-		} else if (ret == 0) {
-			// EOF?
-			errno = 0;
-			break;
-		} else {
-			count += ret;
-		}
-	}
-
-	return count;
 }
 
 /** Compile and execute a regular expression for xrpmatch(). */
@@ -398,6 +338,80 @@ int pipe_cloexec(int pipefd[2]) {
 #endif
 }
 
+size_t xread(int fd, void *buf, size_t nbytes) {
+	size_t count = 0;
+
+	while (count < nbytes) {
+		ssize_t ret = read(fd, (char *)buf + count, nbytes - count);
+		if (ret < 0) {
+			if (errno == EINTR) {
+				continue;
+			} else {
+				break;
+			}
+		} else if (ret == 0) {
+			// EOF
+			errno = 0;
+			break;
+		} else {
+			count += ret;
+		}
+	}
+
+	return count;
+}
+
+size_t xwrite(int fd, const void *buf, size_t nbytes) {
+	size_t count = 0;
+
+	while (count < nbytes) {
+		ssize_t ret = write(fd, (const char *)buf + count, nbytes - count);
+		if (ret < 0) {
+			if (errno == EINTR) {
+				continue;
+			} else {
+				break;
+			}
+		} else if (ret == 0) {
+			// EOF?
+			errno = 0;
+			break;
+		} else {
+			count += ret;
+		}
+	}
+
+	return count;
+}
+
+void close_quietly(int fd) {
+	int error = errno;
+	xclose(fd);
+	errno = error;
+}
+
+int xclose(int fd) {
+	int ret = close(fd);
+	if (ret != 0) {
+		assert(errno != EBADF);
+	}
+	return ret;
+}
+
+int xfaccessat(int fd, const char *path, int amode) {
+	int ret = faccessat(fd, path, amode, 0);
+
+#ifdef AT_EACCESS
+	// Some platforms, like Hurd, only support AT_EACCESS.  Other platforms,
+	// like Android, don't support AT_EACCESS at all.
+	if (ret != 0 && (errno == EINVAL || errno == ENOTSUP)) {
+		ret = faccessat(fd, path, amode, AT_EACCESS);
+	}
+#endif
+
+	return ret;
+}
+
 char *xconfstr(int name) {
 #if __ANDROID__
 	errno = ENOTSUP;
@@ -420,20 +434,6 @@ char *xconfstr(int name) {
 
 	return str;
 #endif // !__ANDROID__
-}
-
-int xfaccessat(int fd, const char *path, int amode) {
-	int ret = faccessat(fd, path, amode, 0);
-
-#ifdef AT_EACCESS
-	// Some platforms, like Hurd, only support AT_EACCESS.  Other platforms,
-	// like Android, don't support AT_EACCESS at all.
-	if (ret != 0 && (errno == EINVAL || errno == ENOTSUP)) {
-		ret = faccessat(fd, path, amode, AT_EACCESS);
-	}
-#endif
-
-	return ret;
 }
 
 char *xreadlinkat(int fd, const char *path, size_t size) {
