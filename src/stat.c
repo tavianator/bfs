@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "stat.h"
+#include "atomic.h"
 #include "bfstd.h"
 #include "config.h"
 #include "diag.h"
@@ -248,14 +249,14 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
  */
 static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, int x_flags, struct bfs_stat *buf) {
 #if BFS_STATX
-	static bool has_statx = true;
+	static atomic bool has_statx = true;
 
-	if (has_statx) {
+	if (load(&has_statx, relaxed)) {
 		int ret = bfs_statx_impl(at_fd, at_path, at_flags | x_flags, buf);
 		// EPERM is commonly returned in a seccomp() sandbox that does
 		// not allow statx()
 		if (ret != 0 && (errno == ENOSYS || errno == EPERM)) {
-			has_statx = false;
+			store(&has_statx, false, relaxed);
 		} else {
 			return ret;
 		}
@@ -305,12 +306,12 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 
 	// Check __GNU__ to work around https://lists.gnu.org/archive/html/bug-hurd/2021-12/msg00001.html
 #if defined(AT_EMPTY_PATH) && !__GNU__
-	static bool has_at_ep = true;
-	if (has_at_ep) {
+	static atomic bool has_at_ep = true;
+	if (load(&has_at_ep, relaxed)) {
 		at_flags |= AT_EMPTY_PATH;
 		int ret = bfs_stat_explicit(at_fd, "", at_flags, x_flags, buf);
 		if (ret != 0 && errno == EINVAL) {
-			has_at_ep = false;
+			store(&has_at_ep, false, relaxed);
 		} else {
 			return ret;
 		}
