@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "fsade.h"
+#include "atomic.h"
 #include "config.h"
 #include "bfstd.h"
 #include "bftw.h"
@@ -34,11 +35,10 @@
  * emulate something similar if /proc/self/fd is available.
  */
 static const char *fake_at(const struct BFTW *ftwbuf) {
-	static bool proc_works = true;
-	static bool proc_checked = false;
+	static atomic int proc_works = -1;
 
 	char *path = NULL;
-	if (!proc_works || ftwbuf->at_fd == AT_FDCWD) {
+	if (ftwbuf->at_fd == AT_FDCWD || load(&proc_works, relaxed) == 0) {
 		goto fail;
 	}
 
@@ -47,11 +47,12 @@ static const char *fake_at(const struct BFTW *ftwbuf) {
 		goto fail;
 	}
 
-	if (!proc_checked) {
-		proc_checked = true;
+	if (load(&proc_works, relaxed) < 0) {
 		if (xfaccessat(AT_FDCWD, path, F_OK) != 0) {
-			proc_works = false;
+			store(&proc_works, 0, relaxed);
 			goto fail;
+		} else {
+			store(&proc_works, 1, relaxed);
 		}
 	}
 
