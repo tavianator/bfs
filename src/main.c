@@ -31,6 +31,7 @@
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
  *     - list.h        (linked list macros)
+ *     - lock.h        (mutexes, condition variables, etc.)
  *     - mtab.[ch]     (parses the system's mount table)
  *     - pwcache.[ch]  (a cache for the user/group tables)
  *     - sanity.h      (sanitizer interfaces)
