@@ -155,6 +155,7 @@ static void *ioq_work(void *ptr) {
 		sanitize_uninit(cmd);
 
 		struct ioq_res *res = &cmd->res;
+		res->ptr = req.ptr;
 		res->dir = bfs_opendir(req.dfd, req.path);
 		res->error = errno;
 		ioqq_push(ioq->ready, cmd);

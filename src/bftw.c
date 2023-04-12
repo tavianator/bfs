@@ -853,13 +853,13 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 
 		if (file->refcount > 1) {
 			// Keep the fd around if any subdirectories exist
-			file->fd = bfs_freedir(state->dir);
+			file->fd = bfs_freedir(state->dir, false);
 		} else {
-			bfs_closedir(state->dir);
 			file->fd = -1;
 		}
 
 		if (file->fd < 0) {
+			bfs_closedir(state->dir);
 			bftw_cache_remove(&state->cache, file);
 		}
 	}

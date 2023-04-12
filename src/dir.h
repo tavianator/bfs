@@ -8,6 +8,7 @@
 #ifndef BFS_DIR_H
 #define BFS_DIR_H
 
+#include "config.h"
 #include <sys/types.h>
 
 /**
@@ -103,9 +104,14 @@ int bfs_closedir(struct bfs_dir *dir);
  *
  * @param dir
  *         The directory to free.
+ * @param same_fd
+ *         If true, require that the returned file descriptor is the same one
+ *         that bfs_dirfd() would have returned.  Otherwise, it may be a new
+ *         file descriptor for the same directory.
  * @return
- *         The file descriptor on success, or -1 on failure.
+ *         On success, a file descriptor for the directory is returned.  On
+ *         failure, -1 is returned, and the directory remains open.
  */
-int bfs_freedir(struct bfs_dir *dir);
+int bfs_freedir(struct bfs_dir *dir, bool same_fd);
 
 #endif // BFS_DIR_H

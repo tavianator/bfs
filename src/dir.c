@@ -243,13 +243,15 @@ int bfs_closedir(struct bfs_dir *dir) {
 	int ret = xclose(dir->fd);
 #else
 	int ret = closedir(dir->dir);
-	bfs_verify(ret == 0 || errno != EBADF);
+	if (ret != 0) {
+		bfs_verify(errno != EBADF);
+	}
 #endif
 	free(dir);
 	return ret;
 }
 
-int bfs_freedir(struct bfs_dir *dir) {
+int bfs_freedir(struct bfs_dir *dir, bool same_fd) {
 #if BFS_GETDENTS
 	int ret = dir->fd;
 	free(dir);
@@ -257,10 +259,16 @@ int bfs_freedir(struct bfs_dir *dir) {
 	int ret = fdclosedir(dir->dir);
 	free(dir);
 #else
+	if (same_fd) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
 	int ret = dup_cloexec(dirfd(dir->dir));
-	int error = errno;
-	bfs_closedir(dir);
-	errno = error;
+	if (ret >= 0) {
+		bfs_closedir(dir);
+	}
 #endif
+
 	return ret;
 }
