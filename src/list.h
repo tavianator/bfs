@@ -105,12 +105,14 @@
 #define LIST_BLOCK_(block) do { block } while (0)
 
 /**
- * Add an item to the tail of a singly-linked list.
+ * Insert an item into a singly-linked list.
  *
  * @param list
- *         The list to modify.
+ *         The list to remove from.
+ * @param cursor
+ *         A pointer to the item to insert after, e.g. &list->head or list->tail.
  * @param item
- *         The item to append.
+ *         The item to insert.
  * @param node (optional)
  *         If specified, use item->node.next rather than item->next.
  *
@@ -118,27 +120,29 @@
  *
  * We play some tricks with variadic macros to handle the optional parameter:
  *
- *     SLIST_APPEND(list, item) => {
- *             *list->tail = item;
- *             list->tail = &item->next;
+ *     SLIST_INSERT(list, cursor, item) => {
+ *             item->next = *cursor;
+ *             *cursor = item;
+ *             list->tail = item->next ? list->tail : &item->next;
  *     }
  *
- *     SLIST_APPEND(list, item, node) => {
- *             *list->tail = item;
- *             list->tail = &item->node.next;
+ *     SLIST_INSERT(list, cursor, item, node) => {
+ *             item->node.next = *cursor;
+ *             *cursor = item;
+ *             list->tail = item->node.next ? list->tail : &item->node.next;
  *     }
  *
  * The first trick is that
  *
- *     #define SLIST_APPEND(list, item, ...)
+ *     #define SLIST_INSERT(list, item, cursor, ...)
  *
  * won't work because both commas are required (until C23; see N3033). As a
  * workaround, we dispatch to another macro and add a trailing comma.
  *
- *     SLIST_APPEND(list, item)       => SLIST_APPEND_(list, item, )
- *     SLIST_APPEND(list, item, node) => SLIST_APPEND_(list, item, node, )
+ *     SLIST_INSERT(list, cursor, item)       => SLIST_INSERT_(list, cursor, item, )
+ *     SLIST_INSERT(list, cursor, item, node) => SLIST_INSERT_(list, cursor, item, node, )
  */
-#define SLIST_APPEND(list, ...) SLIST_APPEND_(list, __VA_ARGS__, )
+#define SLIST_INSERT(list, cursor, ...) SLIST_INSERT_(list, cursor, __VA_ARGS__, )
 
 /**
  * Now we need a way to generate either ->next or ->node.next depending on
@@ -178,18 +182,31 @@
 #define LIST_NODE__(dir, node, ignored, dot, ...) node dot dir
 
 /**
- * SLIST_APPEND_() uses LIST_NEXT_() to generate the right name for the list
+ * SLIST_INSERT_() uses LIST_NEXT_() to generate the right name for the list
  * node, and finally delegates to the actual implementation.
- *
- *     SLIST_APPEND_(list, item, )       => SLIST_APPEND__((list), (item), next)
- *     SLIST_APPEND_(list, item, node, ) => SLIST_APPEND__((list), (item), node.next)
  */
-#define SLIST_APPEND_(list, item, ...) \
-	LIST_BLOCK_(SLIST_APPEND__((list), (item), LIST_NEXT_(__VA_ARGS__)))
+#define SLIST_INSERT_(list, cursor, item, ...) \
+	LIST_BLOCK_(SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__)))
 
-#define SLIST_APPEND__(list, item, next) \
-	*list->tail = item; \
-	list->tail = &item->next;
+#define SLIST_INSERT__(list, cursor, item, next) \
+	item->next = *cursor; \
+	*cursor = item; \
+	list->tail = item->next ? list->tail : &item->next;
+
+/**
+ * Add an item to the tail of a singly-linked list.
+ *
+ * @param list
+ *         The list to modify.
+ * @param item
+ *         The item to append.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
+ */
+#define SLIST_APPEND(list, ...) SLIST_APPEND_(list, __VA_ARGS__, )
+
+#define SLIST_APPEND_(list, item, ...) \
+	SLIST_INSERT_(list, (list)->tail, item, __VA_ARGS__)
 
 /**
  * Add an item to the head of a singly-linked list.
@@ -204,12 +221,7 @@
 #define SLIST_PREPEND(list, ...) SLIST_PREPEND_(list, __VA_ARGS__, )
 
 #define SLIST_PREPEND_(list, item, ...) \
-	LIST_BLOCK_(SLIST_PREPEND__((list), (item), LIST_NEXT_(__VA_ARGS__)))
-
-#define SLIST_PREPEND__(list, item, next) \
-	list->tail = list->head ? list->tail : &item->next; \
-	item->next = list->head; \
-	list->head = item;
+	SLIST_INSERT_(list, &(list)->head, item, __VA_ARGS__)
 
 /**
  * Add an entire singly-linked list to the tail of another.
@@ -260,9 +272,8 @@
  */
 #define SLIST_POP(...) SLIST_POP_(__VA_ARGS__, )
 
-#define SLIST_POP_(list, ...) SLIST_POP__((list), LIST_NEXT_(__VA_ARGS__))
-
-#define SLIST_POP__(list, next) SLIST_REMOVE__(list, (&list->head), next)
+#define SLIST_POP_(list, ...) \
+	SLIST_REMOVE_(list, &(list)->head, __VA_ARGS__)
 
 /**
  * Initialize a doubly-linked list.
