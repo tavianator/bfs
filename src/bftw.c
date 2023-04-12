@@ -705,6 +705,10 @@ static void bftw_fill_id(struct bftw_file *file, const struct BFTW *ftwbuf) {
  * Visit a path, invoking the callback.
  */
 static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, enum bftw_visit visit) {
+	if (visit == BFTW_POST && !(state->flags & BFTW_POST_ORDER)) {
+		return BFTW_PRUNE;
+	}
+
 	if (bftw_update_path(state, name) != 0) {
 		state->error = errno;
 		return BFTW_STOP;
@@ -814,13 +818,23 @@ static int bftw_build_path(struct bftw_state *state) {
 /**
  * Pop the next file from the queue.
  */
-static int bftw_pop(struct bftw_state *state) {
+static bool bftw_pop(struct bftw_state *state) {
 	state->file = state->queue.head;
-	if (!state->file) {
+	if (state->file) {
+		SLIST_POP(&state->queue);
+		return true;
+	} else {
+		return false;
+	}
+}
+
+/**
+ * Start processing the next file in the queue.
+ */
+static int bftw_next(struct bftw_state *state) {
+	if (!bftw_pop(state)) {
 		return 0;
 	}
-
-	SLIST_POP(&state->queue);
 
 	if (bftw_build_path(state) != 0) {
 		return -1;
@@ -871,23 +885,25 @@ static int bftw_readdir(struct bftw_state *state) {
 enum bftw_gc_flags {
 	/** Don't visit anything. */
 	BFTW_VISIT_NONE = 0,
+	/** Report directory errors. */
+	BFTW_VISIT_ERROR = 1 << 0,
 	/** Visit the file itself. */
-	BFTW_VISIT_FILE = 1 << 0,
+	BFTW_VISIT_FILE = 1 << 1,
 	/** Visit the file's ancestors. */
-	BFTW_VISIT_PARENTS = 1 << 1,
+	BFTW_VISIT_PARENTS = 1 << 2,
 	/** Visit both the file and its ancestors. */
-	BFTW_VISIT_ALL = BFTW_VISIT_FILE | BFTW_VISIT_PARENTS,
+	BFTW_VISIT_ALL = BFTW_VISIT_ERROR | BFTW_VISIT_FILE | BFTW_VISIT_PARENTS,
 };
 
 /**
- * Close the current directory.
+ * Garbage collect the current file and its parents.
  */
-static enum bftw_action bftw_closedir(struct bftw_state *state, enum bftw_gc_flags flags) {
-	struct bftw_file *file = state->file;
+static enum bftw_action bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	enum bftw_action ret = BFTW_CONTINUE;
 
 	if (state->dir) {
-		assert(file->fd >= 0);
+		struct bftw_file *file = state->file;
+		assert(file && file->fd >= 0);
 
 		if (file->refcount > 1) {
 			// Keep the fd around if any subdirectories exist
@@ -902,32 +918,22 @@ static enum bftw_action bftw_closedir(struct bftw_state *state, enum bftw_gc_fla
 		}
 	}
 
-	state->de = NULL;
 	state->dir = NULL;
+	state->de = NULL;
 
 	if (state->direrror != 0) {
-		if (flags & BFTW_VISIT_FILE) {
-			ret = bftw_visit(state, NULL, BFTW_PRE);
+		if (flags & BFTW_VISIT_ERROR) {
+			if (bftw_visit(state, NULL, BFTW_PRE) == BFTW_STOP) {
+				ret = BFTW_STOP;
+				flags = 0;
+			}
 		} else {
 			state->error = state->direrror;
 		}
 		state->direrror = 0;
 	}
 
-	return ret;
-}
-
-/**
- * Finalize and free a file we're done with.
- */
-static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flags flags) {
-	enum bftw_action ret = BFTW_CONTINUE;
-
-	if (!(state->flags & BFTW_POST_ORDER)) {
-		flags = 0;
-	}
-	bool visit = flags & BFTW_VISIT_FILE;
-
+	enum bftw_gc_flags visit = BFTW_VISIT_FILE;
 	while (state->file) {
 		struct bftw_file *file = state->file;
 		if (--file->refcount > 0) {
@@ -935,11 +941,13 @@ static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flag
 			break;
 		}
 
-		if (visit && bftw_visit(state, NULL, BFTW_POST) == BFTW_STOP) {
-			ret = BFTW_STOP;
-			flags &= ~BFTW_VISIT_PARENTS;
+		if (flags & visit) {
+			if (bftw_visit(state, NULL, BFTW_POST) == BFTW_STOP) {
+				ret = BFTW_STOP;
+				flags = 0;
+			}
 		}
-		visit = flags & BFTW_VISIT_PARENTS;
+		visit = BFTW_VISIT_PARENTS;
 
 		struct bftw_file *parent = file->parent;
 		if (state->previous == file) {
@@ -953,18 +961,6 @@ static enum bftw_action bftw_gc_file(struct bftw_state *state, enum bftw_gc_flag
 }
 
 /**
- * Drain all the files from the queue.
- */
-static void bftw_drain_queue(struct bftw_state *state) {
-	while (state->queue.head) {
-		state->file = state->queue.head;
-		SLIST_POP(&state->queue);
-
-		bftw_gc_file(state, BFTW_VISIT_NONE);
-	}
-}
-
-/**
  * Dispose of the bftw() state.
  *
  * @return
@@ -973,10 +969,9 @@ static void bftw_drain_queue(struct bftw_state *state) {
 static int bftw_state_destroy(struct bftw_state *state) {
 	dstrfree(state->path);
 
-	bftw_closedir(state, BFTW_VISIT_NONE);
-
-	bftw_gc_file(state, BFTW_VISIT_NONE);
-	bftw_drain_queue(state);
+	do {
+		bftw_gc(state, BFTW_VISIT_NONE);
+	} while (bftw_pop(state));
 
 	bftw_cache_destroy(&state->cache);
 
@@ -1064,7 +1059,7 @@ static int bftw_stream(const struct bftw_args *args) {
 	}
 	bftw_batch_finish(&state);
 
-	while (bftw_pop(&state) > 0) {
+	while (bftw_next(&state) > 0) {
 		bftw_opendir(&state);
 
 		while (bftw_readdir(&state) > 0) {
@@ -1085,10 +1080,7 @@ static int bftw_stream(const struct bftw_args *args) {
 		}
 		bftw_batch_finish(&state);
 
-		if (bftw_closedir(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
-			goto done;
-		}
-		if (bftw_gc_file(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
+		if (bftw_gc(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
 			goto done;
 		}
 	}
@@ -1113,7 +1105,7 @@ static int bftw_batch(const struct bftw_args *args) {
 	}
 	bftw_batch_finish(&state);
 
-	while (bftw_pop(&state) > 0) {
+	while (bftw_next(&state) > 0) {
 		enum bftw_gc_flags gcflags = BFTW_VISIT_ALL;
 
 		switch (bftw_visit(&state, NULL, BFTW_PRE)) {
@@ -1135,12 +1127,8 @@ static int bftw_batch(const struct bftw_args *args) {
 		}
 		bftw_batch_finish(&state);
 
-		if (bftw_closedir(&state, gcflags) == BFTW_STOP) {
-			goto done;
-		}
-
 	next:
-		if (bftw_gc_file(&state, gcflags) == BFTW_STOP) {
+		if (bftw_gc(&state, gcflags) == BFTW_STOP) {
 			goto done;
 		}
 	}
