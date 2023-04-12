@@ -111,8 +111,8 @@
  *         The list to modify.
  * @param item
  *         The item to append.
- * @param link (optional)
- *         If specified, use item->link.next rather than item->next.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
  *
  * ---
  *
@@ -123,9 +123,9 @@
  *             list->tail = &item->next;
  *     }
  *
- *     SLIST_APPEND(list, item, link) => {
+ *     SLIST_APPEND(list, item, node) => {
  *             *list->tail = item;
- *             list->tail = &item->link.next;
+ *             list->tail = &item->node.next;
  *     }
  *
  * The first trick is that
@@ -136,13 +136,13 @@
  * workaround, we dispatch to another macro and add a trailing comma.
  *
  *     SLIST_APPEND(list, item)       => SLIST_APPEND_(list, item, )
- *     SLIST_APPEND(list, item, link) => SLIST_APPEND_(list, item, link, )
+ *     SLIST_APPEND(list, item, node) => SLIST_APPEND_(list, item, node, )
  */
 #define SLIST_APPEND(list, ...) SLIST_APPEND_(list, __VA_ARGS__, )
 
 /**
- * Now we need a way to generate either ->next or ->link.next depending on
- * whether the link parameter was passed.  The approach is based on
+ * Now we need a way to generate either ->next or ->node.next depending on
+ * whether the node parameter was passed.  The approach is based on
  *
  *     #define FOO(...) BAR(__VA_ARGS__, 1, 2, )
  *     #define BAR(x, y, z, ...) z
@@ -152,37 +152,37 @@
  *
  * The LIST_NEXT_() macro uses this technique:
  *
- *     LIST_NEXT_()       => LIST_LINK_(next, )
- *     LIST_NEXT_(link, ) => LIST_LINK_(next, link, )
+ *     LIST_NEXT_()       => LIST_NODE_(next, )
+ *     LIST_NEXT_(node, ) => LIST_NODE_(next, node, )
  */
-#define LIST_NEXT_(...) LIST_LINK_(next, __VA_ARGS__)
+#define LIST_NEXT_(...) LIST_NODE_(next, __VA_ARGS__)
 
 /**
- * LIST_LINK_() dispatches to yet another macro:
+ * LIST_NODE_() dispatches to yet another macro:
  *
- *     LIST_LINK_(next, )       => LIST_LINK__(next,     , . ,   , )
- *     LIST_LINK_(next, link, ) => LIST_LINK__(next, link,   , . , , )
+ *     LIST_NODE_(next, )       => LIST_NODE__(next,     , . ,   , )
+ *     LIST_NODE_(next, node, ) => LIST_NODE__(next, node,   , . , , )
  */
-#define LIST_LINK_(dir, ...) LIST_LINK__(dir, __VA_ARGS__, . , , )
+#define LIST_NODE_(dir, ...) LIST_NODE__(dir, __VA_ARGS__, . , , )
 
 /**
- * And finally, LIST_LINK__() adds the link and the dot if necessary.
+ * And finally, LIST_NODE__() adds the node and the dot if necessary.
  *
- *                 dir   link ignored dot
+ *                 dir   node ignored dot
  *                  v     v      v     v
- *     LIST_LINK__(next,     ,   .   ,   , )   => next
- *     LIST_LINK__(next, link,       , . , , ) => link . next
+ *     LIST_NODE__(next,     ,   .   ,   , )   => next
+ *     LIST_NODE__(next, node,       , . , , ) => node . next
  *                  ^     ^      ^     ^
- *                 dir   link ignored dot
+ *                 dir   node ignored dot
  */
-#define LIST_LINK__(dir, link, ignored, dot, ...) link dot dir
+#define LIST_NODE__(dir, node, ignored, dot, ...) node dot dir
 
 /**
  * SLIST_APPEND_() uses LIST_NEXT_() to generate the right name for the list
- * link, and finally delegates to the actual implementation.
+ * node, and finally delegates to the actual implementation.
  *
  *     SLIST_APPEND_(list, item, )       => SLIST_APPEND__((list), (item), next)
- *     SLIST_APPEND_(list, item, link, ) => SLIST_APPEND__((list), (item), link.next)
+ *     SLIST_APPEND_(list, item, node, ) => SLIST_APPEND__((list), (item), node.next)
  */
 #define SLIST_APPEND_(list, item, ...) \
 	LIST_BLOCK_(SLIST_APPEND__((list), (item), LIST_NEXT_(__VA_ARGS__)))
@@ -198,8 +198,8 @@
  *         The list to modify.
  * @param item
  *         The item to prepend.
- * @param link (optional)
- *         If specified, use item->link.next rather than item->next.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
  */
 #define SLIST_PREPEND(list, ...) SLIST_PREPEND_(list, __VA_ARGS__, )
 
@@ -236,8 +236,8 @@
  *         The list to remove from.
  * @param cursor
  *         A pointer to the item to remove, either &list->head or &prev->next.
- * @param link (optional)
- *         If specified, use item->link.next rather than item->next.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
  */
 #define SLIST_REMOVE(list, ...) SLIST_REMOVE_(list, __VA_ARGS__, )
 
@@ -255,8 +255,8 @@
  *
  * @param list
  *         The list to pop from.
- * @param link (optional)
- *         If specified, use head->link.next rather than head->next.
+ * @param node (optional)
+ *         If specified, use head->node.next rather than head->next.
  */
 #define SLIST_POP(...) SLIST_POP_(__VA_ARGS__, )
 
@@ -278,9 +278,9 @@
 
 /**
  * LIST_PREV_()       => prev
- * LIST_PREV_(link, ) => link.prev
+ * LIST_PREV_(node, ) => node.prev
  */
-#define LIST_PREV_(...) LIST_LINK_(prev, __VA_ARGS__)
+#define LIST_PREV_(...) LIST_NODE_(prev, __VA_ARGS__)
 
 /**
  * Add an item to the tail of a doubly-linked list.
@@ -289,8 +289,8 @@
  *         The list to modify.
  * @param item
  *         The item to append.
- * @param link (optional)
- *         If specified, use item->link.{prev,next} rather than item->{prev,next}.
+ * @param node (optional)
+ *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_APPEND(list, ...) LIST_INSERT(list, (list)->tail, __VA_ARGS__)
 
@@ -301,8 +301,8 @@
  *         The list to modify.
  * @param item
  *         The item to prepend.
- * @param link (optional)
- *         If specified, use item->link.{prev,next} rather than item->{prev,next}.
+ * @param node (optional)
+ *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_PREPEND(list, ...) LIST_INSERT(list, NULL, __VA_ARGS__)
 
@@ -315,8 +315,8 @@
  *         Insert after this element.
  * @param item
  *         The item to insert.
- * @param link (optional)
- *         If specified, use item->link.{prev,next} rather than item->{prev,next}.
+ * @param node (optional)
+ *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_INSERT(list, cursor, ...) LIST_INSERT_(list, cursor, __VA_ARGS__, )
 
@@ -336,8 +336,8 @@
  *         The list to modify.
  * @param item
  *         The item to remove.
- * @param link (optional)
- *         If specified, use item->link.{prev,next} rather than item->{prev,next}.
+ * @param node (optional)
+ *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_REMOVE(list, ...) LIST_REMOVE_(list, __VA_ARGS__, )
 
@@ -356,8 +356,8 @@
  *         The list to check.
  * @param item
  *         The item to check.
- * @param link (optional)
- *         If specified, use item->link.{prev,next} rather than item->{prev,next}.
+ * @param node (optional)
+ *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  * @return
  *         Whether the item is attached to the list.
  */
