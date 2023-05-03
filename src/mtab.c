@@ -15,23 +15,23 @@
 #include <sys/types.h>
 
 #if BFS_USE_MNTENT_H
-#	define BFS_MNTENT 1
+#  define BFS_MNTENT 1
 #elif BSD
-#	define BFS_MNTINFO 1
+#  define BFS_MNTINFO 1
 #elif __SVR4
-#	define BFS_MNTTAB 1
+#  define BFS_MNTTAB 1
 #endif
 
 #if BFS_MNTENT
-#	include <mntent.h>
-#	include <paths.h>
-#	include <stdio.h>
+#  include <mntent.h>
+#  include <paths.h>
+#  include <stdio.h>
 #elif BFS_MNTINFO
-#	include <sys/mount.h>
-#	include <sys/ucred.h>
+#  include <sys/mount.h>
+#  include <sys/ucred.h>
 #elif BFS_MNTTAB
-#	include <stdio.h>
-#	include <sys/mnttab.h>
+#  include <stdio.h>
+#  include <sys/mnttab.h>
 #endif
 
 /**

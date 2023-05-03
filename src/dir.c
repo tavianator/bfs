@@ -16,16 +16,16 @@
 #include <unistd.h>
 
 #ifndef BFS_GETDENTS
-#	define BFS_GETDENTS (__linux__ || __FreeBSD__)
+#  define BFS_GETDENTS (__linux__ || __FreeBSD__)
 #endif
 
 #if BFS_GETDENTS
-#	if __has_feature(memory_sanitizer)
-#		include <sanitizer/msan_interface.h>
-#	endif
-#	if __linux__
-#		include <sys/syscall.h>
-#	endif
+#  if __has_feature(memory_sanitizer)
+#    include <sanitizer/msan_interface.h>
+#  endif
+#  if __linux__
+#    include <sys/syscall.h>
+#  endif
 
 /** getdents() syscall wrapper. */
 static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
@@ -119,10 +119,10 @@ struct bfs_dir {
 };
 
 #if BFS_GETDENTS
-#	define DIR_SIZE (64 << 10)
-#	define BUF_SIZE (DIR_SIZE - sizeof(struct bfs_dir))
+#  define DIR_SIZE (64 << 10)
+#  define BUF_SIZE (DIR_SIZE - sizeof(struct bfs_dir))
 #else
-#	define DIR_SIZE sizeof(struct bfs_dir)
+#  define DIR_SIZE sizeof(struct bfs_dir)
 #endif
 
 struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {

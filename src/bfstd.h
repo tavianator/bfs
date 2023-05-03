@@ -21,29 +21,29 @@ bool is_nonexistence_error(int error);
 #include <fcntl.h>
 
 #ifndef O_EXEC
-#	ifdef O_PATH
-#		define O_EXEC O_PATH
-#	else
-#		define O_EXEC O_RDONLY
-#	endif
+#  ifdef O_PATH
+#    define O_EXEC O_PATH
+#  else
+#    define O_EXEC O_RDONLY
+#  endif
 #endif
 
 #ifndef O_SEARCH
-#	ifdef O_PATH
-#		define O_SEARCH O_PATH
-#	else
-#		define O_SEARCH O_RDONLY
-#	endif
+#  ifdef O_PATH
+#    define O_SEARCH O_PATH
+#  else
+#    define O_SEARCH O_RDONLY
+#  endif
 #endif
 
 #ifndef O_DIRECTORY
-#	define O_DIRECTORY 0
+#  define O_DIRECTORY 0
 #endif
 
 #include <fnmatch.h>
 
 #if !defined(FNM_CASEFOLD) && defined(FNM_IGNORECASE)
-#	define FNM_CASEFOLD FNM_IGNORECASE
+#  define FNM_CASEFOLD FNM_IGNORECASE
 #endif
 
 // #include <libgen.h>
@@ -144,10 +144,10 @@ int xminor(dev_t dev);
 // #include <sys/stat.h>
 
 #if __APPLE__
-#	define st_atim st_atimespec
-#	define st_ctim st_ctimespec
-#	define st_mtim st_mtimespec
-#	define st_birthtim st_birthtimespec
+#  define st_atim st_atimespec
+#  define st_ctim st_ctimespec
+#  define st_mtim st_mtimespec
+#  define st_birthtim st_birthtimespec
 #endif
 
 // #include <unistd.h>

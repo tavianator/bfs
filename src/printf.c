@@ -72,10 +72,10 @@ static bool should_color(CFILE *cfile, const struct bfs_printf *directive) {
 /**
  * Print a value to a temporary buffer before formatting it.
  */
-#define BFS_PRINTF_BUF(buf, format, ...)				\
-	char buf[256];							\
-	int ret = snprintf(buf, sizeof(buf), format, __VA_ARGS__);	\
-	assert(ret >= 0 && (size_t)ret < sizeof(buf));			\
+#define BFS_PRINTF_BUF(buf, format, ...) \
+	char buf[256]; \
+	int ret = snprintf(buf, sizeof(buf), format, __VA_ARGS__); \
+	assert(ret >= 0 && (size_t)ret < sizeof(buf)); \
 	(void)ret
 
 /**

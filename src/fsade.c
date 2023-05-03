@@ -13,17 +13,17 @@
 #include <unistd.h>
 
 #if BFS_CAN_CHECK_ACL
-#	include <sys/acl.h>
+#  include <sys/acl.h>
 #endif
 
 #if BFS_CAN_CHECK_CAPABILITIES
-#	include <sys/capability.h>
+#  include <sys/capability.h>
 #endif
 
 #if BFS_USE_SYS_EXTATTR_H
-#	include <sys/extattr.h>
+#  include <sys/extattr.h>
 #elif BFS_USE_SYS_XATTR_H
-#	include <sys/xattr.h>
+#  include <sys/xattr.h>
 #endif
 
 #if BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS

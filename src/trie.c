@@ -94,9 +94,9 @@
 static_assert(CHAR_BIT == 8, "This trie implementation assumes 8-bit bytes.");
 
 #if BFS_TARGET_CLONES && (__i386__ || __x86_64__)
-#	define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
+#  define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
 #else
-#	define TARGET_CLONES_POPCNT
+#  define TARGET_CLONES_POPCNT
 #endif
 
 /** Number of bits for the sparse array bitmap, aka the range of a nibble. */
@@ -367,23 +367,23 @@ static size_t trie_node_size(unsigned int size) {
 }
 
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#	define TRIE_BSWAP(n) (n)
+#  define TRIE_BSWAP(n) (n)
 #elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#	if __SIZEOF_SIZE_T__ == 8
-#		define TRIE_BSWAP(n) __builtin_bswap64(n)
-#	elif __SIZEOF_SIZE_T__ == 4
-#		define TRIE_BSWAP(n) __builtin_bswap32(n)
-#	endif
+#  if __SIZEOF_SIZE_T__ == 8
+#    define TRIE_BSWAP(n) __builtin_bswap64(n)
+#  elif __SIZEOF_SIZE_T__ == 4
+#    define TRIE_BSWAP(n) __builtin_bswap32(n)
+#  endif
 #endif
 
 #ifdef TRIE_BSWAP
-#	if __SIZEOF_SIZE_T__ == __SIZEOF_LONG_LONG__
-#		define TRIE_CTZ(n) __builtin_ctzll(n)
-#	elif __SIZEOF_SIZE_T__ == __SIZEOF_LONG__
-#		define TRIE_CTZ(n) __builtin_ctzl(n)
-#	elif __SIZEOF_SIZE_T__ == __SIZEOF_INT__
-#		define TRIE_CTZ(n) __builtin_ctz(n)
-#	endif
+#  if __SIZEOF_SIZE_T__ == __SIZEOF_LONG_LONG__
+#    define TRIE_CTZ(n) __builtin_ctzll(n)
+#  elif __SIZEOF_SIZE_T__ == __SIZEOF_LONG__
+#    define TRIE_CTZ(n) __builtin_ctzl(n)
+#  elif __SIZEOF_SIZE_T__ == __SIZEOF_INT__
+#    define TRIE_CTZ(n) __builtin_ctz(n)
+#  endif
 #endif
 
 /** Find the offset of the first nibble that differs between two keys. */

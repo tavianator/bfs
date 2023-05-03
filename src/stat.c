@@ -13,15 +13,15 @@
 #include <sys/stat.h>
 
 #if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
-#	define BFS_LIBC_STATX true
+#  define BFS_LIBC_STATX true
 #elif __linux__
-#	include <linux/stat.h>
-#	include <sys/syscall.h>
-#	include <unistd.h>
+#  include <linux/stat.h>
+#  include <sys/syscall.h>
+#  include <unistd.h>
 #endif
 
 #if BFS_LIBC_STATX || defined(__NR_statx)
-#	define BFS_STATX true
+#  define BFS_STATX true
 #endif
 
 const char *bfs_stat_field_name(enum bfs_stat_field field) {

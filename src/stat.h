@@ -17,7 +17,7 @@
 #include <time.h>
 
 #if BFS_USE_SYS_PARAM_H
-#	include <sys/param.h>
+#  include <sys/param.h>
 #endif
 
 /**
@@ -61,11 +61,11 @@ enum bfs_stat_flags {
 };
 
 #ifdef DEV_BSIZE
-#	define BFS_STAT_BLKSIZE DEV_BSIZE
+#  define BFS_STAT_BLKSIZE DEV_BSIZE
 #elif defined(S_BLKSIZE)
-#	define BFS_STAT_BLKSIZE S_BLKSIZE
+#  define BFS_STAT_BLKSIZE S_BLKSIZE
 #else
-#	define BFS_STAT_BLKSIZE 512
+#  define BFS_STAT_BLKSIZE 512
 #endif
 
 /**

@@ -9,10 +9,10 @@
 #include <string.h>
 
 #if BFS_WITH_ONIGURUMA
-#	include <langinfo.h>
-#	include <oniguruma.h>
+#  include <langinfo.h>
+#  include <oniguruma.h>
 #else
-#	include <regex.h>
+#  include <regex.h>
 #endif
 
 struct bfs_regex {
@@ -43,20 +43,20 @@ static int bfs_onig_encoding(OnigEncoding *penc) {
 	// from the current locale.
 	const char *charmap = nl_langinfo(CODESET);
 	if (charmap) {
-#define BFS_MAP_ENCODING(name, value)				\
-		do {						\
-			if (strcmp(charmap, name) == 0) {	\
-				enc = value;			\
-			}					\
+#define BFS_MAP_ENCODING(name, value) \
+		do { \
+			if (strcmp(charmap, name) == 0) { \
+				enc = value; \
+			} \
 		} while (0)
-#define BFS_MAP_ENCODING2(name1, name2, value)		\
-		do {					\
-			BFS_MAP_ENCODING(name1, value);	\
-			BFS_MAP_ENCODING(name2, value);	\
+#define BFS_MAP_ENCODING2(name1, name2, value) \
+		do { \
+			BFS_MAP_ENCODING(name1, value); \
+			BFS_MAP_ENCODING(name2, value); \
 		} while (0)
 
 		// These names were found with locale -m on Linux and FreeBSD
-#define BFS_MAP_ISO_8859(n)						\
+#define BFS_MAP_ISO_8859(n) \
 		BFS_MAP_ENCODING2("ISO-8859-" #n, "ISO8859-" #n, ONIG_ENCODING_ISO_8859_ ## n)
 
 		BFS_MAP_ISO_8859(1);
@@ -78,7 +78,7 @@ static int bfs_onig_encoding(OnigEncoding *penc) {
 
 		BFS_MAP_ENCODING("UTF-8", ONIG_ENCODING_UTF8);
 
-#define BFS_MAP_EUC(name)						\
+#define BFS_MAP_EUC(name) \
 		BFS_MAP_ENCODING2("EUC-" #name, "euc" #name, ONIG_ENCODING_EUC_ ## name)
 
 		BFS_MAP_EUC(JP);

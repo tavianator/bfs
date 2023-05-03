@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 #if BFS_USE_PATHS_H
-#	include <paths.h>
+#  include <paths.h>
 #endif
 
 /**

@@ -19,13 +19,13 @@
 #include <wchar.h>
 
 #if BFS_USE_SYS_SYSMACROS_H
-#	include <sys/sysmacros.h>
+#  include <sys/sysmacros.h>
 #elif BFS_USE_SYS_MKDEV_H
-#	include <sys/mkdev.h>
+#  include <sys/mkdev.h>
 #endif
 
 #if BFS_USE_UTIL_H
-#	include <util.h>
+#  include <util.h>
 #endif
 
 bool is_nonexistence_error(int error) {

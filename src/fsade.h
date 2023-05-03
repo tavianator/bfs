@@ -15,10 +15,10 @@
 #define BFS_CAN_CHECK_ACL BFS_USE_SYS_ACL_H
 
 #if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_USE_SYS_CAPABILITY_H && !__FreeBSD__
-#	include <sys/capability.h>
-#	ifdef CAP_CHOWN
-#		define BFS_CAN_CHECK_CAPABILITIES true
-#	endif
+#  include <sys/capability.h>
+#  ifdef CAP_CHOWN
+#    define BFS_CAN_CHECK_CAPABILITIES true
+#  endif
 #endif
 
 #define BFS_CAN_CHECK_XATTRS (BFS_USE_SYS_EXTATTR_H || BFS_USE_SYS_XATTR_H)

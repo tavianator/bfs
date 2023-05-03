@@ -943,9 +943,9 @@ bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
 }
 
 #if _POSIX_MONOTONIC_CLOCK > 0
-#	define BFS_CLOCK CLOCK_MONOTONIC
+#  define BFS_CLOCK CLOCK_MONOTONIC
 #elif _POSIX_TIMERS > 0
-#	define BFS_CLOCK CLOCK_REALTIME
+#  define BFS_CLOCK CLOCK_REALTIME
 #endif
 
 /**
@@ -1194,15 +1194,15 @@ static bool eval_file_unique(struct bfs_eval *state, struct trie *seen) {
 	}
 }
 
-#define DEBUG_FLAG(flags, flag)				\
-	do {						\
-		if ((flags & flag) || flags == flag) {	\
-			fputs(#flag, stderr);		\
-			flags ^= flag;			\
-			if (flags) {			\
-				fputs(" | ", stderr);	\
-			}				\
-		}					\
+#define DEBUG_FLAG(flags, flag) \
+	do { \
+		if ((flags & flag) || flags == flag) { \
+			fputs(#flag, stderr); \
+			flags ^= flag; \
+			if (flags) { \
+				fputs(" | ", stderr); \
+			} \
+		} \
 	} while (0)
 
 /**
