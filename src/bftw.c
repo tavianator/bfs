@@ -362,8 +362,10 @@ struct bftw_state {
 
 	/** The cache of open directories. */
 	struct bftw_cache cache;
-	/** The queue of files left to explore. */
-	struct bftw_list queue;
+	/** The queue of directories to read. */
+	struct bftw_list dirs;
+	/** The queue of files to visit. */
+	struct bftw_list files;
 	/** A batch of files to enqueue. */
 	struct bftw_list batch;
 
@@ -397,6 +399,10 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	state->strategy = args->strategy;
 	state->mtab = args->mtab;
 
+	if ((state->flags & BFTW_SORT) || state->strategy == BFTW_DFS) {
+		state->flags |= BFTW_BUFFER;
+	}
+
 	state->error = 0;
 
 	if (args->nopenfd < 1) {
@@ -411,7 +417,8 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	bftw_cache_init(&state->cache, args->nopenfd);
 
-	SLIST_INIT(&state->queue);
+	SLIST_INIT(&state->dirs);
+	SLIST_INIT(&state->files);
 	SLIST_INIT(&state->batch);
 
 	state->file = NULL;
@@ -497,22 +504,47 @@ enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 }
 
 /**
- * Update the path for the current file.
+ * Build the path to the current file.
  */
-static int bftw_update_path(struct bftw_state *state, const char *name) {
+static int bftw_build_path(struct bftw_state *state, const char *name) {
 	const struct bftw_file *file = state->file;
-	size_t length = file ? file->nameoff + file->namelen : 0;
 
-	assert(dstrlen(state->path) >= length);
-	dstresize(&state->path, length);
+	size_t pathlen = file ? file->nameoff + file->namelen : 0;
+	if (dstresize(&state->path, pathlen) != 0) {
+		state->error = errno;
+		return -1;
+	}
+
+	// Try to find a common ancestor with the existing path
+	const struct bftw_file *ancestor = state->previous;
+	while (ancestor && ancestor->depth > file->depth) {
+		ancestor = ancestor->parent;
+	}
+
+	// Build the path backwards
+	while (file && file != ancestor) {
+		if (file->nameoff > 0) {
+			state->path[file->nameoff - 1] = '/';
+		}
+		memcpy(state->path + file->nameoff, file->name, file->namelen);
+
+		if (ancestor && ancestor->depth == file->depth) {
+			ancestor = ancestor->parent;
+		}
+		file = file->parent;
+	}
+
+	state->previous = state->file;
 
 	if (name) {
-		if (length > 0 && state->path[length - 1] != '/') {
+		if (pathlen > 0 && state->path[pathlen - 1] != '/') {
 			if (dstrapp(&state->path, '/') != 0) {
+				state->error = errno;
 				return -1;
 			}
 		}
 		if (dstrcat(&state->path, name) != 0) {
+			state->error = errno;
 			return -1;
 		}
 	}
@@ -689,28 +721,15 @@ static bool bftw_is_mount(struct bftw_state *state, const char *name) {
 	return statbuf && statbuf->dev != parent->dev;
 }
 
-/** Fill file identity information from an ftwbuf. */
-static void bftw_fill_id(struct bftw_file *file, const struct BFTW *ftwbuf) {
-	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
-	if (!statbuf || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
-		statbuf = ftwbuf->lstat_cache.buf;
-	}
-	if (statbuf) {
-		file->dev = statbuf->dev;
-		file->ino = statbuf->ino;
-	}
-}
-
 /**
- * Visit a path, invoking the callback.
+ * Invoke the callback.
  */
-static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, enum bftw_visit visit) {
+static enum bftw_action bftw_call_back(struct bftw_state *state, const char *name, enum bftw_visit visit) {
 	if (visit == BFTW_POST && !(state->flags & BFTW_POST_ORDER)) {
 		return BFTW_PRUNE;
 	}
 
-	if (bftw_update_path(state, name) != 0) {
-		state->error = errno;
+	if (bftw_build_path(state, name) != 0) {
 		return BFTW_STOP;
 	}
 
@@ -730,98 +749,50 @@ static enum bftw_action bftw_visit(struct bftw_state *state, const char *name, e
 	enum bftw_action ret = state->callback(ftwbuf, state->ptr);
 	switch (ret) {
 	case BFTW_CONTINUE:
-		break;
+		if (visit != BFTW_PRE) {
+			return BFTW_PRUNE;
+		}
+		if (ftwbuf->type != BFS_DIR) {
+			return BFTW_PRUNE;
+		}
+		if ((state->flags & BFTW_PRUNE_MOUNTS) && bftw_is_mount(state, name)) {
+			return BFTW_PRUNE;
+		}
+		BFS_FALLTHROUGH;
 	case BFTW_PRUNE:
 	case BFTW_STOP:
-		goto done;
+		return ret;
+
 	default:
 		state->error = EINVAL;
 		return BFTW_STOP;
 	}
-
-	if (visit != BFTW_PRE || ftwbuf->type != BFS_DIR) {
-		ret = BFTW_PRUNE;
-		goto done;
-	}
-
-	if ((state->flags & BFTW_PRUNE_MOUNTS) && bftw_is_mount(state, name)) {
-		ret = BFTW_PRUNE;
-		goto done;
-	}
-
-done:
-	if (state->file && !name) {
-		bftw_fill_id(state->file, ftwbuf);
-	}
-
-	return ret;
 }
 
-/**
- * Push a new file onto the queue.
- */
-static int bftw_push(struct bftw_state *state, const char *name, bool fill_id) {
-	struct bftw_file *parent = state->file;
-	struct bftw_file *file = bftw_file_new(parent, name);
-	if (!file) {
-		state->error = errno;
-		return -1;
+/** Pop a directory to read from the queue. */
+static bool bftw_pop_dir(struct bftw_state *state) {
+	assert(!state->file);
+
+	if (!state->dirs.head) {
+		return false;
 	}
 
-	if (state->de) {
-		file->type = state->de->type;
+	if (state->files.head && state->strategy == BFTW_BFS) {
+		return false;
 	}
 
-	if (fill_id) {
-		bftw_fill_id(file, &state->ftwbuf);
-	}
-
-	SLIST_APPEND(&state->batch, file);
-	return 0;
+	state->file = state->dirs.head;
+	SLIST_POP(&state->dirs);
+	return true;
 }
 
-/**
- * Build the path to the current file.
- */
-static int bftw_build_path(struct bftw_state *state) {
-	const struct bftw_file *file = state->file;
+/** Pop a file to visit from the queue. */
+static bool bftw_pop_file(struct bftw_state *state) {
+	assert(!state->file);
 
-	size_t pathlen = file->nameoff + file->namelen;
-	if (dstresize(&state->path, pathlen) != 0) {
-		state->error = errno;
-		return -1;
-	}
-
-	// Try to find a common ancestor with the existing path
-	const struct bftw_file *ancestor = state->previous;
-	while (ancestor && ancestor->depth > file->depth) {
-		ancestor = ancestor->parent;
-	}
-
-	// Build the path backwards
-	while (file && file != ancestor) {
-		if (file->nameoff > 0) {
-			state->path[file->nameoff - 1] = '/';
-		}
-		memcpy(state->path + file->nameoff, file->name, file->namelen);
-
-		if (ancestor && ancestor->depth == file->depth) {
-			ancestor = ancestor->parent;
-		}
-		file = file->parent;
-	}
-
-	state->previous = state->file;
-	return 0;
-}
-
-/**
- * Pop the next file from the queue.
- */
-static bool bftw_pop(struct bftw_state *state) {
-	state->file = state->queue.head;
+	state->file = state->files.head;
 	if (state->file) {
-		SLIST_POP(&state->queue);
+		SLIST_POP(&state->files);
 		return true;
 	} else {
 		return false;
@@ -829,33 +800,23 @@ static bool bftw_pop(struct bftw_state *state) {
 }
 
 /**
- * Start processing the next file in the queue.
- */
-static int bftw_next(struct bftw_state *state) {
-	if (!bftw_pop(state)) {
-		return 0;
-	}
-
-	if (bftw_build_path(state) != 0) {
-		return -1;
-	}
-
-	return 1;
-}
-
-/**
  * Open the current directory.
  */
-static void bftw_opendir(struct bftw_state *state) {
+static int bftw_opendir(struct bftw_state *state) {
 	assert(!state->dir);
 	assert(!state->de);
 
 	state->direrror = 0;
 
+	if (bftw_build_path(state, NULL) != 0) {
+		return -1;
+	}
+
 	state->dir = bftw_file_opendir(&state->cache, state->file, state->path);
 	if (!state->dir) {
 		state->direrror = errno;
 	}
+	return 0;
 }
 
 /**
@@ -898,8 +859,8 @@ enum bftw_gc_flags {
 /**
  * Garbage collect the current file and its parents.
  */
-static enum bftw_action bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
-	enum bftw_action ret = BFTW_CONTINUE;
+static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
+	int ret = 0;
 
 	if (state->dir) {
 		struct bftw_file *file = state->file;
@@ -923,8 +884,8 @@ static enum bftw_action bftw_gc(struct bftw_state *state, enum bftw_gc_flags fla
 
 	if (state->direrror != 0) {
 		if (flags & BFTW_VISIT_ERROR) {
-			if (bftw_visit(state, NULL, BFTW_PRE) == BFTW_STOP) {
-				ret = BFTW_STOP;
+			if (bftw_call_back(state, NULL, BFTW_PRE) == BFTW_STOP) {
+				ret = -1;
 				flags = 0;
 			}
 		} else {
@@ -942,8 +903,8 @@ static enum bftw_action bftw_gc(struct bftw_state *state, enum bftw_gc_flags fla
 		}
 
 		if (flags & visit) {
-			if (bftw_visit(state, NULL, BFTW_POST) == BFTW_STOP) {
-				ret = BFTW_STOP;
+			if (bftw_call_back(state, NULL, BFTW_POST) == BFTW_STOP) {
+				ret = -1;
 				flags = 0;
 			}
 		}
@@ -969,9 +930,10 @@ static enum bftw_action bftw_gc(struct bftw_state *state, enum bftw_gc_flags fla
 static int bftw_state_destroy(struct bftw_state *state) {
 	dstrfree(state->path);
 
+	SLIST_EXTEND(&state->files, &state->batch);
 	do {
 		bftw_gc(state, BFTW_VISIT_NONE);
-	} while (bftw_pop(state));
+	} while (bftw_pop_dir(state) || bftw_pop_file(state));
 
 	bftw_cache_destroy(&state->cache);
 
@@ -980,8 +942,8 @@ static int bftw_state_destroy(struct bftw_state *state) {
 }
 
 /** Sort a bftw_list by filename. */
-static void bftw_list_sort(struct bftw_list *queue) {
-	if (!queue->head || !queue->head->next) {
+static void bftw_list_sort(struct bftw_list *list) {
+	if (!list->head || !list->head->next) {
 		return;
 	}
 
@@ -990,12 +952,12 @@ static void bftw_list_sort(struct bftw_list *queue) {
 	SLIST_INIT(&right);
 
 	// Split
-	for (struct bftw_file *hare = queue->head; hare && (hare = hare->next); hare = hare->next) {
-		struct bftw_file *tortoise = queue->head;
-		SLIST_POP(queue);
+	for (struct bftw_file *hare = list->head; hare && (hare = hare->next); hare = hare->next) {
+		struct bftw_file *tortoise = list->head;
+		SLIST_POP(list);
 		SLIST_APPEND(&left, tortoise);
 	}
-	SLIST_EXTEND(&right, queue);
+	SLIST_EXTEND(&right, list);
 
 	// Recurse
 	bftw_list_sort(&left);
@@ -1008,14 +970,14 @@ static void bftw_list_sort(struct bftw_list *queue) {
 
 		if (strcoll(lf->name, rf->name) <= 0) {
 			SLIST_POP(&left);
-			SLIST_APPEND(queue, lf);
+			SLIST_APPEND(list, lf);
 		} else {
 			SLIST_POP(&right);
-			SLIST_APPEND(queue, rf);
+			SLIST_APPEND(list, rf);
 		}
 	}
-	SLIST_EXTEND(queue, &left);
-	SLIST_EXTEND(queue, &right);
+	SLIST_EXTEND(list, &left);
+	SLIST_EXTEND(list, &right);
 }
 
 /** Finish adding a batch of files. */
@@ -1024,126 +986,124 @@ static void bftw_batch_finish(struct bftw_state *state) {
 		bftw_list_sort(&state->batch);
 	}
 
-	if (state->strategy == BFTW_DFS) {
-		SLIST_EXTEND(&state->batch, &state->queue);
+	if (state->strategy != BFTW_BFS) {
+		SLIST_EXTEND(&state->batch, &state->files);
 	}
-	SLIST_EXTEND(&state->queue, &state->batch);
+	SLIST_EXTEND(&state->files, &state->batch);
+}
+
+/** Close the current directory. */
+static int bftw_closedir(struct bftw_state *state) {
+	if (bftw_gc(state, BFTW_VISIT_ALL) != 0) {
+		return -1;
+	}
+
+	bftw_batch_finish(state);
+	return 0;
+}
+
+/** Fill file identity information from an ftwbuf. */
+static void bftw_save_ftwbuf(struct bftw_file *file, const struct BFTW *ftwbuf) {
+	file->type = ftwbuf->type;
+
+	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
+	if (!statbuf || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
+		statbuf = ftwbuf->lstat_cache.buf;
+	}
+	if (statbuf) {
+		file->dev = statbuf->dev;
+		file->ino = statbuf->ino;
+	}
+}
+
+/** Visit and/or enqueue the current file. */
+static int bftw_visit(struct bftw_state *state, const char *name) {
+	struct bftw_file *file = state->file;
+
+	if (name && (state->flags & BFTW_BUFFER)) {
+		file = bftw_file_new(file, name);
+		if (!file) {
+			state->error = errno;
+			return -1;
+		}
+
+		if (state->de) {
+			file->type = state->de->type;
+		}
+
+		SLIST_APPEND(&state->batch, file);
+		return 0;
+	}
+
+	switch (bftw_call_back(state, name, BFTW_PRE)) {
+	case BFTW_CONTINUE:
+		if (name) {
+			file = bftw_file_new(state->file, name);
+		} else {
+			state->file = NULL;
+		}
+		if (!file) {
+			state->error = errno;
+			return -1;
+		}
+
+		bftw_save_ftwbuf(file, &state->ftwbuf);
+		SLIST_APPEND(&state->dirs, file);
+		return 0;
+
+	case BFTW_PRUNE:
+		if (file && !name) {
+			return bftw_gc(state, BFTW_VISIT_PARENTS);
+		} else {
+			return 0;
+		}
+
+	default:
+		return -1;
+	}
 }
 
 /**
- * Streaming mode: visit files as they are encountered.
+ * bftw() implementation for simple breadth-/depth-first search.
  */
-static int bftw_stream(const struct bftw_args *args) {
+static int bftw_impl(const struct bftw_args *args) {
 	struct bftw_state state;
 	if (bftw_state_init(&state, args) != 0) {
 		return -1;
 	}
 
-	assert(!(state.flags & (BFTW_SORT | BFTW_BUFFER)));
-
 	for (size_t i = 0; i < args->npaths; ++i) {
-		const char *path = args->paths[i];
-
-		switch (bftw_visit(&state, path, BFTW_PRE)) {
-		case BFTW_CONTINUE:
-			break;
-		case BFTW_PRUNE:
-			continue;
-		case BFTW_STOP:
-			goto done;
-		}
-
-		if (bftw_push(&state, path, true) != 0) {
+		if (bftw_visit(&state, args->paths[i]) != 0) {
 			goto done;
 		}
 	}
 	bftw_batch_finish(&state);
 
-	while (bftw_next(&state) > 0) {
-		bftw_opendir(&state);
-
-		while (bftw_readdir(&state) > 0) {
-			const char *name = state.de->name;
-
-			switch (bftw_visit(&state, name, BFTW_PRE)) {
-			case BFTW_CONTINUE:
-				break;
-			case BFTW_PRUNE:
-				continue;
-			case BFTW_STOP:
+	while (true) {
+		while (bftw_pop_dir(&state)) {
+			if (bftw_opendir(&state) != 0) {
 				goto done;
 			}
-
-			if (bftw_push(&state, name, true) != 0) {
+			while (bftw_readdir(&state) > 0) {
+				if (bftw_visit(&state, state.de->name) != 0) {
+					goto done;
+				}
+			}
+			if (bftw_closedir(&state) != 0) {
 				goto done;
 			}
 		}
-		bftw_batch_finish(&state);
 
-		if (bftw_gc(&state, BFTW_VISIT_ALL) == BFTW_STOP) {
-			goto done;
-		}
-	}
-
-done:
-	return bftw_state_destroy(&state);
-}
-
-/**
- * Batching mode: queue up all children before visiting them.
- */
-static int bftw_batch(const struct bftw_args *args) {
-	struct bftw_state state;
-	if (bftw_state_init(&state, args) != 0) {
-		return -1;
-	}
-
-	for (size_t i = 0; i < args->npaths; ++i) {
-		if (bftw_push(&state, args->paths[i], false) != 0) {
-			goto done;
-		}
-	}
-	bftw_batch_finish(&state);
-
-	while (bftw_next(&state) > 0) {
-		enum bftw_gc_flags gcflags = BFTW_VISIT_ALL;
-
-		switch (bftw_visit(&state, NULL, BFTW_PRE)) {
-		case BFTW_CONTINUE:
+		if (!bftw_pop_file(&state)) {
 			break;
-		case BFTW_PRUNE:
-			gcflags &= ~BFTW_VISIT_FILE;
-			goto next;
-		case BFTW_STOP:
-			goto done;
 		}
-
-		bftw_opendir(&state);
-
-		while (bftw_readdir(&state) > 0) {
-			if (bftw_push(&state, state.de->name, false) != 0) {
-				goto done;
-			}
-		}
-		bftw_batch_finish(&state);
-
-	next:
-		if (bftw_gc(&state, gcflags) == BFTW_STOP) {
-			goto done;
+		if (bftw_visit(&state, NULL) != 0) {
+			break;
 		}
 	}
 
 done:
 	return bftw_state_destroy(&state);
-}
-
-/** Select bftw_stream() or bftw_batch() appropriately. */
-static int bftw_auto(const struct bftw_args *args) {
-	if (args->flags & (BFTW_SORT | BFTW_BUFFER)) {
-		return bftw_batch(args);
-	} else {
-		return bftw_stream(args);
-	}
 }
 
 /**
@@ -1247,7 +1207,6 @@ static void bftw_ids_init(const struct bftw_args *args, struct bftw_ids_state *s
 	ids_args->callback = bftw_ids_callback;
 	ids_args->ptr = state;
 	ids_args->flags &= ~BFTW_POST_ORDER;
-	ids_args->strategy = BFTW_DFS;
 }
 
 /** Finish an iterative deepening search. */
@@ -1277,7 +1236,7 @@ static int bftw_ids(const struct bftw_args *args) {
 	while (!state.quit && !state.bottom) {
 		state.bottom = true;
 
-		if (bftw_auto(&ids_args) != 0) {
+		if (bftw_impl(&ids_args) != 0) {
 			state.error = errno;
 			state.quit = true;
 		}
@@ -1294,7 +1253,7 @@ static int bftw_ids(const struct bftw_args *args) {
 			--state.max_depth;
 			--state.min_depth;
 
-			if (bftw_auto(&ids_args) != 0) {
+			if (bftw_impl(&ids_args) != 0) {
 				state.error = errno;
 				state.quit = true;
 			}
@@ -1315,7 +1274,7 @@ static int bftw_eds(const struct bftw_args *args) {
 	while (!state.quit && !state.bottom) {
 		state.bottom = true;
 
-		if (bftw_auto(&ids_args) != 0) {
+		if (bftw_impl(&ids_args) != 0) {
 			state.error = errno;
 			state.quit = true;
 		}
@@ -1329,7 +1288,7 @@ static int bftw_eds(const struct bftw_args *args) {
 		state.min_depth = 0;
 		ids_args.flags |= BFTW_POST_ORDER;
 
-		if (bftw_auto(&ids_args) != 0) {
+		if (bftw_impl(&ids_args) != 0) {
 			state.error = errno;
 		}
 	}
@@ -1340,9 +1299,8 @@ static int bftw_eds(const struct bftw_args *args) {
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
-		return bftw_auto(args);
 	case BFTW_DFS:
-		return bftw_batch(args);
+		return bftw_impl(args);
 	case BFTW_IDS:
 		return bftw_ids(args);
 	case BFTW_EDS:
