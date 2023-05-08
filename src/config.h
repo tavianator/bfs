@@ -204,9 +204,9 @@
  * Initialize a variable, unless sanitizers would detect uninitialized uses.
  */
 #if __has_feature(memory_sanitizer)
-#  define BFS_UNINIT(var, value) var = var
+#  define BFS_UNINIT(var, value) var
 #else
-#  define BFS_UNINIT(var, value) var = value
+#  define BFS_UNINIT(var, value) value
 #endif
 
 #endif // BFS_CONFIG_H
