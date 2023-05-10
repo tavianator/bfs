@@ -1962,11 +1962,11 @@ static int parse_mode(const struct parser_state *state, const char *mode, struct
 		MODE_PLUS,
 		MODE_MINUS,
 		MODE_EQUALS,
-	} op = BFS_UNINIT(op, MODE_EQUALS);
+	} op = uninit(op, MODE_EQUALS);
 
-	mode_t who = BFS_UNINIT(who, 0);
-	mode_t file_change = BFS_UNINIT(file_change, 0);
-	mode_t dir_change = BFS_UNINIT(dir_change, 0);
+	mode_t who = uninit(who, 0);
+	mode_t file_change = uninit(file_change, 0);
+	mode_t dir_change = uninit(dir_change, 0);
 
 	const char *i = mode;
 	while (true) {
