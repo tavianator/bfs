@@ -129,18 +129,7 @@
 #  define __GLIBC_PREREQ(maj, min) false
 #endif
 
-// Wrappers for fundamental language features/extensions
-
-/**
- * Silence compiler warnings about switch/case fall-throughs.
- */
-#if __has_c_attribute(fallthrough)
-#  define BFS_FALLTHROUGH [[fallthrough]]
-#elif __has_attribute(fallthrough)
-#  define BFS_FALLTHROUGH __attribute__((fallthrough))
-#else
-#  define BFS_FALLTHROUGH ((void)0)
-#endif
+// Fundamental utilities
 
 /**
  * Get the length of an array.
@@ -168,6 +157,28 @@
 	(sizeof(type) <= BFS_FLEX_LB(type, member, 0) \
 		? BFS_FLEX_LB(type, member, length) \
 		: BFS_FLEX_MAX(sizeof(type), BFS_FLEX_LB(type, member, length)))
+
+/**
+ * Initialize a variable, unless sanitizers would detect uninitialized uses.
+ */
+#if __has_feature(memory_sanitizer)
+#  define BFS_UNINIT(var, value) var
+#else
+#  define BFS_UNINIT(var, value) value
+#endif
+
+// Wrappers for attributes
+
+/**
+ * Silence compiler warnings about switch/case fall-throughs.
+ */
+#if __has_c_attribute(fallthrough)
+#  define BFS_FALLTHROUGH [[fallthrough]]
+#elif __has_attribute(fallthrough)
+#  define BFS_FALLTHROUGH __attribute__((fallthrough))
+#else
+#  define BFS_FALLTHROUGH ((void)0)
+#endif
 
 /**
  * Adds compiler warnings for bad printf()-style function calls, if supported.
@@ -198,15 +209,6 @@
 #else
 #  define BFS_SUPPRESS(warning)
 #  define BFS_UNSUPPRESS()
-#endif
-
-/**
- * Initialize a variable, unless sanitizers would detect uninitialized uses.
- */
-#if __has_feature(memory_sanitizer)
-#  define BFS_UNINIT(var, value) var
-#else
-#  define BFS_UNINIT(var, value) value
 #endif
 
 #endif // BFS_CONFIG_H
