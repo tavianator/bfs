@@ -758,7 +758,7 @@ static enum bftw_action bftw_call_back(struct bftw_state *state, const char *nam
 		if ((state->flags & BFTW_PRUNE_MOUNTS) && bftw_is_mount(state, name)) {
 			return BFTW_PRUNE;
 		}
-		BFS_FALLTHROUGH;
+		fallthru;
 	case BFTW_PRUNE:
 	case BFTW_STOP:
 		return ret;

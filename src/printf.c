@@ -680,7 +680,7 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 				case '0':
 				case '+':
 					must_be_numeric = true;
-					BFS_FALLTHROUGH;
+					fallthru;
 				case ' ':
 				case '-':
 					if (strchr(directive.str, c)) {

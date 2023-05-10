@@ -173,11 +173,11 @@
  * Silence compiler warnings about switch/case fall-throughs.
  */
 #if __has_c_attribute(fallthrough)
-#  define BFS_FALLTHROUGH [[fallthrough]]
+#  define fallthru [[fallthrough]]
 #elif __has_attribute(fallthrough)
-#  define BFS_FALLTHROUGH __attribute__((fallthrough))
+#  define fallthru __attribute__((fallthrough))
 #else
-#  define BFS_FALLTHROUGH ((void)0)
+#  define fallthru ((void)0)
 #endif
 
 /**
