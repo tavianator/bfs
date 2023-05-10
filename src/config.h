@@ -136,7 +136,7 @@
  */
 #define countof(array) (sizeof(array) / sizeof(0[array]))
 
-// Lower bound on BFS_FLEX_SIZEOF()
+// Lower bound on flex_sizeof()
 #define BFS_FLEX_LB(type, member, length) (offsetof(type, member) + sizeof(((type *)NULL)->member[0]) * (length))
 
 // Maximum macro for BFS_FLEX_SIZE()
@@ -153,7 +153,7 @@
  * @param length
  *         The length of the flexible array.
  */
-#define BFS_FLEX_SIZEOF(type, member, length) \
+#define flex_sizeof(type, member, length) \
 	(sizeof(type) <= BFS_FLEX_LB(type, member, 0) \
 		? BFS_FLEX_LB(type, member, length) \
 		: BFS_FLEX_MAX(sizeof(type), BFS_FLEX_LB(type, member, length)))

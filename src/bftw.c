@@ -178,7 +178,7 @@ static void bftw_cache_destroy(struct bftw_cache *cache) {
 /** Create a new bftw_file. */
 static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *name) {
 	size_t namelen = strlen(name);
-	size_t size = BFS_FLEX_SIZEOF(struct bftw_file, name, namelen + 1);
+	size_t size = flex_sizeof(struct bftw_file, name, namelen + 1);
 
 	struct bftw_file *file = malloc(size);
 	if (!file) {

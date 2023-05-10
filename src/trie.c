@@ -336,7 +336,7 @@ struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
 
 /** Create a new leaf, holding a copy of the given key. */
 static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, size_t length) {
-	struct trie_leaf *leaf = malloc(BFS_FLEX_SIZEOF(struct trie_leaf, key, length));
+	struct trie_leaf *leaf = malloc(flex_sizeof(struct trie_leaf, key, length));
 	if (!leaf) {
 		return NULL;
 	}
@@ -363,7 +363,7 @@ static size_t trie_node_size(unsigned int size) {
 	// Node size must be a power of two
 	assert(is_power_of_two(size));
 
-	return BFS_FLEX_SIZEOF(struct trie_node, children, size);
+	return flex_sizeof(struct trie_node, children, size);
 }
 
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__

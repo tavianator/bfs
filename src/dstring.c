@@ -24,7 +24,7 @@ static struct dstring *dstrheader(const char *dstr) {
 
 /** Get the correct size for a dstring with the given capacity. */
 static size_t dstrsize(size_t capacity) {
-	return BFS_FLEX_SIZEOF(struct dstring, data, capacity + 1);
+	return flex_sizeof(struct dstring, data, capacity + 1);
 }
 
 /** Allocate a dstring with the given contents. */
