@@ -134,7 +134,7 @@
 /**
  * Get the length of an array.
  */
-#define BFS_COUNTOF(array) (sizeof(array) / sizeof(0[array]))
+#define countof(array) (sizeof(array) / sizeof(0[array]))
 
 // Lower bound on BFS_FLEX_SIZEOF()
 #define BFS_FLEX_LB(type, member, length) (offsetof(type, member) + sizeof(((type *)NULL)->member[0]) * (length))

@@ -38,7 +38,7 @@ const char *keys[] = {
 	">>>",
 };
 
-const size_t nkeys = BFS_COUNTOF(keys);
+const size_t nkeys = countof(keys);
 
 int main(void) {
 	struct trie trie;

@@ -201,7 +201,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 	const char *path = fake_at(ftwbuf);
 
 	int ret = -1, error = 0;
-	for (size_t i = 0; i < BFS_COUNTOF(acl_types) && ret <= 0; ++i) {
+	for (size_t i = 0; i < countof(acl_types) && ret <= 0; ++i) {
 		acl_type_t type = acl_types[i];
 
 		if (type == ACL_TYPE_DEFAULT && ftwbuf->type != BFS_DIR) {

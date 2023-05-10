@@ -1154,21 +1154,21 @@ static const struct {
  * Look up the appropriate optimizer for an expression and call it.
  */
 static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs_expr *expr) {
-	for (size_t i = 0; i < BFS_COUNTOF(opt_pure); ++i) {
+	for (size_t i = 0; i < countof(opt_pure); ++i) {
 		if (opt_pure[i] == expr->eval_fn) {
 			expr->pure = true;
 			break;
 		}
 	}
 
-	for (size_t i = 0; i < BFS_COUNTOF(opt_always_true); ++i) {
+	for (size_t i = 0; i < countof(opt_always_true); ++i) {
 		if (opt_always_true[i] == expr->eval_fn) {
 			expr->always_true = true;
 			break;
 		}
 	}
 
-	for (size_t i = 0; i < BFS_COUNTOF(opt_always_false); ++i) {
+	for (size_t i = 0; i < countof(opt_always_false); ++i) {
 		if (opt_always_false[i] == expr->eval_fn) {
 			expr->always_false = true;
 			break;
@@ -1176,35 +1176,35 @@ static struct bfs_expr *optimize_expr_lookup(struct opt_state *state, struct bfs
 	}
 
 	expr->cost = FAST_COST;
-	for (size_t i = 0; i < BFS_COUNTOF(opt_costs); ++i) {
+	for (size_t i = 0; i < countof(opt_costs); ++i) {
 		if (opt_costs[i].eval_fn == expr->eval_fn) {
 			expr->cost = opt_costs[i].cost;
 			break;
 		}
 	}
 
-	for (size_t i = 0; i < BFS_COUNTOF(opt_probs); ++i) {
+	for (size_t i = 0; i < countof(opt_probs); ++i) {
 		if (opt_probs[i].eval_fn == expr->eval_fn) {
 			expr->probability = opt_probs[i].probability;
 			break;
 		}
 	}
 
-	for (size_t i = 0; i < BFS_COUNTOF(opt_preds); ++i) {
+	for (size_t i = 0; i < countof(opt_preds); ++i) {
 		if (opt_preds[i].eval_fn == expr->eval_fn) {
 			infer_pred_facts(state, opt_preds[i].pred);
 			break;
 		}
 	}
 
-	for (size_t i = 0; i < BFS_COUNTOF(opt_ranges); ++i) {
+	for (size_t i = 0; i < countof(opt_ranges); ++i) {
 		if (opt_ranges[i].eval_fn == expr->eval_fn) {
 			infer_icmp_facts(state, expr, opt_ranges[i].range);
 			break;
 		}
 	}
 
-	for (size_t i = 0; i < BFS_COUNTOF(opt_fns); ++i) {
+	for (size_t i = 0; i < countof(opt_fns); ++i) {
 		if (opt_fns[i].eval_fn == expr->eval_fn) {
 			return opt_fns[i].opt_fn(state, expr);
 		}
