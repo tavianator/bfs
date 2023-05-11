@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 /**
- * Formatters for diagnostic messages.
+ * Diagnostic messages.
  */
 
 #ifndef BFS_DIAG_H
@@ -11,6 +11,16 @@
 #include "ctx.h"
 #include "config.h"
 #include <stdarg.h>
+
+/**
+ * static_assert() with an optional second argument.
+ */
+#if __STDC_VERSION__ >= 202311L
+#  define bfs_static_assert static_assert
+#else
+#  define bfs_static_assert(...) BFS_STATIC_ASSERT(__VA_ARGS__, #__VA_ARGS__, )
+#  define BFS_STATIC_ASSERT(expr, msg, ...) _Static_assert(expr, msg)
+#endif
 
 struct bfs_expr;
 
