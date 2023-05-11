@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "xtime.h"
+#include "atomic.h"
 #include "config.h"
 #include <errno.h>
 #include <limits.h>
@@ -10,15 +11,19 @@
 #include <time.h>
 #include <unistd.h>
 
-/** Whether tzset() has been called. */
-static bool tz_is_set = false;
+/** Call tzset() if necessary. */
+static void xtzset(void) {
+	static atomic bool is_set = false;
+
+	if (!load(&is_set, relaxed)) {
+		tzset();
+		store(&is_set, true, relaxed);
+	}
+}
 
 int xlocaltime(const time_t *timep, struct tm *result) {
 	// Should be called before localtime_r() according to POSIX.1-2004
-	if (!tz_is_set) {
-		tzset();
-		tz_is_set = true;
-	}
+	xtzset();
 
 	if (localtime_r(timep, result)) {
 		return 0;
@@ -29,10 +34,7 @@ int xlocaltime(const time_t *timep, struct tm *result) {
 
 int xgmtime(const time_t *timep, struct tm *result) {
 	// Should be called before gmtime_r() according to POSIX.1-2004
-	if (!tz_is_set) {
-		tzset();
-		tz_is_set = true;
-	}
+	xtzset();
 
 	if (gmtime_r(timep, result)) {
 		return 0;
