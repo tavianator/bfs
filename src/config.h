@@ -162,7 +162,17 @@ static inline size_t align_ceil(size_t align, size_t size) {
 	flex_sizeof_impl(alignof(type), sizeof(type), offsetof(type, member), sizeof(((type *)NULL)->member[0]), count)
 
 static inline size_t flex_sizeof_impl(size_t align, size_t min, size_t offset, size_t size, size_t count) {
-	size_t ret = align_ceil(align, offset + size * count);
+	size_t ret = size * count;
+	size_t overflow = ret / size != count;
+
+	ret += offset;
+	overflow |= ret < offset;
+
+	size_t mask = align - 1;
+	ret += mask;
+	overflow |= ret < mask;
+	ret &= ~mask;
+	ret |= -overflow;
 
 	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
 	// type has more padding than necessary for alignment

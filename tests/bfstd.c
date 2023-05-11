@@ -41,6 +41,7 @@ int main(void) {
 	};
 	assert(flex_sizeof(struct flexible, bar, 0) >= sizeof(struct flexible));
 	assert(flex_sizeof(struct flexible, bar, 16) % alignof(struct flexible) == 0);
+	assert(flex_sizeof(struct flexible, bar, SIZE_MAX / sizeof(int) + 1) == SIZE_MAX);
 	assert(flex_sizeof_impl(8, 16, 4, 4, 1) == 16);
 
 	// From man 3p basename
