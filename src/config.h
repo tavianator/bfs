@@ -140,11 +140,12 @@
  */
 #define countof(array) (sizeof(array) / sizeof(0[array]))
 
-// Lower bound on flex_sizeof()
-#define BFS_FLEX_LB(type, member, length) (offsetof(type, member) + sizeof(((type *)NULL)->member[0]) * (length))
-
-// Maximum macro for BFS_FLEX_SIZE()
-#define BFS_FLEX_MAX(a, b) ((a) > (b) ? (a) : (b))
+/**
+ * Round up to a multiple of an alignment.
+ */
+static inline size_t align_ceil(size_t align, size_t size) {
+	return (size + align - 1) & ~(align - 1);
+}
 
 /**
  * Computes the size of a struct containing a flexible array member of the given
@@ -154,13 +155,23 @@
  *         The type of the struct containing the flexible array.
  * @param member
  *         The name of the flexible array member.
- * @param length
+ * @param count
  *         The length of the flexible array.
  */
-#define flex_sizeof(type, member, length) \
-	(sizeof(type) <= BFS_FLEX_LB(type, member, 0) \
-		? BFS_FLEX_LB(type, member, length) \
-		: BFS_FLEX_MAX(sizeof(type), BFS_FLEX_LB(type, member, length)))
+#define flex_sizeof(type, member, count) \
+	flex_sizeof_impl(alignof(type), sizeof(type), offsetof(type, member), sizeof(((type *)NULL)->member[0]), count)
+
+static inline size_t flex_sizeof_impl(size_t align, size_t min, size_t offset, size_t size, size_t count) {
+	size_t ret = align_ceil(align, offset + size * count);
+
+	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
+	// type has more padding than necessary for alignment
+	if (min > align_ceil(align, offset) && ret < min) {
+		ret = min;
+	}
+
+	return ret;
+}
 
 /**
  * Initialize a variable, unless sanitizers would detect uninitialized uses.

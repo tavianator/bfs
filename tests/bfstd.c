@@ -1,8 +1,12 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#undef NDEBUG
 #include "../src/bfstd.h"
+#include "../src/config.h"
+#include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -30,6 +34,15 @@ static void check_base_dir(const char *path, const char *dir, const char *base) 
 }
 
 int main(void) {
+	// Check flex_sizeof()
+	struct flexible {
+		alignas(64) int foo;
+		int bar[];
+	};
+	assert(flex_sizeof(struct flexible, bar, 0) >= sizeof(struct flexible));
+	assert(flex_sizeof(struct flexible, bar, 16) % alignof(struct flexible) == 0);
+	assert(flex_sizeof_impl(8, 16, 4, 4, 1) == 16);
+
 	// From man 3p basename
 	check_base_dir("usr", ".", "usr");
 	check_base_dir("usr/", ".", "usr");
