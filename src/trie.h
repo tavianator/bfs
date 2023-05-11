@@ -5,7 +5,6 @@
 #define BFS_TRIE_H
 
 #include "config.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 

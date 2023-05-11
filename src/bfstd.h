@@ -8,7 +8,7 @@
 #ifndef BFS_BFSTD_H
 #define BFS_BFSTD_H
 
-#include <stdbool.h>
+#include "config.h"
 #include <stddef.h>
 
 // #include <errno.h>

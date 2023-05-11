@@ -11,7 +11,6 @@
 #include "ctx.h"
 #include "config.h"
 #include <stdarg.h>
-#include <stdbool.h>
 
 struct bfs_expr;
 

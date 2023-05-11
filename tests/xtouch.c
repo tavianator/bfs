@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "../src/bfstd.h"
+#include "../src/config.h"
 #include "../src/xtime.h"
 #include <errno.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

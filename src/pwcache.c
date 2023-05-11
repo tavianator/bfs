@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "pwcache.h"
+#include "config.h"
 #include "darray.h"
 #include "trie.h"
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>

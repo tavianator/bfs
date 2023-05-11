@@ -9,8 +9,8 @@
 #define BFS_CTX_H
 
 #include "bftw.h"
+#include "config.h"
 #include "trie.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <sys/resource.h>
 #include <time.h>

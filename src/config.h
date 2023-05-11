@@ -8,8 +8,12 @@
 #ifndef BFS_CONFIG_H
 #define BFS_CONFIG_H
 
-#include <stdbool.h>
 #include <stddef.h>
+
+#if __STDC_VERSION__ < 202311L
+#  include <stdalign.h>
+#  include <stdbool.h>
+#endif
 
 // bfs packaging configuration
 

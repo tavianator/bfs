@@ -10,7 +10,6 @@
 #define BFS_FSADE_H
 
 #include "config.h"
-#include <stdbool.h>
 
 #define BFS_CAN_CHECK_ACL BFS_USE_SYS_ACL_H
 

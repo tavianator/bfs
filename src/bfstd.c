@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <langinfo.h>
 #include <nl_types.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

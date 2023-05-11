@@ -9,9 +9,9 @@
 #define BFS_EXPR_H
 
 #include "color.h"
+#include "config.h"
 #include "eval.h"
 #include "stat.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
 #include <time.h>

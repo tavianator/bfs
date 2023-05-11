@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "../src/xtime.h"
-#include <stdbool.h>
+#include "../src/config.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

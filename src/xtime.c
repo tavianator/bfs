@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "xtime.h"
+#include "config.h"
 #include <errno.h>
 #include <limits.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
