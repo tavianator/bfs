@@ -367,14 +367,10 @@ static size_t trie_node_size(unsigned int size) {
 	return flex_sizeof(struct trie_node, children, size);
 }
 
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#if ENDIAN_NATIVE == ENDIAN_LITTLE
 #  define TRIE_BSWAP(n) (n)
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#  if SIZE_WIDTH == 8
-#    define TRIE_BSWAP(n) __builtin_bswap64(n)
-#  elif SIZE_WIDTH == 4
-#    define TRIE_BSWAP(n) __builtin_bswap32(n)
-#  endif
+#elif ENDIAN_NATIVE == ENDIAN_BIG
+#  define TRIE_BSWAP(n) bswap(n)
 #endif
 
 #ifdef TRIE_BSWAP
