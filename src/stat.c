@@ -19,7 +19,7 @@
 #  include <unistd.h>
 #endif
 
-#if BFS_LIBC_STATX || defined(__NR_statx)
+#if BFS_LIBC_STATX || defined(SYS_statx)
 #  define BFS_STATX true
 #endif
 
@@ -141,7 +141,7 @@ static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int 
 #if BFS_LIBC_STATX
 	return statx(at_fd, at_path, at_flags, mask, buf);
 #else
-	return syscall(__NR_statx, at_fd, at_path, at_flags, mask, buf);
+	return syscall(SYS_statx, at_fd, at_path, at_flags, mask, buf);
 #endif
 }
 

@@ -32,7 +32,7 @@ static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 #endif
 
 #if __linux__ && __GLIBC__ && !__GLIBC_PREREQ(2, 30)
-	ssize_t ret = syscall(__NR_getdents64, fd, buf, size);
+	ssize_t ret = syscall(SYS_getdents64, fd, buf, size);
 #elif __linux__
 	ssize_t ret = getdents64(fd, buf, size);
 #else
