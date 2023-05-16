@@ -240,7 +240,7 @@ LIBBFS := \
 $(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
 
 # Standalone unit tests
-UNITS := bfstd trie xtimegm
+UNITS := bfstd int trie xtimegm
 UNIT_TESTS := $(UNITS:%=$(BIN)/tests/%)
 UNIT_CHECKS := $(UNITS:%=check-%)
 
