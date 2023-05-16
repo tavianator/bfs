@@ -8,6 +8,7 @@
 #ifndef BFS_INT_H
 #define BFS_INT_H
 
+#include "config.h"
 #include <limits.h>
 #include <stdint.h>
 
@@ -164,5 +165,191 @@ static inline uint8_t bswap8(uint8_t n) {
 		uint16_t: bswap16, \
 		uint32_t: bswap32, \
 		uint64_t: bswap64)(n)
+
+// Define an overload for each unsigned type
+#define UINT_OVERLOADS(macro) \
+	macro(unsigned char, _uc, UCHAR_WIDTH) \
+	macro(unsigned short, _us, USHRT_WIDTH) \
+	macro(unsigned int, _ui, UINT_WIDTH) \
+	macro(unsigned long, _ul, ULONG_WIDTH) \
+	macro(unsigned long long, _ull, ULLONG_WIDTH)
+
+// Select an overload based on an unsigned integer type
+#define UINT_SELECT(n, name) \
+	_Generic((n), \
+		char:               name##_uc, \
+		signed char:        name##_uc, \
+		unsigned char:      name##_uc, \
+		signed short:       name##_us, \
+		unsigned short:     name##_us, \
+		signed int:         name##_ui, \
+		unsigned int:       name##_ui, \
+		signed long:        name##_ul, \
+		unsigned long:      name##_ul, \
+		signed long long:   name##_ull, \
+		unsigned long long: name##_ull)
+
+// C23 polyfill: bit utilities
+
+#if __STDC_VERSION__ >= 202311L
+#  define count_ones stdc_count_ones
+#  define count_zeros stdc_count_zeros
+#  define rotate_left stdc_rotate_left
+#  define rotate_right stdc_rotate_right
+#  define leading_zeros stdc_leading_zeros
+#  define leading_ones stdc_leading_ones
+#  define trailing_zeros stdc_trailing_zeros
+#  define trailing_ones stdc_trailing_ones
+#  define first_leading_zero stdc_first_leading_zero
+#  define first_leading_one stdc_first_leading_one
+#  define first_trailing_zero stdc_first_trailing_zero
+#  define first_trailing_one stdc_first_trailing_one
+#  define has_single_bit stdc_has_single_bit
+#  define bit_width stdc_bit_width
+#  define bit_ceil stdc_bit_ceil
+#  define bit_floor stdc_bit_floor
+#else
+
+#if __GNUC__
+
+// GCC provides builtins for unsigned {int,long,long long}, so promote char/short
+#define UINT_BUILTIN_uc(name) __builtin_##name
+#define UINT_BUILTIN_us(name) __builtin_##name
+#define UINT_BUILTIN_ui(name) __builtin_##name
+#define UINT_BUILTIN_ul(name) __builtin_##name##l
+#define UINT_BUILTIN_ull(name) __builtin_##name##ll
+#define UINT_BUILTIN(name, suffix) UINT_BUILTIN##suffix(name)
+
+#define BUILTIN_WIDTH_uc UINT_WIDTH
+#define BUILTIN_WIDTH_us UINT_WIDTH
+#define BUILTIN_WIDTH_ui UINT_WIDTH
+#define BUILTIN_WIDTH_ul ULONG_WIDTH
+#define BUILTIN_WIDTH_ull ULLONG_WIDTH
+#define BUILTIN_WIDTH(suffix) BUILTIN_WIDTH##suffix
+
+#define COUNT_ONES(type, suffix, width) \
+	static inline int count_ones##suffix(type n) { \
+		return UINT_BUILTIN(popcount, suffix)(n); \
+	}
+
+#define LEADING_ZEROS(type, suffix, width) \
+	static inline int leading_zeros##suffix(type n) { \
+	        return n \
+			? UINT_BUILTIN(clz, suffix)(n) - (BUILTIN_WIDTH(suffix) - width) \
+			: width; \
+	}
+
+#define TRAILING_ZEROS(type, suffix, width) \
+	static inline int trailing_zeros##suffix(type n) { \
+		return n ? UINT_BUILTIN(ctz, suffix)(n) : width; \
+	}
+
+#define FIRST_TRAILING_ONE(type, suffix, width) \
+	static inline int first_trailing_one##suffix(type n) { \
+		return UINT_BUILTIN(ffs, suffix)(n); \
+	}
+
+#else // !__GNUC__
+
+#define COUNT_ONES(type, suffix, width) \
+	static inline int count_ones##suffix(type n) { \
+		int ret; \
+		for (ret = 0; n; ++ret) { \
+			n &= n - 1; \
+		} \
+		return ret; \
+	}
+
+#define LEADING_ZEROS(type, suffix, width) \
+	static inline int leading_zeros##suffix(type n) { \
+		type bit = (type)1 << (width - 1); \
+		int ret; \
+		for (ret = 0; bit && !(n & bit); ++ret, bit >>= 1); \
+		return ret; \
+	}
+
+#define TRAILING_ZEROS(type, suffix, width) \
+	static inline int trailing_zeros##suffix(type n) { \
+		type bit = 1; \
+		int ret; \
+		for (ret = 0; bit && !(n & bit); ++ret, bit <<= 1); \
+		return ret; \
+	}
+
+#define FIRST_TRAILING_ONE(type, suffix, width) \
+	static inline int first_trailing_one##suffix(type n) { \
+		return n ? trailing_zeros##suffix(n) + 1 : 0; \
+	}
+
+#endif // !__GNUC__
+
+UINT_OVERLOADS(COUNT_ONES)
+UINT_OVERLOADS(LEADING_ZEROS)
+UINT_OVERLOADS(TRAILING_ZEROS)
+UINT_OVERLOADS(FIRST_TRAILING_ONE)
+
+#define ROTATE_LEFT(type, suffix, width) \
+	static inline type rotate_left##suffix(type n, int c) { \
+		return (n << c) | (n >> ((width - c) % width)); \
+	}
+
+#define ROTATE_RIGHT(type, suffix, width) \
+	static inline type rotate_right##suffix(type n, int c) { \
+		return (n >> c) | (n << ((width - c) % width)); \
+	}
+
+#define FIRST_LEADING_ONE(type, suffix, width) \
+	static inline int first_leading_one##suffix(type n) { \
+		return width - leading_zeros##suffix(n); \
+	}
+
+#define HAS_SINGLE_BIT(type, suffix, width) \
+	static inline bool has_single_bit##suffix(type n) { \
+		return n && !(n & (n - 1)); \
+	}
+
+UINT_OVERLOADS(ROTATE_LEFT)
+UINT_OVERLOADS(ROTATE_RIGHT)
+UINT_OVERLOADS(FIRST_LEADING_ONE)
+UINT_OVERLOADS(HAS_SINGLE_BIT)
+
+#define count_ones(n) UINT_SELECT(n, count_ones)(n)
+#define count_zeros(n) UINT_SELECT(n, count_ones)(~(n))
+
+#define rotate_left(n, c) UINT_SELECT(n, rotate_left)(n, c)
+#define rotate_right(n, c) UINT_SELECT(n, rotate_right)(n, c)
+
+#define leading_zeros(n) UINT_SELECT(n, leading_zeros)(n)
+#define leading_ones(n) UINT_SELECT(n, leading_zeros)(~(n))
+
+#define trailing_zeros(n) UINT_SELECT(n, trailing_zeros)(n)
+#define trailing_ones(n) UINT_SELECT(n, trailing_zeros)(~(n))
+
+#define first_leading_one(n) UINT_SELECT(n, first_leading_one)(n)
+#define first_leading_zero(n) UINT_SELECT(n, first_leading_one)(~(n))
+
+#define first_trailing_one(n) UINT_SELECT(n, first_trailing_one)(n)
+#define first_trailing_zero(n) UINT_SELECT(n, first_trailing_one)(~(n))
+
+#define has_single_bit(n) UINT_SELECT(n, has_single_bit)(n)
+
+#define BIT_FLOOR(type, suffix, width) \
+	static inline type bit_floor##suffix(type n) { \
+		return n ? (type)1 << (first_leading_one##suffix(n) - 1) : 0; \
+	}
+
+#define BIT_CEIL(type, suffix, width) \
+	static inline type bit_ceil##suffix(type n) { \
+		return (type)1 << first_leading_one##suffix(n - !!n); \
+	}
+
+UINT_OVERLOADS(BIT_FLOOR)
+UINT_OVERLOADS(BIT_CEIL)
+
+#define bit_width(n) first_leading_one(n)
+#define bit_floor(n) UINT_SELECT(n, bit_floor)(n)
+#define bit_ceil(n) UINT_SELECT(n, bit_ceil)(n)
+
+#endif // __STDC_VERSION__ < 202311L
 
 #endif // BFS_INT_H
