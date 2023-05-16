@@ -1,10 +1,14 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#undef NDEBUG
+
 #include "../src/int.h"
 #include "../src/diag.h"
+#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 bfs_static_assert(UMAX_WIDTH(0x1) == 1);
 bfs_static_assert(UMAX_WIDTH(0x3) == 2);
@@ -51,4 +55,10 @@ bfs_static_assert(INTMAX_MIN == IWIDTH_MIN(INTMAX_WIDTH));
 bfs_static_assert(INTMAX_MAX == IWIDTH_MAX(INTMAX_WIDTH));
 
 int main(void) {
+	assert(bswap((uint8_t)0x12) == 0x12);
+	assert(bswap((uint16_t)0x1234) == 0x3412);
+	assert(bswap((uint32_t)0x12345678) == 0x78563412);
+	assert(bswap((uint64_t)0x1234567812345678) == 0x7856341278563412);
+
+	return EXIT_SUCCESS;
 }

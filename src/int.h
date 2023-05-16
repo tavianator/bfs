@@ -11,6 +11,10 @@
 #include <limits.h>
 #include <stdint.h>
 
+#if __STDC_VERSION__ >= 202311L
+#  include <stdbit.h>
+#endif
+
 // C23 polyfill: _WIDTH macros
 
 // The U*_MAX macros are of the form 2**n - 1, and we want to extract the n.
@@ -96,5 +100,69 @@
 #ifndef INTMAX_WIDTH
 #  define INTMAX_WIDTH UINTMAX_WIDTH
 #endif
+
+// C23 polyfill: byte order
+
+#ifdef __STDC_ENDIAN_LITTLE__
+#  define ENDIAN_LITTLE __STDC_ENDIAN_LITTLE__
+#elif defined(__ORDER_LITTLE_ENDIAN__)
+#  define ENDIAN_LITTLE __ORDER_LITTLE_ENDIAN__
+#else
+#  define ENDIAN_LITTLE 1234
+#endif
+
+#ifdef __STDC_ENDIAN_BIG__
+#  define ENDIAN_BIG __STDC_ENDIAN_BIG__
+#elif defined(__ORDER_BIG_ENDIAN__)
+#  define ENDIAN_BIG __ORDER_BIG_ENDIAN__
+#else
+#  define ENDIAN_BIG 4321
+#endif
+
+#ifdef __STDC_ENDIAN_NATIVE__
+#  define ENDIAN_NATIVE __STDC_ENDIAN_NATIVE__
+#elif defined(__ORDER_NATIVE_ENDIAN__)
+#  define ENDIAN_NATIVE __ORDER_NATIVE_ENDIAN__
+#else
+#  define ENDIAN_NATIVE 0
+#endif
+
+#if __STDC_VERSION__ >= 202311L
+#  define bswap16 stdc_memreverse8u16
+#  define bswap32 stdc_memreverse8u32
+#  define bswap64 stdc_memreverse8u64
+#elif __GNUC__
+#  define bswap16 __builtin_bswap16
+#  define bswap32 __builtin_bswap32
+#  define bswap64 __builtin_bswap64
+#else
+
+static inline uint16_t bswap16(uint16_t n) {
+	return (n << 8) | (n >> 8);
+}
+
+static inline uint32_t bswap32(uint32_t n) {
+	return ((uint32_t)bswap16(n) << 16) | bswap16(n >> 16);
+}
+
+static inline uint64_t bswap64(uint64_t n) {
+	return ((uint64_t)bswap32(n) << 32) | bswap32(n >> 32);
+}
+
+#endif
+
+static inline uint8_t bswap8(uint8_t n) {
+	return n;
+}
+
+/**
+ * Reverse the byte order of an integer.
+ */
+#define bswap(n) \
+	_Generic((n), \
+		uint8_t: bswap8, \
+		uint16_t: bswap16, \
+		uint32_t: bswap32, \
+		uint64_t: bswap64)(n)
 
 #endif // BFS_INT_H
