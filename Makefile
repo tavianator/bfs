@@ -247,10 +247,12 @@ UNIT_CHECKS := $(UNITS:%=check-%)
 # Testing utilities
 TEST_UTILS := $(BIN)/tests/mksock $(BIN)/tests/xtouch
 
-tests: $(UNIT_TESTS) $(TEST_UTILS)
+TESTS := $(UNIT_TESTS) $(TEST_UTILS)
+
+tests: $(TESTS)
 .PHONY: tests
 
-$(UNIT_TESTS): $(BIN)/tests/%: $(OBJ)/tests/%.o $(LIBBFS)
+$(TESTS): $(BIN)/tests/%: $(OBJ)/tests/%.o $(LIBBFS)
 
 # The different search strategies that we test
 STRATEGIES := bfs dfs ids eds
