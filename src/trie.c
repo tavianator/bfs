@@ -84,6 +84,7 @@
 #include "trie.h"
 #include "config.h"
 #include "diag.h"
+#include "int.h"
 #include "list.h"
 #include <assert.h>
 #include <limits.h>
@@ -369,19 +370,19 @@ static size_t trie_node_size(unsigned int size) {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #  define TRIE_BSWAP(n) (n)
 #elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#  if __SIZEOF_SIZE_T__ == 8
+#  if SIZE_WIDTH == 8
 #    define TRIE_BSWAP(n) __builtin_bswap64(n)
-#  elif __SIZEOF_SIZE_T__ == 4
+#  elif SIZE_WIDTH == 4
 #    define TRIE_BSWAP(n) __builtin_bswap32(n)
 #  endif
 #endif
 
 #ifdef TRIE_BSWAP
-#  if __SIZEOF_SIZE_T__ == __SIZEOF_LONG_LONG__
+#  if SIZE_WIDTH == LLONG_WIDTH
 #    define TRIE_CTZ(n) __builtin_ctzll(n)
-#  elif __SIZEOF_SIZE_T__ == __SIZEOF_LONG__
+#  elif SiZE_WIDTH == LONG_WIDTH
 #    define TRIE_CTZ(n) __builtin_ctzl(n)
-#  elif __SIZEOF_SIZE_T__ == __SIZEOF_INT__
+#  elif SIZE_WIDTH == INT_WIDTH
 #    define TRIE_CTZ(n) __builtin_ctz(n)
 #  endif
 #endif
