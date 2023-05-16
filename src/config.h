@@ -141,10 +141,17 @@
 #define countof(array) (sizeof(array) / sizeof(0[array]))
 
 /**
+ * Round down to a multiple of an alignment.
+ */
+static inline size_t align_floor(size_t align, size_t size) {
+	return size & ~(align - 1);
+}
+
+/**
  * Round up to a multiple of an alignment.
  */
 static inline size_t align_ceil(size_t align, size_t size) {
-	return (size + align - 1) & ~(align - 1);
+	return align_floor(align, size + align - 1);
 }
 
 /**
@@ -171,8 +178,8 @@ static inline size_t flex_sizeof_impl(size_t align, size_t min, size_t offset, s
 	size_t mask = align - 1;
 	ret += mask;
 	overflow |= ret < mask;
-	ret &= ~mask;
 	ret |= -overflow;
+	ret &= ~mask;
 
 	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
 	// type has more padding than necessary for alignment
