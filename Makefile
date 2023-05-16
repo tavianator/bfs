@@ -189,13 +189,7 @@ $(FLAG_GOALS): $(FLAG_PREREQS)
 	@:
 .PHONY: $(FLAG_GOALS)
 
-all: \
-    $(BIN)/bfs \
-    $(BIN)/tests/bfstd \
-    $(BIN)/tests/mksock \
-    $(BIN)/tests/trie \
-    $(BIN)/tests/xtimegm \
-    $(BIN)/tests/xtouch
+all: bfs tests
 .PHONY: all
 
 $(BIN)/%:
@@ -245,30 +239,34 @@ LIBBFS := \
 # The main executable
 $(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
 
-# Standalone binary tests
-STANDALONE_CHECKS := check-bfstd check-trie check-xtimegm
+# Standalone unit tests
+UNITS := bfstd trie xtimegm
+UNIT_TESTS := $(UNITS:%=$(BIN)/tests/%)
+UNIT_CHECKS := $(UNITS:%=check-%)
+
+# Testing utilities
+TEST_UTILS := $(BIN)/tests/mksock $(BIN)/tests/xtouch
+
+tests: $(UNIT_TESTS) $(TEST_UTILS)
+.PHONY: tests
+
+$(UNIT_TESTS): $(BIN)/tests/%: $(OBJ)/tests/%.o $(LIBBFS)
 
 # The different search strategies that we test
 STRATEGIES := bfs dfs ids eds
 STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 
 # All the different checks we run
-CHECKS := $(STANDALONE_CHECKS) $(STRATEGY_CHECKS)
+CHECKS := $(UNIT_CHECKS) $(STRATEGY_CHECKS)
 
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
 
-$(STANDALONE_CHECKS): check-%: $(BIN)/tests/%
+$(UNIT_CHECKS): check-%: $(BIN)/tests/%
 	$<
 
-$(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(BIN)/tests/mksock $(BIN)/tests/xtouch
+$(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(TEST_UTILS)
 	./tests/tests.sh --bfs="$(BIN)/bfs -S $*" $(TEST_FLAGS)
-
-$(BIN)/tests/bfstd: $(OBJ)/tests/bfstd.o $(LIBBFS)
-$(BIN)/tests/mksock: $(OBJ)/tests/mksock.o $(LIBBFS)
-$(BIN)/tests/trie: $(OBJ)/tests/trie.o $(LIBBFS)
-$(BIN)/tests/xtimegm: $(OBJ)/tests/xtimegm.o $(LIBBFS)
-$(BIN)/tests/xtouch: $(OBJ)/tests/xtouch.o $(LIBBFS)
 
 # Custom test flags for distcheck
 DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
