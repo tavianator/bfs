@@ -34,6 +34,7 @@ DEFAULT_CFLAGS := \
     -g \
     -Wall \
     -Wformat=2 \
+    -Werror=implicit \
     -Wimplicit-fallthrough \
     -Wmissing-declarations \
     -Wshadow \
