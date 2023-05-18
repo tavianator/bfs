@@ -3,7 +3,7 @@
 
 #undef NDEBUG
 
-#include "../src/int.h"
+#include "../src/bit.h"
 #include "../src/diag.h"
 #include <assert.h>
 #include <limits.h>

@@ -5,8 +5,8 @@
  * Bits & bytes.
  */
 
-#ifndef BFS_INT_H
-#define BFS_INT_H
+#ifndef BFS_BIT_H
+#define BFS_BIT_H
 
 #include "config.h"
 #include <limits.h>
@@ -352,4 +352,4 @@ UINT_OVERLOADS(BIT_CEIL)
 
 #endif // __STDC_VERSION__ < 202311L
 
-#endif // BFS_INT_H
+#endif // BFS_BIT_H

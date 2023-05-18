@@ -82,9 +82,9 @@
  */
 
 #include "trie.h"
+#include "bit.h"
 #include "config.h"
 #include "diag.h"
-#include "int.h"
 #include "list.h"
 #include <assert.h>
 #include <limits.h>
