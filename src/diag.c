@@ -9,7 +9,15 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <stddef.h>
+#include <stdlib.h>
+
+noreturn void bfs_abortf(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
+	abort();
+}
 
 void bfs_perror(const struct bfs_ctx *ctx, const char *str) {
 	bfs_error(ctx, "%s: %m.\n", str);

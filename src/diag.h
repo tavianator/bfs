@@ -22,6 +22,30 @@
 #  define BFS_STATIC_ASSERT(expr, msg, ...) _Static_assert(expr, msg)
 #endif
 
+/**
+ * Print a message to standard error and abort.
+ */
+BFS_FORMATTER(1, 2)
+noreturn void bfs_abortf(const char *format, ...);
+
+/**
+ * Unconditional abort with a message.
+ */
+#define bfs_abort(...) \
+	BFS_ABORT(__VA_ARGS__, "\n")
+
+#define BFS_ABORT(format, ...) \
+	bfs_abortf((format) ? "%s: %s:%d:%s(): " format "%s" : "", BFS_COMMAND, __FILE__, __LINE__, __func__, __VA_ARGS__)
+
+/**
+ * Abort in debug builds; no-op in release builds.
+ */
+#ifdef NDEBUG
+#  define bfs_bug(...) ((void)0)
+#else
+#  define bfs_bug bfs_abort
+#endif
+
 struct bfs_expr;
 
 /**
