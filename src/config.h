@@ -13,6 +13,7 @@
 #if __STDC_VERSION__ < 202311L
 #  include <stdalign.h>
 #  include <stdbool.h>
+#  include <stdnoreturn.h>
 #endif
 
 // bfs packaging configuration
