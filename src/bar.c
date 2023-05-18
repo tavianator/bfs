@@ -3,11 +3,11 @@
 
 #include "bar.h"
 #include "bfstd.h"
+#include "bit.h"
 #include "config.h"
 #include "dstring.h"
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -49,7 +49,7 @@ static int ass_puts(int fd, const char *str) {
 }
 
 /** Number of decimal digits needed for terminal sizes. */
-#define ITOA_DIGITS ((sizeof(unsigned short) * CHAR_BIT + 2) / 3)
+#define ITOA_DIGITS ((USHRT_WIDTH + 2) / 3)
 
 /** Async Signal Safe itoa(). */
 static char *ass_itoa(char *str, unsigned int n) {
