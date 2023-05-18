@@ -92,7 +92,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-bfs_static_assert(CHAR_BIT == 8);
+bfs_static_assert(CHAR_WIDTH == 8);
 
 #if BFS_TARGET_CLONES && (__i386__ || __x86_64__)
 #  define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
@@ -101,11 +101,11 @@ bfs_static_assert(CHAR_BIT == 8);
 #endif
 
 /** Number of bits for the sparse array bitmap, aka the range of a nibble. */
-#define BITMAP_BITS 16
+#define BITMAP_WIDTH 16
 /** The number of remaining bits in a word, to hold the offset. */
-#define OFFSET_BITS (sizeof(size_t)*CHAR_BIT - BITMAP_BITS)
+#define OFFSET_WIDTH (SIZE_WIDTH - BITMAP_WIDTH)
 /** The highest representable offset (only 64k on a 32-bit architecture). */
-#define OFFSET_MAX (((size_t)1 << OFFSET_BITS) - 1)
+#define OFFSET_MAX (((size_t)1 << OFFSET_WIDTH) - 1)
 
 /**
  * An internal node of the trie.
@@ -116,13 +116,13 @@ struct trie_node {
 	 * Bit i will be set if a child exists at logical index i, and its index
 	 * into the array will be popcount(bitmap & ((1 << i) - 1)).
 	 */
-	size_t bitmap : BITMAP_BITS;
+	size_t bitmap : BITMAP_WIDTH;
 
 	/**
 	 * The offset into the key in nibbles.  This is relative to the parent
 	 * node, to support offsets larger than OFFSET_MAX.
 	 */
-	size_t offset : OFFSET_BITS;
+	size_t offset : OFFSET_WIDTH;
 
 	/**
 	 * Flexible array of children.  Each pointer uses the lowest bit as a
