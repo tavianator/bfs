@@ -638,7 +638,7 @@ static const char *parse_int(const struct parser_state *state, char **arg, const
 		break;
 
 	default:
-		assert(!"Invalid int size");
+		bfs_bug("Invalid int size");
 		goto bad;
 	}
 
@@ -3492,7 +3492,7 @@ static const char *bftw_strategy_name(enum bftw_strategy strategy) {
 		return "eds";
 	}
 
-	assert(!"Invalid strategy");
+	bfs_bug("Invalid strategy");
 	return "???";
 }
 

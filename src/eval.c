@@ -142,7 +142,7 @@ bool bfs_expr_cmp(const struct bfs_expr *expr, long long n) {
 		return n > expr->num;
 	}
 
-	assert(!"Invalid comparison mode");
+	bfs_bug("Invalid comparison mode");
 	return false;
 }
 
@@ -476,7 +476,7 @@ bool eval_flags(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return (flags & set) || (flags & clear) != clear;
 	}
 
-	assert(!"Invalid comparison mode");
+	bfs_bug("Invalid comparison mode");
 	return false;
 }
 
@@ -626,7 +626,7 @@ bool eval_perm(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return !(mode & target) == !target;
 	}
 
-	assert(!"Invalid comparison mode");
+	bfs_bug("Invalid comparison mode");
 	return false;
 }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "dstring.h"
-#include <assert.h>
+#include "diag.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -184,7 +184,7 @@ int dstrvcatf(char **str, const char *format, va_list args) {
 		tail = *str + len;
 		ret = vsnprintf(tail, tail_len + 1, format, copy);
 		if (ret < 0 || (size_t)ret != tail_len) {
-			assert(!"Length of formatted string changed");
+			bfs_bug("Length of formatted string changed");
 			goto fail;
 		}
 	}

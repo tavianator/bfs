@@ -4,7 +4,7 @@
 #include "stat.h"
 #include "bfstd.h"
 #include "config.h"
-#include <assert.h>
+#include "diag.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -57,7 +57,7 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 		return "modification time";
 	}
 
-	assert(!"Unrecognized stat field");
+	bfs_bug("Unrecognized stat field");
 	return "???";
 }
 
@@ -340,7 +340,7 @@ const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_f
 	case BFS_STAT_MTIME:
 		return &buf->mtime;
 	default:
-		assert(!"Invalid stat field for time");
+		bfs_bug("Invalid stat field for time");
 		errno = EINVAL;
 		return NULL;
 	}

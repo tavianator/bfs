@@ -11,7 +11,6 @@
 #include "stat.h"
 #include "trie.h"
 #include "xtime.h"
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -38,7 +37,7 @@ const char *debug_flag_name(enum debug_flags flag) {
 		break;
 	}
 
-	assert(!"Unrecognized debug flag");
+	bfs_bug("Unrecognized debug flag");
 	return "???";
 }
 

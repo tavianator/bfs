@@ -3,6 +3,7 @@
 
 #include "bfstd.h"
 #include "config.h"
+#include "diag.h"
 #include "xregex.h"
 #include <assert.h>
 #include <errno.h>
@@ -95,7 +96,7 @@ FILE *xfopen(const char *path, int flags) {
 		strcpy(mode, "r+b");
 		break;
 	default:
-		assert(!"Invalid access mode");
+		bfs_bug("Invalid access mode");
 		errno = EINVAL;
 		return NULL;
 	}

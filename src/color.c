@@ -5,6 +5,7 @@
 #include "bfstd.h"
 #include "bftw.h"
 #include "config.h"
+#include "diag.h"
 #include "dir.h"
 #include "dstring.h"
 #include "expr.h"
@@ -1085,7 +1086,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	return 0;
 
 invalid:
-	assert(!"Invalid format string");
+	bfs_bug("Invalid format string");
 	errno = EINVAL;
 	return -1;
 }
