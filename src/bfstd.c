@@ -5,7 +5,6 @@
 #include "config.h"
 #include "diag.h"
 #include "xregex.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
@@ -393,7 +392,7 @@ void close_quietly(int fd) {
 int xclose(int fd) {
 	int ret = close(fd);
 	if (ret != 0) {
-		assert(errno != EBADF);
+		bfs_verify(errno != EBADF);
 	}
 	return ret;
 }

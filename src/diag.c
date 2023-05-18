@@ -6,7 +6,6 @@
 #include "ctx.h"
 #include "color.h"
 #include "expr.h"
-#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -117,7 +116,7 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 	for (size_t i = 0; i < ctx->argc; ++i) {
 		if (&ctx->argv[i] == expr->argv) {
 			for (size_t j = 0; j < expr->argc; ++j) {
-				assert(i + j < ctx->argc);
+				bfs_assert(i + j < ctx->argc);
 				args[i + j] = true;
 				ret = true;
 			}

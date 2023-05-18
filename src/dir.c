@@ -4,7 +4,7 @@
 #include "dir.h"
 #include "bfstd.h"
 #include "config.h"
-#include <assert.h>
+#include "diag.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -249,7 +249,7 @@ int bfs_closedir(struct bfs_dir *dir) {
 	int ret = xclose(dir->fd);
 #else
 	int ret = closedir(dir->dir);
-	assert(ret == 0 || errno != EBADF);
+	bfs_verify(ret == 0 || errno != EBADF);
 #endif
 	free(dir);
 	return ret;

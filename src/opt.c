@@ -35,7 +35,6 @@
 #include "exec.h"
 #include "expr.h"
 #include "pwcache.h"
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -308,7 +307,7 @@ struct opt_state {
 /** Log an optimization. */
 BFS_FORMATTER(3, 4)
 static bool opt_debug(const struct opt_state *state, int level, const char *format, ...) {
-	assert(state->ctx->optlevel >= level);
+	bfs_assert(state->ctx->optlevel >= level);
 
 	if (bfs_debug(state->ctx, DEBUG_OPT, "${cyn}-O%d${rs}: ", level)) {
 		va_list args;
@@ -387,7 +386,7 @@ static struct bfs_expr *de_morgan(const struct opt_state *state, struct bfs_expr
 		has_parent = false;
 	}
 
-	assert(expr->eval_fn == eval_and || expr->eval_fn == eval_or);
+	bfs_assert(expr->eval_fn == eval_and || expr->eval_fn == eval_or);
 	if (expr->eval_fn == eval_and) {
 		expr->eval_fn = eval_or;
 		expr->argv = &fake_or_arg;
@@ -446,7 +445,7 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
  * Optimize a negation.
  */
 static struct bfs_expr *optimize_not_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_not);
+	bfs_assert(expr->eval_fn == eval_not);
 
 	struct bfs_expr *rhs = expr->rhs;
 
@@ -498,7 +497,7 @@ fail:
 
 /** Optimize a conjunction. */
 static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_and);
+	bfs_assert(expr->eval_fn == eval_and);
 
 	struct bfs_expr *lhs = expr->lhs;
 	struct bfs_expr *rhs = expr->rhs;
@@ -569,7 +568,7 @@ fail:
 
 /** Optimize a disjunction. */
 static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_or);
+	bfs_assert(expr->eval_fn == eval_or);
 
 	struct bfs_expr *lhs = expr->lhs;
 	struct bfs_expr *rhs = expr->rhs;
@@ -673,7 +672,7 @@ static struct bfs_expr *ignore_result(const struct opt_state *state, struct bfs_
 
 /** Optimize a comma expression. */
 static struct bfs_expr *optimize_comma_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_comma);
+	bfs_assert(expr->eval_fn == eval_comma);
 
 	struct bfs_expr *lhs = expr->lhs;
 	struct bfs_expr *rhs = expr->rhs;

@@ -29,7 +29,6 @@
 #include "xregex.h"
 #include "xspawn.h"
 #include "xtime.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -134,7 +133,7 @@ static struct bfs_expr *new_unary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *rh
 
 	expr->lhs = NULL;
 	expr->rhs = rhs;
-	assert(bfs_expr_is_parent(expr));
+	bfs_assert(bfs_expr_is_parent(expr));
 
 	expr->persistent_fds = rhs->persistent_fds;
 	expr->ephemeral_fds = rhs->ephemeral_fds;
@@ -154,7 +153,7 @@ static struct bfs_expr *new_binary_expr(bfs_eval_fn *eval_fn, struct bfs_expr *l
 
 	expr->lhs = lhs;
 	expr->rhs = rhs;
-	assert(bfs_expr_is_parent(expr));
+	bfs_assert(bfs_expr_is_parent(expr));
 
 	expr->persistent_fds = lhs->persistent_fds + rhs->persistent_fds;
 	if (lhs->ephemeral_fds > rhs->ephemeral_fds) {
@@ -263,7 +262,7 @@ static void init_highlight(const struct bfs_ctx *ctx, bool *args) {
 static void highlight_args(const struct bfs_ctx *ctx, char **argv, size_t argc, bool *args) {
 	size_t i = argv - ctx->argv;
 	for (size_t j = 0; j < argc; ++j) {
-		assert(i + j < ctx->argc);
+		bfs_assert(i + j < ctx->argc);
 		args[i + j] = true;
 	}
 }

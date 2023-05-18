@@ -86,7 +86,6 @@
 #include "config.h"
 #include "diag.h"
 #include "list.h"
-#include <assert.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -139,27 +138,27 @@ static bool trie_is_leaf(uintptr_t ptr) {
 
 /** Decode a pointer to a leaf. */
 static struct trie_leaf *trie_decode_leaf(uintptr_t ptr) {
-	assert(trie_is_leaf(ptr));
+	bfs_assert(trie_is_leaf(ptr));
 	return (struct trie_leaf *)(ptr ^ 1);
 }
 
 /** Encode a pointer to a leaf. */
 static uintptr_t trie_encode_leaf(const struct trie_leaf *leaf) {
 	uintptr_t ptr = (uintptr_t)leaf ^ 1;
-	assert(trie_is_leaf(ptr));
+	bfs_assert(trie_is_leaf(ptr));
 	return ptr;
 }
 
 /** Decode a pointer to an internal node. */
 static struct trie_node *trie_decode_node(uintptr_t ptr) {
-	assert(!trie_is_leaf(ptr));
+	bfs_assert(!trie_is_leaf(ptr));
 	return (struct trie_node *)ptr;
 }
 
 /** Encode a pointer to an internal node. */
 static uintptr_t trie_encode_node(const struct trie_node *node) {
 	uintptr_t ptr = (uintptr_t)node;
-	assert(!trie_is_leaf(ptr));
+	bfs_assert(!trie_is_leaf(ptr));
 	return ptr;
 }
 
@@ -341,9 +340,9 @@ static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
 /** Compute the size of a trie node with a certain number of children. */
 static size_t trie_node_size(unsigned int size) {
 	// Empty nodes aren't supported
-	assert(size > 0);
+	bfs_assert(size > 0);
 	// Node size must be a power of two
-	assert(has_single_bit(size));
+	bfs_assert(has_single_bit(size));
 
 	return flex_sizeof(struct trie_node, children, size);
 }
@@ -435,7 +434,7 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
 	unsigned int bit = 1U << nibble;
 
 	// The child must not already be present
-	assert(!(node->bitmap & bit));
+	bfs_assert(!(node->bitmap & bit));
 	node->bitmap |= bit;
 
 	unsigned int target = count_ones(node->bitmap & (bit - 1));
@@ -474,7 +473,7 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
 static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
 	// We only ever need to jump to leaf nodes, since internal nodes are
 	// guaranteed to be within OFFSET_MAX anyway
-	assert(trie_is_leaf(*ptr));
+	bfs_assert(trie_is_leaf(*ptr));
 
 	struct trie_node *node = malloc(trie_node_size(1));
 	if (!node) {
@@ -512,7 +511,7 @@ static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
 static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, struct trie_leaf *rep, size_t offset, size_t mismatch) {
 	unsigned char key_nibble = trie_key_nibble(leaf->key, mismatch);
 	unsigned char rep_nibble = trie_key_nibble(rep->key, mismatch);
-	assert(key_nibble != rep_nibble);
+	bfs_assert(key_nibble != rep_nibble);
 
 	struct trie_node *node = malloc(trie_node_size(2));
 	if (!node) {
@@ -570,11 +569,11 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 		unsigned char nibble = trie_key_nibble(key, offset);
 		unsigned int bit = 1U << nibble;
 		if (node->bitmap & bit) {
-			assert(offset < mismatch);
+			bfs_assert(offset < mismatch);
 			unsigned int index = count_ones(node->bitmap & (bit - 1));
 			ptr = &node->children[index];
 		} else {
-			assert(offset == mismatch);
+			bfs_assert(offset == mismatch);
 			return trie_node_insert(trie, ptr, leaf, nibble);
 		}
 	}
@@ -600,7 +599,7 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
 		struct trie_node *node = trie_decode_node(ptr);
 
 		// Make sure the bitmap is a power of two, i.e. it has just one child
-		assert(has_single_bit(node->bitmap));
+		bfs_assert(has_single_bit(node->bitmap));
 
 		ptr = node->children[0];
 		free(node);
@@ -651,12 +650,12 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	while (!trie_is_leaf(*child)) {
 		struct trie_node *node = trie_decode_node(*child);
 		offset += node->offset;
-		assert((offset >> 1) < leaf->length);
+		bfs_assert((offset >> 1) < leaf->length);
 
 		unsigned char nibble = trie_key_nibble(leaf->key, offset);
 		unsigned int bit = 1U << nibble;
 		unsigned int bitmap = node->bitmap;
-		assert(bitmap & bit);
+		bfs_assert(bitmap & bit);
 		unsigned int index = count_ones(bitmap & (bit - 1));
 
 		// Advance the parent pointer, unless this node had only one child
@@ -669,7 +668,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 		child = &node->children[index];
 	}
 
-	assert(trie_decode_leaf(*child) == leaf);
+	bfs_assert(trie_decode_leaf(*child) == leaf);
 
 	if (!parent) {
 		trie_free_singletons(trie, trie->root);
@@ -683,7 +682,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 
 	node->bitmap ^= child_bit;
 	unsigned int parent_size = count_ones(node->bitmap);
-	assert(parent_size > 0);
+	bfs_assert(parent_size > 0);
 	if (parent_size == 1 && trie_collapse_node(parent, node, child_index) == 0) {
 		return;
 	}

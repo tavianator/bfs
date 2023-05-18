@@ -26,7 +26,6 @@
 #include "trie.h"
 #include "xregex.h"
 #include "xtime.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -990,7 +989,7 @@ static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
 		}
 	}
 
-	assert(!state->quit);
+	bfs_assert(!state->quit);
 
 	bool ret = expr->eval_fn(expr, state);
 
@@ -1006,10 +1005,10 @@ static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	if (bfs_expr_never_returns(expr)) {
-		assert(state->quit);
+		bfs_assert(state->quit);
 	} else if (!state->quit) {
-		assert(!expr->always_true || ret);
-		assert(!expr->always_false || !ret);
+		bfs_assert(!expr->always_true || ret);
+		bfs_assert(!expr->always_false || !ret);
 	}
 
 	return ret;
@@ -1511,7 +1510,7 @@ static void dump_bftw_flags(enum bftw_flags flags) {
 	DEBUG_FLAG(flags, BFTW_SORT);
 	DEBUG_FLAG(flags, BFTW_BUFFER);
 
-	assert(!flags);
+	bfs_assert(flags == 0, "Missing bftw flag 0x%X", flags);
 }
 
 /**

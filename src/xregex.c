@@ -3,7 +3,7 @@
 
 #include "xregex.h"
 #include "config.h"
-#include <assert.h>
+#include "diag.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -140,7 +140,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		syntax = ONIG_SYNTAX_GREP;
 		break;
 	}
-	assert(syntax);
+	bfs_assert(syntax);
 
 	OnigOptionType options = syntax->options;
 	if (flags & BFS_REGEX_ICASE) {

@@ -10,7 +10,6 @@
 #include "diag.h"
 #include "dstring.h"
 #include "xspawn.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -276,12 +275,12 @@ static void bfs_exec_free_arg(char *arg, const char *tmpl) {
 
 /** Open a file to use as the working directory. */
 static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
-	assert(execbuf->wd_fd < 0);
-	assert(!execbuf->wd_path);
+	bfs_assert(execbuf->wd_fd < 0);
+	bfs_assert(!execbuf->wd_path);
 
 	if (ftwbuf->at_fd != AT_FDCWD) {
 		// Rely on at_fd being the immediate parent
-		assert(xbaseoff(ftwbuf->at_path) == 0);
+		bfs_assert(xbaseoff(ftwbuf->at_path) == 0);
 
 		execbuf->wd_fd = ftwbuf->at_fd;
 		if (!(execbuf->flags & BFS_EXEC_MULTI)) {

@@ -19,13 +19,13 @@
 #include "bftw.h"
 #include "bfstd.h"
 #include "config.h"
+#include "diag.h"
 #include "dir.h"
 #include "dstring.h"
 #include "list.h"
 #include "mtab.h"
 #include "stat.h"
 #include "trie.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -114,7 +114,7 @@ static void bftw_cache_remove(struct bftw_cache *cache, struct bftw_file *file) 
 
 /** Close a bftw_file. */
 static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(file->fd >= 0);
+	bfs_assert(file->fd >= 0);
 
 	if (LIST_ATTACHED(cache, file, lru)) {
 		bftw_cache_remove(cache, file);
@@ -137,7 +137,7 @@ static int bftw_cache_pop(struct bftw_cache *cache) {
 
 /** Add a bftw_file to the cache. */
 static int bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(file->fd >= 0);
+	bfs_assert(file->fd >= 0);
 
 	if (cache->capacity == 0 && bftw_cache_pop(cache) != 0) {
 		bftw_file_close(cache, file);
@@ -145,7 +145,7 @@ static int bftw_cache_add(struct bftw_cache *cache, struct bftw_file *file) {
 		return -1;
 	}
 
-	assert(cache->capacity > 0);
+	bfs_assert(cache->capacity > 0);
 	--cache->capacity;
 
 	LIST_INSERT(cache, cache->target, file, lru);
@@ -169,9 +169,9 @@ static size_t bftw_child_nameoff(const struct bftw_file *parent) {
 
 /** Destroy a cache. */
 static void bftw_cache_destroy(struct bftw_cache *cache) {
-	assert(!cache->head);
-	assert(!cache->tail);
-	assert(!cache->target);
+	bfs_assert(!cache->head);
+	bfs_assert(!cache->tail);
+	bfs_assert(!cache->target);
 }
 
 /** Create a new bftw_file. */
@@ -230,7 +230,7 @@ static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *nam
  *         The opened file descriptor, or negative on error.
  */
 static int bftw_file_openat(struct bftw_cache *cache, struct bftw_file *file, struct bftw_file *base, const char *at_path) {
-	assert(file->fd < 0);
+	bfs_assert(file->fd < 0);
 
 	int at_fd = AT_FDCWD;
 	if (base) {
@@ -332,7 +332,7 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_cache *cache, struct bftw_f
 
 /** Free a bftw_file. */
 static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
-	assert(file->refcount == 0);
+	bfs_assert(file->refcount == 0);
 
 	if (file->fd >= 0) {
 		bftw_file_close(cache, file);
@@ -770,7 +770,7 @@ static enum bftw_action bftw_call_back(struct bftw_state *state, const char *nam
 
 /** Pop a directory to read from the queue. */
 static bool bftw_pop_dir(struct bftw_state *state) {
-	assert(!state->file);
+	bfs_assert(!state->file);
 
 	if (!state->dirs.head) {
 		return false;
@@ -787,7 +787,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 
 /** Pop a file to visit from the queue. */
 static bool bftw_pop_file(struct bftw_state *state) {
-	assert(!state->file);
+	bfs_assert(!state->file);
 
 	state->file = state->files.head;
 	if (state->file) {
@@ -802,8 +802,8 @@ static bool bftw_pop_file(struct bftw_state *state) {
  * Open the current directory.
  */
 static int bftw_opendir(struct bftw_state *state) {
-	assert(!state->dir);
-	assert(!state->de);
+	bfs_assert(!state->dir);
+	bfs_assert(!state->de);
 
 	state->direrror = 0;
 
@@ -863,7 +863,7 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 
 	if (state->dir) {
 		struct bftw_file *file = state->file;
-		assert(file && file->fd >= 0);
+		bfs_assert(file && file->fd >= 0);
 
 		if (file->refcount > 1) {
 			// Keep the fd around if any subdirectories exist

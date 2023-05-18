@@ -12,7 +12,6 @@
 #include "fsade.h"
 #include "stat.h"
 #include "trie.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -699,7 +698,7 @@ static int print_colored(CFILE *cfile, const char *esc, const char *str, size_t 
 /** Find the offset of the first broken path component. */
 static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t max) {
 	ssize_t ret = max;
-	assert(ret >= 0);
+	bfs_assert(ret >= 0);
 
 	if (bftw_type(ftwbuf, flags) != BFS_ERROR) {
 		goto out;
@@ -1100,7 +1099,7 @@ static int cbuff(CFILE *cfile, const char *format, ...) {
 }
 
 int cvfprintf(CFILE *cfile, const char *format, va_list args) {
-	assert(dstrlen(cfile->buffer) == 0);
+	bfs_assert(dstrlen(cfile->buffer) == 0);
 
 	int ret = -1;
 	if (cvbuff(cfile, format, args) == 0) {
