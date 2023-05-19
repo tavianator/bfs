@@ -4,6 +4,7 @@
 #include "../src/bfstd.h"
 #include "../src/config.h"
 #include "../src/diag.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -12,23 +13,13 @@
 /** Check the result of xdirname()/xbasename(). */
 static void check_base_dir(const char *path, const char *dir, const char *base) {
 	char *xdir = xdirname(path);
-	if (!xdir) {
-		perror("xdirname()");
-		abort();
-	} else if (strcmp(xdir, dir) != 0) {
-		fprintf(stderr, "xdirname(\"%s\") == \"%s\" (!= \"%s\")\n", path, xdir, dir);
-		abort();
-	}
+	bfs_verify(xdir, "xdirname(): %s", strerror(errno));
+	bfs_verify(strcmp(xdir, dir) == 0, "xdirname('%s') == '%s' (!= '%s')", path, xdir, dir);
 	free(xdir);
 
 	char *xbase = xbasename(path);
-	if (!xbase) {
-		perror("xbasename()");
-		abort();
-	} else if (strcmp(xbase, base) != 0) {
-		fprintf(stderr, "xbasename(\"%s\") == \"%s\" (!= \"%s\")\n", path, xbase, base);
-		abort();
-	}
+	bfs_verify(xbase, "xbasename(): %s", strerror(errno));
+	bfs_verify(strcmp(xbase, base) == 0, "xbasename('%s') == '%s' (!= '%s')", path, xbase, base);
 	free(xbase);
 }
 
