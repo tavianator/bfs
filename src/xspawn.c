@@ -49,9 +49,7 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 
 int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 	while (ctx->head) {
-		struct bfs_spawn_action *action = ctx->head;
-		SLIST_POP(ctx);
-		free(action);
+		free(SLIST_POP(ctx));
 	}
 
 	return 0;

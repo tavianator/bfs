@@ -780,8 +780,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 		return false;
 	}
 
-	state->file = state->dirs.head;
-	SLIST_POP(&state->dirs);
+	state->file = SLIST_POP(&state->dirs);
 	return true;
 }
 
@@ -952,8 +951,7 @@ static void bftw_list_sort(struct bftw_list *list) {
 
 	// Split
 	for (struct bftw_file *hare = list->head; hare && (hare = hare->next); hare = hare->next) {
-		struct bftw_file *tortoise = list->head;
-		SLIST_POP(list);
+		struct bftw_file *tortoise = SLIST_POP(list);
 		SLIST_APPEND(&left, tortoise);
 	}
 	SLIST_EXTEND(&right, list);

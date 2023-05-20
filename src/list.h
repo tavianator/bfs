@@ -79,6 +79,7 @@
 #define BFS_LIST_H
 
 #include <stddef.h>
+#include <string.h>
 
 /**
  * Initialize a singly-linked list.
@@ -250,17 +251,27 @@
  *         A pointer to the item to remove, either &list->head or &prev->next.
  * @param node (optional)
  *         If specified, use item->node.next rather than item->next.
+ * @return
+ *         The removed item.
  */
 #define SLIST_REMOVE(list, ...) SLIST_REMOVE_(list, __VA_ARGS__, )
 
 #define SLIST_REMOVE_(list, cursor, ...) \
-	LIST_BLOCK_(SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__)))
+	SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__))
 
 #define SLIST_REMOVE__(list, cursor, next) \
-	void *_next = (void *)(*cursor)->next; \
-	(*cursor)->next = NULL; \
-	*cursor = _next; \
-	list->tail = _next ? list->tail : cursor;
+	(list->tail = (*cursor)->next ? list->tail : cursor, \
+	 slist_remove_impl(*cursor, cursor, &(*cursor)->next, list->tail, sizeof(*cursor)))
+
+// Helper for SLIST_REMOVE()
+static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void *tail, size_t size) {
+	// ret = *cursor;
+	// *cursor = ret->next;
+	memcpy(cursor, next, size);
+	// ret->next = *list->tail; (NULL)
+	memcpy(next, tail, size);
+	return ret;
+}
 
 /**
  * Pop the head off a singly-linked list.
