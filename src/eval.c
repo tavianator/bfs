@@ -1471,6 +1471,23 @@ static int raise_fdlimit(const struct bfs_ctx *ctx) {
 	return ret;
 }
 
+/** Preallocate the fd table in the kernel. */
+static void reserve_fds(int limit) {
+	// Kernels typically implement the fd table as a dynamic array.
+	// Growing the array can be expensive, especially if files are being
+	// opened in parallel.  We can work around this by allocating the
+	// highest possible fd, forcing the kernel to grow the table upfront.
+
+#ifdef F_DUPFD_CLOEXEC
+	int fd = fcntl(STDIN_FILENO, F_DUPFD_CLOEXEC, limit - 1);
+#else
+	int fd = fcntl(STDIN_FILENO, F_DUPFD, limit - 1);
+#endif
+	if (fd >= 0) {
+		xclose(fd);
+	}
+}
+
 /** Infer the number of file descriptors available to bftw(). */
 static int infer_fdlimit(const struct bfs_ctx *ctx, int limit) {
 	// 3 for std{in,out,err}
@@ -1604,6 +1621,7 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 	}
 
 	int fdlimit = raise_fdlimit(ctx);
+	reserve_fds(fdlimit);
 	fdlimit = infer_fdlimit(ctx, fdlimit);
 
 	int nthreads;
