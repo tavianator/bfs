@@ -299,11 +299,10 @@ static int bftw_file_open(struct bftw_cache *cache, struct bftw_file *file, cons
 		SLIST_PREPEND(&parents, cur);
 	}
 
-	while ((cur = parents.head)) {
+	while ((cur = SLIST_POP(&parents))) {
 		if (!cur->parent || cur->parent->fd >= 0) {
 			bftw_file_openat(cache, cur, cur->parent, cur->name);
 		}
-		SLIST_POP(&parents);
 	}
 
 	return file->fd;
@@ -772,29 +771,17 @@ static enum bftw_action bftw_call_back(struct bftw_state *state, const char *nam
 static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
-	if (!state->dirs.head) {
-		return false;
-	}
-
 	if (state->files.head && state->strategy == BFTW_BFS) {
 		return false;
 	}
 
-	state->file = SLIST_POP(&state->dirs);
-	return true;
+	return (state->file = SLIST_POP(&state->dirs));
 }
 
 /** Pop a file to visit from the queue. */
 static bool bftw_pop_file(struct bftw_state *state) {
 	bfs_assert(!state->file);
-
-	state->file = state->files.head;
-	if (state->file) {
-		SLIST_POP(&state->files);
-		return true;
-	} else {
-		return false;
-	}
+	return (state->file = SLIST_POP(&state->files));
 }
 
 /**

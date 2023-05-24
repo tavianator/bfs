@@ -280,11 +280,13 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  *         The list to pop from.
  * @param node (optional)
  *         If specified, use head->node.next rather than head->next.
+ * @return
+ *         The popped item, or NULL if the list was empty.
  */
 #define SLIST_POP(...) SLIST_POP_(__VA_ARGS__, )
 
 #define SLIST_POP_(list, ...) \
-	SLIST_REMOVE_(list, &(list)->head, __VA_ARGS__)
+	((list)->head ? SLIST_REMOVE_(list, &(list)->head, __VA_ARGS__) : NULL)
 
 /**
  * Initialize a doubly-linked list.
