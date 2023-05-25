@@ -4,6 +4,7 @@
 #include "xregex.h"
 #include "config.h"
 #include "diag.h"
+#include "sanity.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -175,13 +176,10 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		cflags |= REG_ICASE;
 	}
 
-#if __has_feature(memory_sanitizer)
-	// https://github.com/google/sanitizers/issues/1496
-	memset(&regex->impl, 0, sizeof(regex->impl));
-#endif
-
 	regex->err = regcomp(&regex->impl, pattern, cflags);
 	if (regex->err != 0) {
+		// https://github.com/google/sanitizers/issues/1496
+		sanitize_init(&regex->impl);
 		return -1;
 	}
 #endif

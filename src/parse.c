@@ -24,6 +24,7 @@
 #include "opt.h"
 #include "printf.h"
 #include "pwcache.h"
+#include "sanity.h"
 #include "stat.h"
 #include "typo.h"
 #include "xregex.h"

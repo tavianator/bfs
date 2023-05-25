@@ -5,6 +5,7 @@
 #include "bfstd.h"
 #include "config.h"
 #include "diag.h"
+#include "sanity.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,18 +19,13 @@
 #endif
 
 #if BFS_GETDENTS
-#  if __has_feature(memory_sanitizer)
-#    include <sanitizer/msan_interface.h>
-#  endif
 #  if __linux__
 #    include <sys/syscall.h>
 #  endif
 
 /** getdents() syscall wrapper. */
 static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
-#if __has_feature(memory_sanitizer)
-	__msan_allocated_memory(buf, size);
-#endif
+	sanitize_uninit(buf, size);
 
 #if __linux__ && __GLIBC__ && !__GLIBC_PREREQ(2, 30)
 	ssize_t ret = syscall(SYS_getdents64, fd, buf, size);
@@ -39,11 +35,9 @@ static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 	ssize_t ret = getdents(fd, buf, size);
 #endif
 
-#if __has_feature(memory_sanitizer)
 	if (ret > 0) {
-		__msan_unpoison(buf, ret);
+		sanitize_init(buf, ret);
 	}
-#endif
 
 	return ret;
 }

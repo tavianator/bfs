@@ -5,6 +5,7 @@
 #include "bfstd.h"
 #include "config.h"
 #include "diag.h"
+#include "sanity.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -132,17 +133,18 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, struct bf
  * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
  */
 static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int mask, struct statx *buf) {
-#if __has_feature(memory_sanitizer)
-	// -fsanitize=memory doesn't know about statx(), so tell it the memory
-	// got initialized
-	memset(buf, 0, sizeof(*buf));
+#if BFS_LIBC_STATX
+	int ret = statx(at_fd, at_path, at_flags, mask, buf);
+#else
+	int ret = syscall(SYS_statx, at_fd, at_path, at_flags, mask, buf);
 #endif
 
-#if BFS_LIBC_STATX
-	return statx(at_fd, at_path, at_flags, mask, buf);
-#else
-	return syscall(SYS_statx, at_fd, at_path, at_flags, mask, buf);
-#endif
+	if (ret == 0) {
+		// -fsanitize=memory doesn't know about statx()
+		sanitize_init(buf);
+	}
+
+	return ret;
 }
 
 /**

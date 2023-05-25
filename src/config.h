@@ -191,15 +191,6 @@ static inline size_t flex_sizeof_impl(size_t align, size_t min, size_t offset, s
 	return ret;
 }
 
-/**
- * Initialize a variable, unless sanitizers would detect uninitialized uses.
- */
-#if __has_feature(memory_sanitizer)
-#  define uninit(var, value) var
-#else
-#  define uninit(var, value) value
-#endif
-
 // Wrappers for attributes
 
 /**
