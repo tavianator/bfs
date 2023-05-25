@@ -7,6 +7,7 @@
 #include "bftw.h"
 #include "dir.h"
 #include "dstring.h"
+#include "sanity.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
