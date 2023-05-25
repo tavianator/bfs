@@ -21,6 +21,7 @@
  *
  * - Utilities:
  *     - bar.[ch]      (a terminal status bar)
+ *     - bit.h         (bit manipulation)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
  *     - config.h      (configuration and feature/platform detection)
@@ -29,8 +30,10 @@
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
+ *     - list.h        (linked list macros)
  *     - mtab.[ch]     (parses the system's mount table)
  *     - pwcache.[ch]  (a cache for the user/group tables)
+ *     - sanity.h      (sanitizer interfaces)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
