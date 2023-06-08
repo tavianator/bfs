@@ -436,10 +436,11 @@ struct colors *parse_colors(void) {
 	ret |= init_color(colors, "err", "01;31", &colors->error);
 
 	// Defaults from man dir_colors
+	// "" means fall back to ->normal
 
 	ret |= init_color(colors, "no", NULL,    &colors->normal);
 
-	ret |= init_color(colors, "fi", NULL,    &colors->file);
+	ret |= init_color(colors, "fi", "",      &colors->file);
 	ret |= init_color(colors, "mh", NULL,    &colors->multi_hard);
 	ret |= init_color(colors, "ex", "01;32", &colors->executable);
 	ret |= init_color(colors, "ca", NULL,    &colors->capable);
@@ -472,8 +473,7 @@ struct colors *parse_colors(void) {
 
 	if (colors->link && strcmp(colors->link, "target") == 0) {
 		colors->link_as_target = true;
-		dstrfree(colors->link);
-		colors->link = NULL;
+		dstresize(&colors->link, 0);
 	}
 
 	return colors;
@@ -634,7 +634,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 	}
 
-	if (!color) {
+	if (color && !color[0]) {
 		color = colors->normal;
 	}
 
