@@ -642,6 +642,11 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 		goto done;
 	}
 
+	// ls -l prints non-path text in the "normal" color, so do the same
+	if (cfprintf(cfile, "${no}") < 0) {
+		goto error;
+	}
+
 	uintmax_t ino = statbuf->ino;
 	uintmax_t block_size = ctx->posixly_correct ? 512 : 1024;
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + block_size - 1)/block_size;
@@ -709,7 +714,7 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 		errno = EOVERFLOW;
 		goto error;
 	}
-	if (fprintf(file, " %s", time_str) < 0) {
+	if (cfprintf(cfile, " %s${rs}", time_str) < 0) {
 		goto error;
 	}
 
