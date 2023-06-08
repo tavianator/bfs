@@ -629,6 +629,24 @@ bool eval_perm(const struct bfs_expr *expr, struct bfs_eval *state) {
 	return false;
 }
 
+/** Print a user/group name/id, and update the column width. */
+static int print_owner(FILE *file, const char *name, uintmax_t id, int *width) {
+	if (name) {
+		int len = xstrwidth(name);
+		if (*width < len) {
+			*width = len;
+		}
+
+		return fprintf(file, " %s%*s", name, *width - len, "");
+	} else {
+		int ret = fprintf(file, " %-*ju", *width, id);
+		if (ret >= 0 && *width < ret - 1) {
+			*width = ret - 1;
+		}
+		return ret;
+	}
+}
+
 /**
  * -f?ls action.
  */
@@ -658,28 +676,16 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 		goto error;
 	}
 
-	uintmax_t uid = statbuf->uid;
-	const struct passwd *pwd = bfs_getpwuid(ctx->users, uid);
-	if (pwd) {
-		if (fprintf(file, " %-8s", pwd->pw_name) < 0) {
-			goto error;
-		}
-	} else {
-		if (fprintf(file, " %-8ju", uid) < 0) {
-			goto error;
-		}
+	const struct passwd *pwd = bfs_getpwuid(ctx->users, statbuf->uid);
+	static int uwidth = 8;
+	if (print_owner(file, pwd ? pwd->pw_name : NULL, statbuf->uid, &uwidth) < 0) {
+		goto error;
 	}
 
-	uintmax_t gid = statbuf->gid;
-	const struct group *grp = bfs_getgrgid(ctx->groups, gid);
-	if (grp) {
-		if (fprintf(file, " %-8s", grp->gr_name) < 0) {
-			goto error;
-		}
-	} else {
-		if (fprintf(file, " %-8ju", gid) < 0) {
-			goto error;
-		}
+	const struct group *grp = bfs_getgrgid(ctx->groups, statbuf->gid);
+	static int gwidth = 8;
+	if (print_owner(file, grp ? grp->gr_name : NULL, statbuf->gid, &gwidth) < 0) {
+		goto error;
 	}
 
 	if (ftwbuf->type == BFS_BLK || ftwbuf->type == BFS_CHR) {
