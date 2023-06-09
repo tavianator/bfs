@@ -6,6 +6,7 @@
 #include "diag.h"
 #include "sanity.h"
 #include <errno.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,16 +30,14 @@ struct bfs_regex {
 };
 
 #if BFS_WITH_ONIGURUMA
-/** Get (and initialize) the appropriate encoding for the current locale. */
-static int bfs_onig_encoding(OnigEncoding *penc) {
-	static OnigEncoding enc = NULL;
-	if (enc) {
-		*penc = enc;
-		return ONIG_NORMAL;
-	}
 
+static int bfs_onig_status;
+static OnigEncoding bfs_onig_enc;
+
+/** pthread_once() callback. */
+static void bfs_onig_once(void) {
 	// Fall back to ASCII by default
-	enc = ONIG_ENCODING_ASCII;
+	bfs_onig_enc = ONIG_ENCODING_ASCII;
 
 	// Oniguruma has no locale support, so try to guess the right encoding
 	// from the current locale.
@@ -47,7 +46,7 @@ static int bfs_onig_encoding(OnigEncoding *penc) {
 #define BFS_MAP_ENCODING(name, value) \
 		do { \
 			if (strcmp(charmap, name) == 0) { \
-				enc = value; \
+				bfs_onig_enc = value; \
 			} \
 		} while (0)
 #define BFS_MAP_ENCODING2(name1, name2, value) \
@@ -97,12 +96,21 @@ static int bfs_onig_encoding(OnigEncoding *penc) {
 		BFS_MAP_ENCODING("GB18030", ONIG_ENCODING_BIG5);
 	}
 
-	int ret = onig_initialize(&enc, 1);
-	if (ret != ONIG_NORMAL) {
-		enc = NULL;
+	bfs_onig_status = onig_initialize(&bfs_onig_enc, 1);
+	if (bfs_onig_status != ONIG_NORMAL) {
+		bfs_onig_enc = NULL;
 	}
-	*penc = enc;
-	return ret;
+}
+
+/** Initialize Oniguruma. */
+static int bfs_onig_initialize(OnigEncoding *enc) {
+	static pthread_once_t once = PTHREAD_ONCE_INIT;
+	if (pthread_once(&once, bfs_onig_once) != 0) {
+		return ONIGERR_FAIL_TO_INITIALIZE;
+	}
+
+	*enc = bfs_onig_enc;
+	return bfs_onig_status;
 }
 #endif
 
@@ -141,7 +149,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		syntax = ONIG_SYNTAX_GREP;
 		break;
 	}
-	bfs_assert(syntax);
+	bfs_assert(syntax, "Invalid regex type");
 
 	OnigOptionType options = syntax->options;
 	if (flags & BFS_REGEX_ICASE) {
@@ -149,7 +157,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 	}
 
 	OnigEncoding enc;
-	regex->err = bfs_onig_encoding(&enc);
+	regex->err = bfs_onig_initialize(&enc);
 	if (regex->err != ONIG_NORMAL) {
 		return -1;
 	}
