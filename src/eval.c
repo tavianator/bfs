@@ -1505,6 +1505,19 @@ static int infer_fdlimit(const struct bfs_ctx *ctx, int limit) {
 	return ret;
 }
 
+static int infer_nproc(void) {
+	long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+
+	if (nproc < 0) {
+		nproc = 0;
+	} else if (nproc > 8) {
+		// Not much speedup after 8 threads
+		nproc = 8;
+	}
+
+	return nproc;
+}
+
 /**
  * Dump the bftw() flags for -D search.
  */
@@ -1593,12 +1606,20 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 	int fdlimit = raise_fdlimit(ctx);
 	fdlimit = infer_fdlimit(ctx, fdlimit);
 
+	int nthreads;
+	if (ctx->threads > 0) {
+		nthreads = ctx->threads - 1;
+	} else {
+		nthreads = infer_nproc();
+	}
+
 	struct bftw_args bftw_args = {
 		.paths = ctx->paths,
 		.npaths = darray_length(ctx->paths),
 		.callback = eval_callback,
 		.ptr = &args,
 		.nopenfd = fdlimit,
+		.nthreads = nthreads,
 		.flags = ctx->flags,
 		.strategy = ctx->strategy,
 		.mtab = bfs_ctx_mtab(ctx),
@@ -1618,6 +1639,7 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 		fprintf(stderr, "\t.callback = eval_callback,\n");
 		fprintf(stderr, "\t.ptr = &args,\n");
 		fprintf(stderr, "\t.nopenfd = %d,\n", bftw_args.nopenfd);
+		fprintf(stderr, "\t.nthreads = %d,\n", bftw_args.nthreads);
 		fprintf(stderr, "\t.flags = ");
 		dump_bftw_flags(bftw_args.flags);
 		fprintf(stderr, ",\n\t.strategy = %s,\n", dump_bftw_strategy(bftw_args.strategy));

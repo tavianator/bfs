@@ -56,6 +56,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->maxdepth = INT_MAX;
 	ctx->flags = BFTW_RECOVER;
 	ctx->strategy = BFTW_BFS;
+	ctx->threads = 0;
 	ctx->optlevel = 3;
 	ctx->debug = 0;
 	ctx->ignore_races = false;

@@ -1637,6 +1637,23 @@ static struct bfs_expr *parse_inum(struct parser_state *state, int arg1, int arg
 }
 
 /**
+ * Parse -j<n>.
+ */
+static struct bfs_expr *parse_jobs(struct parser_state *state, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_flag(state);
+	if (!expr) {
+		return NULL;
+	}
+
+	if (!parse_int(state, expr->argv, expr->argv[0] + 2, &state->ctx->threads, IF_INT | IF_UNSIGNED)) {
+		bfs_expr_free(expr);
+		return NULL;
+	}
+
+	return expr;
+}
+
+/**
  * Parse -links N.
  */
 static struct bfs_expr *parse_links(struct parser_state *state, int arg1, int arg2) {
@@ -2753,7 +2770,9 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
 	cfprintf(cout, "      Enable optimization level ${bld}N${rs} (default: ${bld}3${rs})\n");
 	cfprintf(cout, "  ${cyn}-S${rs} ${bld}bfs${rs}|${bld}dfs${rs}|${bld}ids${rs}|${bld}eds${rs}\n");
 	cfprintf(cout, "      Use ${bld}b${rs}readth-${bld}f${rs}irst/${bld}d${rs}epth-${bld}f${rs}irst/${bld}i${rs}terative/${bld}e${rs}xponential ${bld}d${rs}eepening ${bld}s${rs}earch\n");
-	cfprintf(cout, "      (default: ${cyn}-S${rs} ${bld}bfs${rs})\n\n");
+	cfprintf(cout, "      (default: ${cyn}-S${rs} ${bld}bfs${rs})\n");
+	cfprintf(cout, "  ${cyn}-j${bld}N${rs}\n");
+	cfprintf(cout, "      Search with ${bld}N${rs} threads in parallel (default: number of CPUs, up to ${bld}8${rs})\n\n");
 
 	cfprintf(cout, "${bld}Operators:${rs}\n\n");
 
@@ -3060,6 +3079,7 @@ static const struct table_entry parse_table[] = {
 	{"-ipath", T_TEST, parse_path, true},
 	{"-iregex", T_TEST, parse_regex, BFS_REGEX_ICASE},
 	{"-iwholename", T_TEST, parse_path, true},
+	{"-j", T_FLAG, parse_jobs, 0, 0, true},
 	{"-links", T_TEST, parse_links},
 	{"-lname", T_TEST, parse_lname, false},
 	{"-ls", T_ACTION, parse_ls},
@@ -3550,6 +3570,10 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 
 	if (ctx->optlevel != 3) {
 		cfprintf(cerr, " ${cyn}-O${bld}%d${rs}", ctx->optlevel);
+	}
+
+	if (ctx->threads > 0) {
+		cfprintf(cerr, " ${cyn}-j${bld}%d${rs}", ctx->threads);
 	}
 
 	cfprintf(cerr, " ${cyn}-S${rs} ${bld}%s${rs}", bftw_strategy_name(ctx->strategy));

@@ -186,6 +186,8 @@ struct bftw_args {
 	void *ptr;
 	/** The maximum number of file descriptors to keep open. */
 	int nopenfd;
+	/** The maximum number of threads to use. */
+	int nthreads;
 	/** Flags that control bftw() behaviour. */
 	enum bftw_flags flags;
 	/** The search strategy to use. */

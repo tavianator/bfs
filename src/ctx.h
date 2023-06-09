@@ -68,6 +68,8 @@ struct bfs_ctx {
 	/** bftw() search strategy. */
 	enum bftw_strategy strategy;
 
+	/** Threads (-j). */
+	int threads;
 	/** Optimization level (-O). */
 	int optlevel;
 	/** Debugging flags (-D). */

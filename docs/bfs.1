@@ -171,12 +171,18 @@ consumes too much memory.
 .TP
 .I eds
 Exponential deepening search.
-A compromise between breadth- and depth-first search, which searches exponentially increasing depth ranges (e.g 0-1, 1-2, 2-4, 4-8, etc.).
+A compromise between breadth- and depth-first search, which searches exponentially increasing depth ranges (e.g. 0-1, 1-2, 2-4, 4-8, etc.).
 Provides many of the benefits of breadth-first search with depth-first's reduced memory consumption.
 Typically far faster than
 .B \-S
 .IR ids .
 .RE
+.TP
+\fB\-j\fIN\fR
+Search with
+.I N
+threads in parallel (default: number of CPUs, up to
+.IR 8 ).
 .SH OPERATORS
 .TP
 \fB( \fIexpression \fB)\fR
