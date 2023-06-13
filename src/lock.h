@@ -11,6 +11,7 @@
 #include "diag.h"
 #include <errno.h>
 #include <pthread.h>
+#include <string.h>
 
 #define lock_verify(expr, cond) \
 	bfs_verify((errno = (expr), (cond)), "%s: %s", #expr, strerror(errno))
