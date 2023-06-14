@@ -3736,12 +3736,6 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.now = ctx->now,
 	};
 
-	const char *cmd = state.command + xbaseoff(state.command);
-	if (strcmp(cmd, "find") == 0) {
-		// Operate depth-first when invoked as "find"
-		ctx->strategy = BFTW_DFS;
-	}
-
 	ctx->exclude = bfs_expr_new(eval_false, 1, &fake_false_arg);
 	if (!ctx->exclude) {
 		goto fail;
