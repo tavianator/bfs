@@ -73,8 +73,8 @@
 #define sanitize_uninit(...) SANITIZE_CALL(__msan_allocated_memory, __VA_ARGS__)
 
 #else
-#  define sanitize_init(...)
-#  define sanitize_uninit(...)
+#  define sanitize_init(...) ((void)0)
+#  define sanitize_uninit(...) ((void)0)
 #endif
 
 /**
