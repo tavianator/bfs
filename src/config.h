@@ -191,6 +191,29 @@ static inline size_t flex_sizeof_impl(size_t align, size_t min, size_t offset, s
 	return ret;
 }
 
+/**
+ * False sharing/destructive interference/largest cache line size.
+ */
+#ifdef __GCC_DESTRUCTIVE_SIZE
+#  define FALSE_SHARING_SIZE __GCC_DESTRUCTIVE_SIZE
+#else
+#  define FALSE_SHARING_SIZE 64
+#endif
+
+/**
+ * True sharing/constructive interference/smallest cache line size.
+ */
+#ifdef __GCC_CONSTRUCTIVE_SIZE
+#  define TRUE_SHARING_SIZE __GCC_CONSTRUCTIVE_SIZE
+#else
+#  define TRUE_SHARING_SIZE 64
+#endif
+
+/**
+ * Alignment specifier that avoids false sharing.
+ */
+#define cache_align alignas(FALSE_SHARING_SIZE)
+
 // Wrappers for attributes
 
 /**
