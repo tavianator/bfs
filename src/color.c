@@ -858,6 +858,18 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	return ret;
 }
 
+/** Print an shell-escaped string. */
+static int print_wordesc(CFILE *cfile, const char *str) {
+	char *esc = wordesc(str);
+	if (!esc) {
+		return -1;
+	}
+
+	int ret = dstrcat(&cfile->buffer, esc);
+	free(esc);
+	return ret;
+}
+
 /** Format some colored output to the buffer. */
 BFS_FORMATTER(2, 3)
 static int cbuff(CFILE *cfile, const char *format, ...);
@@ -994,6 +1006,12 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 
 			case 'p':
 				switch (*++i) {
+				case 'q':
+					if (print_wordesc(cfile, va_arg(args, const char *)) != 0) {
+						return -1;
+					}
+					break;
+
 				case 'F':
 					if (print_name(cfile, va_arg(args, const struct BFTW *)) != 0) {
 						return -1;
