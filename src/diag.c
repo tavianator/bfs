@@ -5,10 +5,12 @@
 #include "bfstd.h"
 #include "ctx.h"
 #include "color.h"
+#include "dstring.h"
 #include "expr.h"
 #include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 noreturn void bfs_abortf(const char *format, ...) {
 	va_list args;
@@ -149,6 +151,17 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 		bfs_error_prefix(ctx);
 	}
 
+	char *argv[ctx->argc];
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		argv[i] = wordesc(ctx->argv[i]);
+		if (!argv[i]) {
+			for (size_t j = 0; j < i; ++j) {
+				free(argv[j]);
+			}
+			return;
+		}
+	}
+
 	size_t max_argc = 0;
 	for (size_t i = 0; i < ctx->argc; ++i) {
 		if (i > 0) {
@@ -157,9 +170,9 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 
 		if (args[i]) {
 			max_argc = i + 1;
-			cfprintf(ctx->cerr, "${bld}%s${rs}", ctx->argv[i]);
+			cfprintf(ctx->cerr, "${bld}%s${rs}", argv[i]);
 		} else {
-			cfprintf(ctx->cerr, "%s", ctx->argv[i]);
+			cfprintf(ctx->cerr, "%s", argv[i]);
 		}
 	}
 
@@ -188,7 +201,7 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 			}
 		}
 
-		size_t len = xstrwidth(ctx->argv[i]);
+		size_t len = xstrwidth(argv[i]);
 		for (size_t j = 0; j < len; ++j) {
 			if (args[i]) {
 				cfprintf(ctx->cerr, "~");
@@ -203,6 +216,10 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 	}
 
 	cfprintf(ctx->cerr, "\n");
+
+	for (size_t i = 0; i < ctx->argc; ++i) {
+		free(argv[i]);
+	}
 }
 
 void bfs_argv_error(const struct bfs_ctx *ctx, const bool *args) {
