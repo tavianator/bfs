@@ -1225,10 +1225,6 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 		return ret;
 	}
 
-	if (!bfs_expr_is_parent(expr) && !expr->pure) {
-		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
-	}
-
 	expr = optimize_expr_lookup(state, expr);
 	if (!expr) {
 		return NULL;
@@ -1247,6 +1243,8 @@ static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct 
 				expr->ephemeral_fds = lhs->ephemeral_fds;
 			}
 		}
+	} else if (!expr->pure) {
+		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
 	}
 
 	if (expr->always_true) {
