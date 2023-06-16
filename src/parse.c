@@ -646,19 +646,19 @@ static const char *parse_int(const struct parser_state *state, char **arg, const
 
 bad:
 	if (!(flags & IF_QUIET)) {
-		parse_argv_error(state, arg, 1, "${bld}%s${rs} is not a valid integer.\n", str);
+		parse_argv_error(state, arg, 1, "${bld}%pq${rs} is not a valid integer.\n", str);
 	}
 	return NULL;
 
 negative:
 	if (!(flags & IF_QUIET)) {
-		parse_argv_error(state, arg, 1, "Negative integer ${bld}%s${rs} is not allowed here.\n", str);
+		parse_argv_error(state, arg, 1, "Negative integer ${bld}%pq${rs} is not allowed here.\n", str);
 	}
 	return NULL;
 
 range:
 	if (!(flags & IF_QUIET)) {
-		parse_argv_error(state, arg, 1, "${bld}%s${rs} is too large an integer.\n", str);
+		parse_argv_error(state, arg, 1, "${bld}%pq${rs} is too large an integer.\n", str);
 	}
 	return NULL;
 }
@@ -1823,7 +1823,7 @@ static int parse_reftime(const struct parser_state *state, struct bfs_expr *expr
 static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int arg2) {
 	const char *arg = state->argv[0];
 	if (strlen(arg) != 8) {
-		parse_error(state, "Expected ${blu}-newer${bld}XY${rs}; found ${blu}-newer${bld}%s${rs}.\n", arg + 6);
+		parse_error(state, "Expected ${blu}-newer${bld}XY${rs}; found ${blu}-newer${bld}%pq${rs}.\n", arg + 6);
 		return NULL;
 	}
 
@@ -2495,7 +2495,7 @@ static struct bfs_expr *parse_size(struct parser_state *state, int arg1, int arg
 	return expr;
 
 bad_unit:
-	parse_expr_error(state, expr, "Expected a size unit (one of ${bld}cwbkMGTP${rs}); found ${err}%s${rs}.\n", unit);
+	parse_expr_error(state, expr, "Expected a size unit (one of ${bld}cwbkMGTP${rs}); found ${err}%pq${rs}.\n", unit);
 fail:
 	bfs_expr_free(expr);
 	return NULL;
@@ -3600,7 +3600,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
 			cfprintf(cerr, " ${cyn}-f${rs}");
 		}
-		cfprintf(cerr, " ${mag}%s${rs}", path);
+		cfprintf(cerr, " ${mag}%pq${rs}", path);
 	}
 
 	if (ctx->cout->colors) {
