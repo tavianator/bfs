@@ -544,3 +544,49 @@ size_t xstrwidth(const char *str) {
 
 	return ret;
 }
+
+char *wordesc(const char *str) {
+	size_t len = strlen(str);
+
+	if (strcspn(str, "|&;<>()$`\\\"' \t\n*?[#˜=%") == len) {
+		// Whole string is safe
+		// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
+		if (len > 0) {
+			return strdup(str);
+		} else {
+			return strdup("\"\"");
+		}
+	} else if (strcspn(str, "`$\\\"") == len) {
+		// Safe to double-quote the whole string
+		// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
+		char *ret = malloc(len + 3);
+		if (!ret) {
+			return NULL;
+		}
+
+		char *cur = stpcpy(ret, "\"");
+		cur = stpcpy(cur, str);
+		cur = stpcpy(cur, "\"");
+		return ret;
+	}
+
+	// Every ' is replaced with '\'', so at most a 3x growth
+	char *ret = malloc(3 * len + 3);
+	if (!ret) {
+		return NULL;
+	}
+
+	char *cur = stpcpy(ret, "'");
+	while (*str) {
+		size_t chunk = strcspn(str, "'");
+		cur = stpncpy(cur, str, chunk);
+		str += chunk;
+		if (*str) {
+			cur = stpcpy(cur, "'\\''");
+			++str;
+		}
+	}
+	cur = stpcpy(cur, "'");
+
+	return ret;
+}

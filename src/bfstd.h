@@ -277,4 +277,17 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
  */
 size_t xstrwidth(const char *str);
 
+// #include <wordexp.h>
+
+/**
+ * Escape a string as a single shell word.
+ *
+ * @param str
+ *         The string to escape.
+ * @return
+ *         A string that a shell would evaluate to str, dynamically allocated,
+ *         or NULL on failure.
+ */
+char *wordesc(const char *str);
+
 #endif // BFS_BFSTD_H
