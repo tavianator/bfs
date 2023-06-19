@@ -266,6 +266,9 @@ struct ioq {
 	/** The current size of the queue. */
 	size_t size;
 
+	/** ioq_cmd command arena. */
+	struct arena cmds;
+
 	/** Pending I/O requests. */
 	struct ioqq *pending;
 	/** Ready I/O responses. */
@@ -311,6 +314,7 @@ struct ioq *ioq_create(size_t depth, size_t nthreads) {
 	}
 
 	ioq->depth = depth;
+	ARENA_INIT(&ioq->cmds, union ioq_cmd);
 
 	ioq->pending = ioqq_create(depth);
 	if (!ioq->pending) {
@@ -345,7 +349,7 @@ int ioq_opendir(struct ioq *ioq, int dfd, const char *path, void *ptr) {
 		return -1;
 	}
 
-	union ioq_cmd *cmd = ALLOC(union ioq_cmd);
+	union ioq_cmd *cmd = arena_alloc(&ioq->cmds);
 	if (!cmd) {
 		return -1;
 	}
@@ -385,8 +389,7 @@ struct ioq_res *ioq_trypop(struct ioq *ioq) {
 }
 
 void ioq_free(struct ioq *ioq, struct ioq_res *res) {
-	union ioq_cmd *cmd = (union ioq_cmd *)res;
-	free(cmd);
+	arena_free(&ioq->cmds, (union ioq_cmd *)res);
 }
 
 void ioq_destroy(struct ioq *ioq) {
@@ -406,6 +409,8 @@ void ioq_destroy(struct ioq *ioq) {
 
 	ioqq_destroy(ioq->ready);
 	ioqq_destroy(ioq->pending);
+
+	arena_destroy(&ioq->cmds);
 
 	free(ioq);
 }
