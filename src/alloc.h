@@ -190,4 +190,96 @@ void arena_free(struct arena *arena, void *ptr);
  */
 void arena_destroy(struct arena *arena);
 
+/**
+ * An arena allocator for flexibly-sized types.
+ */
+struct varena {
+	/** The alignment of the struct. */
+	size_t align;
+	/** The offset of the flexible array. */
+	size_t offset;
+	/** The size of the flexible array elements. */
+	size_t size;
+	/** Shift amount for the smallest size class. */
+	size_t shift;
+	/** The number of arenas of different sizes. */
+	size_t narenas;
+	/** The array of differently-sized arenas. */
+	struct arena *arenas;
+};
+
+/**
+ * Initialize a varena for a struct with the given layout.
+ *
+ * @param varena
+ *         The varena to initialize.
+ * @param align
+ *         alignof(type)
+ * @param min
+ *         sizeof(type)
+ * @param offset
+ *         offsetof(type, flexible_array)
+ * @param size
+ *         sizeof(flexible_array[i])
+ */
+void varena_init(struct varena *varena, size_t align, size_t min, size_t offset, size_t size);
+
+/**
+ * Initialize a varena for the given type and flexible array.
+ *
+ * @param varena
+ *         The varena to initialize.
+ * @param type
+ *         A struct type containing a flexible array.
+ * @param member
+ *         The name of the flexible array member.
+ */
+#define VARENA_INIT(varena, type, member) \
+	varena_init(varena, alignof(type), sizeof(type), offsetof(type, member), sizeof_member(type, member[0]))
+
+/**
+ * Arena-allocate a flexible struct.
+ *
+ * @param varena
+ *         The varena to allocate from.
+ * @param count
+ *         The length of the flexible array.
+ * @return
+ *         The allocated struct, or NULL on failure.
+ */
+void *varena_alloc(struct varena *varena, size_t count);
+
+/**
+ * Resize a flexible struct.
+ *
+ * @param varena
+ *         The varena to allocate from.
+ * @param ptr
+ *         The object to resize.
+ * @param old_count
+ *         The old array lenth.
+ * @param new_count
+ *         The new array length.
+ * @return
+ *         The resized struct, or NULL on failure.
+ */
+void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t new_count);
+
+/**
+ * Free an arena-allocated flexible struct.
+ *
+ * @param varena
+ *         The that allocated the object.
+ * @param ptr
+ *         The object to free.
+ * @param count
+ *         The length of the flexible array.
+ */
+void varena_free(struct varena *varena, void *ptr, size_t count);
+
+/**
+ * Destroy a varena, freeing all allocations.
+ */
+void varena_destroy(struct varena *varena);
+
 #endif // BFS_ALLOC_H
