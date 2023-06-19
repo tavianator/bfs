@@ -73,9 +73,14 @@
 #define sanitize_uninit(...) SANITIZE_CALL(__msan_allocated_memory, __VA_ARGS__)
 
 #else
-#  define sanitize_init(...) ((void)0)
-#  define sanitize_uninit(...) ((void)0)
+#  define sanitize_init(...) SANITIZE_CALL(sanitize_ignore, __VA_ARGS__)
+#  define sanitize_uninit(...) SANITIZE_CALL(sanitize_ignore, __VA_ARGS__)
 #endif
+
+/**
+ * Squelch unused variable warnings when not sanitizing.
+ */
+#define sanitize_ignore(ptr, size) ((void)(ptr), (void)(size))
 
 /**
  * Initialize a variable, unless sanitizers would detect uninitialized uses.
