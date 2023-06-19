@@ -24,17 +24,6 @@ static void check_base_dir(const char *path, const char *dir, const char *base) 
 }
 
 int main(void) {
-	// Check flex_sizeof()
-	struct flexible {
-		alignas(64) int foo;
-		int bar[];
-	};
-	bfs_verify(flex_sizeof(struct flexible, bar, 0) >= sizeof(struct flexible));
-	bfs_verify(flex_sizeof(struct flexible, bar, 16) % alignof(struct flexible) == 0);
-	bfs_verify(flex_sizeof(struct flexible, bar, SIZE_MAX / sizeof(int) + 1)
-	           == align_floor(alignof(struct flexible), SIZE_MAX));
-	bfs_verify(flex_sizeof_impl(8, 16, 4, 4, 1) == 16);
-
 	// From man 3p basename
 	check_base_dir("usr", ".", "usr");
 	check_base_dir("usr/", ".", "usr");
@@ -46,4 +35,6 @@ int main(void) {
 	check_base_dir("/usr/lib", "/usr", "lib");
 	check_base_dir("//usr//lib//", "//usr", "lib");
 	check_base_dir("/home//dwc//test", "/home//dwc", "test");
+
+	return EXIT_SUCCESS;
 }

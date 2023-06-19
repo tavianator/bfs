@@ -143,19 +143,6 @@ char *xgetdelim(FILE *file, char delim) {
 	}
 }
 
-void *xmemalign(size_t align, size_t size) {
-	bfs_assert(has_single_bit(align));
-	bfs_assert((size & (align - 1)) == 0);
-
-#if __APPLE__
-	void *ptr = NULL;
-	errno = posix_memalign(&ptr, align, size);
-	return ptr;
-#else
-	return aligned_alloc(align, size);
-#endif
-}
-
 /** Compile and execute a regular expression for xrpmatch(). */
 static int xrpregex(nl_item item, const char *response) {
 	const char *pattern = nl_langinfo(item);

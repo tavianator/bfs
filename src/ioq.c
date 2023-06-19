@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "ioq.h"
+#include "alloc.h"
 #include "atomic.h"
 #include "bfstd.h"
 #include "bit.h"
@@ -114,7 +115,7 @@ static struct ioqq *ioqq_create(size_t size) {
 	// Circular buffer size must be a power of two
 	size = bit_ceil(size);
 
-	struct ioqq *ioqq = xmemalign(alignof(struct ioqq), flex_sizeof(struct ioqq, slots, size));
+	struct ioqq *ioqq = ALLOC_FLEX(struct ioqq, slots, size);
 	if (!ioqq) {
 		return NULL;
 	}
@@ -124,7 +125,7 @@ static struct ioqq *ioqq_create(size_t size) {
 
 	// Use a pool of monitors
 	size_t nmonitors = size < 64 ? size : 64;
-	ioqq->monitors = xmemalign(alignof(struct ioq_monitor), nmonitors * sizeof(struct ioq_monitor));
+	ioqq->monitors = ALLOC_ARRAY(struct ioq_monitor, nmonitors);
 	if (!ioqq->monitors) {
 		ioqq_destroy(ioqq);
 		return NULL;
@@ -273,7 +274,7 @@ struct ioq {
 	/** The number of background threads. */
 	size_t nthreads;
 	/** The background threads themselves. */
-	pthread_t *threads;
+	pthread_t threads[];
 };
 
 /** Background thread entry point. */
@@ -303,18 +304,13 @@ static void *ioq_work(void *ptr) {
 	return NULL;
 }
 
-struct ioq *ioq_create(size_t depth, size_t threads) {
-	struct ioq *ioq = malloc(sizeof(*ioq));
+struct ioq *ioq_create(size_t depth, size_t nthreads) {
+	struct ioq *ioq = ZALLOC_FLEX(struct ioq, threads, nthreads);
 	if (!ioq) {
 		goto fail;
 	}
 
 	ioq->depth = depth;
-	ioq->size = 0;
-
-	ioq->pending = NULL;
-	ioq->ready = NULL;
-	ioq->nthreads = 0;
 
 	ioq->pending = ioqq_create(depth);
 	if (!ioq->pending) {
@@ -326,12 +322,7 @@ struct ioq *ioq_create(size_t depth, size_t threads) {
 		goto fail;
 	}
 
-	ioq->threads = malloc(threads * sizeof(ioq->threads[0]));
-	if (!ioq->threads) {
-		goto fail;
-	}
-
-	for (size_t i = 0; i < threads; ++i) {
+	for (size_t i = 0; i < nthreads; ++i) {
 		errno = pthread_create(&ioq->threads[i], NULL, ioq_work, ioq);
 		if (errno != 0) {
 			goto fail;
@@ -354,7 +345,7 @@ int ioq_opendir(struct ioq *ioq, int dfd, const char *path, void *ptr) {
 		return -1;
 	}
 
-	union ioq_cmd *cmd = malloc(sizeof(*cmd));
+	union ioq_cmd *cmd = ALLOC(union ioq_cmd);
 	if (!cmd) {
 		return -1;
 	}
@@ -412,7 +403,6 @@ void ioq_destroy(struct ioq *ioq) {
 			abort();
 		}
 	}
-	free(ioq->threads);
 
 	ioqq_destroy(ioq->ready);
 	ioqq_destroy(ioq->pending);

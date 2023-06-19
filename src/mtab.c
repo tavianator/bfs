@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "mtab.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "config.h"
 #include "darray.h"
@@ -87,15 +88,13 @@ fail:
 }
 
 struct bfs_mtab *bfs_mtab_parse(void) {
-	struct bfs_mtab *mtab = malloc(sizeof(*mtab));
+	struct bfs_mtab *mtab = ZALLOC(struct bfs_mtab);
 	if (!mtab) {
 		return NULL;
 	}
 
-	mtab->entries = NULL;
 	trie_init(&mtab->names);
 	trie_init(&mtab->types);
-	mtab->types_filled = false;
 
 	int error = 0;
 

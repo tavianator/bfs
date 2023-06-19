@@ -142,56 +142,6 @@
 #define countof(array) (sizeof(array) / sizeof(0[array]))
 
 /**
- * Round down to a multiple of an alignment.
- */
-static inline size_t align_floor(size_t align, size_t size) {
-	return size & ~(align - 1);
-}
-
-/**
- * Round up to a multiple of an alignment.
- */
-static inline size_t align_ceil(size_t align, size_t size) {
-	return align_floor(align, size + align - 1);
-}
-
-/**
- * Computes the size of a struct containing a flexible array member of the given
- * length.
- *
- * @param type
- *         The type of the struct containing the flexible array.
- * @param member
- *         The name of the flexible array member.
- * @param count
- *         The length of the flexible array.
- */
-#define flex_sizeof(type, member, count) \
-	flex_sizeof_impl(alignof(type), sizeof(type), offsetof(type, member), sizeof(((type *)NULL)->member[0]), count)
-
-static inline size_t flex_sizeof_impl(size_t align, size_t min, size_t offset, size_t size, size_t count) {
-	size_t ret = size * count;
-	size_t overflow = ret / size != count;
-
-	ret += offset;
-	overflow |= ret < offset;
-
-	size_t mask = align - 1;
-	ret += mask;
-	overflow |= ret < mask;
-	ret |= -overflow;
-	ret &= ~mask;
-
-	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
-	// type has more padding than necessary for alignment
-	if (min > align_ceil(align, offset) && ret < min) {
-		ret = min;
-	}
-
-	return ret;
-}
-
-/**
  * False sharing/destructive interference/largest cache line size.
  */
 #ifdef __GCC_DESTRUCTIVE_SIZE

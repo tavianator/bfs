@@ -82,6 +82,7 @@
  */
 
 #include "trie.h"
+#include "alloc.h"
 #include "bit.h"
 #include "config.h"
 #include "diag.h"
@@ -317,7 +318,7 @@ struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
 
 /** Create a new leaf, holding a copy of the given key. */
 static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, size_t length) {
-	struct trie_leaf *leaf = malloc(flex_sizeof(struct trie_leaf, key, length));
+	struct trie_leaf *leaf = ALLOC_FLEX(struct trie_leaf, key, length);
 	if (!leaf) {
 		return NULL;
 	}
@@ -339,12 +340,10 @@ static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
 
 /** Compute the size of a trie node with a certain number of children. */
 static size_t trie_node_size(unsigned int size) {
-	// Empty nodes aren't supported
-	bfs_assert(size > 0);
 	// Node size must be a power of two
 	bfs_assert(has_single_bit(size));
 
-	return flex_sizeof(struct trie_node, children, size);
+	return sizeof_flex(struct trie_node, children, size);
 }
 
 #if ENDIAN_NATIVE == ENDIAN_LITTLE

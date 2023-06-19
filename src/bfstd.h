@@ -106,18 +106,6 @@ char *xgetdelim(FILE *file, char delim);
 // #include <stdlib.h>
 
 /**
- * Portable version of aligned_alloc()/posix_memalign().
- *
- * @param align
- *         The allocation's alignment.
- * @param size
- *         The allocation's size.
- * @return
- *         The allocation, or NULL on failure.
- */
-void *xmemalign(size_t align, size_t size);
-
-/**
  * Process a yes/no prompt.
  *
  * @return 1 for yes, 0 for no, and -1 for unknown.

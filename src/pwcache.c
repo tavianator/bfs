@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "pwcache.h"
+#include "alloc.h"
 #include "config.h"
 #include "darray.h"
 #include "trie.h"
@@ -71,7 +72,7 @@ struct bfs_users {
 };
 
 struct bfs_users *bfs_users_new(void) {
-	struct bfs_users *users = malloc(sizeof(*users));
+	struct bfs_users *users = ALLOC(struct bfs_users);
 	if (!users) {
 		return NULL;
 	}
@@ -144,7 +145,7 @@ struct bfs_groups {
 };
 
 struct bfs_groups *bfs_groups_new(void) {
-	struct bfs_groups *groups = malloc(sizeof(*groups));
+	struct bfs_groups *groups = ALLOC(struct bfs_groups);
 	if (!groups) {
 		return NULL;
 	}

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "xspawn.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "config.h"
 #include "list.h"
@@ -62,7 +63,7 @@ int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags) {
 
 /** Add a spawn action to the chain. */
 static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_spawn_op op) {
-	struct bfs_spawn_action *action = malloc(sizeof(*action));
+	struct bfs_spawn_action *action = ALLOC(struct bfs_spawn_action);
 	if (!action) {
 		return NULL;
 	}

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "exec.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "ctx.h"
@@ -124,26 +125,16 @@ static void bfs_exec_parse_error(const struct bfs_ctx *ctx, const struct bfs_exe
 }
 
 struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs_exec_flags flags) {
-	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
+	struct bfs_exec *execbuf = ZALLOC(struct bfs_exec);
 	if (!execbuf) {
-		bfs_perror(ctx, "malloc()");
+		bfs_perror(ctx, "zalloc()");
 		goto fail;
 	}
 
 	execbuf->flags = flags;
 	execbuf->ctx = ctx;
 	execbuf->tmpl_argv = argv + 1;
-	execbuf->tmpl_argc = 0;
-	execbuf->argv = NULL;
-	execbuf->argc = 0;
-	execbuf->argv_cap = 0;
-	execbuf->arg_size = 0;
-	execbuf->arg_max = 0;
-	execbuf->arg_min = 0;
 	execbuf->wd_fd = -1;
-	execbuf->wd_path = NULL;
-	execbuf->wd_len = 0;
-	execbuf->ret = 0;
 
 	while (true) {
 		const char *arg = execbuf->tmpl_argv[execbuf->tmpl_argc];
@@ -176,9 +167,9 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 	}
 
 	execbuf->argv_cap = execbuf->tmpl_argc + 1;
-	execbuf->argv = malloc(execbuf->argv_cap*sizeof(*execbuf->argv));
+	execbuf->argv = ALLOC_ARRAY(char *, execbuf->argv_cap);
 	if (!execbuf->argv) {
-		bfs_perror(ctx, "malloc()");
+		bfs_perror(ctx, "alloc()");
 		goto fail;
 	}
 
@@ -224,9 +215,8 @@ static char *bfs_exec_format_path(const struct bfs_exec *execbuf, const struct B
 		return NULL;
 	}
 
-	strcpy(path, "./");
-	strcpy(path + 2, name);
-
+	char *cur = stpcpy(path, "./");
+	cur = stpcpy(cur, name);
 	return path;
 }
 
@@ -612,7 +602,7 @@ static int bfs_exec_push(struct bfs_exec *execbuf, char *arg) {
 
 	if (execbuf->argc + 1 >= execbuf->argv_cap) {
 		size_t cap = 2*execbuf->argv_cap;
-		char **argv = realloc(execbuf->argv, cap*sizeof(*argv));
+		char **argv = realloc(execbuf->argv, sizeof_array(char *, cap));
 		if (!argv) {
 			return -1;
 		}

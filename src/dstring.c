@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "dstring.h"
+#include "alloc.h"
 #include "diag.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -24,7 +25,7 @@ static struct dstring *dstrheader(const char *dstr) {
 
 /** Get the correct size for a dstring with the given capacity. */
 static size_t dstrsize(size_t capacity) {
-	return flex_sizeof(struct dstring, data, capacity + 1);
+	return sizeof_flex(struct dstring, data, capacity + 1);
 }
 
 /** Allocate a dstring with the given contents. */

@@ -9,6 +9,7 @@
  */
 
 #include "parse.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -55,39 +56,16 @@ static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
 
 struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
-	struct bfs_expr *expr = malloc(sizeof(*expr));
+	struct bfs_expr *expr = ZALLOC(struct bfs_expr);
 	if (!expr) {
-		perror("malloc()");
+		perror("zalloc()");
 		return NULL;
 	}
 
 	expr->eval_fn = eval_fn;
 	expr->argc = argc;
 	expr->argv = argv;
-	expr->persistent_fds = 0;
-	expr->ephemeral_fds = 0;
-	expr->pure = false;
-	expr->always_true = false;
-	expr->always_false = false;
-	expr->cost = 0.0;
 	expr->probability = 0.5;
-	expr->evaluations = 0;
-	expr->successes = 0;
-	expr->elapsed.tv_sec = 0;
-	expr->elapsed.tv_nsec = 0;
-
-	// Prevent bfs_expr_free() from freeing uninitialized pointers on error paths
-	if (bfs_expr_is_parent(expr)) {
-		expr->lhs = NULL;
-		expr->rhs = NULL;
-	} else if (eval_fn == eval_exec) {
-		expr->exec = NULL;
-	} else if (eval_fn == eval_fprintf) {
-		expr->printf = NULL;
-	} else if (eval_fn == eval_regex) {
-		expr->regex = NULL;
-	}
-
 	return expr;
 }
 

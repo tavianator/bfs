@@ -17,6 +17,7 @@
  */
 
 #include "bftw.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "config.h"
 #include "diag.h"
@@ -241,9 +242,7 @@ static void bftw_cache_destroy(struct bftw_cache *cache) {
 /** Create a new bftw_file. */
 static struct bftw_file *bftw_file_new(struct bftw_file *parent, const char *name) {
 	size_t namelen = strlen(name);
-	size_t size = flex_sizeof(struct bftw_file, name, namelen + 1);
-
-	struct bftw_file *file = malloc(size);
+	struct bftw_file *file = ALLOC_FLEX(struct bftw_file, name, namelen + 1);
 	if (!file) {
 		return NULL;
 	}

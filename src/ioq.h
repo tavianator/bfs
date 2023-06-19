@@ -33,12 +33,12 @@ struct ioq_res {
  *
  * @param depth
  *         The maximum depth of the queue.
- * @param threads
+ * @param nthreads
  *         The maximum number of background threads.
  * @return
  *         The new I/O queue, or NULL on failure.
  */
-struct ioq *ioq_create(size_t depth, size_t threads);
+struct ioq *ioq_create(size_t depth, size_t nthreads);
 
 /**
  * Asynchronous bfs_opendir().

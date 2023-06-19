@@ -20,6 +20,7 @@
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
+ *     - alloc.[ch]    (memory allocation)
  *     - atomic.h      (atomic operations)
  *     - bar.[ch]      (a terminal status bar)
  *     - bit.h         (bit manipulation)

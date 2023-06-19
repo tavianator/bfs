@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "color.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "config.h"
@@ -404,7 +405,7 @@ static void parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
 }
 
 struct colors *parse_colors(void) {
-	struct colors *colors = malloc(sizeof(struct colors));
+	struct colors *colors = ALLOC(struct colors);
 	if (!colors) {
 		return NULL;
 	}
@@ -497,7 +498,7 @@ void free_colors(struct colors *colors) {
 }
 
 CFILE *cfwrap(FILE *file, const struct colors *colors, bool close) {
-	CFILE *cfile = malloc(sizeof(*cfile));
+	CFILE *cfile = ALLOC(CFILE);
 	if (!cfile) {
 		return NULL;
 	}

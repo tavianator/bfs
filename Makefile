@@ -217,6 +217,7 @@ $(OBJ)/FLAGS: $(OBJ)/FLAGS.new
 
 # All object files except the entry point
 LIBBFS := \
+    $(OBJ)/src/alloc.o \
     $(OBJ)/src/bar.o \
     $(OBJ)/src/bfstd.o \
     $(OBJ)/src/bftw.o \
@@ -246,7 +247,7 @@ LIBBFS := \
 $(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
 
 # Standalone unit tests
-UNITS := bfstd bit trie xtimegm
+UNITS := alloc bfstd bit trie xtimegm
 UNIT_TESTS := $(UNITS:%=$(BIN)/tests/%)
 UNIT_CHECKS := $(UNITS:%=check-%)
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "ctx.h"
+#include "alloc.h"
 #include "color.h"
 #include "darray.h"
 #include "diag.h"
@@ -42,43 +43,17 @@ const char *debug_flag_name(enum debug_flags flag) {
 }
 
 struct bfs_ctx *bfs_ctx_new(void) {
-	struct bfs_ctx *ctx = malloc(sizeof(*ctx));
+	struct bfs_ctx *ctx = ZALLOC(struct bfs_ctx);
 	if (!ctx) {
 		return NULL;
 	}
 
-	ctx->argv = NULL;
-	ctx->paths = NULL;
-	ctx->expr = NULL;
-	ctx->exclude = NULL;
-
-	ctx->mindepth = 0;
 	ctx->maxdepth = INT_MAX;
 	ctx->flags = BFTW_RECOVER;
 	ctx->strategy = BFTW_BFS;
-	ctx->threads = 0;
 	ctx->optlevel = 3;
-	ctx->debug = 0;
-	ctx->ignore_races = false;
-	ctx->posixly_correct = false;
-	ctx->status = false;
-	ctx->unique = false;
-	ctx->warn = false;
-	ctx->xargs_safe = false;
-
-	ctx->colors = NULL;
-	ctx->colors_error = 0;
-	ctx->cout = NULL;
-	ctx->cerr = NULL;
-
-	ctx->users = NULL;
-	ctx->groups = NULL;
-
-	ctx->mtab = NULL;
-	ctx->mtab_error = 0;
 
 	trie_init(&ctx->files);
-	ctx->nfiles = 0;
 
 	struct rlimit rl;
 	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
@@ -155,7 +130,7 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 		return ctx_file->cfile;
 	}
 
-	leaf->value = ctx_file = malloc(sizeof(*ctx_file));
+	leaf->value = ctx_file = ALLOC(struct bfs_ctx_file);
 	if (!ctx_file) {
 		trie_remove(&ctx->files, leaf);
 		return NULL;

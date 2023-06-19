@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "xregex.h"
+#include "alloc.h"
 #include "config.h"
 #include "diag.h"
 #include "sanity.h"
@@ -115,7 +116,7 @@ static int bfs_onig_initialize(OnigEncoding *enc) {
 #endif
 
 int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_type type, enum bfs_regcomp_flags flags) {
-	struct bfs_regex *regex = *preg = malloc(sizeof(*regex));
+	struct bfs_regex *regex = *preg = ALLOC(struct bfs_regex);
 	if (!regex) {
 		return -1;
 	}
