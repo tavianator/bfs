@@ -146,4 +146,48 @@ void *zalloc(size_t align, size_t size);
 #define ZALLOC_FLEX(type, member, count) \
 	(type *)zalloc(alignof(type), sizeof_flex(type, member, count))
 
+/**
+ * An arena allocator for fixed-size types.
+ *
+ * Arena allocators are intentionally not thread safe.
+ */
+struct arena {
+	/** The list of free chunks. */
+	void *chunks;
+	/** The number of allocated slabs. */
+	size_t nslabs;
+	/** The array of slabs. */
+	void **slabs;
+	/** Chunk alignment. */
+	size_t align;
+	/** Chunk size. */
+	size_t size;
+};
+
+/**
+ * Initialize an arena for chunks of the given size and alignment.
+ */
+void arena_init(struct arena *arena, size_t align, size_t size);
+
+/**
+ * Initialize an arena for the given type.
+ */
+#define ARENA_INIT(arena, type) \
+	arena_init((arena), alignof(type), sizeof(type))
+
+/**
+ * Allocate an object out of the arena.
+ */
+void *arena_alloc(struct arena *arena);
+
+/**
+ * Free an object from the arena.
+ */
+void arena_free(struct arena *arena, void *ptr);
+
+/**
+ * Destroy an arena, freeing all allocations.
+ */
+void arena_destroy(struct arena *arena);
+
 #endif // BFS_ALLOC_H
