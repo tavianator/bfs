@@ -5,6 +5,7 @@
 #define BFS_TRIE_H
 
 #include "config.h"
+#include "alloc.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -30,6 +31,10 @@ struct trie {
 	uintptr_t root;
 	/** Linked list of leaves. */
 	struct trie_leaf *head, *tail;
+	/** Node allocator. */
+	struct varena nodes;
+	/** Leaf allocator. */
+	struct varena leaves;
 };
 
 /**

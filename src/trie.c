@@ -166,6 +166,8 @@ static uintptr_t trie_encode_node(const struct trie_node *node) {
 void trie_init(struct trie *trie) {
 	trie->root = 0;
 	LIST_INIT(trie);
+	VARENA_INIT(&trie->nodes, struct trie_node, children);
+	VARENA_INIT(&trie->leaves, struct trie_leaf, key);
 }
 
 /** Extract the nibble at a certain offset from a byte sequence. */
@@ -318,7 +320,7 @@ struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
 
 /** Create a new leaf, holding a copy of the given key. */
 static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, size_t length) {
-	struct trie_leaf *leaf = ALLOC_FLEX(struct trie_leaf, key, length);
+	struct trie_leaf *leaf = varena_alloc(&trie->leaves, length);
 	if (!leaf) {
 		return NULL;
 	}
@@ -335,15 +337,26 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 /** Free a leaf. */
 static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
 	LIST_REMOVE(trie, leaf);
-	free(leaf);
+	varena_free(&trie->leaves, leaf, leaf->length);
 }
 
-/** Compute the size of a trie node with a certain number of children. */
-static size_t trie_node_size(unsigned int size) {
-	// Node size must be a power of two
+/** Create a new node. */
+static struct trie_node *trie_node_alloc(struct trie *trie, size_t size) {
 	bfs_assert(has_single_bit(size));
+	return varena_alloc(&trie->nodes, size);
+}
 
-	return sizeof_flex(struct trie_node, children, size);
+/** Reallocate a trie node. */
+static struct trie_node *trie_node_realloc(struct trie *trie, struct trie_node *node, size_t old_size, size_t new_size) {
+	bfs_assert(has_single_bit(old_size));
+	bfs_assert(has_single_bit(new_size));
+	return varena_realloc(&trie->nodes, node, old_size, new_size);
+}
+
+/** Free a node. */
+static void trie_node_free(struct trie *trie, struct trie_node *node, size_t size) {
+	bfs_assert(size == (size_t)count_ones(node->bitmap));
+	varena_free(&trie->nodes, node, size);
 }
 
 #if ENDIAN_NATIVE == ENDIAN_LITTLE
@@ -422,7 +435,7 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
 
 	// Double the capacity every power of two
 	if (has_single_bit(size)) {
-		node = realloc(node, trie_node_size(2 * size));
+		node = trie_node_realloc(trie, node, size, 2 * size);
 		if (!node) {
 			trie_leaf_free(trie, leaf);
 			return NULL;
@@ -469,12 +482,12 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
  *           | Y
  *           +--->key
  */
-static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
+static uintptr_t *trie_jump(struct trie *trie, uintptr_t *ptr, const char *key, size_t *offset) {
 	// We only ever need to jump to leaf nodes, since internal nodes are
 	// guaranteed to be within OFFSET_MAX anyway
 	bfs_assert(trie_is_leaf(*ptr));
 
-	struct trie_node *node = malloc(trie_node_size(1));
+	struct trie_node *node = trie_node_alloc(trie, 1);
 	if (!node) {
 		return NULL;
 	}
@@ -512,7 +525,7 @@ static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, struct tr
 	unsigned char rep_nibble = trie_key_nibble(rep->key, mismatch);
 	bfs_assert(key_nibble != rep_nibble);
 
-	struct trie_node *node = malloc(trie_node_size(2));
+	struct trie_node *node = trie_node_alloc(trie, 2);
 	if (!node) {
 		trie_leaf_free(trie, leaf);
 		return NULL;
@@ -578,7 +591,7 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 	}
 
 	while (mismatch - offset > OFFSET_MAX) {
-		ptr = trie_jump(ptr, key, &offset);
+		ptr = trie_jump(trie, ptr, key, &offset);
 		if (!ptr) {
 			trie_leaf_free(trie, leaf);
 			return NULL;
@@ -601,7 +614,7 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
 		bfs_assert(has_single_bit(node->bitmap));
 
 		ptr = node->children[0];
-		free(node);
+		trie_node_free(trie, node, 1);
 	}
 
 	trie_leaf_free(trie, trie_decode_leaf(ptr));
@@ -624,7 +637,7 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
  *       v
  *     other
  */
-static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, unsigned int child_index) {
+static int trie_collapse_node(struct trie *trie, uintptr_t *parent, struct trie_node *parent_node, unsigned int child_index) {
 	uintptr_t other = parent_node->children[child_index ^ 1];
 	if (!trie_is_leaf(other)) {
 		struct trie_node *other_node = trie_decode_node(other);
@@ -636,7 +649,7 @@ static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, 
 	}
 
 	*parent = other;
-	free(parent_node);
+	trie_node_free(trie, parent_node, 1);
 	return 0;
 }
 
@@ -682,7 +695,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	node->bitmap ^= child_bit;
 	unsigned int parent_size = count_ones(node->bitmap);
 	bfs_assert(parent_size > 0);
-	if (parent_size == 1 && trie_collapse_node(parent, node, child_index) == 0) {
+	if (parent_size == 1 && trie_collapse_node(trie, parent, node, child_index) == 0) {
 		return;
 	}
 
@@ -691,7 +704,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	}
 
 	if (has_single_bit(parent_size)) {
-		node = realloc(node, trie_node_size(parent_size));
+		node = trie_node_realloc(trie, node, 2 * parent_size, parent_size);
 		if (node) {
 			*parent = trie_encode_node(node);
 		}
@@ -702,23 +715,7 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 	trie_remove_impl(trie, leaf);
 }
 
-/** Free an encoded pointer to a node. */
-TARGET_CLONES_POPCNT
-static void free_trie_ptr(uintptr_t ptr) {
-	if (trie_is_leaf(ptr)) {
-		free(trie_decode_leaf(ptr));
-	} else {
-		struct trie_node *node = trie_decode_node(ptr);
-		size_t size = count_ones(node->bitmap);
-		for (size_t i = 0; i < size; ++i) {
-			free_trie_ptr(node->children[i]);
-		}
-		free(node);
-	}
-}
-
 void trie_destroy(struct trie *trie) {
-	if (trie->root) {
-		free_trie_ptr(trie->root);
-	}
+	varena_destroy(&trie->leaves);
+	varena_destroy(&trie->nodes);
 }
