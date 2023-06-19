@@ -127,6 +127,18 @@ int ynprompt(void);
 // #include <string.h>
 
 /**
+ * Allocate a copy of a region of memory.
+ *
+ * @param src
+ *         The memory region to copy.
+ * @param size
+ *         The size of the memory region.
+ * @return
+ *         A copy of the region, allocated with malloc(), or NULL on failure.
+ */
+void *xmemdup(const void *src, size_t size);
+
+/**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
  * @param mode

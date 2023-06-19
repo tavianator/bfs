@@ -243,6 +243,14 @@ static char type_char(mode_t mode) {
 	return '?';
 }
 
+void *xmemdup(const void *src, size_t size) {
+	void *ret = malloc(size);
+	if (ret) {
+		memcpy(ret, src, size);
+	}
+	return ret;
+}
+
 void xstrmode(mode_t mode, char str[11]) {
 	strcpy(str, "----------");
 

@@ -3666,13 +3666,10 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	ctx->argc = argc;
-	ctx->argv = malloc((argc + 1)*sizeof(*ctx->argv));
+	ctx->argv = xmemdup(argv, sizeof_array(char *, argc + 1));
 	if (!ctx->argv) {
-		perror("malloc()");
+		perror("xmemdup()");
 		goto fail;
-	}
-	for (int i = 0; i <= argc; ++i) {
-		ctx->argv[i] = argv[i];
 	}
 
 	enum use_color use_color = COLOR_AUTO;
