@@ -45,6 +45,8 @@ struct ioq *ioq_create(size_t depth, size_t nthreads);
  *
  * @param ioq
  *         The I/O queue.
+ * @param dir
+ *         The allocated directory.
  * @param dfd
  *         The base file descriptor.
  * @param path
@@ -54,7 +56,7 @@ struct ioq *ioq_create(size_t depth, size_t nthreads);
  * @return
  *         0 on success, or -1 on failure.
  */
-int ioq_opendir(struct ioq *ioq, int dfd, const char *path, void *ptr);
+int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, void *ptr);
 
 /**
  * Pop a response from the queue.

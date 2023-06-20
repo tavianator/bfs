@@ -421,10 +421,15 @@ bool eval_empty(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	if (ftwbuf->type == BFS_DIR) {
-		struct bfs_dir *dir = bfs_opendir(ftwbuf->at_fd, ftwbuf->at_path);
+		struct bfs_dir *dir = bfs_allocdir();
 		if (!dir) {
 			eval_report_error(state);
-			goto done;
+			return ret;
+		}
+
+		if (bfs_opendir(dir, ftwbuf->at_fd, ftwbuf->at_path) != 0) {
+			eval_report_error(state);
+			return ret;
 		}
 
 		int did_read = bfs_readdir(dir, NULL);
@@ -435,6 +440,7 @@ bool eval_empty(const struct bfs_expr *expr, struct bfs_eval *state) {
 		}
 
 		bfs_closedir(dir);
+		free(dir);
 	} else if (ftwbuf->type == BFS_REG) {
 		const struct bfs_stat *statbuf = eval_stat(state);
 		if (statbuf) {
@@ -442,7 +448,6 @@ bool eval_empty(const struct bfs_expr *expr, struct bfs_eval *state) {
 		}
 	}
 
-done:
 	return ret;
 }
 
@@ -1495,20 +1500,25 @@ static int infer_fdlimit(const struct bfs_ctx *ctx, int limit) {
 
 	// Check /proc/self/fd for the current number of open fds, if possible
 	// (we may have inherited more than just the standard ones)
-	struct bfs_dir *dir = bfs_opendir(AT_FDCWD, "/proc/self/fd");
+	struct bfs_dir *dir = bfs_allocdir();
 	if (!dir) {
-		dir = bfs_opendir(AT_FDCWD, "/dev/fd");
+		goto done;
 	}
-	if (dir) {
-		// Account for 'dir' itself
-		nopen = -1;
 
-		while (bfs_readdir(dir, NULL) > 0) {
-			++nopen;
-		}
-
-		bfs_closedir(dir);
+	if (bfs_opendir(dir, AT_FDCWD, "/proc/self/fd") != 0
+	    && bfs_opendir(dir, AT_FDCWD, "/dev/fd") != 0) {
+		goto done;
 	}
+
+	// Account for 'dir' itself
+	nopen = -1;
+
+	while (bfs_readdir(dir, NULL) > 0) {
+		++nopen;
+	}
+	bfs_closedir(dir);
+done:
+	free(dir);
 
 	int ret = limit - nopen;
 	ret -= ctx->expr->persistent_fds;

@@ -20,9 +20,11 @@
  * An I/O queue request.
  */
 struct ioq_req {
+	/** Directory allocation. */
+	struct bfs_dir *dir;
 	/** Base file descriptor for openat(). */
 	int dfd;
-	/** Relative path to dfd. */
+	/** Path to open, relative to dfd. */
 	const char *path;
 
 	/** Arbitrary user data. */
@@ -295,10 +297,12 @@ static void *ioq_work(void *ptr) {
 
 		struct ioq_res *res = &cmd->res;
 		res->ptr = req.ptr;
-		res->dir = bfs_opendir(req.dfd, req.path);
-		res->error = errno;
-		if (res->dir) {
+		res->dir = req.dir;
+		res->error = 0;
+		if (bfs_opendir(req.dir, req.dfd, req.path) == 0) {
 			bfs_polldir(res->dir);
+		} else {
+			res->error = errno;
 		}
 
 		ioqq_push(ioq->ready, cmd);
@@ -344,7 +348,7 @@ fail:
 	return NULL;
 }
 
-int ioq_opendir(struct ioq *ioq, int dfd, const char *path, void *ptr) {
+int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, void *ptr) {
 	if (ioq->size >= ioq->depth) {
 		return -1;
 	}
@@ -355,6 +359,7 @@ int ioq_opendir(struct ioq *ioq, int dfd, const char *path, void *ptr) {
 	}
 
 	struct ioq_req *req = &cmd->req;
+	req->dir = dir;
 	req->dfd = dfd;
 	req->path = path;
 	req->ptr = ptr;

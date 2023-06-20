@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "dir.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "config.h"
 #include "diag.h"
@@ -120,26 +121,26 @@ struct bfs_dir {
 #  define DIR_SIZE sizeof(struct bfs_dir)
 #endif
 
-struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
-	struct bfs_dir *dir = malloc(DIR_SIZE);
-	if (!dir) {
-		return NULL;
-	}
+struct bfs_dir *bfs_allocdir(void) {
+	return malloc(DIR_SIZE);
+}
 
+void bfs_dir_arena(struct arena *arena) {
+	arena_init(arena, alignof(struct bfs_dir), DIR_SIZE);
+}
+
+int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path) {
 	int fd;
 	if (at_path) {
 		fd = openat(at_fd, at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+		if (fd < 0) {
+			return -1;
+		}
 	} else if (at_fd >= 0) {
 		fd = at_fd;
 	} else {
-		free(dir);
 		errno = EBADF;
-		return NULL;
-	}
-
-	if (fd < 0) {
-		free(dir);
-		return NULL;
+		return -1;
 	}
 
 #if BFS_GETDENTS
@@ -152,14 +153,13 @@ struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
 		if (at_path) {
 			close_quietly(fd);
 		}
-		free(dir);
-		return NULL;
+		return -1;
 	}
 	dir->de = NULL;
 #endif
 
 	dir->eof = false;
-	return dir;
+	return 0;
 }
 
 int bfs_dirfd(const struct bfs_dir *dir) {
@@ -291,17 +291,16 @@ int bfs_closedir(struct bfs_dir *dir) {
 		bfs_verify(errno != EBADF);
 	}
 #endif
-	free(dir);
+
+	sanitize_uninit(dir, DIR_SIZE);
 	return ret;
 }
 
-int bfs_freedir(struct bfs_dir *dir, bool same_fd) {
+int bfs_fdclosedir(struct bfs_dir *dir, bool same_fd) {
 #if BFS_GETDENTS
 	int ret = dir->fd;
-	free(dir);
 #elif __FreeBSD__
 	int ret = fdclosedir(dir->dir);
-	free(dir);
 #else
 	if (same_fd) {
 		errno = ENOTSUP;
@@ -309,10 +308,13 @@ int bfs_freedir(struct bfs_dir *dir, bool same_fd) {
 	}
 
 	int ret = dup_cloexec(dirfd(dir->dir));
-	if (ret >= 0) {
-		bfs_closedir(dir);
+	if (ret < 0) {
+		return -1;
 	}
+
+	bfs_closedir(dir);
 #endif
 
+	sanitize_uninit(dir, DIR_SIZE);
 	return ret;
 }

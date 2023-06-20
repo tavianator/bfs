@@ -8,6 +8,7 @@
 #ifndef BFS_DIR_H
 #define BFS_DIR_H
 
+#include "alloc.h"
 #include "config.h"
 #include <sys/types.h>
 
@@ -62,17 +63,35 @@ struct bfs_dirent {
 };
 
 /**
+ * Allocate space for a directory.
+ *
+ * @return
+ *         An allocated, unopen directory, or NULL on failure.
+ */
+struct bfs_dir *bfs_allocdir(void);
+
+/**
+ * Initialize an arena for directories.
+ *
+ * @param arena
+ *         The arena to initialize.
+ */
+void bfs_dir_arena(struct arena *arena);
+
+/**
  * Open a directory.
  *
+ * @param dir
+ *         The allocated directory.
  * @param at_fd
  *         The base directory for path resolution.
  * @param at_path
  *         The path of the directory to open, relative to at_fd.  Pass NULL to
  *         open at_fd itself.
  * @return
- *         The opened directory, or NULL on failure.
+ *         0 on success, or -1 on failure.
  */
-struct bfs_dir *bfs_opendir(int at_fd, const char *at_path);
+int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path);
 
 /**
  * Get the file descriptor for a directory.
@@ -110,7 +129,7 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de);
 int bfs_closedir(struct bfs_dir *dir);
 
 /**
- * Free a directory, keeping an open file descriptor to it.
+ * Extract the file descriptor from an open directory.
  *
  * @param dir
  *         The directory to free.
@@ -122,6 +141,6 @@ int bfs_closedir(struct bfs_dir *dir);
  *         On success, a file descriptor for the directory is returned.  On
  *         failure, -1 is returned, and the directory remains open.
  */
-int bfs_freedir(struct bfs_dir *dir, bool same_fd);
+int bfs_fdclosedir(struct bfs_dir *dir, bool same_fd);
 
 #endif // BFS_DIR_H
