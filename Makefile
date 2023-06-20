@@ -197,7 +197,7 @@ all: bfs tests
 $(BIN)/%:
 	@$(MKDIR) $(@D)
 	+$(CC) $(ALL_LDFLAGS) $^ $(ALL_LDLIBS) -o $@
-ifeq ($(OS) $(TSAN),FreeBSD tsan)
+ifeq ($(OS) $(SANITIZE),FreeBSD y)
 	elfctl -e +noaslr $@
 endif
 
