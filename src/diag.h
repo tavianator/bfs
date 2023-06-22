@@ -23,19 +23,35 @@
 #endif
 
 /**
+ * A source code location.
+ */
+struct bfs_loc {
+	const char *file;
+	int line;
+	const char *func;
+};
+
+#define BFS_LOC_INIT { .file = __FILE__, .line = __LINE__, .func = __func__ }
+
+/**
+ * Get the current source code location.
+ */
+#if __STDC_VERSION__ >= 202311L
+#  define bfs_location() (&(static const struct bfs_loc)BFS_LOC_INIT)
+#else
+#  define bfs_location() (&(const struct bfs_loc)BFS_LOC_INIT)
+#endif
+
+/**
  * Print a message to standard error and abort.
  */
-BFS_FORMATTER(1, 2)
-noreturn void bfs_abortf(const char *format, ...);
+BFS_FORMATTER(2, 3)
+noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 
 /**
  * Unconditional abort with a message.
  */
-#define bfs_abort(...) \
-	BFS_ABORT(__VA_ARGS__, "\n")
-
-#define BFS_ABORT(format, ...) \
-	bfs_abortf((format) ? "%s: %s:%d:%s(): " format "%s" : "", BFS_COMMAND, __FILE__, __LINE__, __func__, __VA_ARGS__)
+#define bfs_abort(...) bfs_abortf(bfs_location(), __VA_ARGS__)
 
 /**
  * Abort in debug builds; no-op in release builds.
@@ -46,18 +62,20 @@ noreturn void bfs_abortf(const char *format, ...);
 #  define bfs_bug bfs_abort
 #endif
 
+
+
 /**
  * Unconditional assert.
  */
 #define bfs_verify(...) \
-	BFS_VERIFY(#__VA_ARGS__, __VA_ARGS__, "", "\n")
+	bfs_verify_(#__VA_ARGS__, __VA_ARGS__, "", "")
 
-#define BFS_VERIFY(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_abortf( \
+#define bfs_verify_(str, cond, format, ...) \
+	((cond) ? (void)0 : bfs_abort( \
 		sizeof(format) > 1 \
-			? "%s: %s:%d: %s(): %.0s" format "%s%s" \
-			: "%s: %s:%d: %s(): Assertion failed: `%s`%s", \
-		BFS_COMMAND, __FILE__, __LINE__, __func__, str, __VA_ARGS__))
+			? "%.0s" format "%s%s" \
+			: "Assertion failed: `%s`%s", \
+		str, __VA_ARGS__))
 
 /**
  * Assert in debug builds; no-op in release builds.

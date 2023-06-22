@@ -5,6 +5,7 @@
 #include "bfstd.h"
 #include "ctx.h"
 #include "color.h"
+#include "config.h"
 #include "dstring.h"
 #include "expr.h"
 #include <errno.h>
@@ -12,11 +13,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-noreturn void bfs_abortf(const char *format, ...) {
+noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
+	const char *cmd = NULL;
+#if __GLIBC__
+	cmd = program_invocation_short_name;
+#elif BSD
+	cmd = getprogname();
+#endif
+	if (!cmd) {
+		cmd = BFS_COMMAND;
+	}
+
+	fprintf(stderr, "%s: %s@%s:%d: ", cmd, loc->func, loc->file, loc->line);
+
 	va_list args;
 	va_start(args, format);
 	vfprintf(stderr, format, args);
 	va_end(args);
+
+	fprintf(stderr, "\n");
+
 	abort();
 }
 
