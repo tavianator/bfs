@@ -143,6 +143,21 @@ char *xgetdelim(FILE *file, char delim) {
 	}
 }
 
+const char *xgetprogname(void) {
+	const char *cmd = NULL;
+#if __GLIBC__
+	cmd = program_invocation_short_name;
+#elif BSD
+	cmd = getprogname();
+#endif
+
+	if (!cmd) {
+		cmd = BFS_COMMAND;
+	}
+
+	return cmd;
+}
+
 /** Compile and execute a regular expression for xrpmatch(). */
 static int xrpregex(nl_item item, const char *response) {
 	const char *pattern = nl_langinfo(item);

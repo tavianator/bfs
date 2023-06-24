@@ -14,17 +14,7 @@
 #include <string.h>
 
 noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
-	const char *cmd = NULL;
-#if __GLIBC__
-	cmd = program_invocation_short_name;
-#elif BSD
-	cmd = getprogname();
-#endif
-	if (!cmd) {
-		cmd = BFS_COMMAND;
-	}
-
-	fprintf(stderr, "%s: %s@%s:%d: ", cmd, loc->func, loc->file, loc->line);
+	fprintf(stderr, "%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
 
 	va_list args;
 	va_start(args, format);

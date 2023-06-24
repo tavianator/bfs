@@ -106,6 +106,14 @@ char *xgetdelim(FILE *file, char delim);
 // #include <stdlib.h>
 
 /**
+ * Wrapper for getprogname() or equivalent functionality.
+ *
+ * @return
+ *         The basename of the currently running program.
+ */
+const char *xgetprogname(void);
+
+/**
  * Process a yes/no prompt.
  *
  * @return 1 for yes, 0 for no, and -1 for unknown.
