@@ -89,7 +89,7 @@ ifdef TSAN
 # tsan needs all code instrumented
 NOLIBS := y
 # https://github.com/google/sanitizers/issues/342
-LOCAL_CPPFLAGS += -DBFS_TARGET_CLONES=false
+LOCAL_CPPFLAGS += -DBFS_USE_TARGET_CLONES=0
 LOCAL_CFLAGS += -fsanitize=thread
 SANITIZE := y
 endif
