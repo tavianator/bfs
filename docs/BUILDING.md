@@ -56,7 +56,7 @@ Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 | `CC`                             | The C compiler to use, e.g. `make CC=clang` |
 | `CFLAGS`<br>`EXTRA_CFLAGS`       | Override/add to the default compiler flags  |
 | `LDFLAGS`<br>`EXTRA_LDFLAGS`     | Override/add to the linker flags            |
-| `WITH_ACL`<br>`WITH_ATTR`<br>... | Enable/disable [optional dependencies]      |
+| `USE_ACL`<br>`USE_ATTR`<br>...   | Enable/disable [optional dependencies]      |
 | `TEST_FLAGS`                     | `tests.sh` flags for `make check`           |
 | `BUILDDIR`                       | The build output directory (default: `.`)   |
 | `DESTDIR`                        | The root directory for `make install`       |
@@ -68,14 +68,14 @@ Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 ### Dependencies
 
 `bfs` depends on some system libraries for some of its features.
-These dependencies are optional, and can be turned off at build time if necessary by setting the appropriate variable to the empty string (e.g. `make WITH_ONIGURUMA=`).
+These dependencies are optional, and can be turned off at build time if necessary by setting the appropriate variable to the empty string (e.g. `make USE_ONIGURUMA=`).
 
-| Dependency  | Platforms  | `make` flag      |
-|-------------|------------|------------------|
-| [acl]       | Linux only | `WITH_ACL`       |
-| [attr]      | Linux only | `WITH_ATTR`      |
-| [libcap]    | Linux only | `WITH_LIBCAP`    |
-| [Oniguruma] | All        | `WITH_ONIGURUMA` |
+| Dependency  | Platforms  | `make` flag     |
+|-------------|------------|-----------------|
+| [acl]       | Linux only | `USE_ACL`       |
+| [attr]      | Linux only | `USE_ATTR`      |
+| [libcap]    | Linux only | `USE_LIBCAP`    |
+| [Oniguruma] | All        | `USE_ONIGURUMA` |
 
 [acl]: https://savannah.nongnu.org/projects/acl
 [attr]: https://savannah.nongnu.org/projects/attr

@@ -18,8 +18,8 @@
 #if __STDC_VERSION__ >= 202311L
 #  define bfs_static_assert static_assert
 #else
-#  define bfs_static_assert(...) BFS_STATIC_ASSERT(__VA_ARGS__, #__VA_ARGS__, )
-#  define BFS_STATIC_ASSERT(expr, msg, ...) _Static_assert(expr, msg)
+#  define bfs_static_assert(...) bfs_static_assert_(__VA_ARGS__, #__VA_ARGS__, )
+#  define bfs_static_assert_(expr, msg, ...) _Static_assert(expr, msg)
 #endif
 
 /**
@@ -61,8 +61,6 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 #else
 #  define bfs_bug bfs_abort
 #endif
-
-
 
 /**
  * Unconditional assert.

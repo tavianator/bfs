@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 #  include <langinfo.h>
 #  include <oniguruma.h>
 #else
@@ -19,7 +19,7 @@
 #endif
 
 struct bfs_regex {
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 	unsigned char *pattern;
 	OnigRegex impl;
 	int err;
@@ -30,7 +30,7 @@ struct bfs_regex {
 #endif
 };
 
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 
 static int bfs_onig_status;
 static OnigEncoding bfs_onig_enc;
@@ -121,7 +121,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		return -1;
 	}
 
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 	// onig_error_code_to_str() says
 	//
 	//     don't call this after the pattern argument of onig_new() is freed
@@ -204,7 +204,7 @@ fail:
 int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags) {
 	size_t len = strlen(str);
 
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 	const unsigned char *ustr = (const unsigned char *)str;
 	const unsigned char *end = ustr + len;
 
@@ -263,7 +263,7 @@ int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags
 
 void bfs_regfree(struct bfs_regex *regex) {
 	if (regex) {
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 		onig_free(regex->impl);
 		free(regex->pattern);
 #else
@@ -278,7 +278,7 @@ char *bfs_regerror(const struct bfs_regex *regex) {
 		return strdup(strerror(ENOMEM));
 	}
 
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 	unsigned char *str = malloc(ONIG_MAX_ERROR_MESSAGE_LEN);
 	if (str) {
 		onig_error_code_to_str(str, regex->err, &regex->einfo);

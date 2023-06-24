@@ -2296,7 +2296,7 @@ static struct bfs_expr *parse_regextype(struct parser_state *state, int arg1, in
 		state->regex_type = BFS_REGEX_POSIX_BASIC;
 	} else if (strcmp(type, "posix-extended") == 0) {
 		state->regex_type = BFS_REGEX_POSIX_EXTENDED;
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 	} else if (strcmp(type, "emacs") == 0) {
 		state->regex_type = BFS_REGEX_EMACS;
 	} else if (strcmp(type, "grep") == 0) {
@@ -2318,7 +2318,7 @@ list_types:
 	cfprintf(cfile, "  ${bld}posix-basic${rs}:    POSIX basic regular expressions (BRE)\n");
 	cfprintf(cfile, "  ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n");
 	cfprintf(cfile, "  ${bld}ed${rs}:             Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
-#if BFS_WITH_ONIGURUMA
+#if BFS_USE_ONIGURUMA
 	cfprintf(cfile, "  ${bld}emacs${rs}:          Like ${grn}emacs${rs}\n");
 	cfprintf(cfile, "  ${bld}grep${rs}:           Like ${grn}grep${rs}\n");
 #endif

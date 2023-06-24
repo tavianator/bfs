@@ -15,11 +15,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifndef BFS_GETDENTS
-#  define BFS_GETDENTS (__linux__ || __FreeBSD__)
+#ifndef BFS_USE_GETDENTS
+#  define BFS_USE_GETDENTS (__linux__ || __FreeBSD__)
 #endif
 
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 #  if __linux__
 #    include <sys/syscall.h>
 #  endif
@@ -43,9 +43,9 @@ static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 	return ret;
 }
 
-#endif // BFS_GETDENTS
+#endif // BFS_USE_GETDENTS
 
-#if BFS_GETDENTS && __linux__
+#if BFS_USE_GETDENTS && __linux__
 /** Directory entry type for bfs_getdents() */
 typedef struct dirent64 sys_dirent;
 #else
@@ -101,7 +101,7 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
 }
 
 struct bfs_dir {
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 	alignas(sys_dirent) int fd;
 	unsigned short pos;
 	unsigned short size;
@@ -114,7 +114,7 @@ struct bfs_dir {
 	bool eof;
 };
 
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 #  define DIR_SIZE (64 << 10)
 #  define BUF_SIZE (DIR_SIZE - sizeof(struct bfs_dir))
 #else
@@ -143,7 +143,7 @@ int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path) {
 		return -1;
 	}
 
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 	dir->fd = fd;
 	dir->pos = 0;
 	dir->size = 0;
@@ -163,7 +163,7 @@ int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path) {
 }
 
 int bfs_dirfd(const struct bfs_dir *dir) {
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 	return dir->fd;
 #else
 	return dirfd(dir->dir);
@@ -171,7 +171,7 @@ int bfs_dirfd(const struct bfs_dir *dir) {
 }
 
 int bfs_polldir(struct bfs_dir *dir) {
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 	if (dir->pos < dir->size) {
 		return 1;
 	} else if (dir->eof) {
@@ -203,7 +203,7 @@ int bfs_polldir(struct bfs_dir *dir) {
 	}
 
 	return 1;
-#else // !BFS_GETDENTS
+#else // !BFS_USE_GETDENTS
 	if (dir->de) {
 		return 1;
 	} else if (dir->eof) {
@@ -227,7 +227,7 @@ int bfs_polldir(struct bfs_dir *dir) {
 static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
 	int ret = bfs_polldir(dir);
 	if (ret > 0) {
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 		char *buf = (char *)(dir + 1);
 		*de = (const sys_dirent *)(buf + dir->pos);
 		dir->pos += (*de)->d_reclen;
@@ -283,7 +283,7 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 }
 
 int bfs_closedir(struct bfs_dir *dir) {
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 	int ret = xclose(dir->fd);
 #else
 	int ret = closedir(dir->dir);
@@ -297,7 +297,7 @@ int bfs_closedir(struct bfs_dir *dir) {
 }
 
 int bfs_fdclosedir(struct bfs_dir *dir, bool same_fd) {
-#if BFS_GETDENTS
+#if BFS_USE_GETDENTS
 	int ret = dir->fd;
 #elif __FreeBSD__
 	int ret = fdclosedir(dir->dir);

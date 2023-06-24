@@ -14,15 +14,17 @@
 #include <sys/stat.h>
 
 #if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
-#  define BFS_LIBC_STATX true
+#  define BFS_HAS_LIBC_STATX true
 #elif __linux__
 #  include <linux/stat.h>
 #  include <sys/syscall.h>
 #  include <unistd.h>
 #endif
 
-#if BFS_LIBC_STATX || defined(SYS_statx)
-#  define BFS_STATX true
+#ifndef BFS_USE_STATX
+#  if BFS_HAS_LIBC_STATX || defined(SYS_statx)
+#    define BFS_USE_STATX true
+#  endif
 #endif
 
 const char *bfs_stat_field_name(enum bfs_stat_field field) {
@@ -128,13 +130,13 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, struct bf
 	return ret;
 }
 
-#if BFS_STATX
+#if BFS_USE_STATX
 
 /**
  * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
  */
 static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int mask, struct statx *buf) {
-#if BFS_LIBC_STATX
+#if BFS_HAS_LIBC_STATX
 	int ret = statx(at_fd, at_path, at_flags, mask, buf);
 #else
 	int ret = syscall(SYS_statx, at_fd, at_path, at_flags, mask, buf);
@@ -242,13 +244,13 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 	return ret;
 }
 
-#endif // BFS_STATX
+#endif // BFS_USE_STATX
 
 /**
  * Calls the stat() implementation with explicit flags.
  */
 static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, int x_flags, struct bfs_stat *buf) {
-#if BFS_STATX
+#if BFS_USE_STATX
 	static atomic bool has_statx = true;
 
 	if (load(&has_statx, relaxed)) {

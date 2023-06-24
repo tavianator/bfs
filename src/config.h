@@ -189,8 +189,10 @@
 /**
  * Check if function multiversioning via GNU indirect functions (ifunc) is supported.
  */
-#if !defined(BFS_TARGET_CLONES) && __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__ || __NetBSD__)
-#  define BFS_TARGET_CLONES true
+#ifndef BFS_USE_TARGET_CLONES
+#  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__ || __NetBSD__)
+#    define BFS_USE_TARGET_CLONES true
+#  endif
 #endif
 
 /**

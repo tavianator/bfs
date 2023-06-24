@@ -14,22 +14,22 @@
 #include <string.h>
 #include <sys/types.h>
 
-#if BFS_USE_MNTENT_H
-#  define BFS_MNTENT 1
-#elif BSD
-#  define BFS_MNTINFO 1
-#elif __SVR4
-#  define BFS_MNTTAB 1
+#if !defined(BFS_USE_MNTENT) && BFS_USE_MNTENT_H
+#  define BFS_USE_MNTENT true
+#elif !defined(BFS_USE_MNTINFO) && BSD
+#  define BFS_USE_MNTINFO true
+#elif !defined(BFS_USE_MNTTAB) && __SVR4
+#  define BFS_USE_MNTTAB true
 #endif
 
-#if BFS_MNTENT
+#if BFS_USE_MNTENT
 #  include <mntent.h>
 #  include <paths.h>
 #  include <stdio.h>
-#elif BFS_MNTINFO
+#elif BFS_USE_MNTINFO
 #  include <sys/mount.h>
 #  include <sys/ucred.h>
-#elif BFS_MNTTAB
+#elif BFS_USE_MNTTAB
 #  include <stdio.h>
 #  include <sys/mnttab.h>
 #endif
@@ -45,7 +45,7 @@ struct bfs_mtab_entry {
 };
 
 struct bfs_mtab {
-	/** The list of mount points. */
+	/** The array of mount points. */
 	struct bfs_mtab_entry *entries;
 	/** The basenames of every mount point. */
 	struct trie names;
@@ -59,7 +59,7 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
+static inline int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
 	struct bfs_mtab_entry entry = {
 		.path = strdup(path),
 		.type = strdup(type),
@@ -98,7 +98,7 @@ struct bfs_mtab *bfs_mtab_parse(void) {
 
 	int error = 0;
 
-#if BFS_MNTENT
+#if BFS_USE_MNTENT
 
 	FILE *file = setmntent(_PATH_MOUNTED, "r");
 	if (!file) {
@@ -121,7 +121,7 @@ struct bfs_mtab *bfs_mtab_parse(void) {
 
 	endmntent(file);
 
-#elif BFS_MNTINFO
+#elif BFS_USE_MNTINFO
 
 #if __NetBSD__
 	typedef struct statvfs bfs_statfs;
@@ -143,7 +143,7 @@ struct bfs_mtab *bfs_mtab_parse(void) {
 		}
 	}
 
-#elif BFS_MNTTAB
+#elif BFS_USE_MNTTAB
 
 	FILE *file = xfopen(MNTTAB, O_RDONLY | O_CLOEXEC);
 	if (!file) {

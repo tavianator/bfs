@@ -104,11 +104,11 @@ LOCAL_CFLAGS += -fno-sanitize-recover=all
 endif
 
 ifndef NOLIBS
-WITH_ONIGURUMA := y
+USE_ONIGURUMA := y
 endif
 
-ifdef WITH_ONIGURUMA
-LOCAL_CPPFLAGS += -DBFS_WITH_ONIGURUMA=1
+ifdef USE_ONIGURUMA
+LOCAL_CPPFLAGS += -DBFS_USE_ONIGURUMA=1
 
 ONIG_CONFIG := $(shell command -v onig-config 2>/dev/null)
 ifdef ONIG_CONFIG
@@ -120,28 +120,28 @@ endif
 
 LOCAL_CFLAGS += $(ONIG_CFLAGS)
 LOCAL_LDLIBS += $(ONIG_LDLIBS)
-endif # WITH_ONIGURUMA
+endif # USE_ONIGURUMA
 
 ifeq ($(OS),Linux)
 ifndef NOLIBS
-WITH_ACL := y
-WITH_ATTR := y
-WITH_LIBCAP := y
+USE_ACL := y
+USE_ATTR := y
+USE_LIBCAP := y
 endif
 
-ifdef WITH_ACL
+ifdef USE_ACL
 LOCAL_LDLIBS += -lacl
 else
 LOCAL_CPPFLAGS += -DBFS_USE_SYS_ACL_H=0
 endif
 
-ifdef WITH_ATTR
+ifdef USE_ATTR
 LOCAL_LDLIBS += -lattr
 else
 LOCAL_CPPFLAGS += -DBFS_USE_SYS_XATTR_H=0
 endif
 
-ifdef WITH_LIBCAP
+ifdef USE_LIBCAP
 LOCAL_LDLIBS += -lcap
 else
 LOCAL_CPPFLAGS += -DBFS_USE_SYS_CAPABILITY_H=0
