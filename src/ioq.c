@@ -9,7 +9,7 @@
 #include "config.h"
 #include "diag.h"
 #include "dir.h"
-#include "lock.h"
+#include "thread.h"
 #include "sanity.h"
 #include <assert.h>
 #include <errno.h>
@@ -335,8 +335,7 @@ struct ioq *ioq_create(size_t depth, size_t nthreads) {
 	}
 
 	for (size_t i = 0; i < nthreads; ++i) {
-		errno = pthread_create(&ioq->threads[i], NULL, ioq_work, ioq);
-		if (errno != 0) {
+		if (thread_create(&ioq->threads[i], NULL, ioq_work, ioq) != 0) {
 			goto fail;
 		}
 		++ioq->nthreads;
@@ -417,9 +416,7 @@ void ioq_destroy(struct ioq *ioq) {
 	ioq_cancel(ioq);
 
 	for (size_t i = 0; i < ioq->nthreads; ++i) {
-		if (pthread_join(ioq->threads[i], NULL) != 0) {
-			abort();
-		}
+		thread_join(ioq->threads[i], NULL);
 	}
 
 	ioqq_destroy(ioq->ready);

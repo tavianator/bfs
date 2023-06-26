@@ -5,6 +5,7 @@
 #include "alloc.h"
 #include "config.h"
 #include "diag.h"
+#include "thread.h"
 #include "sanity.h"
 #include <errno.h>
 #include <pthread.h>
@@ -106,9 +107,7 @@ static void bfs_onig_once(void) {
 /** Initialize Oniguruma. */
 static int bfs_onig_initialize(OnigEncoding *enc) {
 	static pthread_once_t once = PTHREAD_ONCE_INIT;
-	if (pthread_once(&once, bfs_onig_once) != 0) {
-		return ONIGERR_FAIL_TO_INITIALIZE;
-	}
+	call_once(&once, bfs_onig_once);
 
 	*enc = bfs_onig_enc;
 	return bfs_onig_status;
