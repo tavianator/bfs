@@ -264,6 +264,8 @@ struct ioq {
 	size_t depth;
 	/** The current size of the queue. */
 	size_t size;
+	/** Cancellation flag. */
+	atomic bool cancel;
 
 	/** ioq_cmd command arena. */
 	struct arena cmds;
@@ -289,17 +291,22 @@ static void *ioq_work(void *ptr) {
 			break;
 		}
 
+		bool cancel = load(&ioq->cancel, relaxed);
+
 		struct ioq_req req = cmd->req;
 		sanitize_uninit(cmd);
 
 		struct ioq_res *res = &cmd->res;
 		res->ptr = req.ptr;
 		res->dir = req.dir;
-		res->error = 0;
-		if (bfs_opendir(req.dir, req.dfd, req.path) == 0) {
-			bfs_polldir(res->dir);
-		} else {
+
+		if (cancel) {
+			res->error = EINTR;
+		} else if (bfs_opendir(req.dir, req.dfd, req.path) != 0) {
 			res->error = errno;
+		} else {
+			res->error = 0;
+			bfs_polldir(res->dir);
 		}
 
 		ioqq_push(ioq->ready, cmd);
@@ -394,14 +401,20 @@ void ioq_free(struct ioq *ioq, struct ioq_res *res) {
 	arena_free(&ioq->cmds, (union ioq_cmd *)res);
 }
 
+void ioq_cancel(struct ioq *ioq) {
+	if (!exchange(&ioq->cancel, true, relaxed)) {
+		for (size_t i = 0; i < ioq->nthreads; ++i) {
+			ioqq_push(ioq->pending, &IOQ_STOP);
+		}
+	}
+}
+
 void ioq_destroy(struct ioq *ioq) {
 	if (!ioq) {
 		return;
 	}
 
-	for (size_t i = 0; i < ioq->nthreads; ++i) {
-		ioqq_push(ioq->pending, &IOQ_STOP);
-	}
+	ioq_cancel(ioq);
 
 	for (size_t i = 0; i < ioq->nthreads; ++i) {
 		if (pthread_join(ioq->threads[i], NULL) != 0) {

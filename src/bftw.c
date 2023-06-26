@@ -1147,6 +1147,10 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 static int bftw_state_destroy(struct bftw_state *state) {
 	dstrfree(state->path);
 
+	if (state->ioq) {
+		ioq_cancel(state->ioq);
+	}
+
 	SLIST_EXTEND(&state->files, &state->batch);
 	do {
 		bftw_gc(state, BFTW_VISIT_NONE);

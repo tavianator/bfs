@@ -89,6 +89,11 @@ struct ioq_res *ioq_trypop(struct ioq *ioq);
 void ioq_free(struct ioq *ioq, struct ioq_res *res);
 
 /**
+ * Cancel any pending I/O operations.
+ */
+void ioq_cancel(struct ioq *ioq);
+
+/**
  * Stop and destroy an I/O queue.
  */
 void ioq_destroy(struct ioq *ioq);
