@@ -248,12 +248,9 @@ static union ioq_cmd *ioqq_trypop(struct ioqq *ioqq) {
 	prev &= ~IOQ_BLOCKED;
 
 	if (prev) {
-#ifdef NDEBUG
-		store(&ioqq->tail, i + IOQ_STRIDE, relaxed);
-#else
-		size_t j = fetch_add(&ioqq->tail, IOQ_STRIDE, relaxed);
+		size_t j = exchange(&ioqq->tail, i + IOQ_STRIDE, relaxed);
 		bfs_assert(j == i, "ioqq_trypop() only supports a single consumer");
-#endif
+		(void)j;
 	}
 
 	return (union ioq_cmd *)prev;
