@@ -13,8 +13,13 @@
 [01;34m.[0m [01;34m./rainbow[0m [37;44msticky[0m [01;34m./rainbow/[0m[37;44msticky[0m [01;34mrainbow/[0m[37;44msticky[0m 
 [01;34m.[0m [01;34m./rainbow[0m file.dat [01;34m./rainbow/[0mfile.dat [01;34mrainbow/[0mfile.dat 
 [01;34m.[0m [01;34m./rainbow[0m file.txt [01;34m./rainbow/[0mfile.txt [01;34mrainbow/[0mfile.txt 
+[01;34m.[0m [01;34m./rainbow[0m lower.gz [01;34m./rainbow/[0mlower.gz [01;34mrainbow/[0mlower.gz 
+[01;34m.[0m [01;34m./rainbow[0m lower.tar [01;34m./rainbow/[0mlower.tar [01;34mrainbow/[0mlower.tar 
+[01;34m.[0m [01;34m./rainbow[0m lower.tar.gz [01;34m./rainbow/[0mlower.tar.gz [01;34mrainbow/[0mlower.tar.gz 
+[01;34m.[0m [01;34m./rainbow[0m lu.tar.GZ [01;34m./rainbow/[0mlu.tar.GZ [01;34mrainbow/[0mlu.tar.GZ 
 [01;34m.[0m [01;34m./rainbow[0m mh1 [01;34m./rainbow/[0mmh1 [01;34mrainbow/[0mmh1 
 [01;34m.[0m [01;34m./rainbow[0m mh2 [01;34m./rainbow/[0mmh2 [01;34mrainbow/[0mmh2 
-[01;34m.[0m [01;34m./rainbow[0m star.gz [01;34m./rainbow/[0mstar.gz [01;34mrainbow/[0mstar.gz 
-[01;34m.[0m [01;34m./rainbow[0m star.tar [01;34m./rainbow/[0mstar.tar [01;34mrainbow/[0mstar.tar 
-[01;34m.[0m [01;34m./rainbow[0m star.tar.gz [01;34m./rainbow/[0mstar.tar.gz [01;34mrainbow/[0mstar.tar.gz 
+[01;34m.[0m [01;34m./rainbow[0m ul.TAR.gz [01;34m./rainbow/[0mul.TAR.gz [01;34mrainbow/[0mul.TAR.gz 
+[01;34m.[0m [01;34m./rainbow[0m upper.GZ [01;34m./rainbow/[0mupper.GZ [01;34mrainbow/[0mupper.GZ 
+[01;34m.[0m [01;34m./rainbow[0m upper.TAR [01;34m./rainbow/[0mupper.TAR [01;34mrainbow/[0mupper.TAR 
+[01;34m.[0m [01;34m./rainbow[0m upper.TAR.GZ [01;34m./rainbow/[0mupper.TAR.GZ [01;34mrainbow/[0mupper.TAR.GZ 

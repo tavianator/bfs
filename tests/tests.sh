@@ -413,7 +413,9 @@ make_deep "$TMP/deep"
 function make_rainbow() {
     "$XTOUCH" -p "$1/file.txt"
     "$XTOUCH" -p "$1/file.dat"
-    "$XTOUCH" -p "$1/star".{gz,tar,tar.gz}
+    "$XTOUCH" -p "$1/lower".{gz,tar,tar.gz}
+    "$XTOUCH" -p "$1/upper".{GZ,TAR,TAR.GZ}
+    "$XTOUCH" -p "$1/lu.tar.GZ" "$1/ul.TAR.gz"
     ln -s file.txt "$1/link.txt"
     "$XTOUCH" -p "$1/mh1"
     ln "$1/mh1" "$1/mh2"
