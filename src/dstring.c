@@ -54,12 +54,18 @@ char *dstralloc(size_t capacity) {
 }
 
 char *dstrdup(const char *str) {
-	size_t len = strlen(str);
-	return dstralloc_impl(len, len, str);
+	return dstrxdup(str, strlen(str));
 }
 
 char *dstrndup(const char *str, size_t n) {
-	size_t len = strnlen(str, n);
+	return dstrxdup(str, strnlen(str, n));
+}
+
+char *dstrddup(const char *dstr) {
+	return dstrxdup(dstr, dstrlen(dstr));
+}
+
+char *dstrxdup(const char *str, size_t len) {
 	return dstralloc_impl(len, len, str);
 }
 
@@ -98,37 +104,56 @@ int dstresize(char **dstr, size_t length) {
 	struct dstring *header = dstrheader(*dstr);
 	header->length = length;
 	header->data[length] = '\0';
-
 	return 0;
 }
 
-/** Common implementation of dstr{cat,ncat,app}. */
-static int dstrcat_impl(char **dest, const char *src, size_t srclen) {
+int dstrcat(char **dest, const char *src) {
+	return dstrxcat(dest, src, strlen(src));
+}
+
+int dstrncat(char **dest, const char *src, size_t n) {
+	return dstrxcat(dest, src, strnlen(src, n));
+}
+
+int dstrdcat(char **dest, const char *src) {
+	return dstrxcat(dest, src, dstrlen(src));
+}
+
+int dstrxcat(char **dest, const char *src, size_t len) {
 	size_t oldlen = dstrlen(*dest);
-	size_t newlen = oldlen + srclen;
+	size_t newlen = oldlen + len;
 
 	if (dstresize(dest, newlen) != 0) {
 		return -1;
 	}
 
-	memcpy(*dest + oldlen, src, srclen);
+	memcpy(*dest + oldlen, src, len);
 	return 0;
 }
 
-int dstrcat(char **dest, const char *src) {
-	return dstrcat_impl(dest, src, strlen(src));
-}
-
-int dstrncat(char **dest, const char *src, size_t n) {
-	return dstrcat_impl(dest, src, strnlen(src, n));
-}
-
-int dstrdcat(char **dest, const char *src) {
-	return dstrcat_impl(dest, src, dstrlen(src));
-}
-
 int dstrapp(char **str, char c) {
-	return dstrcat_impl(str, &c, 1);
+	return dstrxcat(str, &c, 1);
+}
+
+int dstrcpy(char **dest, const char *src) {
+	return dstrxcpy(dest, src, strlen(src));
+}
+
+int dstrncpy(char **dest, const char *src, size_t n) {
+	return dstrxcpy(dest, src, strnlen(src, n));
+}
+
+int dstrdcpy(char **dest, const char *src) {
+	return dstrxcpy(dest, src, dstrlen(src));
+}
+
+int dstrxcpy(char **dest, const char *src, size_t len) {
+	if (dstresize(dest, len) != 0) {
+		return -1;
+	}
+
+	memcpy(*dest, src, len);
+	return 0;
 }
 
 char *dstrprintf(const char *format, ...) {
