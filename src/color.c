@@ -22,68 +22,121 @@
 #include <time.h>
 #include <unistd.h>
 
+/**
+ * An escape sequence, which may contain embedded NUL bytes.
+ */
+struct esc_seq {
+	/** The length of the escape sequence. */
+	size_t len;
+	/** The escape sequence iteself, without a terminating NUL. */
+	char seq[];
+};
+
+/**
+ * A colored file extension, like `*.tar=01;31`.
+ */
+struct ext_color {
+	/** Priority, to disambiguate case-sensitive and insensitive matches. */
+	size_t priority;
+	/** The escape sequence associated with this extension. */
+	struct esc_seq *esc;
+	/** The length of the extension to match. */
+	size_t len;
+	/** Whether the comparison should be case-insensitive. */
+	bool icase;
+	/** The extension to match (NUL-terminated). */
+	char ext[];
+};
+
 struct colors {
-	char *reset;
-	char *leftcode;
-	char *rightcode;
-	char *endcode;
-	char *clear_to_eol;
+	/** esc_seq allocator. */
+	struct varena esc_arena;
+	/** ext_color allocator. */
+	struct varena ext_arena;
 
-	char *bold;
-	char *gray;
-	char *red;
-	char *green;
-	char *yellow;
-	char *blue;
-	char *magenta;
-	char *cyan;
-	char *white;
+	// Known dircolors keys
 
-	char *warning;
-	char *error;
+	struct esc_seq *reset;
+	struct esc_seq *leftcode;
+	struct esc_seq *rightcode;
+	struct esc_seq *endcode;
+	struct esc_seq *clear_to_eol;
 
-	char *normal;
+	struct esc_seq *bold;
+	struct esc_seq *gray;
+	struct esc_seq *red;
+	struct esc_seq *green;
+	struct esc_seq *yellow;
+	struct esc_seq *blue;
+	struct esc_seq *magenta;
+	struct esc_seq *cyan;
+	struct esc_seq *white;
 
-	char *file;
-	char *multi_hard;
-	char *executable;
-	char *capable;
-	char *setgid;
-	char *setuid;
+	struct esc_seq *warning;
+	struct esc_seq *error;
 
-	char *directory;
-	char *sticky;
-	char *other_writable;
-	char *sticky_other_writable;
+	struct esc_seq *normal;
 
-	char *link;
-	char *orphan;
-	char *missing;
+	struct esc_seq *file;
+	struct esc_seq *multi_hard;
+	struct esc_seq *executable;
+	struct esc_seq *capable;
+	struct esc_seq *setgid;
+	struct esc_seq *setuid;
+
+	struct esc_seq *directory;
+	struct esc_seq *sticky;
+	struct esc_seq *other_writable;
+	struct esc_seq *sticky_other_writable;
+
+	struct esc_seq *link;
+	struct esc_seq *orphan;
+	struct esc_seq *missing;
 	bool link_as_target;
 
-	char *blockdev;
-	char *chardev;
-	char *door;
-	char *pipe;
-	char *socket;
+	struct esc_seq *blockdev;
+	struct esc_seq *chardev;
+	struct esc_seq *door;
+	struct esc_seq *pipe;
+	struct esc_seq *socket;
 
 	/** A mapping from color names (fi, di, ln, etc.) to struct fields. */
 	struct trie names;
 
-	/** A mapping from file extensions to colors. */
-	struct trie ext_colors;
+	/** Number of extensions. */
+	size_t ext_count;
+	/** Case-sensitive extension trie. */
+	struct trie ext_trie;
+	/** Case-insensitive extension trie. */
+	struct trie iext_trie;
 };
 
+/** Allocate an escape sequence. */
+static struct esc_seq *new_esc(struct colors *colors, const char *seq, size_t len) {
+	struct esc_seq *esc = varena_alloc(&colors->esc_arena, len);
+	if (esc) {
+		esc->len = len;
+		memcpy(esc->seq, seq, len);
+	}
+	return esc;
+}
+
+/** Free an escape sequence. */
+static void free_esc(struct colors *colors, struct esc_seq *seq) {
+	varena_free(&colors->esc_arena, seq, seq->len);
+}
+
 /** Initialize a color in the table. */
-static int init_color(struct colors *colors, const char *name, const char *value, char **field) {
+static int init_esc(struct colors *colors, const char *name, const char *value, struct esc_seq **field) {
+	struct esc_seq *esc = NULL;
 	if (value) {
-		*field = dstrdup(value);
-		if (!*field) {
+		esc = new_esc(colors, value, strlen(value));
+		if (!esc) {
 			return -1;
 		}
-	} else {
-		*field = NULL;
 	}
+
+	*field = esc;
 
 	struct trie_leaf *leaf = trie_insert_str(&colors->names, name);
 	if (leaf) {
@@ -94,100 +147,182 @@ static int init_color(struct colors *colors, const char *name, const char *value
 	}
 }
 
-/** Get a color from the table. */
-static char **get_color(const struct colors *colors, const char *name) {
+/** Get an escape sequence from the table. */
+static struct esc_seq **get_esc(const struct colors *colors, const char *name) {
 	const struct trie_leaf *leaf = trie_find_str(&colors->names, name);
-	if (leaf) {
-		return (char **)leaf->value;
-	} else {
-		return NULL;
-	}
+	return leaf ? leaf->value : NULL;
 }
 
-/** Set the value of a color. */
-static int set_color(struct colors *colors, const char *name, char *value) {
-	char **color = get_color(colors, name);
-	if (color) {
-		dstrfree(*color);
-		*color = value;
+/** Set a named escape sequence. */
+static int set_esc(struct colors *colors, const char *name, char *value) {
+	struct esc_seq **field = get_esc(colors, name);
+	if (!field) {
 		return 0;
-	} else {
-		return -1;
+	}
+
+	if (*field) {
+		free_esc(colors, *field);
+		*field = NULL;
+	}
+
+	if (value) {
+		*field = new_esc(colors, value, dstrlen(value));
+		if (!*field) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/** Reverse a string, to turn suffix matches into prefix matches. */
+static void ext_reverse(char *ext, size_t len) {
+	for (size_t i = 0, j = len - 1; len && i < j; ++i, --j) {
+		char c = ext[i];
+		ext[i] = ext[j];
+		ext[j] = c;
 	}
 }
 
-/**
- * Transform a file extension for fast lookups, by reversing and lowercasing it.
- */
-static void extxfrm(char *ext, size_t len) {
-	for (size_t i = 0; i < len - i; ++i) {
-		char a = ext[i];
-		char b = ext[len - i - 1];
+/** Convert a string to lowercase for case-insensitive matching. */
+static void ext_tolower(char *ext, size_t len) {
+	for (size_t i = 0; i < len; ++i) {
+		char c = ext[i];
 
 		// What's internationalization?  Doesn't matter, this is what
 		// GNU ls does.  Luckily, since there's no standard C way to
 		// casefold.  Not using tolower() here since it respects the
 		// current locale, which GNU ls doesn't do.
-		if (a >= 'A' && a <= 'Z') {
-			a += 'a' - 'A';
-		}
-		if (b >= 'A' && b <= 'Z') {
-			b += 'a' - 'A';
+		if (c >= 'A' && c <= 'Z') {
+			c += 'a' - 'A';
 		}
 
-		ext[i] = b;
-		ext[len - i - 1] = a;
+		ext[i] = c;
 	}
 }
 
 /** Maximum supported extension length. */
 #define EXT_MAX 255
 
-/**
- * Set the color for an extension.
- */
-static int set_ext_color(struct colors *colors, char *key, char *value) {
+/** Set the color for an extension. */
+static int set_ext(struct colors *colors, char *key, char *value) {
 	size_t len = dstrlen(key);
-	if (len > EXT_MAX) {
+	struct ext_color *ext = varena_alloc(&colors->ext_arena, len + 1);
+	if (!ext) {
 		return -1;
 	}
 
-	extxfrm(key, len);
+	ext->priority = colors->ext_count++;
+	ext->len = len;
+	ext->icase = true;
+	ext->esc = new_esc(colors, value, dstrlen(value));
+	if (!ext->esc) {
+		goto fail;
+	}
+
+	key = memcpy(ext->ext, key, len + 1);
+
+	// Reverse the extension (`*.y.x` -> `x.y.*`) so we can use trie_find_prefix()
+	ext_reverse(key, len);
+
+	// Find any pre-existing exact match
+	struct ext_color *prev = NULL;
+	struct trie_leaf *leaf = trie_find_str(&colors->ext_trie, key);
+	if (leaf) {
+		prev = leaf->value;
+		trie_remove(&colors->ext_trie, leaf);
+	}
 
 	// A later *.x should override any earlier *.x, *.y.x, etc.
-	struct trie_leaf *match;
-	while ((match = trie_find_postfix(&colors->ext_colors, key))) {
-		dstrfree(match->value);
-		trie_remove(&colors->ext_colors, match);
+	while ((leaf = trie_find_postfix(&colors->ext_trie, key))) {
+		trie_remove(&colors->ext_trie, leaf);
 	}
 
-	struct trie_leaf *leaf = trie_insert_str(&colors->ext_colors, key);
-	if (leaf) {
-		leaf->value = value;
-		return 0;
-	} else {
-		return -1;
+	// Insert the extension into the case-sensitive trie
+	leaf = trie_insert_str(&colors->ext_trie, key);
+	if (!leaf) {
+		goto fail;
 	}
+	leaf->value = ext;
+
+	// "Smart case": if the same extension is given with two different
+	// capitalizations (e.g. `*.y.x=31:*.Y.Z=32:`), make it case-sensitive
+	ext_tolower(key, len);
+	leaf = trie_insert_str(&colors->iext_trie, key);
+	if (!leaf) {
+		goto fail;
+	}
+
+	// If a match for the lowercased extension exists and is different from
+	// the exact match, or is already case-sensitive, mark this one too
+	struct ext_color *iprev = leaf->value;
+	if (iprev && (iprev != prev || !iprev->icase)) {
+		iprev->icase = false;
+		ext->icase = false;
+	}
+	leaf->value = ext;
+
+	return 0;
+
+fail:
+	if (ext->esc) {
+		free_esc(colors, ext->esc);
+	}
+	varena_free(&colors->ext_arena, ext, len + 1);
+	return -1;
+}
+
+/** Rebuild the case-insensitive trie after all extensions have been parsed. */
+static int build_iext_trie(struct colors *colors) {
+	trie_destroy(&colors->iext_trie);
+	trie_init(&colors->iext_trie);
+
+	TRIE_FOR_EACH(&colors->ext_trie, leaf) {
+		struct ext_color *ext = leaf->value;
+		if (!ext->icase) {
+			continue;
+		}
+
+		// set_ext() already reversed and lowercased the extension
+		struct trie_leaf *ileaf;
+		while ((ileaf = trie_find_postfix(&colors->iext_trie, ext->ext))) {
+			trie_remove(&colors->ext_trie, ileaf);
+		}
+
+		ileaf = trie_insert_str(&colors->iext_trie, ext->ext);
+		if (!ileaf) {
+			return -1;
+		}
+		ileaf->value = ext;
+	}
+
+	return 0;
 }
 
 /**
  * Find a color by an extension.
  */
-static const char *get_ext_color(const struct colors *colors, const char *filename) {
+static const struct esc_seq *get_ext(const struct colors *colors, const char *filename) {
 	size_t name_len = strlen(filename);
 	size_t ext_len = name_len < EXT_MAX ? name_len : EXT_MAX;
-	const char *ext = filename + name_len - ext_len;
+	const char *suffix = filename + name_len - ext_len;
 
 	char xfrm[ext_len + 1];
-	memcpy(xfrm, ext, sizeof(xfrm));
-	extxfrm(xfrm, ext_len);
+	memcpy(xfrm, suffix, sizeof(xfrm));
 
-	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_colors, xfrm);
-	if (leaf) {
-		return leaf->value;
-	} else {
-		return NULL;
+	ext_reverse(xfrm, ext_len);
+	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_trie, xfrm);
+	const struct ext_color *ext = leaf ? leaf->value : NULL;
+
+	ext_tolower(xfrm, ext_len);
+	const struct trie_leaf *ileaf = trie_find_prefix(&colors->iext_trie, xfrm);
+	const struct ext_color *iext = ileaf ? ileaf->value : NULL;
+
+	if (iext && (!ext || ext->priority < iext->priority)) {
+		ext = iext;
 	}
+
+	return ext ? ext->esc : NULL;
 }
 
 /**
@@ -211,6 +346,8 @@ static const char *get_ext_color(const struct colors *colors, const char *filena
  *
  * See man dir_colors.
  *
+ * @param str
+ *         A dstring to fill with the unescaped chunk.
  * @param value
  *         The value to parse.
  * @param end
@@ -218,16 +355,18 @@ static const char *get_ext_color(const struct colors *colors, const char *filena
  * @param[out] next
  *         Will be set to the next chunk.
  * @return
- *         The parsed chunk as a dstring.
+ *         0 on success, -1 on failure.
  */
-static char *unescape(const char *value, char end, const char **next) {
+static int unescape(char **str, const char *value, char end, const char **next) {
+	*next = NULL;
+
 	if (!value) {
-		goto fail;
+		errno = EINVAL;
+		return -1;
 	}
 
-	char *str = dstralloc(0);
-	if (!str) {
-		goto fail_str;
+	if (dstresize(str, 0) != 0) {
+		return -1;
 	}
 
 	const char *i;
@@ -304,7 +443,8 @@ static char *unescape(const char *value, char end, const char **next) {
 				break;
 
 			case '\0':
-				goto fail_str;
+				errno = EINVAL;
+				return -1;
 
 			default:
 				c = *i;
@@ -318,7 +458,8 @@ static char *unescape(const char *value, char end, const char **next) {
 				c = '\177';
 				break;
 			case '\0':
-				goto fail_str;
+				errno = EINVAL;
+				return -1;
 			default:
 				// CTRL masks bits 6 and 7
 				c = *i & 0x1F;
@@ -331,77 +472,70 @@ static char *unescape(const char *value, char end, const char **next) {
 			break;
 		}
 
-		if (dstrapp(&str, c) != 0) {
-			goto fail_str;
+		if (dstrapp(str, c) != 0) {
+			return -1;
 		}
 	}
 
 	if (*i) {
 		*next = i + 1;
-	} else {
-		*next = NULL;
 	}
 
-	return str;
-
-fail_str:
-	dstrfree(str);
-fail:
-	*next = NULL;
-	return NULL;
+	return 0;
 }
 
 /** Parse the GNU $LS_COLORS format. */
-static void parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
+static int parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
+	int ret = -1;
+	char *key = NULL;
+	char *value = NULL;
+
 	for (const char *chunk = ls_colors, *next; chunk; chunk = next) {
 		if (chunk[0] == '*') {
-			char *key = unescape(chunk + 1, '=', &next);
-			if (!key) {
-				continue;
+			if (unescape(&key, chunk + 1, '=', &next) != 0) {
+				goto fail;
 			}
-
-			char *value = unescape(next, ':', &next);
-			if (value) {
-				if (set_ext_color(colors, key, value) != 0) {
-					dstrfree(value);
-				}
+			if (unescape(&value, next, ':', &next) != 0) {
+				goto fail;
 			}
-
-			dstrfree(key);
+			if (set_ext(colors, key, value) != 0) {
+				goto fail;
+			}
 		} else {
 			const char *equals = strchr(chunk, '=');
 			if (!equals) {
 				break;
 			}
 
-			char *value = unescape(equals + 1, ':', &next);
-			if (!value) {
-				continue;
+			if (dstrncpy(&key, chunk, equals - chunk) != 0) {
+				goto fail;
 			}
-
-			char *key = strndup(chunk, equals - chunk);
-			if (!key) {
-				dstrfree(value);
-				continue;
+			if (unescape(&value, equals + 1, ':', &next) != 0) {
+				goto fail;
 			}
 
 			// All-zero values should be treated like NULL, to fall
 			// back on any other relevant coloring for that file
+			char *esc = value;
 			if (strspn(value, "0") == strlen(value)
 			    && strcmp(key, "rs") != 0
 			    && strcmp(key, "lc") != 0
 			    && strcmp(key, "rc") != 0
 			    && strcmp(key, "ec") != 0) {
-				dstrfree(value);
-				value = NULL;
+				esc = NULL;
 			}
 
-			if (set_color(colors, key, value) != 0) {
-				dstrfree(value);
+			if (set_esc(colors, key, esc) != 0) {
+				goto fail;
 			}
-			free(key);
 		}
 	}
+
+	ret = 0;
+fail:
+	dstrfree(value);
+	dstrfree(key);
+	return ret;
 }
 
 struct colors *parse_colors(void) {
@@ -410,91 +544,105 @@ struct colors *parse_colors(void) {
 		return NULL;
 	}
 
+	VARENA_INIT(&colors->esc_arena, struct esc_seq, seq);
+	VARENA_INIT(&colors->ext_arena, struct ext_color, ext);
 	trie_init(&colors->names);
-	trie_init(&colors->ext_colors);
+	colors->ext_count = 0;
+	trie_init(&colors->ext_trie);
+	trie_init(&colors->iext_trie);
 
 	int ret = 0;
 
 	// From man console_codes
 
-	ret |= init_color(colors, "rs", "0",      &colors->reset);
-	ret |= init_color(colors, "lc", "\033[",  &colors->leftcode);
-	ret |= init_color(colors, "rc", "m",      &colors->rightcode);
-	ret |= init_color(colors, "ec", NULL,     &colors->endcode);
-	ret |= init_color(colors, "cl", "\033[K", &colors->clear_to_eol);
+	ret |= init_esc(colors, "rs", "0",      &colors->reset);
+	ret |= init_esc(colors, "lc", "\033[",  &colors->leftcode);
+	ret |= init_esc(colors, "rc", "m",      &colors->rightcode);
+	ret |= init_esc(colors, "ec", NULL,     &colors->endcode);
+	ret |= init_esc(colors, "cl", "\033[K", &colors->clear_to_eol);
 
-	ret |= init_color(colors, "bld", "01;39", &colors->bold);
-	ret |= init_color(colors, "gry", "01;30", &colors->gray);
-	ret |= init_color(colors, "red", "01;31", &colors->red);
-	ret |= init_color(colors, "grn", "01;32", &colors->green);
-	ret |= init_color(colors, "ylw", "01;33", &colors->yellow);
-	ret |= init_color(colors, "blu", "01;34", &colors->blue);
-	ret |= init_color(colors, "mag", "01;35", &colors->magenta);
-	ret |= init_color(colors, "cyn", "01;36", &colors->cyan);
-	ret |= init_color(colors, "wht", "01;37", &colors->white);
+	ret |= init_esc(colors, "bld", "01;39", &colors->bold);
+	ret |= init_esc(colors, "gry", "01;30", &colors->gray);
+	ret |= init_esc(colors, "red", "01;31", &colors->red);
+	ret |= init_esc(colors, "grn", "01;32", &colors->green);
+	ret |= init_esc(colors, "ylw", "01;33", &colors->yellow);
+	ret |= init_esc(colors, "blu", "01;34", &colors->blue);
+	ret |= init_esc(colors, "mag", "01;35", &colors->magenta);
+	ret |= init_esc(colors, "cyn", "01;36", &colors->cyan);
+	ret |= init_esc(colors, "wht", "01;37", &colors->white);
 
-	ret |= init_color(colors, "wrn", "01;33", &colors->warning);
-	ret |= init_color(colors, "err", "01;31", &colors->error);
+	ret |= init_esc(colors, "wrn", "01;33", &colors->warning);
+	ret |= init_esc(colors, "err", "01;31", &colors->error);
 
 	// Defaults from man dir_colors
 	// "" means fall back to ->normal
 
-	ret |= init_color(colors, "no", NULL,    &colors->normal);
+	ret |= init_esc(colors, "no", NULL,    &colors->normal);
 
-	ret |= init_color(colors, "fi", "",      &colors->file);
-	ret |= init_color(colors, "mh", NULL,    &colors->multi_hard);
-	ret |= init_color(colors, "ex", "01;32", &colors->executable);
-	ret |= init_color(colors, "ca", NULL,    &colors->capable);
-	ret |= init_color(colors, "sg", "30;43", &colors->setgid);
-	ret |= init_color(colors, "su", "37;41", &colors->setuid);
+	ret |= init_esc(colors, "fi", "",      &colors->file);
+	ret |= init_esc(colors, "mh", NULL,    &colors->multi_hard);
+	ret |= init_esc(colors, "ex", "01;32", &colors->executable);
+	ret |= init_esc(colors, "ca", NULL,    &colors->capable);
+	ret |= init_esc(colors, "sg", "30;43", &colors->setgid);
+	ret |= init_esc(colors, "su", "37;41", &colors->setuid);
 
-	ret |= init_color(colors, "di", "01;34", &colors->directory);
-	ret |= init_color(colors, "st", "37;44", &colors->sticky);
-	ret |= init_color(colors, "ow", "34;42", &colors->other_writable);
-	ret |= init_color(colors, "tw", "30;42", &colors->sticky_other_writable);
+	ret |= init_esc(colors, "di", "01;34", &colors->directory);
+	ret |= init_esc(colors, "st", "37;44", &colors->sticky);
+	ret |= init_esc(colors, "ow", "34;42", &colors->other_writable);
+	ret |= init_esc(colors, "tw", "30;42", &colors->sticky_other_writable);
 
-	ret |= init_color(colors, "ln", "01;36", &colors->link);
-	ret |= init_color(colors, "or", NULL,    &colors->orphan);
-	ret |= init_color(colors, "mi", NULL,    &colors->missing);
+	ret |= init_esc(colors, "ln", "01;36", &colors->link);
+	ret |= init_esc(colors, "or", NULL,    &colors->orphan);
+	ret |= init_esc(colors, "mi", NULL,    &colors->missing);
 	colors->link_as_target = false;
 
-	ret |= init_color(colors, "bd", "01;33", &colors->blockdev);
-	ret |= init_color(colors, "cd", "01;33", &colors->chardev);
-	ret |= init_color(colors, "do", "01;35", &colors->door);
-	ret |= init_color(colors, "pi", "33",    &colors->pipe);
-	ret |= init_color(colors, "so", "01;35", &colors->socket);
+	ret |= init_esc(colors, "bd", "01;33", &colors->blockdev);
+	ret |= init_esc(colors, "cd", "01;33", &colors->chardev);
+	ret |= init_esc(colors, "do", "01;35", &colors->door);
+	ret |= init_esc(colors, "pi", "33",    &colors->pipe);
+	ret |= init_esc(colors, "so", "01;35", &colors->socket);
 
-	if (ret) {
-		free_colors(colors);
-		return NULL;
+	if (ret != 0) {
+		goto fail;
 	}
 
-	parse_gnu_ls_colors(colors, getenv("LS_COLORS"));
-	parse_gnu_ls_colors(colors, getenv("BFS_COLORS"));
+	if (parse_gnu_ls_colors(colors, getenv("LS_COLORS")) != 0) {
+		goto fail;
+	}
+	if (parse_gnu_ls_colors(colors, getenv("BFS_COLORS")) != 0) {
+		goto fail;
+	}
+	if (build_iext_trie(colors) != 0) {
+		goto fail;
+	}
 
-	if (colors->link && strcmp(colors->link, "target") == 0) {
-		colors->link_as_target = true;
-		dstresize(&colors->link, 0);
+	if (colors->link) {
+		size_t len = strlen("target");
+		if (colors->link->len == len && memcmp(colors->link->seq, "target", len) == 0) {
+			colors->link_as_target = true;
+			colors->link->len = 0;
+		}
 	}
 
 	return colors;
+
+fail:
+	free_colors(colors);
+	return NULL;
 }
 
 void free_colors(struct colors *colors) {
-	if (colors) {
-		TRIE_FOR_EACH(&colors->ext_colors, leaf) {
-			dstrfree(leaf->value);
-		}
-		trie_destroy(&colors->ext_colors);
-
-		TRIE_FOR_EACH(&colors->names, leaf) {
-			char **field = leaf->value;
-			dstrfree(*field);
-		}
-		trie_destroy(&colors->names);
-
-		free(colors);
+	if (!colors) {
+		return;
 	}
+
+	trie_destroy(&colors->iext_trie);
+	trie_destroy(&colors->ext_trie);
+	trie_destroy(&colors->names);
+	varena_destroy(&colors->ext_arena);
+	varena_destroy(&colors->esc_arena);
+
+	free(colors);
 }
 
 CFILE *cfwrap(FILE *file, const struct colors *colors, bool close) {
@@ -547,14 +695,14 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 }
 
 /** Get the color for a file. */
-static const char *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+static const struct esc_seq *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	enum bfs_type type = bftw_type(ftwbuf, flags);
 	if (type == BFS_ERROR) {
 		goto error;
 	}
 
 	const struct bfs_stat *statbuf = NULL;
-	const char *color = NULL;
+	const struct esc_seq *color = NULL;
 
 	switch (type) {
 	case BFS_REG:
@@ -578,7 +726,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		}
 
 		if (!color) {
-			color = get_ext_color(colors, filename);
+			color = get_ext(colors, filename);
 		}
 
 		if (!color) {
@@ -635,7 +783,7 @@ static const char *file_color(const struct colors *colors, const char *filename,
 		break;
 	}
 
-	if (color && !color[0]) {
+	if (color && color->len == 0) {
 		color = colors->normal;
 	}
 
@@ -649,17 +797,22 @@ error:
 	}
 }
 
+/** Print an escape sequence chunk. */
+static int print_esc_chunk(CFILE *cfile, const struct esc_seq *esc) {
+	return dstrxcat(&cfile->buffer, esc->seq, esc->len);
+}
+
 /** Print an ANSI escape sequence. */
-static int print_esc(CFILE *cfile, const char *esc) {
+static int print_esc(CFILE *cfile, const struct esc_seq *esc) {
 	const struct colors *colors = cfile->colors;
 
-	if (dstrdcat(&cfile->buffer, colors->leftcode) != 0) {
+	if (print_esc_chunk(cfile, colors->leftcode) != 0) {
 		return -1;
 	}
-	if (dstrdcat(&cfile->buffer, esc) != 0) {
+	if (print_esc_chunk(cfile, esc) != 0) {
 		return -1;
 	}
-	if (dstrdcat(&cfile->buffer, colors->rightcode) != 0) {
+	if (print_esc_chunk(cfile, colors->rightcode) != 0) {
 		return -1;
 	}
 
@@ -671,20 +824,20 @@ static int print_reset(CFILE *cfile) {
 	const struct colors *colors = cfile->colors;
 
 	if (colors->endcode) {
-		return dstrdcat(&cfile->buffer, colors->endcode);
+		return dstrxcat(&cfile->buffer, colors->endcode->seq, colors->endcode->len);
 	} else {
 		return print_esc(cfile, colors->reset);
 	}
 }
 
 /** Print a string with an optional color. */
-static int print_colored(CFILE *cfile, const char *esc, const char *str, size_t len) {
+static int print_colored(CFILE *cfile, const struct esc_seq *esc, const char *str, size_t len) {
 	if (esc) {
 		if (print_esc(cfile, esc) != 0) {
 			return -1;
 		}
 	}
-	if (dstrncat(&cfile->buffer, str, len) != 0) {
+	if (dstrxcat(&cfile->buffer, str, len) != 0) {
 		return -1;
 	}
 	if (esc) {
@@ -772,7 +925,7 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 	}
 
 	if ((size_t)broken < nameoff) {
-		const char *color = colors->missing;
+		const struct esc_seq *color = colors->missing;
 		if (!color) {
 			color = colors->orphan;
 		}
@@ -786,8 +939,8 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 
 /** Print a file name with colors. */
 static int print_name_colored(CFILE *cfile, const char *name, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	const char *color = file_color(cfile->colors, name, ftwbuf, flags);
-	return print_colored(cfile, color, name, strlen(name));
+	const struct esc_seq *esc = file_color(cfile->colors, name, ftwbuf, flags);
+	return print_colored(cfile, esc, name, strlen(name));
 }
 
 /** Print a path with colors. */
@@ -1077,7 +1230,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 				memcpy(name, i, len);
 				name[len] = '\0';
 
-				char **esc = get_color(colors, name);
+				struct esc_seq **esc = get_esc(colors, name);
 				if (!esc) {
 					goto invalid;
 				}
