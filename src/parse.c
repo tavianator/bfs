@@ -1126,7 +1126,7 @@ static struct bfs_expr *parse_color(struct parser_state *state, int color, int a
 
 	if (color) {
 		if (!colors) {
-			parse_expr_error(state, expr, "%s.\n", strerror(ctx->colors_error));
+			parse_expr_error(state, expr, "Error parsing $$LS_COLORS: %s.\n", strerror(ctx->colors_error));
 			bfs_expr_free(expr);
 			return NULL;
 		}
@@ -3723,6 +3723,10 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		} else {
 			goto fail;
 		}
+	}
+
+	if (state.use_color == COLOR_AUTO && !ctx->colors) {
+		bfs_warning(ctx, "Error parsing $$LS_COLORS: %s.\n\n", strerror(ctx->colors_error));
 	}
 
 	if (bfs_optimize(ctx) != 0) {
