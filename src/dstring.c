@@ -3,6 +3,7 @@
 
 #include "dstring.h"
 #include "alloc.h"
+#include "bit.h"
 #include "diag.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -67,10 +68,15 @@ size_t dstrlen(const char *dstr) {
 }
 
 int dstreserve(char **dstr, size_t capacity) {
+	if (!*dstr) {
+		*dstr = dstralloc(capacity);
+		return *dstr ? 0 : -1;
+	}
+
 	struct dstring *header = dstrheader(*dstr);
 
 	if (capacity > header->capacity) {
-		capacity *= 2;
+		capacity = bit_ceil(capacity + 1) - 1;
 
 		header = realloc(header, dstrsize(capacity));
 		if (!header) {
