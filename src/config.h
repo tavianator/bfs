@@ -22,7 +22,7 @@
 #  define BFS_COMMAND "bfs"
 #endif
 #ifndef BFS_VERSION
-#  define BFS_VERSION "2.6.3"
+#  define BFS_VERSION "3.0"
 #endif
 #ifndef BFS_HOMEPAGE
 #  define BFS_HOMEPAGE "https://tavianator.com/projects/bfs.html"

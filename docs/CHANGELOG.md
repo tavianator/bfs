@@ -1,3 +1,42 @@
+3.*
+===
+
+3.0
+---
+
+**Coming soon**
+
+### New features
+
+- `bfs` now reads directories asynchronously and in parallel ([#101]).
+  Performance is significantly improved as a result.
+  Parallelism is controlled by the new `-j` flag, e.g. `-j1`, `-j2`, etc.
+
+[#101]: https://github.com/tavianator/bfs/issues/101
+
+### Changes
+
+- `bfs` now uses the [C17] standard version, up from C11
+
+- Due to [#101], `bfs` now requires some additional C and POSIX features:
+  - [Standard C atomics] (`<stdatomic.h>`)
+  - [POSIX threads] (`<pthread.h>`)
+
+- `$LS_COLORS` extensions written in different cases (e.g. `*.jpg=35:*.JPG=01;35`) are now matched case-sensitively, to match the new behaviour of GNU ls since coreutils version 9.2
+
+- Added a warning/error if `$LS_COLORS` can't be parsed, depending on whether `-color` is requested explicitly
+
+- Build flags like `WITH_ONIGURUMA` have been renamed to `USE_ONIGURUMA`
+
+[C17]: https://en.cppreference.com/w/c/17
+[Standard C atomics]: https://en.cppreference.com/w/c/atomic
+[POSIX threads]: https://pubs.opengroup.org/onlinepubs/9699919799/idx/threads.html
+
+### Bug fixes
+
+- Fixed handling of the "normal text" color (`no` in `$LS_COLORS`) to match GNU ls
+
+
 2.*
 ===
 
