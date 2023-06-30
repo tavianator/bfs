@@ -42,6 +42,8 @@ typedef struct CFILE {
 	const struct colors *colors;
 	/** A buffer for colored formatting. */
 	char *buffer;
+	/** Whether the next ${rs} is actually necessary. */
+	bool need_reset;
 	/** Whether to close the underlying stream. */
 	bool close;
 } CFILE;

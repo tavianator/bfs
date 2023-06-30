@@ -707,6 +707,7 @@ CFILE *cfwrap(FILE *file, const struct colors *colors, bool close) {
 	}
 
 	cfile->file = file;
+	cfile->need_reset = false;
 	cfile->close = close;
 
 	if (isatty(fileno(file))) {
@@ -853,15 +854,22 @@ static int print_esc_chunk(CFILE *cfile, const struct esc_seq *esc) {
 
 /** Print an ANSI escape sequence. */
 static int print_esc(CFILE *cfile, const struct esc_seq *esc) {
-	const struct colors *colors = cfile->colors;
+	if (!esc) {
+		return 0;
+	}
 
-	if (print_esc_chunk(cfile, colors->leftcode) != 0) {
+	const struct colors *colors = cfile->colors;
+	if (esc != colors->reset) {
+		cfile->need_reset = true;
+	}
+
+	if (print_esc_chunk(cfile, cfile->colors->leftcode) != 0) {
 		return -1;
 	}
 	if (print_esc_chunk(cfile, esc) != 0) {
 		return -1;
 	}
-	if (print_esc_chunk(cfile, colors->rightcode) != 0) {
+	if (print_esc_chunk(cfile, cfile->colors->rightcode) != 0) {
 		return -1;
 	}
 
@@ -870,10 +878,14 @@ static int print_esc(CFILE *cfile, const struct esc_seq *esc) {
 
 /** Reset after an ANSI escape sequence. */
 static int print_reset(CFILE *cfile) {
-	const struct colors *colors = cfile->colors;
+	if (!cfile->need_reset) {
+		return 0;
+	}
+	cfile->need_reset = false;
 
+	const struct colors *colors = cfile->colors;
 	if (colors->endcode) {
-		return dstrxcat(&cfile->buffer, colors->endcode->seq, colors->endcode->len);
+		return print_esc_chunk(cfile, colors->endcode);
 	} else {
 		return print_esc(cfile, colors->reset);
 	}
@@ -881,18 +893,14 @@ static int print_reset(CFILE *cfile) {
 
 /** Print a string with an optional color. */
 static int print_colored(CFILE *cfile, const struct esc_seq *esc, const char *str, size_t len) {
-	if (esc) {
-		if (print_esc(cfile, esc) != 0) {
-			return -1;
-		}
+	if (print_esc(cfile, esc) != 0) {
+		return -1;
 	}
 	if (dstrxcat(&cfile->buffer, str, len) != 0) {
 		return -1;
 	}
-	if (esc) {
-		if (print_reset(cfile) != 0) {
-			return -1;
-		}
+	if (print_reset(cfile) != 0) {
+		return -1;
 	}
 
 	return 0;
@@ -1151,13 +1159,19 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	const struct colors *colors = cfile->colors;
 	int error = errno;
 
+	// Color specifier (e.g. ${blu}) state
+	struct esc_seq **esc;
+	const char *end;
+	size_t len;
+	char name[4];
+
 	for (const char *i = format; *i; ++i) {
 		size_t verbatim = strcspn(i, "%$");
 		if (dstrncat(&cfile->buffer, i, verbatim) != 0) {
 			return -1;
 		}
-
 		i += verbatim;
+
 		switch (*i) {
 		case '%':
 			switch (*++i) {
@@ -1263,9 +1277,9 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 				}
 				break;
 
-			case '{': {
+			case '{':
 				++i;
-				const char *end = strchr(i, '}');
+				end = strchr(i, '}');
 				if (!end) {
 					goto invalid;
 				}
@@ -1274,16 +1288,22 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 					break;
 				}
 
-				size_t len = end - i;
-				char name[len + 1];
+				len = end - i;
+				if (len >= sizeof(name)) {
+					goto invalid;
+				}
 				memcpy(name, i, len);
 				name[len] = '\0';
 
-				struct esc_seq **esc = get_esc(colors, name);
-				if (!esc) {
-					goto invalid;
-				}
-				if (*esc) {
+				if (strcmp(name, "rs") == 0) {
+					if (print_reset(cfile) != 0) {
+						return -1;
+					}
+				} else {
+					esc = get_esc(colors, name);
+					if (!esc) {
+						goto invalid;
+					}
 					if (print_esc(cfile, *esc) != 0) {
 						return -1;
 					}
@@ -1291,7 +1311,6 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 
 				i = end;
 				break;
-			}
 
 			default:
 				goto invalid;
@@ -1306,7 +1325,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	return 0;
 
 invalid:
-	bfs_bug("Invalid format string");
+	bfs_bug("Invalid format string '%s'", format);
 	errno = EINVAL;
 	return -1;
 }
