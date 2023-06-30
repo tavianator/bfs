@@ -42,8 +42,8 @@ struct ext_color {
 	struct esc_seq *esc;
 	/** The length of the extension to match. */
 	size_t len;
-	/** Whether the comparison should be case-insensitive. */
-	bool icase;
+	/** Whether the comparison should be case-sensitive. */
+	bool case_sensitive;
 	/** The extension to match (NUL-terminated). */
 	char ext[];
 };
@@ -147,6 +147,11 @@ static int init_esc(struct colors *colors, const char *name, const char *value, 
 	}
 }
 
+/** Check if an escape sequence is equal to a string. */
+static bool esc_eq(const struct esc_seq *esc, const char *str, size_t len) {
+	return esc->len == len && memcmp(esc->seq, str, len) == 0;
+}
+
 /** Get an escape sequence from the table. */
 static struct esc_seq **get_esc(const struct colors *colors, const char *name) {
 	const struct trie_leaf *leaf = trie_find_str(&colors->names, name);
@@ -204,6 +209,55 @@ static void ext_tolower(char *ext, size_t len) {
 /** Maximum supported extension length. */
 #define EXT_MAX 255
 
+/**
+ * The "smart case" algorithm.
+ *
+ * @param ext
+ *         The current extension being added.
+ * @param prev
+ *         The previous case-sensitive match, if any, for the same extension.
+ * @param iprev
+ *         The previous case-insensitive match, if any, for the same extension.
+ * @return
+ *         Whether this extension should become case-sensitive.
+ */
+static bool ext_case_sensitive(struct ext_color *ext, struct ext_color *prev, struct ext_color *iprev) {
+	// This is the first case-insensitive occurrence of this extension, e.g.
+	//
+	//     *.gz=01;31:*.tar.gz=01;33
+	if (!iprev) {
+		bfs_assert(!prev);
+		return false;
+	}
+
+	// If the last version of this extension is already case-sensitive,
+	// this one should be too, e.g.
+	//
+	//     *.tar.gz=01;31:*.TAR.GZ=01;32:*.TAR.GZ=01;33
+	if (iprev->case_sensitive) {
+		return true;
+	}
+
+	// The case matches the last occurrence exactly, e.g.
+	//
+	//     *.tar.gz=01;31:*.tar.gz=01;33
+	if (iprev == prev) {
+		return false;
+	}
+
+	// Different case, but same value, e.g.
+	//
+	//     *.tar.gz=01;31:*.TAR.GZ=01;31
+	if (esc_eq(iprev->esc, ext->esc->seq, ext->esc->len)) {
+		return false;
+	}
+
+	// Different case, different value, e.g.
+	//
+	//     *.tar.gz=01;31:*.TAR.GZ=01;33
+	return true;
+}
+
 /** Set the color for an extension. */
 static int set_ext(struct colors *colors, char *key, char *value) {
 	size_t len = dstrlen(key);
@@ -214,7 +268,7 @@ static int set_ext(struct colors *colors, char *key, char *value) {
 
 	ext->priority = colors->ext_count++;
 	ext->len = len;
-	ext->icase = true;
+	ext->case_sensitive = false;
 	ext->esc = new_esc(colors, value, dstrlen(value));
 	if (!ext->esc) {
 		goto fail;
@@ -253,12 +307,10 @@ static int set_ext(struct colors *colors, char *key, char *value) {
 		goto fail;
 	}
 
-	// If a match for the lowercased extension exists and is different from
-	// the exact match, or is already case-sensitive, mark this one too
 	struct ext_color *iprev = leaf->value;
-	if (iprev && (iprev != prev || !iprev->icase)) {
-		iprev->icase = false;
-		ext->icase = false;
+	if (ext_case_sensitive(ext, prev, iprev)) {
+		iprev->case_sensitive = true;
+		ext->case_sensitive = true;
 	}
 	leaf->value = ext;
 
@@ -279,14 +331,14 @@ static int build_iext_trie(struct colors *colors) {
 
 	TRIE_FOR_EACH(&colors->ext_trie, leaf) {
 		struct ext_color *ext = leaf->value;
-		if (!ext->icase) {
+		if (ext->case_sensitive) {
 			continue;
 		}
 
 		// set_ext() already reversed and lowercased the extension
 		struct trie_leaf *ileaf;
 		while ((ileaf = trie_find_postfix(&colors->iext_trie, ext->ext))) {
-			trie_remove(&colors->ext_trie, ileaf);
+			trie_remove(&colors->iext_trie, ileaf);
 		}
 
 		ileaf = trie_insert_str(&colors->iext_trie, ext->ext);
@@ -616,12 +668,9 @@ struct colors *parse_colors(void) {
 		goto fail;
 	}
 
-	if (colors->link) {
-		size_t len = strlen("target");
-		if (colors->link->len == len && memcmp(colors->link->seq, "target", len) == 0) {
-			colors->link_as_target = true;
-			colors->link->len = 0;
-		}
+	if (colors->link && esc_eq(colors->link, "target", strlen("target"))) {
+		colors->link_as_target = true;
+		colors->link->len = 0;
 	}
 
 	return colors;
