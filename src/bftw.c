@@ -461,8 +461,12 @@ struct bftw_state {
 
 	/** The cache of open directories. */
 	struct bftw_cache cache;
+
 	/** The async I/O queue. */
 	struct ioq *ioq;
+	/** The number of I/O threads. */
+	size_t nthreads;
+
 	/** The queue of directories to read. */
 	struct bftw_list dirs;
 	/** The queue of files to visit. */
@@ -536,6 +540,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 			return -1;
 		}
 	}
+	state->nthreads = nthreads;
 
 	SLIST_INIT(&state->dirs);
 	SLIST_INIT(&state->files);
@@ -889,72 +894,14 @@ static enum bftw_action bftw_call_back(struct bftw_state *state, const char *nam
 	}
 }
 
-/** Push a directory onto the queue. */
-static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
-	bfs_assert(file->type == BFS_DIR);
-
-	struct bftw_cache *cache = &state->cache;
-
-	if (!state->ioq) {
-		goto append;
-	}
-
-	int dfd = AT_FDCWD;
-	if (file->parent) {
-		dfd = file->parent->fd;
-		if (dfd < 0) {
-			goto append;
-		}
-		bftw_cache_pin(cache, file->parent);
-	}
-
-	if (cache->capacity == 0) {
-		if (bftw_cache_pop(cache) != 0) {
-			goto unpin;
-		}
-	}
-
-	struct bfs_dir *dir = arena_alloc(&state->cache.dirs);
-	if (!dir) {
-		goto unpin;
-	}
-
-	if (ioq_opendir(state->ioq, dir, dfd, file->name, file) != 0) {
-		goto free;
-	}
-
-	file->ioqueued = true;
-	--cache->capacity;
-
-	if (state->flags & BFTW_SORT) {
-		goto append;
-	} else {
-		return;
-	}
-
-free:
-	arena_free(&state->cache.dirs, dir);
-unpin:
-	if (file->parent) {
-		bftw_cache_unpin(cache, file->parent);
-	}
-append:
-	SLIST_APPEND(&state->dirs, file);
-}
-
 /** Pop a response from the I/O queue. */
 static int bftw_ioq_pop(struct bftw_state *state, bool block) {
-	if (!state->ioq) {
+	struct ioq *ioq = state->ioq;
+	if (!ioq) {
 		return -1;
 	}
 
-	struct ioq_res *res;
-	if (block) {
-		res = ioq_pop(state->ioq);
-	} else {
-		res = ioq_trypop(state->ioq);
-	}
-
+	struct ioq_res *res = block ? ioq_pop(ioq) : ioq_trypop(ioq);
 	if (!res) {
 		return -1;
 	}
@@ -970,18 +917,104 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 	}
 
 	if (res->error) {
-		arena_free(&state->cache.dirs, res->dir);
+		arena_free(&cache->dirs, res->dir);
 	} else {
 		bftw_file_set_dir(cache, file, res->dir);
 	}
 
-	ioq_free(state->ioq, res);
+	ioq_free(ioq, res);
 
 	if (!(state->flags & BFTW_SORT)) {
 		SLIST_PREPEND(&state->dirs, file);
 	}
 
 	return 0;
+}
+
+/** Try to reserve space in the I/O queue. */
+static int bftw_ioq_reserve(struct bftw_state *state) {
+	struct ioq *ioq = state->ioq;
+	if (!ioq) {
+		return -1;
+	}
+
+	if (ioq_capacity(ioq) > 0) {
+		return 0;
+	}
+
+	// With more than two threads, it is faster to wait for an I/O operation
+	// to complete than it is to do it ourselves
+	bool block = state->nthreads > 2;
+	if (bftw_ioq_pop(state, block) < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
+/** Try to reserve space in the cache. */
+static int bftw_cache_reserve(struct bftw_state *state) {
+	struct bftw_cache *cache = &state->cache;
+	if (cache->capacity > 0) {
+		return 0;
+	}
+
+	return bftw_cache_pop(cache);
+}
+
+/** Push a directory onto the queue. */
+static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
+	bfs_assert(file->type == BFS_DIR);
+
+	struct bftw_cache *cache = &state->cache;
+
+	if (bftw_ioq_reserve(state) != 0) {
+		goto append;
+	}
+
+	int dfd = AT_FDCWD;
+	if (file->parent) {
+		dfd = file->parent->fd;
+		if (dfd < 0) {
+			goto append;
+		}
+		bftw_cache_pin(cache, file->parent);
+	}
+
+	if (bftw_cache_reserve(state) != 0) {
+		goto unpin;
+	}
+
+	struct bfs_dir *dir = arena_alloc(&cache->dirs);
+	if (!dir) {
+		goto unpin;
+	}
+
+	if (ioq_opendir(state->ioq, dir, dfd, file->name, file) != 0) {
+		goto free;
+	}
+
+	file->ioqueued = true;
+	--cache->capacity;
+
+	if (state->flags & BFTW_SORT) {
+		// When sorting, dirs are always kept in order in state->dirs,
+		// and we wait for the ioq to open them before popping
+		goto append;
+	} else {
+		// When not sorting, dirs are not added to state->dirs until
+		// popped from the ioq
+		return;
+	}
+
+free:
+	arena_free(&cache->dirs, dir);
+unpin:
+	if (file->parent) {
+		bftw_cache_unpin(cache, file->parent);
+	}
+append:
+	SLIST_APPEND(&state->dirs, file);
 }
 
 /** Pop a directory to read from the queue. */
