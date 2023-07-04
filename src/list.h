@@ -109,7 +109,7 @@
  * Insert an item into a singly-linked list.
  *
  * @param list
- *         The list to remove from.
+ *         The list to modify.
  * @param cursor
  *         A pointer to the item to insert after, e.g. &list->head or list->tail.
  * @param item
@@ -246,7 +246,7 @@
  * Remove an item from a singly-linked list.
  *
  * @param list
- *         The list to remove from.
+ *         The list to modify.
  * @param cursor
  *         A pointer to the item to remove, either &list->head or &prev->next.
  * @param node (optional)
@@ -277,7 +277,7 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * Pop the head off a singly-linked list.
  *
  * @param list
- *         The list to pop from.
+ *         The list to modify.
  * @param node (optional)
  *         If specified, use head->node.next rather than head->next.
  * @return
@@ -334,7 +334,7 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * Insert into a doubly-linked list after the given cursor.
  *
  * @param list
- *         The list to initialize.
+ *         The list to modify.
  * @param cursor
  *         Insert after this element.
  * @param item
