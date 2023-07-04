@@ -240,18 +240,22 @@ static union ioq_cmd *ioqq_trypop(struct ioqq *ioqq) {
 	size_t i = load(&ioqq->tail, relaxed);
 	atomic uintptr_t *slot = &ioqq->slots[i & ioqq->slot_mask];
 
-	uintptr_t prev = exchange(slot, 0, acquire);
+	uintptr_t prev = load(slot, relaxed);
+	if (!(prev & ~IOQ_BLOCKED)) {
+		return NULL;
+	}
+	if (!compare_exchange_weak(slot, &prev, 0, acquire, relaxed)) {
+		return NULL;
+	}
 
 	if (prev & IOQ_BLOCKED) {
 		ioqq_wake(ioqq, i);
 	}
 	prev &= ~IOQ_BLOCKED;
 
-	if (prev) {
-		size_t j = exchange(&ioqq->tail, i + IOQ_STRIDE, relaxed);
-		bfs_assert(j == i, "ioqq_trypop() only supports a single consumer");
-		(void)j;
-	}
+	size_t j = exchange(&ioqq->tail, i + IOQ_STRIDE, relaxed);
+	bfs_assert(j == i, "ioqq_trypop() only supports a single consumer");
+	(void)j;
 
 	return (union ioq_cmd *)prev;
 }
