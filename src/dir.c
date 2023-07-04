@@ -15,10 +15,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifndef BFS_USE_GETDENTS
-#  define BFS_USE_GETDENTS (__linux__ || __FreeBSD__)
-#endif
-
 #if BFS_USE_GETDENTS
 #  if __linux__
 #    include <sys/syscall.h>
@@ -296,25 +292,15 @@ int bfs_closedir(struct bfs_dir *dir) {
 	return ret;
 }
 
-int bfs_fdclosedir(struct bfs_dir *dir, bool same_fd) {
+#if BFS_USE_UNWRAPDIR
+int bfs_unwrapdir(struct bfs_dir *dir) {
 #if BFS_USE_GETDENTS
 	int ret = dir->fd;
 #elif __FreeBSD__
 	int ret = fdclosedir(dir->dir);
-#else
-	if (same_fd) {
-		errno = ENOTSUP;
-		return -1;
-	}
-
-	int ret = dup_cloexec(dirfd(dir->dir));
-	if (ret < 0) {
-		return -1;
-	}
-
-	bfs_closedir(dir);
 #endif
 
 	sanitize_uninit(dir, DIR_SIZE);
 	return ret;
 }
+#endif

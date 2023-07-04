@@ -149,29 +149,6 @@ static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 	bftw_cache_remove(cache, file);
 }
 
-/** Free an open directory. */
-static void bftw_file_freedir(struct bftw_cache *cache, struct bftw_file *file) {
-	if (!file->dir) {
-		return;
-	}
-
-	// Try to keep an open fd if any children exist
-	bool reffed = file->refcount > 1;
-	// Keep the fd the same if it's pinned
-	bool pinned = file->pincount > 0;
-
-	if (reffed || pinned) {
-		int fd = bfs_fdclosedir(file->dir, pinned);
-		if (fd >= 0) {
-			file->fd = fd;
-			arena_free(&cache->dirs, file->dir);
-			file->dir = NULL;
-		}
-	} else {
-		bftw_file_close(cache, file);
-	}
-}
-
 /** Pop the least recently used directory from the cache. */
 static int bftw_cache_pop(struct bftw_cache *cache) {
 	struct bftw_file *file = cache->tail;
@@ -228,7 +205,6 @@ static void bftw_cache_unpin(struct bftw_cache *cache, struct bftw_file *file) {
 
 	if (--file->pincount == 0) {
 		bftw_lru_add(cache, file);
-		bftw_file_freedir(cache, file);
 	}
 }
 
@@ -911,7 +887,18 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 	struct bfs_dir *dir;
 
 	enum ioq_op op = ent->op;
-	if (op == IOQ_OPENDIR) {
+	switch (op) {
+	case IOQ_CLOSE:
+		++cache->capacity;
+		break;
+
+	case IOQ_CLOSEDIR:
+		++cache->capacity;
+		dir = ent->closedir.dir;
+		arena_free(&cache->dirs, dir);
+		break;
+
+	case IOQ_OPENDIR:
 		file = ent->ptr;
 		file->ioqueued = false;
 
@@ -930,6 +917,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		if (!(state->flags & BFTW_SORT)) {
 			SLIST_PREPEND(&state->dirs, file);
 		}
+		break;
 	}
 
 	ioq_free(ioq, ent);
@@ -962,6 +950,12 @@ static int bftw_cache_reserve(struct bftw_state *state) {
 	struct bftw_cache *cache = &state->cache;
 	if (cache->capacity > 0) {
 		return 0;
+	}
+
+	while (bftw_ioq_pop(state, false) >= 0) {
+		if (cache->capacity > 0) {
+			return 0;
+		}
 	}
 
 	return bftw_cache_pop(cache);
@@ -1022,13 +1016,106 @@ append:
 	SLIST_APPEND(&state->dirs, file);
 }
 
+/** Close a directory, asynchronously if possible. */
+static int bftw_ioq_closedir(struct bftw_state *state, struct bfs_dir *dir) {
+	if (bftw_ioq_reserve(state) == 0) {
+		if (ioq_closedir(state->ioq, dir, NULL) == 0) {
+			return 0;
+		}
+	}
+
+	struct bftw_cache *cache = &state->cache;
+	int ret = bfs_closedir(dir);
+	arena_free(&cache->dirs, dir);
+	++cache->capacity;
+	return ret;
+}
+
+/** Close a file descriptor, asynchronously if possible. */
+static int bftw_ioq_close(struct bftw_state *state, int fd) {
+	if (bftw_ioq_reserve(state) == 0) {
+		if (ioq_close(state->ioq, fd, NULL) == 0) {
+			return 0;
+		}
+	}
+
+	struct bftw_cache *cache = &state->cache;
+	int ret = xclose(fd);
+	++cache->capacity;
+	return ret;
+}
+
+/** Close a file, asynchronously if possible. */
+static int bftw_close(struct bftw_state *state, struct bftw_file *file) {
+	bfs_assert(file->fd >= 0);
+	bfs_assert(file->pincount == 0);
+
+	struct bfs_dir *dir = file->dir;
+	int fd = file->fd;
+
+	bftw_lru_remove(&state->cache, file);
+	file->dir = NULL;
+	file->fd = -1;
+
+	if (dir) {
+		return bftw_ioq_closedir(state, dir);
+	} else {
+		return bftw_ioq_close(state, fd);
+	}
+}
+
+/** Free an open directory. */
+static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
+	struct bfs_dir *dir = file->dir;
+	if (!dir) {
+		return 0;
+	}
+
+	struct bftw_cache *cache = &state->cache;
+
+	// Try to keep an open fd if any children exist
+	bool reffed = file->refcount > 1;
+	// Keep the fd the same if it's pinned
+	bool pinned = file->pincount > 0;
+
+#if BFS_USE_UNWRAPDIR
+	if (reffed || pinned) {
+		bfs_unwrapdir(dir);
+		arena_free(&cache->dirs, dir);
+		file->dir = NULL;
+		return 0;
+	}
+#else
+	if (pinned) {
+		return -1;
+	}
+#endif
+
+	if (!reffed) {
+		return bftw_close(state, file);
+	}
+
+	if (bftw_cache_reserve(state) != 0) {
+		return -1;
+	}
+
+	int fd = dup_cloexec(file->fd);
+	if (fd < 0) {
+		return -1;
+	}
+	--cache->capacity;
+
+	file->dir = NULL;
+	file->fd = fd;
+	return bftw_ioq_closedir(state, dir);
+}
+
 /** Pop a directory to read from the queue. */
 static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
-	bool have_dirs = state->dirs.head;
+	struct bftw_file *dir = state->dirs.head;
 	bool have_files = state->files.head;
-	bool have_room = state->cache.capacity > 0;
 
 	if (state->flags & BFTW_SORT) {
 		// Keep strict breadth-first order when sorting
@@ -1036,15 +1123,24 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 			return false;
 		}
 	} else {
-		// Block if we have no other files/dirs to visit, or no room in the cache
-		bool block = !(have_dirs || have_files) || !have_room;
-		bftw_ioq_pop(state, block);
+		while (!dir || !dir->dir) {
+			// Block if we have no other files/dirs to visit, or no room in the cache
+			bool have_room = state->cache.capacity > 0;
+			bool block = !(dir || have_files) || !have_room;
+
+			if (bftw_ioq_pop(state, block) < 0) {
+				break;
+			}
+			dir = state->dirs.head;
+		}
 	}
 
-	struct bftw_file *dir = state->file = SLIST_POP(&state->dirs);
 	if (!dir) {
 		return false;
 	}
+
+	SLIST_POP(&state->dirs);
+	state->file = dir;
 
 	while (dir->ioqueued) {
 		bftw_ioq_pop(state, true);
@@ -1132,7 +1228,7 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 
 	if (state->dir) {
 		bftw_cache_unpin(&state->cache, state->file);
-		bftw_file_freedir(&state->cache, state->file);
+		bftw_unwrapdir(state, state->file);
 	}
 	state->dir = NULL;
 	state->de = NULL;
@@ -1169,8 +1265,12 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 		if (state->previous == file) {
 			state->previous = parent;
 		}
-		bftw_file_free(&state->cache, file);
 		state->file = parent;
+
+		if (file->fd >= 0) {
+			bftw_close(state, file);
+		}
+		bftw_file_free(&state->cache, file);
 	}
 
 	return ret;
@@ -1185,8 +1285,11 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 static int bftw_state_destroy(struct bftw_state *state) {
 	dstrfree(state->path);
 
-	if (state->ioq) {
-		ioq_cancel(state->ioq);
+	struct ioq *ioq = state->ioq;
+	if (ioq) {
+		ioq_cancel(ioq);
+		while (bftw_ioq_pop(state, true) >= 0);
+		state->ioq = NULL;
 	}
 
 	SLIST_EXTEND(&state->files, &state->batch);
@@ -1194,7 +1297,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 		bftw_gc(state, BFTW_VISIT_NONE);
 	} while (bftw_pop_dir(state) || bftw_pop_file(state));
 
-	ioq_destroy(state->ioq);
+	ioq_destroy(ioq);
 
 	bftw_cache_destroy(&state->cache);
 

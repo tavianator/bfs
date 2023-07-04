@@ -13,6 +13,14 @@
 #include <sys/types.h>
 
 /**
+ * Whether the implementation uses the getdents() syscall directly, rather than
+ * libc's readdir().
+ */
+#ifndef BFS_USE_GETDENTS
+#  define BFS_USE_GETDENTS (__linux__ || __FreeBSD__)
+#endif
+
+/**
  * A directory.
  */
 struct bfs_dir;
@@ -129,18 +137,22 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de);
 int bfs_closedir(struct bfs_dir *dir);
 
 /**
- * Extract the file descriptor from an open directory.
+ * Whether the bfs_unwrapdir() function is supported.
+ */
+#ifndef BFS_USE_UNWRAPDIR
+#  define BFS_USE_UNWRAPDIR (BFS_USE_GETDENTS || __FreeBSD__)
+#endif
+
+#if BFS_USE_UNWRAPDIR
+/**
+ * Detach the file descriptor from an open directory.
  *
  * @param dir
- *         The directory to free.
- * @param same_fd
- *         If true, require that the returned file descriptor is the same one
- *         that bfs_dirfd() would have returned.  Otherwise, it may be a new
- *         file descriptor for the same directory.
+ *         The directory to detach.
  * @return
- *         On success, a file descriptor for the directory is returned.  On
- *         failure, -1 is returned, and the directory remains open.
+ *         The file descriptor of the directory.
  */
-int bfs_fdclosedir(struct bfs_dir *dir, bool same_fd);
+int bfs_unwrapdir(struct bfs_dir *dir);
+#endif
 
 #endif // BFS_DIR_H
