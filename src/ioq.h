@@ -16,16 +16,49 @@
 struct ioq;
 
 /**
- * An I/O queue response.
+ * I/O queue operations.
  */
-struct ioq_res {
-	/** The opened directory. */
-	struct bfs_dir *dir;
+enum ioq_op {
+	/** ioq_close(). */
+	IOQ_CLOSE,
+	/** ioq_opendir(). */
+	IOQ_OPENDIR,
+	/** ioq_closedir(). */
+	IOQ_CLOSEDIR,
+};
+
+/**
+ * An I/O queue entry.
+ */
+struct ioq_ent {
+	/** The I/O operation. */
+	enum ioq_op op;
+
+	/** The return value of the operation. */
+	int ret;
 	/** The error code, if the operation failed. */
 	int error;
 
 	/** Arbitrary user data. */
 	void *ptr;
+
+	/** Operation-specific arguments. */
+	union {
+		/** ioq_close() args. */
+		struct ioq_close {
+			int fd;
+		} close;
+		/** ioq_opendir() args. */
+		struct ioq_opendir {
+			struct bfs_dir *dir;
+			int dfd;
+			const char *path;
+		} opendir;
+		/** ioq_closedir() args. */
+		struct ioq_closedir {
+			struct bfs_dir *dir;
+		} closedir;
+	};
 };
 
 /**
@@ -46,6 +79,20 @@ struct ioq *ioq_create(size_t depth, size_t nthreads);
 size_t ioq_capacity(const struct ioq *ioq);
 
 /**
+ * Asynchronous close().
+ *
+ * @param ioq
+ *         The I/O queue.
+ * @param fd
+ *         The fd to close.
+ * @param ptr
+ *         An arbitrary pointer to associate with the request.
+ * @return
+ *         0 on success, or -1 on failure.
+ */
+int ioq_close(struct ioq *ioq, int fd, void *ptr);
+
+/**
  * Asynchronous bfs_opendir().
  *
  * @param ioq
@@ -64,6 +111,20 @@ size_t ioq_capacity(const struct ioq *ioq);
 int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, void *ptr);
 
 /**
+ * Asynchronous bfs_closedir().
+ *
+ * @param ioq
+ *         The I/O queue.
+ * @param dir
+ *         The directory to close.
+ * @param ptr
+ *         An arbitrary pointer to associate with the request.
+ * @return
+ *         0 on success, or -1 on failure.
+ */
+int ioq_closedir(struct ioq *ioq, struct bfs_dir *dir, void *ptr);
+
+/**
  * Pop a response from the queue.
  *
  * @param ioq
@@ -71,7 +132,7 @@ int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path,
  * @return
  *         The next response, or NULL.
  */
-struct ioq_res *ioq_pop(struct ioq *ioq);
+struct ioq_ent *ioq_pop(struct ioq *ioq);
 
 /**
  * Pop a response from the queue, without blocking.
@@ -81,17 +142,17 @@ struct ioq_res *ioq_pop(struct ioq *ioq);
  * @return
  *         The next response, or NULL.
  */
-struct ioq_res *ioq_trypop(struct ioq *ioq);
+struct ioq_ent *ioq_trypop(struct ioq *ioq);
 
 /**
- * Free a response.
+ * Free a queue entry.
  *
  * @param ioq
  *         The I/O queue.
- * @param res
- *         The response to free.
+ * @param ent
+ *         The entry to free.
  */
-void ioq_free(struct ioq *ioq, struct ioq_res *res);
+void ioq_free(struct ioq *ioq, struct ioq_ent *ent);
 
 /**
  * Cancel any pending I/O operations.

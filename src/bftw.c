@@ -901,34 +901,39 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		return -1;
 	}
 
-	struct ioq_res *res = block ? ioq_pop(ioq) : ioq_trypop(ioq);
-	if (!res) {
+	struct ioq_ent *ent = block ? ioq_pop(ioq) : ioq_trypop(ioq);
+	if (!ent) {
 		return -1;
 	}
 
 	struct bftw_cache *cache = &state->cache;
-	++cache->capacity;
+	struct bftw_file *file;
+	struct bfs_dir *dir;
 
-	struct bftw_file *file = res->ptr;
-	file->ioqueued = false;
+	enum ioq_op op = ent->op;
+	if (op == IOQ_OPENDIR) {
+		file = ent->ptr;
+		file->ioqueued = false;
 
-	if (file->parent) {
-		bftw_cache_unpin(cache, file->parent);
+		++cache->capacity;
+		if (file->parent) {
+			bftw_cache_unpin(cache, file->parent);
+		}
+
+		dir = ent->opendir.dir;
+		if (ent->ret == 0) {
+			bftw_file_set_dir(cache, file, dir);
+		} else {
+			arena_free(&cache->dirs, dir);
+		}
+
+		if (!(state->flags & BFTW_SORT)) {
+			SLIST_PREPEND(&state->dirs, file);
+		}
 	}
 
-	if (res->error) {
-		arena_free(&cache->dirs, res->dir);
-	} else {
-		bftw_file_set_dir(cache, file, res->dir);
-	}
-
-	ioq_free(ioq, res);
-
-	if (!(state->flags & BFTW_SORT)) {
-		SLIST_PREPEND(&state->dirs, file);
-	}
-
-	return 0;
+	ioq_free(ioq, ent);
+	return op;
 }
 
 /** Try to reserve space in the I/O queue. */
