@@ -41,6 +41,11 @@ struct ioq_res {
 struct ioq *ioq_create(size_t depth, size_t nthreads);
 
 /**
+ * Check the remaining capacity of a queue.
+ */
+size_t ioq_capacity(const struct ioq *ioq);
+
+/**
  * Asynchronous bfs_opendir().
  *
  * @param ioq

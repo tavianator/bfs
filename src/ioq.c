@@ -355,6 +355,10 @@ fail:
 	return NULL;
 }
 
+size_t ioq_capacity(const struct ioq *ioq) {
+	return ioq->depth - ioq->size;
+}
+
 int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, void *ptr) {
 	if (ioq->size >= ioq->depth) {
 		return -1;
@@ -382,7 +386,6 @@ struct ioq_res *ioq_pop(struct ioq *ioq) {
 	}
 
 	union ioq_cmd *cmd = ioqq_pop(ioq->ready);
-	--ioq->size;
 	return &cmd->res;
 }
 
@@ -396,11 +399,13 @@ struct ioq_res *ioq_trypop(struct ioq *ioq) {
 		return NULL;
 	}
 
-	--ioq->size;
 	return &cmd->res;
 }
 
 void ioq_free(struct ioq *ioq, struct ioq_res *res) {
+	bfs_assert(ioq->size > 0);
+	--ioq->size;
+
 	arena_free(&ioq->cmds, (union ioq_cmd *)res);
 }
 
