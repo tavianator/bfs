@@ -1676,16 +1676,18 @@ static struct bfs_expr *parse_fnmatch(const struct parser_state *state, struct b
 		return NULL;
 	}
 
+	expr->pattern = expr->argv[1];
+
 	if (casefold) {
 #ifdef FNM_CASEFOLD
-		expr->num = FNM_CASEFOLD;
+		expr->fnm_flags = FNM_CASEFOLD;
 #else
 		parse_expr_error(state, expr, "Missing platform support.\n");
 		bfs_expr_free(expr);
 		return NULL;
 #endif
 	} else {
-		expr->num = 0;
+		expr->fnm_flags = 0;
 	}
 
 	// POSIX says, about fnmatch():
@@ -1694,10 +1696,9 @@ static struct bfs_expr *parse_fnmatch(const struct parser_state *state, struct b
 	//     return a non-zero value (indicating either no match or an error).
 	//
 	// But not all implementations obey this, so check for it ourselves.
-	const char *pattern = expr->argv[1];
-	size_t i, len = strlen(pattern);
+	size_t i, len = strlen(expr->pattern);
 	for (i = 0; i < len; ++i) {
-		if (pattern[len - i - 1] != '\\') {
+		if (expr->pattern[len - i - 1] != '\\') {
 			break;
 		}
 	}
@@ -1706,6 +1707,12 @@ static struct bfs_expr *parse_fnmatch(const struct parser_state *state, struct b
 		expr->eval_fn = eval_false;
 		return expr;
 	}
+
+	// strcmp() can be much faster than fnmatch() since it doesn't have to
+	// parse the pattern, so special-case patterns with no wildcards.
+	//
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01
+	expr->literal = strcspn(expr->pattern, "?*\\[") == len;
 
 	return expr;
 }

@@ -143,6 +143,16 @@ struct bfs_expr {
 			};
 		};
 
+		/** String comparisons. */
+		struct {
+			/** String pattern. */
+			const char *pattern;
+			/** fnmatch() flags. */
+			int fnm_flags;
+			/** Whether strcmp() can be used instead of fnmatch(). */
+			bool literal;
+		};
+
 		/** Printing actions. */
 		struct {
 			/** The output stream. */

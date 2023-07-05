@@ -547,6 +547,20 @@ bool eval_links(const struct bfs_expr *expr, struct bfs_eval *state) {
 	return bfs_expr_cmp(expr, statbuf->nlink);
 }
 
+/** Common code for fnmatch() tests. */
+static bool eval_fnmatch(const struct bfs_expr *expr, const char *str) {
+	if (expr->literal) {
+#ifdef FNM_CASEFOLD
+		if (expr->fnm_flags & FNM_CASEFOLD) {
+			return strcasecmp(expr->pattern, str) == 0;
+		}
+#endif
+		return strcmp(expr->pattern, str) == 0;
+	} else {
+		return fnmatch(expr->pattern, str, expr->fnm_flags) == 0;
+	}
+}
+
 /**
  * -i?lname test.
  */
@@ -568,7 +582,7 @@ bool eval_lname(const struct bfs_expr *expr, struct bfs_eval *state) {
 		goto done;
 	}
 
-	ret = fnmatch(expr->argv[1], name, expr->num) == 0;
+	ret = eval_fnmatch(expr, name);
 
 done:
 	free(name);
@@ -589,7 +603,7 @@ bool eval_name(const struct bfs_expr *expr, struct bfs_eval *state) {
 		name = copy = xbasename(name);
 	}
 
-	bool ret = fnmatch(expr->argv[1], name, expr->num) == 0;
+	bool ret = eval_fnmatch(expr, name);
 	free(copy);
 	return ret;
 }
@@ -598,8 +612,7 @@ bool eval_name(const struct bfs_expr *expr, struct bfs_eval *state) {
  * -i?path test.
  */
 bool eval_path(const struct bfs_expr *expr, struct bfs_eval *state) {
-	const struct BFTW *ftwbuf = state->ftwbuf;
-	return fnmatch(expr->argv[1], ftwbuf->path, expr->num) == 0;
+	return eval_fnmatch(expr, state->ftwbuf->path);
 }
 
 /**
