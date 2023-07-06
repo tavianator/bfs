@@ -1102,17 +1102,17 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 		lhs = expr->lhs;
 		rhs = expr->rhs;
 
-		if (cbuff(cfile, "${red}%s${rs}", expr->argv[0]) < 0) {
+		if (cbuff(cfile, "${red}%pq${rs}", expr->argv[0]) < 0) {
 			return -1;
 		}
 	} else {
-		if (cbuff(cfile, "${blu}%s${rs}", expr->argv[0]) < 0) {
+		if (cbuff(cfile, "${blu}%pq${rs}", expr->argv[0]) < 0) {
 			return -1;
 		}
 	}
 
 	for (size_t i = 1; i < expr->argc; ++i) {
-		if (cbuff(cfile, " ${bld}%s${rs}", expr->argv[i]) < 0) {
+		if (cbuff(cfile, " ${bld}%pq${rs}", expr->argv[i]) < 0) {
 			return -1;
 		}
 	}
