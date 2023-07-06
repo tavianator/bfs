@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <wchar.h>
+#include <wctype.h>
 
 #if BFS_USE_SYS_SYSMACROS_H
 #  include <sys/sysmacros.h>
@@ -251,6 +252,24 @@ void *xmemdup(const void *src, size_t size) {
 		memcpy(ret, src, size);
 	}
 	return ret;
+}
+
+char *xstpecpy(char *dest, char *end, const char *src) {
+	return xstpencpy(dest, end, src, SIZE_MAX);
+}
+
+char *xstpencpy(char *dest, char *end, const char *src, size_t n) {
+	size_t space = end - dest;
+	n = space < n ? space : n;
+	n = strnlen(src, n);
+	memcpy(dest, src, n);
+	if (n < space) {
+		dest[n] = '\0';
+		return dest + n;
+	} else {
+		end[-1] = '\0';
+		return end;
+	}
 }
 
 void xstrmode(mode_t mode, char str[11]) {
@@ -555,48 +574,114 @@ size_t xstrwidth(const char *str) {
 	return ret;
 }
 
+/** Get the length of the longest printable prefix of a string. */
+static size_t printable_len(const char *str, size_t len) {
+	mbstate_t mb;
+	memset(&mb, 0, sizeof(mb));
+
+	const char *cur = str;
+	while (len > 0) {
+		wchar_t wc;
+		size_t mblen = mbrtowc(&wc, cur, len, &mb);
+		if (mblen == (size_t)-1 || mblen == (size_t)-2 || !iswprint(wc)) {
+			break;
+		}
+		cur += mblen;
+		len -= mblen;
+	}
+
+	return cur - str;
+}
+
+/** Get the length of the longest unprintable prefix of a string. */
+static size_t unprintable_len(const char *str, size_t len) {
+	mbstate_t mb;
+	memset(&mb, 0, sizeof(mb));
+
+	const char *cur = str;
+	while (len > 0) {
+		wchar_t wc;
+		size_t mblen = mbrtowc(&wc, cur, len, &mb);
+		if (mblen == (size_t)-1) {
+			// Invalid byte sequence, try again from the next byte
+			mblen = 1;
+		} else if (mblen == (size_t)-2) {
+			// Incomplete byte sequence, the rest is unprintable
+			mblen = len;
+		} else if (iswprint(wc)) {
+			break;
+		}
+
+		cur += mblen;
+		len -= mblen;
+	}
+
+	return cur - str;
+}
+
 char *wordesc(const char *str) {
 	size_t len = strlen(str);
 
-	if (strcspn(str, "|&;<>()$`\\\"' \t\n*?[#˜=%") == len) {
-		// Whole string is safe
-		// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
-		if (len > 0) {
-			return strdup(str);
-		} else {
-			return strdup("\"\"");
-		}
-	} else if (strcspn(str, "`$\\\"") == len) {
-		// Safe to double-quote the whole string
-		// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
-		char *ret = malloc(len + 3);
-		if (!ret) {
-			return NULL;
-		}
-
-		char *cur = stpcpy(ret, "\"");
-		cur = stpcpy(cur, str);
-		cur = stpcpy(cur, "\"");
-		return ret;
-	}
-
-	// Every ' is replaced with '\'', so at most a 3x growth
-	char *ret = malloc(3 * len + 3);
+	// Worst case: every char is replaced with $'\xXX', so at most a 7x growth
+	size_t max_size = 7 * len + 3;
+	char *ret = malloc(max_size);
 	if (!ret) {
 		return NULL;
 	}
+	char *cur = ret;
+	char *end = ret + max_size;
 
-	char *cur = stpcpy(ret, "'");
-	while (*str) {
-		size_t chunk = strcspn(str, "'");
-		cur = stpncpy(cur, str, chunk);
-		str += chunk;
-		if (*str) {
-			cur = stpcpy(cur, "'\\''");
-			++str;
+	while (len > 0) {
+		size_t plen = printable_len(str, len);
+		if (strcspn(str, "|&;<>()$`\\\"' *?[#˜=%") >= plen) {
+			// Whole chunk is safe
+			// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
+			cur = xstpencpy(cur, end, str, plen);
+		} else if (strcspn(str, "`$\\\"") >= plen) {
+			// Safe to double-quote the whole chunk
+			// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
+			cur = xstpecpy(cur, end, "\"");
+			cur = xstpencpy(cur, end, str, plen);
+			cur = xstpecpy(cur, end, "\"");
+		} else {
+			// Single-quote the whole chunk, convert ' into '\''
+			cur = xstpecpy(cur, end, "'");
+			for (size_t i = 0; i < plen; ++i) {
+				if (str[i] == '\'') {
+					cur = xstpecpy(cur, end, "'\\''");
+				} else {
+					cur = xstpencpy(cur, end, &str[i], 1);
+				}
+			}
+			cur = xstpecpy(cur, end, "'");
 		}
-	}
-	cur = stpcpy(cur, "'");
 
+		str += plen;
+		len -= plen;
+		if (len == 0) {
+			break;
+		}
+
+		// Non-printable characters, write them as $'\xXX\xXX...'
+		cur = xstpecpy(cur, end, "$'");
+		size_t uplen = unprintable_len(str, len);
+		for (size_t i = 0; i < uplen; ++i) {
+			static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
+			unsigned char byte = str[i];
+			cur = xstpecpy(cur, end, "\\x");
+			cur = xstpecpy(cur, end, hex[byte / 0x10]);
+			cur = xstpecpy(cur, end, hex[byte % 0x10]);
+		}
+		cur = xstpecpy(cur, end, "'");
+
+		str += uplen;
+		len -= uplen;
+	}
+
+	if (cur == ret) {
+		cur = xstpecpy(cur, end, "\"\"");
+	}
+
+	bfs_assert(cur != end, "Result truncated!");
 	return ret;
 }

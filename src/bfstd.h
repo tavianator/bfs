@@ -135,6 +135,38 @@ int ynprompt(void);
 void *xmemdup(const void *src, size_t size);
 
 /**
+ * A nice string copying function.
+ *
+ * @param dest
+ *         The NUL terminator of the destination string, or `end` if it is
+ *         already truncated.
+ * @param end
+ *         The end of the destination buffer.
+ * @param src
+ *         The string to copy from.
+ * @return
+ *         The new NUL terminator of the destination, or `end` on truncation.
+ */
+char *xstpecpy(char *dest, char *end, const char *src);
+
+/**
+ * A nice string copying function.
+ *
+ * @param dest
+ *         The NUL terminator of the destination string, or `end` if it is
+ *         already truncated.
+ * @param end
+ *         The end of the destination buffer.
+ * @param src
+ *         The string to copy from.
+ * @param n
+ *         The maximum number of characters to copy.
+ * @return
+ *         The new NUL terminator of the destination, or `end` on truncation.
+ */
+char *xstpencpy(char *dest, char *end, const char *src, size_t n);
+
+/**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
  * @param mode
