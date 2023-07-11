@@ -20,7 +20,8 @@ jobs:
               libattr1-dev \
               libcap2-bin \
               libcap-dev \
-              libonig-dev
+              libonig-dev \
+              liburing-dev
 
       - name: Generate coverage
         run: |

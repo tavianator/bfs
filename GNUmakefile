@@ -126,6 +126,7 @@ ifndef NOLIBS
 USE_ACL := y
 USE_ATTR := y
 USE_LIBCAP := y
+USE_LIBURING := y
 endif
 
 ifdef USE_ACL
@@ -144,6 +145,11 @@ ifdef USE_LIBCAP
 LOCAL_LDLIBS += -lcap
 else
 LOCAL_CPPFLAGS += -DBFS_USE_SYS_CAPABILITY_H=0
+endif
+
+ifdef USE_LIBURING
+LOCAL_CPPFLAGS += -DBFS_USE_LIBURING=1
+LOCAL_LDLIBS += -luring
 endif
 
 LOCAL_LDFLAGS += -Wl,--as-needed
@@ -287,7 +293,7 @@ ifneq ($(OS),Darwin)
 endif
 	+$(MAKE) -B tsan ubsan check CC=clang $(DISTCHECK_FLAGS)
 ifeq ($(OS) $(ARCH),Linux x86_64)
-	+$(MAKE) -B check EXTRA_CFLAGS="-m32" ONIG_CONFIG= $(DISTCHECK_FLAGS)
+	+$(MAKE) -B check EXTRA_CFLAGS="-m32" ONIG_CONFIG= USE_LIBURING= $(DISTCHECK_FLAGS)
 endif
 	+$(MAKE) -B release check $(DISTCHECK_FLAGS)
 	+$(MAKE) -B check $(DISTCHECK_FLAGS)

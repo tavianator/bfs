@@ -75,11 +75,13 @@ These dependencies are optional, and can be turned off at build time if necessar
 | [acl]       | Linux only | `USE_ACL`       |
 | [attr]      | Linux only | `USE_ATTR`      |
 | [libcap]    | Linux only | `USE_LIBCAP`    |
+| [liburing]  | Linux only | `USE_LIBURING`  |
 | [Oniguruma] | All        | `USE_ONIGURUMA` |
 
 [acl]: https://savannah.nongnu.org/projects/acl
 [attr]: https://savannah.nongnu.org/projects/attr
 [libcap]: https://sites.google.com/site/fullycapable/
+[liburing]: https://github.com/axboe/liburing
 [Oniguruma]: https://github.com/kkos/oniguruma
 
 ### Dependency tracking
