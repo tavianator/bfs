@@ -1548,8 +1548,8 @@ done:
 static int infer_nproc(void) {
 	long nproc = sysconf(_SC_NPROCESSORS_ONLN);
 
-	if (nproc < 0) {
-		nproc = 0;
+	if (nproc < 1) {
+		nproc = 1;
 	} else if (nproc > 8) {
 		// Not much speedup after 8 threads
 		nproc = 8;
@@ -1651,7 +1651,7 @@ int bfs_eval(const struct bfs_ctx *ctx) {
 	if (ctx->threads > 0) {
 		nthreads = ctx->threads - 1;
 	} else {
-		nthreads = infer_nproc();
+		nthreads = infer_nproc() - 1;
 	}
 
 	struct bftw_args bftw_args = {
