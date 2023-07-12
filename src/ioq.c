@@ -148,20 +148,30 @@ static struct ioqq *ioqq_create(size_t size) {
 
 /** Atomically wait for a slot to change. */
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
-	fetch_or(slot, IOQ_BLOCKED, relaxed);
-	value |= IOQ_BLOCKED;
-
 	size_t i = slot - ioqq->slots;
 	struct ioq_monitor *monitor = &ioqq->monitors[i & ioqq->monitor_mask];
 	mutex_lock(&monitor->mutex);
 
-	uintptr_t ret;
-	while ((ret = load(slot, relaxed)) == value) {
+	uintptr_t ret = load(slot, relaxed);
+	if (ret != value) {
+		goto done;
+	}
+
+	if (!(value & IOQ_BLOCKED)) {
+		value |= IOQ_BLOCKED;
+		if (!compare_exchange_strong(slot, &ret, value, relaxed, relaxed)) {
+			goto done;
+		}
+	}
+
+	do {
 		// To avoid missed wakeups, it is important that
 		// cond_broadcast() is not called right here
 		cond_wait(&monitor->cond, &monitor->mutex);
-	}
+		ret = load(slot, relaxed);
+	} while (ret == value);
 
+done:
 	mutex_unlock(&monitor->mutex);
 	return ret;
 }
