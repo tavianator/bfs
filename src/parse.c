@@ -1623,11 +1623,19 @@ static struct bfs_expr *parse_jobs(struct parser_state *state, int arg1, int arg
 		return NULL;
 	}
 
-	if (!parse_int(state, expr->argv, expr->argv[0] + 2, &state->ctx->threads, IF_INT | IF_UNSIGNED)) {
+	unsigned int n;
+	if (!parse_int(state, expr->argv, expr->argv[0] + 2, &n, IF_INT | IF_UNSIGNED)) {
 		bfs_expr_free(expr);
 		return NULL;
 	}
 
+	if (n == 0) {
+		parse_expr_error(state, expr, "${bld}0${rs} is not enough threads.\n");
+		bfs_expr_free(expr);
+		return NULL;
+	}
+
+	state->ctx->threads = n;
 	return expr;
 }
 
