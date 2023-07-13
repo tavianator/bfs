@@ -320,14 +320,53 @@ size_t xstrwidth(const char *str);
 // #include <wordexp.h>
 
 /**
+ * Flags for wordesc().
+ */
+enum wesc_flags {
+	/**
+	 * Escape special characters so that the shell will treat the escaped
+	 * string as a single word.
+	 */
+	WESC_SHELL = 1 << 0,
+	/**
+	 * Escape special characters so that the escaped string is safe to print
+	 * to a TTY.
+	 */
+	WESC_TTY = 1 << 1,
+};
+
+/**
  * Escape a string as a single shell word.
  *
- * @param str
+ * @param dest
+ *         The destination string to fill.
+ * @param end
+ *         The end of the destination buffer.
+ * @param src
  *         The string to escape.
+ * @param flags
+ *         Controls which characters to escape.
  * @return
- *         A string that a shell would evaluate to str, dynamically allocated,
- *         or NULL on failure.
+ *         The new NUL terminator of the destination, or `end` on truncation.
  */
-char *wordesc(const char *str);
+char *wordesc(char *dest, char *end, const char *str, enum wesc_flags flags);
+
+/**
+ * Escape a string as a single shell word.
+ *
+ * @param dest
+ *         The destination string to fill.
+ * @param end
+ *         The end of the destination buffer.
+ * @param src
+ *         The string to escape.
+ * @param n
+ *         The maximum length of the string.
+ * @param flags
+ *         Controls which characters to escape.
+ * @return
+ *         The new NUL terminator of the destination, or `end` on truncation.
+ */
+char *wordnesc(char *dest, char *end, const char *str, size_t n, enum wesc_flags flags);
 
 #endif // BFS_BFSTD_H

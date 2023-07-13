@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "diag.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "ctx.h"
 #include "color.h"
@@ -114,7 +115,7 @@ bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag) {
 }
 
 /** Recursive part of highlight_expr(). */
-static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs_expr *expr, bool *args) {
+static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs_expr *expr, bool args[]) {
 	if (!expr) {
 		return false;
 	}
@@ -141,7 +142,7 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 }
 
 /** Highlight an expression in the command line. */
-static bool highlight_expr(const struct bfs_ctx *ctx, const struct bfs_expr *expr, bool *args) {
+static bool highlight_expr(const struct bfs_ctx *ctx, const struct bfs_expr *expr, bool args[]) {
 	for (size_t i = 0; i < ctx->argc; ++i) {
 		args[i] = false;
 	}
@@ -150,21 +151,21 @@ static bool highlight_expr(const struct bfs_ctx *ctx, const struct bfs_expr *exp
 }
 
 /** Print a highlighted portion of the command line. */
-static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warning) {
+static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool args[], bool warning) {
 	if (warning) {
 		bfs_warning_prefix(ctx);
 	} else {
 		bfs_error_prefix(ctx);
 	}
 
-	char *argv[ctx->argc];
+	char **argv = ZALLOC_ARRAY(char *, ctx->argc);
+	if (!argv) {
+		return;
+	}
+
 	for (size_t i = 0; i < ctx->argc; ++i) {
-		argv[i] = wordesc(ctx->argv[i]);
-		if (!argv[i]) {
-			for (size_t j = 0; j < i; ++j) {
-				free(argv[j]);
-			}
-			return;
+		if (dstrescat(&argv[i], ctx->argv[i], WESC_SHELL | WESC_TTY) != 0) {
+			goto done;
 		}
 	}
 
@@ -223,12 +224,14 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool *args, bool warn
 
 	cfprintf(ctx->cerr, "\n");
 
+done:
 	for (size_t i = 0; i < ctx->argc; ++i) {
-		free(argv[i]);
+		dstrfree(argv[i]);
 	}
+	free(argv);
 }
 
-void bfs_argv_error(const struct bfs_ctx *ctx, const bool *args) {
+void bfs_argv_error(const struct bfs_ctx *ctx, const bool args[]) {
 	bfs_argv_diag(ctx, args, false);
 }
 
@@ -239,7 +242,7 @@ void bfs_expr_error(const struct bfs_ctx *ctx, const struct bfs_expr *expr) {
 	}
 }
 
-bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool *args) {
+bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool args[]) {
 	if (!ctx->warn) {
 		return false;
 	}

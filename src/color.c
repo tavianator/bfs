@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -891,6 +892,11 @@ static int print_reset(CFILE *cfile) {
 	}
 }
 
+/** Print a shell-escaped string. */
+static int print_wordesc(CFILE *cfile, const char *str, size_t n, enum wesc_flags flags) {
+	return dstrnescat(&cfile->buffer, str, n, flags);
+}
+
 /** Print a string with an optional color. */
 static int print_colored(CFILE *cfile, const struct esc_seq *esc, const char *str, size_t len) {
 	if (print_esc(cfile, esc) != 0) {
@@ -1069,18 +1075,6 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 	return ret;
 }
 
-/** Print an shell-escaped string. */
-static int print_wordesc(CFILE *cfile, const char *str) {
-	char *esc = wordesc(str);
-	if (!esc) {
-		return -1;
-	}
-
-	int ret = dstrcat(&cfile->buffer, esc);
-	free(esc);
-	return ret;
-}
-
 /** Format some colored output to the buffer. */
 BFS_FORMATTER(2, 3)
 static int cbuff(CFILE *cfile, const char *format, ...);
@@ -1224,7 +1218,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 			case 'p':
 				switch (*++i) {
 				case 'q':
-					if (print_wordesc(cfile, va_arg(args, const char *)) != 0) {
+					if (print_wordesc(cfile, va_arg(args, const char *), SIZE_MAX, WESC_SHELL | WESC_TTY) != 0) {
 						return -1;
 					}
 					break;

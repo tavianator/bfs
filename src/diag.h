@@ -149,7 +149,7 @@ bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag);
 /**
  * Highlight parts of the command line in an error message.
  */
-void bfs_argv_error(const struct bfs_ctx *ctx, const bool *args);
+void bfs_argv_error(const struct bfs_ctx *ctx, const bool args[]);
 
 /**
  * Highlight parts of an expression in an error message.
@@ -159,7 +159,7 @@ void bfs_expr_error(const struct bfs_ctx *ctx, const struct bfs_expr *expr);
 /**
  * Highlight parts of the command line in a warning message.
  */
-bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool *args);
+bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool args[]);
 
 /**
  * Highlight parts of an expression in a warning message.

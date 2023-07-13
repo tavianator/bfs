@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <langinfo.h>
 #include <nl_types.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -575,7 +576,7 @@ size_t xstrwidth(const char *str) {
 }
 
 /** Get the length of the longest printable prefix of a string. */
-static size_t printable_len(const char *str, size_t len) {
+static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) {
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
 
@@ -583,9 +584,23 @@ static size_t printable_len(const char *str, size_t len) {
 	while (len > 0) {
 		wchar_t wc;
 		size_t mblen = mbrtowc(&wc, cur, len, &mb);
-		if (mblen == (size_t)-1 || mblen == (size_t)-2 || !iswprint(wc)) {
+		if (mblen == (size_t)-1 || mblen == (size_t)-2) {
 			break;
 		}
+
+		bool safe = iswprint(wc);
+
+		// Technically a literal newline is safe inside single quotes,
+		// but $'\n' is much nicer than '
+		// '
+		if (!(flags & WESC_SHELL) && iswspace(wc)) {
+			safe = true;
+		}
+
+		if (!safe) {
+			break;
+		}
+
 		cur += mblen;
 		len -= mblen;
 	}
@@ -623,13 +638,13 @@ static const char *dollar_esc(char c) {
 }
 
 /** $'Quote' a string for the shell. */
-static char *dollar_quote(char *dest, char *end, const char *str, size_t len) {
+static char *dollar_quote(char *dest, char *end, const char *str, size_t len, enum wesc_flags flags) {
 	static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
 
 	dest = xstpecpy(dest, end, "$'");
 
 	while (len > 0) {
-		size_t plen = printable_len(str, len);
+		size_t plen = printable_len(str, len, flags);
 		size_t elen = strcspn(str, "'\\");
 		size_t min = plen < elen ? plen : elen;
 		dest = xstpencpy(dest, end, str, min);
@@ -657,85 +672,86 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len) {
 }
 
 /** How much of this string is safe as a bare word? */
-static size_t bare_len(const char *str) {
+static size_t bare_len(const char *str, size_t len) {
 	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
-	return strcspn(str, "|&;<>()$`\\\"' *?[#˜=%!");
+	size_t ret = strcspn(str, "|&;<>()$`\\\"' *?[#˜=%!");
+	return ret < len ? ret : len;
 }
 
 /** How much of this string is safe to double-quote? */
-static size_t quotable_len(const char *str) {
+static size_t quotable_len(const char *str, size_t len) {
 	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
-	return strcspn(str, "`$\\\"!");
+	size_t ret = strcspn(str, "`$\\\"!");
+	return ret < len ? ret : len;
 }
 
 /** "Quote" a string for the shell. */
-static char *double_quote(char *dest, char *end, const char *str) {
+static char *double_quote(char *dest, char *end, const char *str, size_t len) {
 	dest = xstpecpy(dest, end, "\"");
-	dest = xstpecpy(dest, end, str);
+	dest = xstpencpy(dest, end, str, len);
 	return xstpecpy(dest, end, "\"");
 }
 
 /** 'Quote' a string for the shell. */
-static char *single_quote(char *dest, char *end, const char *str) {
+static char *single_quote(char *dest, char *end, const char *str, size_t len) {
 	bool open = false;
 
-	while (*str) {
-		size_t len = strcspn(str, "'");
-		if (len > 0) {
+	while (len > 0) {
+		size_t chunk = strcspn(str, "'");
+		chunk = chunk < len ? chunk : len;
+		if (chunk > 0) {
 			if (!open) {
 				dest = xstpecpy(dest, end, "'");
 				open = true;
 			}
-			dest = xstpencpy(dest, end, str, len);
-			str += len;
+			dest = xstpencpy(dest, end, str, chunk);
+			str += chunk;
+			len -= chunk;
 		}
 
-		while (*str == '\'') {
+		while (len > 0 && *str == '\'') {
 			if (open) {
 				dest = xstpecpy(dest, end, "'");
 				open = false;
 			}
 			dest = xstpecpy(dest, end, "\\'");
 			++str;
+			--len;
 		}
 	}
 
 	if (open) {
 		dest = xstpecpy(dest, end, "'");
 	}
+
 	return dest;
 }
 
-char *wordesc(const char *str) {
-	size_t len = strlen(str);
+char *wordesc(char *dest, char *end, const char *str, enum wesc_flags flags) {
+	return wordnesc(dest, end, str, SIZE_MAX, flags);
+}
 
-	// Worst case: every char is replaced with $'\xXX', so at most a 7x growth
-	size_t max_size = 7 * len + 3;
-	char *ret = malloc(max_size);
-	if (!ret) {
-		return NULL;
-	}
-	char *cur = ret;
-	char *end = ret + max_size;
+char *wordnesc(char *dest, char *end, const char *str, size_t n, enum wesc_flags flags) {
+	size_t len = strnlen(str, n);
+	char *start = dest;
 
-	if (printable_len(str, len) < len) {
+	if (printable_len(str, len, flags) < len) {
 		// String contains unprintable chars, use $'this\x7Fsyntax'
-		cur = dollar_quote(cur, end, str, len);
-	} else if (bare_len(str) == len) {
+		dest = dollar_quote(dest, end, str, len, flags);
+	} else if (!(flags & WESC_SHELL) || bare_len(str, len) == len) {
 		// Whole string is safe as a bare word
-		cur = xstpecpy(cur, end, str);
-	} else if (quotable_len(str) == len) {
+		dest = xstpencpy(dest, end, str, len);
+	} else if (quotable_len(str, len) == len) {
 		// Whole string is safe to double-quote
-		cur = double_quote(cur, end, str);
+		dest = double_quote(dest, end, str, len);
 	} else {
 		// Single-quote the whole string
-		cur = single_quote(cur, end, str);
+		dest = single_quote(dest, end, str, len);
 	}
 
-	if (cur == ret) {
-		cur = xstpecpy(cur, end, "\"\"");
+	if (dest == start) {
+		dest = xstpecpy(dest, end, "\"\"");
 	}
 
-	bfs_assert(cur != end, "Result truncated!");
-	return ret;
+	return dest;
 }

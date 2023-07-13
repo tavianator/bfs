@@ -8,6 +8,7 @@
 #ifndef BFS_DSTRING_H
 #define BFS_DSTRING_H
 
+#include "bfstd.h"
 #include "config.h"
 #include <stdarg.h>
 #include <stddef.h>
@@ -260,6 +261,36 @@ int dstrcatf(char **str, const char *format, ...);
  */
 BFS_FORMATTER(2, 0)
 int dstrvcatf(char **str, const char *format, va_list args);
+
+/**
+ * Concatenate while shell-escaping.
+ *
+ * @param dest
+ *         The destination dynamic string.
+ * @param str
+ *         The string to escape.
+ * @param flags
+ *         Flags for wordesc().
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int dstrescat(char **dest, const char *str, enum wesc_flags flags);
+
+/**
+ * Concatenate while shell-escaping.
+ *
+ * @param dest
+ *         The destination dynamic string.
+ * @param str
+ *         The string to escape.
+ * @param n
+ *         The maximum length of the string.
+ * @param flags
+ *         Flags for wordesc().
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int dstrnescat(char **dest, const char *str, size_t n, enum wesc_flags flags);
 
 /**
  * Free a dynamic string.

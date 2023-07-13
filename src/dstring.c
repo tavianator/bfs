@@ -232,6 +232,28 @@ fail:
 	return -1;
 }
 
+int dstrescat(char **dest, const char *str, enum wesc_flags flags) {
+	return dstrnescat(dest, str, SIZE_MAX, flags);
+}
+
+int dstrnescat(char **dest, const char *str, size_t n, enum wesc_flags flags) {
+	size_t len = *dest ? dstrlen(*dest) : 0;
+
+	// Worst case growth is `ccc...` => $'\xCC\xCC\xCC...'
+	n = strnlen(str, n);
+	size_t cap = len + 4 * n + 3;
+	if (dstreserve(dest, cap) != 0) {
+		return -1;
+	}
+
+	char *cur = *dest + len;
+	char *end = *dest + cap + 1;
+	cur = wordnesc(cur, end, str, n, flags);
+	bfs_assert(cur != end, "wordesc() result truncated");
+
+	return dstresize(dest, cur - *dest);
+}
+
 void dstrfree(char *dstr) {
 	if (dstr) {
 		free(dstrheader(dstr));
