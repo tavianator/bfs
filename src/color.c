@@ -106,6 +106,8 @@ struct colors {
 
 	/** Number of extensions. */
 	size_t ext_count;
+	/** Longest extension. */
+	size_t ext_len;
 	/** Case-sensitive extension trie. */
 	struct trie ext_trie;
 	/** Case-insensitive extension trie. */
@@ -206,9 +208,6 @@ static void ext_tolower(char *ext, size_t len) {
 		ext[i] = c;
 	}
 }
-
-/** Maximum supported extension length. */
-#define EXT_MAX 255
 
 /**
  * The "smart case" algorithm.
@@ -331,6 +330,11 @@ static int build_iext_trie(struct colors *colors) {
 	trie_init(&colors->iext_trie);
 
 	TRIE_FOR_EACH(&colors->ext_trie, leaf) {
+		size_t len = leaf->length - 1;
+		if (colors->ext_len < len) {
+			colors->ext_len = len;
+		}
+
 		struct ext_color *ext = leaf->value;
 		if (ext->case_sensitive) {
 			continue;
@@ -356,23 +360,38 @@ static int build_iext_trie(struct colors *colors) {
  * Find a color by an extension.
  */
 static const struct esc_seq *get_ext(const struct colors *colors, const char *filename) {
+	size_t ext_len = colors->ext_len;
 	size_t name_len = strlen(filename);
-	size_t ext_len = name_len < EXT_MAX ? name_len : EXT_MAX;
+	if (name_len < ext_len) {
+		ext_len = name_len;
+	}
 	const char *suffix = filename + name_len - ext_len;
 
-	char xfrm[ext_len + 1];
-	memcpy(xfrm, suffix, sizeof(xfrm));
+	char buf[256];
+	char *copy;
+	if (ext_len < sizeof(buf)) {
+		copy = memcpy(buf, suffix, ext_len + 1);
+	} else {
+		copy = strndup(suffix, ext_len);
+		if (!copy) {
+			return NULL;
+		}
+	}
 
-	ext_reverse(xfrm, ext_len);
-	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_trie, xfrm);
+	ext_reverse(copy, ext_len);
+	const struct trie_leaf *leaf = trie_find_prefix(&colors->ext_trie, copy);
 	const struct ext_color *ext = leaf ? leaf->value : NULL;
 
-	ext_tolower(xfrm, ext_len);
-	const struct trie_leaf *ileaf = trie_find_prefix(&colors->iext_trie, xfrm);
+	ext_tolower(copy, ext_len);
+	const struct trie_leaf *ileaf = trie_find_prefix(&colors->iext_trie, copy);
 	const struct ext_color *iext = ileaf ? ileaf->value : NULL;
 
 	if (iext && (!ext || ext->priority < iext->priority)) {
 		ext = iext;
+	}
+
+	if (copy != buf) {
+		free(copy);
 	}
 
 	return ext ? ext->esc : NULL;
@@ -601,6 +620,7 @@ struct colors *parse_colors(void) {
 	VARENA_INIT(&colors->ext_arena, struct ext_color, ext);
 	trie_init(&colors->names);
 	colors->ext_count = 0;
+	colors->ext_len = 0;
 	trie_init(&colors->ext_trie);
 	trie_init(&colors->iext_trie);
 
