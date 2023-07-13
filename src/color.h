@@ -87,6 +87,7 @@ int cfclose(CFILE *cfile);
  *         %zu: A size_t
  *         %m: strerror(errno)
  *         %pq: A shell-escaped string, like bash's printf %q
+ *         %pQ: A TTY-escaped string.
  *         %pF: A colored file name, from a const struct BFTW * argument
  *         %pP: A colored file path, from a const struct BFTW * argument
  *         %pL: A colored link target, from a const struct BFTW * argument

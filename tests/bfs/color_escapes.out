@@ -1,5 +1,7 @@
+[01;34m:$'rainbow/\e[1m/'[m$'\e[0m'
 [01;34m:rainbow[m
 [01;34m:rainbow/[m[01;32m:exec.sh[m
+[01;34m:rainbow/[m[01;34m:$'\e[1m'[m
 [01;34m:rainbow/[m[01;35m:socket[m
 [01;34m:rainbow/[m[01;36m:broken[m
 [01;34m:rainbow/[m[01;36m:chardev_link[m

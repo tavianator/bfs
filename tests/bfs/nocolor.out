@@ -1,4 +1,6 @@
 rainbow
+rainbow/[1m
+rainbow/[1m/[0m
 rainbow/broken
 rainbow/chardev_link
 rainbow/exec.sh

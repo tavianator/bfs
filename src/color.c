@@ -922,9 +922,12 @@ static int print_colored(CFILE *cfile, const struct esc_seq *esc, const char *st
 	if (print_esc(cfile, esc) != 0) {
 		return -1;
 	}
-	if (dstrxcat(&cfile->buffer, str, len) != 0) {
+
+	// Don't let the string itself interfere with the colors
+	if (print_wordesc(cfile, str, len, WESC_TTY) != 0) {
 		return -1;
 	}
+
 	if (print_reset(cfile) != 0) {
 		return -1;
 	}
@@ -1239,6 +1242,11 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 				switch (*++i) {
 				case 'q':
 					if (print_wordesc(cfile, va_arg(args, const char *), SIZE_MAX, WESC_SHELL | WESC_TTY) != 0) {
+						return -1;
+					}
+					break;
+				case 'Q':
+					if (print_wordesc(cfile, va_arg(args, const char *), SIZE_MAX, WESC_TTY) != 0) {
 						return -1;
 					}
 					break;

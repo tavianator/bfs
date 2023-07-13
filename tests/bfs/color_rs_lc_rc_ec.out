@@ -1,4 +1,6 @@
+LC01;34RC$'rainbow/\e[1m/'EC$'\e[0m'
 LC01;34RCrainbow/ECLC01;32RCexec.shEC
+LC01;34RCrainbow/ECLC01;34RC$'\e[1m'EC
 LC01;34RCrainbow/ECLC01;35RCsocketEC
 LC01;34RCrainbow/ECLC01;36RCbrokenEC
 LC01;34RCrainbow/ECLC01;36RCchardev_linkEC

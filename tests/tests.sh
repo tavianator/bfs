@@ -432,6 +432,7 @@ function make_rainbow() {
     chmod +t "$1"/sticky*
     "$XTOUCH" -p "$1"/exec.sh
     chmod +x "$1"/exec.sh
+    "$XTOUCH" -p "$1/"$'\e[1m/\e[0m'
 }
 make_rainbow "$TMP/rainbow"
 

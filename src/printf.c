@@ -298,7 +298,7 @@ static int bfs_printf_h(CFILE *cfile, const struct bfs_printf *directive, const 
 
 	int ret;
 	if (should_color(cfile, directive)) {
-		ret = cfprintf(cfile, "${di}%s${rs}", buf);
+		ret = cfprintf(cfile, "${di}%pQ${rs}", buf);
 	} else {
 		ret = dyn_fprintf(cfile->file, directive, buf);
 	}
@@ -313,7 +313,7 @@ static int bfs_printf_H(CFILE *cfile, const struct bfs_printf *directive, const 
 		if (ftwbuf->depth == 0) {
 			return cfprintf(cfile, "%pP", ftwbuf);
 		} else {
-			return cfprintf(cfile, "${di}%s${rs}", ftwbuf->root);
+			return cfprintf(cfile, "${di}%pQ${rs}", ftwbuf->root);
 		}
 	} else {
 		return dyn_fprintf(cfile->file, directive, ftwbuf->root);
