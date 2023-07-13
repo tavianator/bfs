@@ -28,6 +28,11 @@ void *alloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert((size & (align - 1)) == 0);
 
+	if (size >> (SIZE_WIDTH - 1)) {
+		errno = EOVERFLOW;
+		return NULL;
+	}
+
 	if (align <= alignof(max_align_t)) {
 		return malloc(size);
 	} else {
@@ -38,6 +43,11 @@ void *alloc(size_t align, size_t size) {
 void *zalloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert((size & (align - 1)) == 0);
+
+	if (size >> (SIZE_WIDTH - 1)) {
+		errno = EOVERFLOW;
+		return NULL;
+	}
 
 	if (align <= alignof(max_align_t)) {
 		return calloc(1, size);
