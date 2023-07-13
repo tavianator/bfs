@@ -995,27 +995,48 @@ out:
 	return ret;
 }
 
-/** Print the directories leading up to a file. */
-static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t nameoff) {
-	const struct colors *colors = cfile->colors;
+/** Print a path with colors. */
+static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+	size_t nameoff;
+	if (path == ftwbuf->path) {
+		nameoff = ftwbuf->nameoff;
+	} else {
+		nameoff = xbaseoff(path);
+	}
+
+	const char *name = path + nameoff;
+	size_t pathlen = nameoff + strlen(name);
 
 	ssize_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
 	if (broken < 0) {
 		return -1;
 	}
+	size_t split = broken;
 
-	if (broken > 0) {
-		if (print_colored(cfile, colors->directory, path, broken) != 0) {
+	const struct colors *colors = cfile->colors;
+	const struct esc_seq *dirs_color = colors->directory;
+	const struct esc_seq *name_color;
+
+	if (split < nameoff) {
+		name_color = colors->missing;
+		if (!name_color) {
+			name_color = colors->orphan;
+		}
+	} else {
+		name_color = file_color(cfile->colors, path + nameoff, ftwbuf, flags);
+		if (name_color == dirs_color) {
+			split = pathlen;
+		}
+	}
+
+	if (split > 0) {
+		if (print_colored(cfile, dirs_color, path, split) != 0) {
 			return -1;
 		}
 	}
 
-	if ((size_t)broken < nameoff) {
-		const struct esc_seq *color = colors->missing;
-		if (!color) {
-			color = colors->orphan;
-		}
-		if (print_colored(cfile, color, path + broken, nameoff - broken) != 0) {
+	if (split < pathlen) {
+		if (print_colored(cfile, name_color, path + split, pathlen - split) != 0) {
 			return -1;
 		}
 	}
@@ -1027,22 +1048,6 @@ static int print_dirs_colored(CFILE *cfile, const char *path, const struct BFTW 
 static int print_name_colored(CFILE *cfile, const char *name, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	const struct esc_seq *esc = file_color(cfile->colors, name, ftwbuf, flags);
 	return print_colored(cfile, esc, name, strlen(name));
-}
-
-/** Print a path with colors. */
-static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	size_t nameoff;
-	if (path == ftwbuf->path) {
-		nameoff = ftwbuf->nameoff;
-	} else {
-		nameoff = xbaseoff(path);
-	}
-
-	if (print_dirs_colored(cfile, path, ftwbuf, flags, nameoff) != 0) {
-		return -1;
-	}
-
-	return print_name_colored(cfile, path + nameoff, ftwbuf, flags);
 }
 
 /** Print the name of a file with the appropriate colors. */

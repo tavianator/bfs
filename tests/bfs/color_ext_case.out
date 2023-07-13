@@ -1,3 +1,4 @@
+[01;34m$'rainbow/\e[1m'[0m
 [01;34m$'rainbow/\e[1m/'[0m$'\e[0m'
 [01;34mrainbow[0m
 [01;34mrainbow/[0m[01;31mlower.gz[0m
@@ -7,7 +8,6 @@
 [01;34mrainbow/[0m[01;32mupper.TAR.GZ[0m
 [01;34mrainbow/[0m[01;33mlower.tar[0m
 [01;34mrainbow/[0m[01;33mupper.TAR[0m
-[01;34mrainbow/[0m[01;34m$'\e[1m'[0m
 [01;34mrainbow/[0m[01;34mul.TAR.gz[0m
 [01;34mrainbow/[0m[01;35mlu.tar.GZ[0m
 [01;34mrainbow/[0m[01;35msocket[0m
