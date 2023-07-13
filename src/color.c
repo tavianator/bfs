@@ -982,8 +982,10 @@ static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, 
 		while (ret && at_path[len - 1] == '/') {
 			--len, --ret;
 		}
-		while (ret && at_path[len - 1] != '/') {
-			--len, --ret;
+		if (errno != ENOTDIR) {
+			while (ret && at_path[len - 1] != '/') {
+				--len, --ret;
+			}
 		}
 
 		dstresize(&at_path, len);

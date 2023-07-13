@@ -2,11 +2,11 @@
 [01;31mscratch/foo/bar[0m
 [01;34m/[0m[01;31m__bfs__/nowhere[0m
 [01;34m/[0m[01;31m__bfs__/nowhere[0m
-[01;34mfoo/bar/[0m[01;31mbaz/qux[0m
-[01;34mfoo/bar/[0m[01;31mbaz/qux[0m
 [01;34mfoo/bar/[0m[01;31mnowhere[0m
 [01;34mfoo/bar/[0m[01;31mnowhere[0m
 [01;34mfoo/bar/[0m[01;31mnowhere/nothing[0m
 [01;34mfoo/bar/[0m[01;31mnowhere/nothing[0m
 [01;34mfoo/bar/[0mbaz
 [01;34mfoo/bar/[0mbaz
+[01;34mfoo/bar/baz[0m[01;31m//qux[0m
+[01;34mfoo/bar/baz[0m[01;31m//qux[0m
