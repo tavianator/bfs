@@ -619,6 +619,31 @@ static size_t unprintable_len(const char *str, size_t len) {
 	return cur - str;
 }
 
+/** Convert a special char into a well-known escape sequence like "\n". */
+static const char *c_esc(char c) {
+	// https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html
+	switch (c) {
+	case '\a':
+		return "\\a";
+	case '\b':
+		return "\\b";
+	case '\033':
+		return "\\e";
+	case '\f':
+		return "\\f";
+	case '\n':
+		return "\\n";
+	case '\r':
+		return "\\r";
+	case '\t':
+		return "\\t";
+	case '\v':
+		return "\\v";
+	default:
+		return NULL;
+	}
+}
+
 char *wordesc(const char *str) {
 	size_t len = strlen(str);
 
@@ -666,11 +691,16 @@ char *wordesc(const char *str) {
 		cur = xstpecpy(cur, end, "$'");
 		size_t uplen = unprintable_len(str, len);
 		for (size_t i = 0; i < uplen; ++i) {
-			static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
-			unsigned char byte = str[i];
-			cur = xstpecpy(cur, end, "\\x");
-			cur = xstpecpy(cur, end, hex[byte / 0x10]);
-			cur = xstpecpy(cur, end, hex[byte % 0x10]);
+			const char *esc = c_esc(str[i]);
+			if (esc) {
+				cur = xstpecpy(cur, end, esc);
+			} else {
+				static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
+				unsigned char byte = str[i];
+				cur = xstpecpy(cur, end, "\\x");
+				cur = xstpecpy(cur, end, hex[byte / 0x10]);
+				cur = xstpecpy(cur, end, hex[byte % 0x10]);
+			}
 		}
 		cur = xstpecpy(cur, end, "'");
 
