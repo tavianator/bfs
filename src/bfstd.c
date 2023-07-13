@@ -633,11 +633,11 @@ char *wordesc(const char *str) {
 
 	while (len > 0) {
 		size_t plen = printable_len(str, len);
-		if (strcspn(str, "|&;<>()$`\\\"' *?[#˜=%") >= plen) {
+		if (strcspn(str, "|&;<>()$`\\\"' *?[#˜=%!") >= plen) {
 			// Whole chunk is safe
 			// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
 			cur = xstpencpy(cur, end, str, plen);
-		} else if (strcspn(str, "`$\\\"") >= plen) {
+		} else if (strcspn(str, "`$\\\"!") >= plen) {
 			// Safe to double-quote the whole chunk
 			// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
 			cur = xstpecpy(cur, end, "\"");
