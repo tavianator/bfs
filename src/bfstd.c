@@ -593,34 +593,8 @@ static size_t printable_len(const char *str, size_t len) {
 	return cur - str;
 }
 
-/** Get the length of the longest unprintable prefix of a string. */
-static size_t unprintable_len(const char *str, size_t len) {
-	mbstate_t mb;
-	memset(&mb, 0, sizeof(mb));
-
-	const char *cur = str;
-	while (len > 0) {
-		wchar_t wc;
-		size_t mblen = mbrtowc(&wc, cur, len, &mb);
-		if (mblen == (size_t)-1) {
-			// Invalid byte sequence, try again from the next byte
-			mblen = 1;
-		} else if (mblen == (size_t)-2) {
-			// Incomplete byte sequence, the rest is unprintable
-			mblen = len;
-		} else if (iswprint(wc)) {
-			break;
-		}
-
-		cur += mblen;
-		len -= mblen;
-	}
-
-	return cur - str;
-}
-
 /** Convert a special char into a well-known escape sequence like "\n". */
-static const char *c_esc(char c) {
+static const char *dollar_esc(char c) {
 	// https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html
 	switch (c) {
 	case '\a':
@@ -639,9 +613,97 @@ static const char *c_esc(char c) {
 		return "\\t";
 	case '\v':
 		return "\\v";
+	case '\'':
+		return "\\'";
+	case '\\':
+		return "\\\\";
 	default:
 		return NULL;
 	}
+}
+
+/** $'Quote' a string for the shell. */
+static char *dollar_quote(char *dest, char *end, const char *str, size_t len) {
+	static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
+
+	dest = xstpecpy(dest, end, "$'");
+
+	while (len > 0) {
+		size_t plen = printable_len(str, len);
+		size_t elen = strcspn(str, "'\\");
+		size_t min = plen < elen ? plen : elen;
+		dest = xstpencpy(dest, end, str, min);
+		str += min;
+		len -= min;
+		if (len == 0) {
+			break;
+		}
+
+		unsigned char byte = *str;
+		++str;
+		--len;
+
+		const char *esc = dollar_esc(byte);
+		if (esc) {
+			dest = xstpecpy(dest, end, esc);
+		} else {
+			dest = xstpecpy(dest, end, "\\x");
+			dest = xstpecpy(dest, end, hex[byte / 0x10]);
+			dest = xstpecpy(dest, end, hex[byte % 0x10]);
+		}
+	}
+
+	return xstpecpy(dest, end, "'");
+}
+
+/** How much of this string is safe as a bare word? */
+static size_t bare_len(const char *str) {
+	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
+	return strcspn(str, "|&;<>()$`\\\"' *?[#˜=%!");
+}
+
+/** How much of this string is safe to double-quote? */
+static size_t quotable_len(const char *str) {
+	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
+	return strcspn(str, "`$\\\"!");
+}
+
+/** "Quote" a string for the shell. */
+static char *double_quote(char *dest, char *end, const char *str) {
+	dest = xstpecpy(dest, end, "\"");
+	dest = xstpecpy(dest, end, str);
+	return xstpecpy(dest, end, "\"");
+}
+
+/** 'Quote' a string for the shell. */
+static char *single_quote(char *dest, char *end, const char *str) {
+	bool open = false;
+
+	while (*str) {
+		size_t len = strcspn(str, "'");
+		if (len > 0) {
+			if (!open) {
+				dest = xstpecpy(dest, end, "'");
+				open = true;
+			}
+			dest = xstpencpy(dest, end, str, len);
+			str += len;
+		}
+
+		while (*str == '\'') {
+			if (open) {
+				dest = xstpecpy(dest, end, "'");
+				open = false;
+			}
+			dest = xstpecpy(dest, end, "\\'");
+			++str;
+		}
+	}
+
+	if (open) {
+		dest = xstpecpy(dest, end, "'");
+	}
+	return dest;
 }
 
 char *wordesc(const char *str) {
@@ -656,56 +718,18 @@ char *wordesc(const char *str) {
 	char *cur = ret;
 	char *end = ret + max_size;
 
-	while (len > 0) {
-		size_t plen = printable_len(str, len);
-		if (strcspn(str, "|&;<>()$`\\\"' *?[#˜=%!") >= plen) {
-			// Whole chunk is safe
-			// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
-			cur = xstpencpy(cur, end, str, plen);
-		} else if (strcspn(str, "`$\\\"!") >= plen) {
-			// Safe to double-quote the whole chunk
-			// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
-			cur = xstpecpy(cur, end, "\"");
-			cur = xstpencpy(cur, end, str, plen);
-			cur = xstpecpy(cur, end, "\"");
-		} else {
-			// Single-quote the whole chunk, convert ' into '\''
-			cur = xstpecpy(cur, end, "'");
-			for (size_t i = 0; i < plen; ++i) {
-				if (str[i] == '\'') {
-					cur = xstpecpy(cur, end, "'\\''");
-				} else {
-					cur = xstpencpy(cur, end, &str[i], 1);
-				}
-			}
-			cur = xstpecpy(cur, end, "'");
-		}
-
-		str += plen;
-		len -= plen;
-		if (len == 0) {
-			break;
-		}
-
-		// Non-printable characters, write them as $'\xXX\xXX...'
-		cur = xstpecpy(cur, end, "$'");
-		size_t uplen = unprintable_len(str, len);
-		for (size_t i = 0; i < uplen; ++i) {
-			const char *esc = c_esc(str[i]);
-			if (esc) {
-				cur = xstpecpy(cur, end, esc);
-			} else {
-				static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
-				unsigned char byte = str[i];
-				cur = xstpecpy(cur, end, "\\x");
-				cur = xstpecpy(cur, end, hex[byte / 0x10]);
-				cur = xstpecpy(cur, end, hex[byte % 0x10]);
-			}
-		}
-		cur = xstpecpy(cur, end, "'");
-
-		str += uplen;
-		len -= uplen;
+	if (printable_len(str, len) < len) {
+		// String contains unprintable chars, use $'this\x7Fsyntax'
+		cur = dollar_quote(cur, end, str, len);
+	} else if (bare_len(str) == len) {
+		// Whole string is safe as a bare word
+		cur = xstpecpy(cur, end, str);
+	} else if (quotable_len(str) == len) {
+		// Whole string is safe to double-quote
+		cur = double_quote(cur, end, str);
+	} else {
+		// Single-quote the whole string
+		cur = single_quote(cur, end, str);
 	}
 
 	if (cur == ret) {
