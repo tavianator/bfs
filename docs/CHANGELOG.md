@@ -4,7 +4,7 @@
 3.0
 ---
 
-**Coming soon**
+**July 13, 2023**
 
 ### New features
 
@@ -25,6 +25,8 @@
 - `$LS_COLORS` extensions written in different cases (e.g. `*.jpg=35:*.JPG=01;35`) are now matched case-sensitively, to match the new behaviour of GNU ls since coreutils version 9.2
 
 - Added a warning/error if `$LS_COLORS` can't be parsed, depending on whether `-color` is requested explicitly
+
+- Filenames with control characters are now escaped when printing with `-color`
 
 - Build flags like `WITH_ONIGURUMA` have been renamed to `USE_ONIGURUMA`
 
