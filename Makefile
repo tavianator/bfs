@@ -55,10 +55,9 @@ LOCAL_CPPFLAGS := \
     -D_LARGEFILE64_SOURCE \
     -D_FILE_OFFSET_BITS=64 \
     -D_TIME_BITS=64 \
-    -DBFS_VERSION=\"$(VERSION)\" \
-    -pthread
+    -DBFS_VERSION=\"$(VERSION)\"
 
-LOCAL_CFLAGS := -std=c17
+LOCAL_CFLAGS := -std=c17 -pthread
 LOCAL_LDFLAGS :=
 LOCAL_LDLIBS :=
 
@@ -162,7 +161,8 @@ LOCAL_CFLAGS := $(patsubst -std=c%,-std=gnu%,$(LOCAL_CFLAGS))
 endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
-CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto -DNDEBUG
+LOCAL_CPPFLAGS += -DNDEBUG
+CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS) $(EXTRA_CPPFLAGS)
