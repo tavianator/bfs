@@ -6,6 +6,7 @@
 #include "config.h"
 #include "diag.h"
 #include "xregex.h"
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
@@ -540,6 +541,25 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 #endif
 }
 
+/** mbrtowc() wrapper. */
+static int xmbrtowc(wchar_t *wc, size_t *i, const char *str, size_t len, mbstate_t *mb) {
+	size_t mblen = mbrtowc(wc, str + *i, len - *i, mb);
+	switch (mblen) {
+	case -1:
+		// Invalid byte sequence
+		*i += 1;
+		memset(mb, 0, sizeof(*mb));
+		return -1;
+	case -2:
+		// Incomplete byte sequence
+		*i += len;
+		return -1;
+	default:
+		*i += mblen;
+		return 0;
+	}
+}
+
 size_t xstrwidth(const char *str) {
 	size_t len = strlen(str);
 	size_t ret = 0;
@@ -547,65 +567,76 @@ size_t xstrwidth(const char *str) {
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
 
-	while (len > 0) {
+	for (size_t i = 0; i < len;) {
 		wchar_t wc;
-		size_t mblen = mbrtowc(&wc, str, len, &mb);
-		int cwidth;
-		if (mblen == (size_t)-1) {
-			// Invalid byte sequence, assume a single-width '?'
-			mblen = 1;
-			cwidth = 1;
-			memset(&mb, 0, sizeof(mb));
-		} else if (mblen == (size_t)-2) {
-			// Incomplete byte sequence, assume a single-width '?'
-			mblen = len;
-			cwidth = 1;
+		if (xmbrtowc(&wc, &i, str, len, &mb) == 0) {
+			ret += wcwidth(wc);
 		} else {
-			cwidth = wcwidth(wc);
-			if (cwidth < 0) {
-				cwidth = 0;
-			}
+			// Assume a single-width '?'
+			++ret;
 		}
-
-		str += mblen;
-		len -= mblen;
-		ret += cwidth;
 	}
 
 	return ret;
 }
 
+/** Check if a character is printable. */
+static bool xisprint(unsigned char c, enum wesc_flags flags) {
+	if (isprint(c)) {
+		return true;
+	}
+
+	// Technically a literal newline is safe inside single quotes, but $'\n'
+	// is much nicer than '
+	// '
+	if (!(flags & WESC_SHELL) && isspace(c)) {
+		return true;
+	}
+
+	return false;
+}
+
+/** Check if a wide character is printable. */
+static bool xiswprint(wchar_t c, enum wesc_flags flags) {
+	if (iswprint(c)) {
+		return true;
+	}
+
+	if (!(flags & WESC_SHELL) && iswspace(c)) {
+		return true;
+	}
+
+	return false;
+}
+
 /** Get the length of the longest printable prefix of a string. */
 static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) {
+	// Fast path: avoid multibyte checks
+	size_t i;
+	for (i = 0; i < len; ++i) {
+		unsigned char c = str[i];
+		if (!isascii(c)) {
+			break;
+		}
+		if (!xisprint(c, flags)) {
+			return i;
+		}
+	}
+
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
 
-	const char *cur = str;
-	while (len > 0) {
+	while (i < len) {
 		wchar_t wc;
-		size_t mblen = mbrtowc(&wc, cur, len, &mb);
-		if (mblen == (size_t)-1 || mblen == (size_t)-2) {
+		if (xmbrtowc(&wc, &i, str, len, &mb) != 0) {
 			break;
 		}
-
-		bool safe = iswprint(wc);
-
-		// Technically a literal newline is safe inside single quotes,
-		// but $'\n' is much nicer than '
-		// '
-		if (!(flags & WESC_SHELL) && iswspace(wc)) {
-			safe = true;
-		}
-
-		if (!safe) {
+		if (!xiswprint(wc, flags)) {
 			break;
 		}
-
-		cur += mblen;
-		len -= mblen;
 	}
 
-	return cur - str;
+	return i;
 }
 
 /** Convert a special char into a well-known escape sequence like "\n". */
@@ -639,32 +670,42 @@ static const char *dollar_esc(char c) {
 
 /** $'Quote' a string for the shell. */
 static char *dollar_quote(char *dest, char *end, const char *str, size_t len, enum wesc_flags flags) {
-	static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
-
 	dest = xstpecpy(dest, end, "$'");
 
-	while (len > 0) {
-		size_t plen = printable_len(str, len, flags);
-		size_t elen = strcspn(str, "'\\");
-		size_t min = plen < elen ? plen : elen;
-		dest = xstpencpy(dest, end, str, min);
-		str += min;
-		len -= min;
-		if (len == 0) {
-			break;
+	mbstate_t mb;
+	memset(&mb, 0, sizeof(mb));
+
+	for (size_t i = 0; i < len;) {
+		size_t start = i;
+		bool safe = false;
+
+		wchar_t wc;
+		if (xmbrtowc(&wc, &i, str, len, &mb) == 0) {
+			safe = xiswprint(wc, flags);
 		}
 
-		unsigned char byte = *str;
-		++str;
-		--len;
+		for (size_t j = start; j < i; ++j) {
+			if (str[j] == '\'' || str[j] == '\\') {
+				safe = false;
+				break;
+			}
+		}
 
-		const char *esc = dollar_esc(byte);
-		if (esc) {
-			dest = xstpecpy(dest, end, esc);
+		if (safe) {
+			dest = xstpencpy(dest, end, str + start, i - start);
 		} else {
-			dest = xstpecpy(dest, end, "\\x");
-			dest = xstpecpy(dest, end, hex[byte / 0x10]);
-			dest = xstpecpy(dest, end, hex[byte % 0x10]);
+			for (size_t j = start; j < i; ++j) {
+				unsigned char byte = str[j];
+				const char *esc = dollar_esc(byte);
+				if (esc) {
+					dest = xstpecpy(dest, end, esc);
+				} else {
+					static const char *hex[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"};
+					dest = xstpecpy(dest, end, "\\x");
+					dest = xstpecpy(dest, end, hex[byte / 0x10]);
+					dest = xstpecpy(dest, end, hex[byte % 0x10]);
+				}
+			}
 		}
 	}
 
