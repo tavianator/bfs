@@ -114,10 +114,15 @@ struct bftw_file {
 	struct bftw_file *parent;
 	/** The root under which this file was found. */
 	struct bftw_file *root;
-	/** The next file in the queue, if any. */
-	struct bftw_file *next;
 
-	/** LRU list links. */
+	/** The next directory to open. */
+	struct { struct bftw_file *next; } to_open;
+	/** The next directory to read. */
+	struct { struct bftw_file *next; } to_read;
+	/** The next file to visit. */
+	struct { struct bftw_file *next; } to_visit;
+
+	/** LRU list node. */
 	struct {
 		struct bftw_file *prev;
 		struct bftw_file *next;
@@ -329,7 +334,9 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 		file->nameoff = 0;
 	}
 
-	file->next = NULL;
+	file->to_open.next = NULL;
+	file->to_read.next = NULL;
+	file->to_visit.next = NULL;
 	file->lru.prev = file->lru.next = NULL;
 
 	file->refcount = 1;
@@ -398,10 +405,13 @@ struct bftw_state {
 	/** The number of I/O threads. */
 	size_t nthreads;
 
+	/** The queue of directories to open. */
+	struct bftw_list to_open;
 	/** The queue of directories to read. */
-	struct bftw_list dirs;
+	struct bftw_list to_read;
+
 	/** The queue of files to visit. */
-	struct bftw_list files;
+	struct bftw_list to_visit;
 	/** A batch of files to enqueue. */
 	struct bftw_list batch;
 
@@ -471,8 +481,10 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 	state->nthreads = nthreads;
 
-	SLIST_INIT(&state->dirs);
-	SLIST_INIT(&state->files);
+	SLIST_INIT(&state->to_open);
+	SLIST_INIT(&state->to_read);
+
+	SLIST_INIT(&state->to_visit);
 	SLIST_INIT(&state->batch);
 
 	state->file = NULL;
@@ -530,7 +542,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		}
 
 		if (!(state->flags & BFTW_SORT)) {
-			SLIST_PREPEND(&state->dirs, file);
+			SLIST_PREPEND(&state->to_read, file, to_read);
 		}
 		break;
 	}
@@ -646,71 +658,16 @@ static int bftw_file_open(struct bftw_state *state, struct bftw_file *file, cons
 
 	struct bftw_file *cur;
 	for (cur = file; cur != base; cur = cur->parent) {
-		SLIST_PREPEND(&parents, cur);
+		SLIST_PREPEND(&parents, cur, to_open);
 	}
 
-	while ((cur = SLIST_POP(&parents))) {
+	while ((cur = SLIST_POP(&parents, to_open))) {
 		if (!cur->parent || cur->parent->fd >= 0) {
 			bftw_file_openat(state, cur, cur->parent, cur->name);
 		}
 	}
 
 	return file->fd;
-}
-
-/** Push a directory onto the queue. */
-static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
-	bfs_assert(file->type == BFS_DIR);
-
-	struct bftw_cache *cache = &state->cache;
-
-	if (bftw_ioq_reserve(state) != 0) {
-		goto append;
-	}
-
-	int dfd = AT_FDCWD;
-	if (file->parent) {
-		dfd = file->parent->fd;
-		if (dfd < 0) {
-			goto append;
-		}
-		bftw_cache_pin(cache, file->parent);
-	}
-
-	if (bftw_cache_reserve(state) != 0) {
-		goto unpin;
-	}
-
-	struct bfs_dir *dir = bftw_allocdir(cache);
-	if (!dir) {
-		goto unpin;
-	}
-
-	if (ioq_opendir(state->ioq, dir, dfd, file->name, file) != 0) {
-		goto free;
-	}
-
-	file->ioqueued = true;
-	--cache->capacity;
-
-	if (state->flags & BFTW_SORT) {
-		// When sorting, dirs are always kept in order in state->dirs,
-		// and we wait for the ioq to open them before popping
-		goto append;
-	} else {
-		// When not sorting, dirs are not added to state->dirs until
-		// popped from the ioq
-		return;
-	}
-
-free:
-	bftw_freedir(cache, dir);
-unpin:
-	if (file->parent) {
-		bftw_cache_unpin(cache, file->parent);
-	}
-append:
-	SLIST_APPEND(&state->dirs, file);
 }
 
 /** Close a directory, asynchronously if possible. */
@@ -807,12 +764,76 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 	return bftw_ioq_closedir(state, dir);
 }
 
+/** Open a directory asynchronously. */
+static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
+	if (bftw_ioq_reserve(state) != 0) {
+		goto fail;
+	}
+
+	int dfd = AT_FDCWD;
+	struct bftw_cache *cache = &state->cache;
+	struct bftw_file *parent = file->parent;
+	if (parent) {
+		dfd = parent->fd;
+		if (dfd < 0) {
+			goto fail;
+		}
+		bftw_cache_pin(cache, parent);
+	}
+
+	if (bftw_cache_reserve(state) != 0) {
+		goto unpin;
+	}
+
+	struct bfs_dir *dir = bftw_allocdir(cache);
+	if (!dir) {
+		goto unpin;
+	}
+
+	if (ioq_opendir(state->ioq, dir, dfd, file->name, file) != 0) {
+		goto free;
+	}
+
+	file->ioqueued = true;
+	--cache->capacity;
+	return 0;
+
+free:
+	bftw_freedir(cache, dir);
+unpin:
+	if (parent) {
+		bftw_cache_unpin(cache, parent);
+	}
+fail:
+	return -1;
+}
+
+/** Push a directory onto the queue. */
+static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
+	bfs_assert(file->type == BFS_DIR);
+
+	SLIST_APPEND(&state->to_open, file, to_open);
+
+	if (state->flags & BFTW_SORT) {
+		// When sorting, directories are kept in order on the to_read
+		// list; otherwise, they are only added once they are open
+		SLIST_APPEND(&state->to_read, file, to_read);
+	}
+
+	while (state->to_open.head) {
+		if (bftw_ioq_opendir(state, state->to_open.head) == 0) {
+			SLIST_POP(&state->to_open, to_open);
+		} else {
+			break;
+		}
+	}
+}
+
 /** Pop a directory to read from the queue. */
 static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
-	struct bftw_file *dir = state->dirs.head;
-	bool have_files = state->files.head;
+	bool have_files = state->to_visit.head;
 
 	if (state->flags & BFTW_SORT) {
 		// Keep strict breadth-first order when sorting
@@ -820,36 +841,39 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 			return false;
 		}
 	} else {
-		while (!dir || !dir->dir) {
+		while (!state->to_read.head) {
 			// Block if we have no other files/dirs to visit, or no room in the cache
+			bool have_dirs = state->to_open.head;
 			bool have_room = state->cache.capacity > 0;
-			bool block = !(dir || have_files) || !have_room;
+			bool block = !(have_dirs || have_files) || !have_room;
 
 			if (bftw_ioq_pop(state, block) < 0) {
 				break;
 			}
-			dir = state->dirs.head;
 		}
 	}
 
-	if (!dir) {
+	struct bftw_file *file = SLIST_POP(&state->to_read, to_read);
+	if (!file || file == state->to_open.head) {
+		file = SLIST_POP(&state->to_open, to_open);
+	}
+	if (!file) {
 		return false;
 	}
 
-	SLIST_POP(&state->dirs);
-	state->file = dir;
-
-	while (dir->ioqueued) {
+	while (file->ioqueued) {
 		bftw_ioq_pop(state, true);
 	}
 
+	state->file = file;
 	return true;
 }
 
 /** Pop a file to visit from the queue. */
 static bool bftw_pop_file(struct bftw_state *state) {
 	bfs_assert(!state->file);
-	return (state->file = SLIST_POP(&state->files));
+	state->file = SLIST_POP(&state->to_visit, to_visit);
+	return state->file;
 }
 
 /** Build the path to the current file. */
@@ -1242,7 +1266,7 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 
 /** Sort a bftw_list by filename. */
 static void bftw_list_sort(struct bftw_list *list) {
-	if (!list->head || !list->head->next) {
+	if (!list->head || !list->head->to_visit.next) {
 		return;
 	}
 
@@ -1251,9 +1275,11 @@ static void bftw_list_sort(struct bftw_list *list) {
 	SLIST_INIT(&right);
 
 	// Split
-	for (struct bftw_file *hare = list->head; hare && (hare = hare->next); hare = hare->next) {
-		struct bftw_file *tortoise = SLIST_POP(list);
-		SLIST_APPEND(&left, tortoise);
+	for (struct bftw_file *hare = list->head;
+	     hare && (hare = hare->to_visit.next);
+	     hare = hare->to_visit.next) {
+		struct bftw_file *tortoise = SLIST_POP(list, to_visit);
+		SLIST_APPEND(&left, tortoise, to_visit);
 	}
 	SLIST_EXTEND(&right, list);
 
@@ -1267,11 +1293,11 @@ static void bftw_list_sort(struct bftw_list *list) {
 		struct bftw_file *rf = right.head;
 
 		if (strcoll(lf->name, rf->name) <= 0) {
-			SLIST_POP(&left);
-			SLIST_APPEND(list, lf);
+			SLIST_POP(&left, to_visit);
+			SLIST_APPEND(list, lf, to_visit);
 		} else {
-			SLIST_POP(&right);
-			SLIST_APPEND(list, rf);
+			SLIST_POP(&right, to_visit);
+			SLIST_APPEND(list, rf, to_visit);
 		}
 	}
 	SLIST_EXTEND(list, &left);
@@ -1285,9 +1311,9 @@ static void bftw_batch_finish(struct bftw_state *state) {
 	}
 
 	if (state->strategy != BFTW_BFS) {
-		SLIST_EXTEND(&state->batch, &state->files);
+		SLIST_EXTEND(&state->batch, &state->to_visit);
 	}
-	SLIST_EXTEND(&state->files, &state->batch);
+	SLIST_EXTEND(&state->to_visit, &state->batch);
 }
 
 /** Close the current directory. */
@@ -1329,7 +1355,7 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 			file->type = state->de->type;
 		}
 
-		SLIST_APPEND(&state->batch, file);
+		SLIST_APPEND(&state->batch, file, to_visit);
 		return 0;
 	}
 
@@ -1377,7 +1403,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 		state->ioq = NULL;
 	}
 
-	SLIST_EXTEND(&state->files, &state->batch);
+	SLIST_EXTEND(&state->to_visit, &state->batch);
 	do {
 		bftw_gc(state, BFTW_VISIT_NONE);
 	} while (bftw_pop_dir(state) || bftw_pop_file(state));
