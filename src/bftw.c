@@ -572,7 +572,13 @@ static int bftw_cache_reserve(struct bftw_state *state) {
 		}
 	}
 
-	return bftw_cache_pop(cache);
+	if (bftw_cache_pop(cache) != 0) {
+		errno = EMFILE;
+		return -1;
+	}
+
+	bfs_assert(cache->capacity > 0);
+	return 0;
 }
 
 /** Open a bftw_file relative to another one. */
@@ -587,8 +593,13 @@ static int bftw_file_openat(struct bftw_state *state, struct bftw_file *file, st
 		at_fd = base->fd;
 	}
 
+	int fd = -1;
+	if (bftw_cache_reserve(state) != 0) {
+		goto unpin;
+	}
+
 	int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
-	int fd = openat(at_fd, at_path, flags);
+	fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && errno == EMFILE) {
 		if (bftw_cache_pop(cache) == 0) {
@@ -597,6 +608,7 @@ static int bftw_file_openat(struct bftw_state *state, struct bftw_file *file, st
 		cache->capacity = 1;
 	}
 
+unpin:
 	if (base) {
 		bftw_cache_unpin(cache, base);
 	}
@@ -606,7 +618,7 @@ static int bftw_file_openat(struct bftw_state *state, struct bftw_file *file, st
 		bftw_cache_add(cache, file);
 	}
 
-	return file->fd;
+	return fd;
 }
 
 /** Open a bftw_file. */
