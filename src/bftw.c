@@ -219,7 +219,6 @@ static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 	bfs_assert(file->pincount == 0);
 
 	if (file->dir) {
-		bfs_assert(file->fd == bfs_dirfd(file->dir));
 		bfs_closedir(file->dir);
 		bftw_freedir(cache, file->dir);
 		file->dir = NULL;
@@ -354,7 +353,9 @@ static void bftw_file_set_dir(struct bftw_cache *cache, struct bftw_file *file, 
 	bfs_assert(!file->dir);
 	file->dir = dir;
 
-	if (file->fd < 0) {
+	if (file->fd >= 0) {
+		bfs_assert(file->fd == bfs_dirfd(dir));
+	} else {
 		file->fd = bfs_dirfd(dir);
 		bftw_cache_add(cache, file);
 	}
