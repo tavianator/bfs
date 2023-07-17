@@ -116,6 +116,16 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	bfs_dir_arena(&cache->dirs);
 }
 
+/** Allocate a directory. */
+static struct bfs_dir *bftw_allocdir(struct bftw_cache *cache) {
+	return arena_alloc(&cache->dirs);
+}
+
+/** Free a directory. */
+static void bftw_freedir(struct bftw_cache *cache, struct bfs_dir *dir) {
+	arena_free(&cache->dirs, dir);
+}
+
 /** Remove a bftw_file from the LRU list. */
 static void bftw_lru_remove(struct bftw_cache *cache, struct bftw_file *file) {
 	if (cache->target == file) {
@@ -139,7 +149,7 @@ static void bftw_file_close(struct bftw_cache *cache, struct bftw_file *file) {
 	if (file->dir) {
 		bfs_assert(file->fd == bfs_dirfd(file->dir));
 		bfs_closedir(file->dir);
-		arena_free(&cache->dirs, file->dir);
+		bftw_freedir(cache, file->dir);
 		file->dir = NULL;
 	} else {
 		xclose(file->fd);
@@ -392,13 +402,13 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_cache *cache, struct bftw_f
 		return NULL;
 	}
 
-	struct bfs_dir *dir = arena_alloc(&cache->dirs);
+	struct bfs_dir *dir = bftw_allocdir(cache);
 	if (!dir) {
 		return NULL;
 	}
 
 	if (bfs_opendir(dir, fd, NULL) != 0) {
-		arena_free(&cache->dirs, dir);
+		bftw_freedir(cache, dir);
 		return NULL;
 	}
 
@@ -895,7 +905,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 	case IOQ_CLOSEDIR:
 		++cache->capacity;
 		dir = ent->closedir.dir;
-		arena_free(&cache->dirs, dir);
+		bftw_freedir(cache, dir);
 		break;
 
 	case IOQ_OPENDIR:
@@ -911,7 +921,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		if (ent->ret == 0) {
 			bftw_file_set_dir(cache, file, dir);
 		} else {
-			arena_free(&cache->dirs, dir);
+			bftw_freedir(cache, dir);
 		}
 
 		if (!(state->flags & BFTW_SORT)) {
@@ -984,7 +994,7 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 		goto unpin;
 	}
 
-	struct bfs_dir *dir = arena_alloc(&cache->dirs);
+	struct bfs_dir *dir = bftw_allocdir(cache);
 	if (!dir) {
 		goto unpin;
 	}
@@ -1007,7 +1017,7 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 	}
 
 free:
-	arena_free(&cache->dirs, dir);
+	bftw_freedir(cache, dir);
 unpin:
 	if (file->parent) {
 		bftw_cache_unpin(cache, file->parent);
@@ -1026,7 +1036,7 @@ static int bftw_ioq_closedir(struct bftw_state *state, struct bfs_dir *dir) {
 
 	struct bftw_cache *cache = &state->cache;
 	int ret = bfs_closedir(dir);
-	arena_free(&cache->dirs, dir);
+	bftw_freedir(cache, dir);
 	++cache->capacity;
 	return ret;
 }
@@ -1081,7 +1091,7 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 #if BFS_USE_UNWRAPDIR
 	if (reffed || pinned) {
 		bfs_unwrapdir(dir);
-		arena_free(&cache->dirs, dir);
+		bftw_freedir(cache, dir);
 		file->dir = NULL;
 		return 0;
 	}
