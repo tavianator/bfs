@@ -462,42 +462,32 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 		errno = EMFILE;
 		return -1;
 	}
-
-	state->path = dstralloc(0);
-	if (!state->path) {
-		return -1;
-	}
-
 	bftw_cache_init(&state->cache, args->nopenfd);
 
-	size_t qdepth = args->nopenfd - 1;
-	if (qdepth > 1024) {
-		qdepth = 1024;
-	}
-
-	size_t nthreads = args->nthreads;
-	if (nthreads > qdepth) {
-		nthreads = qdepth;
-	}
-
-	state->ioq = NULL;
-	if (nthreads > 0) {
-		state->ioq = ioq_create(qdepth, nthreads);
+	state->nthreads = args->nthreads;
+	if (state->nthreads > 0) {
+		state->ioq = ioq_create(4096, state->nthreads);
 		if (!state->ioq) {
-			dstrfree(state->path);
 			return -1;
 		}
+	} else {
+		state->ioq = NULL;
 	}
-	state->nthreads = nthreads;
 
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
 	SLIST_INIT(&state->to_close);
-	state->dirlimit = qdepth;
+
+	size_t dirlimit = args->nopenfd - 1;
+	if (dirlimit > 1024) {
+		dirlimit = 1024;
+	}
+	state->dirlimit = dirlimit;
 
 	SLIST_INIT(&state->to_visit);
 	SLIST_INIT(&state->batch);
 
+	state->path = NULL;
 	state->file = NULL;
 	state->previous = NULL;
 
