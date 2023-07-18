@@ -1,6 +1,24 @@
 3.*
 ===
 
+3.0.1
+-----
+
+**July 18, 2023**
+
+### Bug fixes
+
+- Traversal fixes that mostly affect large directory trees ([#107])
+
+  - `bfs` could encounter `EMFILE`, close a file, and retry many times, particularly with `-j1`
+
+  - Breadth-first search could become highly unbalanced, negating many of the benefits of `bfs`
+
+  - On non-{Linux,FreeBSD} plaforms, directories could stay open longer than necessary, consuming extra memory
+
+[#107]: https://github.com/tavianator/bfs/pull/107
+
+
 3.0
 ---
 
