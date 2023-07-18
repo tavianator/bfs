@@ -119,6 +119,8 @@ struct bftw_file {
 	struct { struct bftw_file *next; } to_open;
 	/** The next directory to read. */
 	struct { struct bftw_file *next; } to_read;
+	/** The next directory to close. */
+	struct { struct bftw_file *next; } to_close;
 	/** The next file to visit. */
 	struct { struct bftw_file *next; } to_visit;
 
@@ -336,6 +338,7 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 
 	file->to_open.next = NULL;
 	file->to_read.next = NULL;
+	file->to_close.next = NULL;
 	file->to_visit.next = NULL;
 	file->lru.prev = file->lru.next = NULL;
 
@@ -411,6 +414,8 @@ struct bftw_state {
 	struct bftw_list to_open;
 	/** The queue of directories to read. */
 	struct bftw_list to_read;
+	/** The queue of unpinned directories to unwrap. */
+	struct bftw_list to_close;
 	/** Available capacity in to_read. */
 	size_t dirlimit;
 
@@ -487,6 +492,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
+	SLIST_INIT(&state->to_close);
 	state->dirlimit = qdepth;
 
 	SLIST_INIT(&state->to_visit);
@@ -516,6 +522,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 
 	struct bftw_cache *cache = &state->cache;
 	struct bftw_file *file;
+	struct bftw_file *parent;
 	struct bfs_dir *dir;
 
 	enum ioq_op op = ent->op;
@@ -535,8 +542,12 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		file->ioqueued = false;
 
 		++cache->capacity;
-		if (file->parent) {
-			bftw_cache_unpin(cache, file->parent);
+		parent = file->parent;
+		if (parent) {
+			bftw_cache_unpin(cache, parent);
+			if (parent->pincount == 0 && parent->dir) {
+				SLIST_APPEND(&state->to_close, parent, to_close);
+			}
 		}
 
 		dir = ent->opendir.dir;
@@ -1228,9 +1239,10 @@ enum bftw_gc_flags {
 static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	int ret = 0;
 
-	if (state->dir) {
-		bftw_cache_unpin(&state->cache, state->file);
-		bftw_unwrapdir(state, state->file);
+	struct bftw_file *file = state->file;
+	if (file && file->dir) {
+		bftw_cache_unpin(&state->cache, file);
+		SLIST_APPEND(&state->to_close, file, to_close);
 	}
 	state->dir = NULL;
 	state->de = NULL;
@@ -1247,9 +1259,12 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	}
 	state->direrror = 0;
 
+	while ((file = SLIST_POP(&state->to_close, to_close))) {
+		bftw_unwrapdir(state, file);
+	}
+
 	enum bftw_gc_flags visit = BFTW_VISIT_FILE;
-	while (state->file) {
-		struct bftw_file *file = state->file;
+	while ((file = state->file)) {
 		if (--file->refcount > 0) {
 			state->file = NULL;
 			break;
