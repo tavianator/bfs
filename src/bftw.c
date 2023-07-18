@@ -366,6 +366,8 @@ static void bftw_file_set_dir(struct bftw_cache *cache, struct bftw_file *file, 
 		file->fd = bfs_dirfd(dir);
 		bftw_cache_add(cache, file);
 	}
+
+	bftw_cache_pin(cache, file);
 }
 
 /** Free a bftw_file. */
@@ -409,6 +411,8 @@ struct bftw_state {
 	struct bftw_list to_open;
 	/** The queue of directories to read. */
 	struct bftw_list to_read;
+	/** Available capacity in to_read. */
+	size_t dirlimit;
 
 	/** The queue of files to visit. */
 	struct bftw_list to_visit;
@@ -483,6 +487,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
+	state->dirlimit = qdepth;
 
 	SLIST_INIT(&state->to_visit);
 	SLIST_INIT(&state->batch);
@@ -539,10 +544,11 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 			bftw_file_set_dir(cache, file, dir);
 		} else {
 			bftw_freedir(cache, dir);
+			++state->dirlimit;
 		}
 
 		if (!(state->flags & BFTW_SORT)) {
-			SLIST_PREPEND(&state->to_read, file, to_read);
+			SLIST_APPEND(&state->to_read, file, to_read);
 		}
 		break;
 	}
@@ -766,6 +772,10 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 
 /** Open a directory asynchronously. */
 static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
+	if (state->dirlimit == 0) {
+		goto fail;
+	}
+
 	if (bftw_ioq_reserve(state) != 0) {
 		goto fail;
 	}
@@ -796,6 +806,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 
 	file->ioqueued = true;
 	--cache->capacity;
+	--state->dirlimit;
 	return 0;
 
 free:
@@ -859,6 +870,10 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 	}
 	if (!file) {
 		return false;
+	}
+
+	if (file->dir) {
+		++state->dirlimit;
 	}
 
 	while (file->ioqueued) {
@@ -953,18 +968,17 @@ static int bftw_opendir(struct bftw_state *state) {
 	state->direrror = 0;
 
 	struct bftw_file *file = state->file;
-	if (file->dir) {
-		state->dir = file->dir;
-	} else {
-		if (bftw_build_path(state, NULL) != 0) {
-			return -1;
-		}
-		state->dir = bftw_file_opendir(state, file, state->path);
+	state->dir = file->dir;
+	if (state->dir) {
+		return 0;
 	}
 
-	if (state->dir) {
-		bftw_cache_pin(&state->cache, file);
-	} else {
+	if (bftw_build_path(state, NULL) != 0) {
+		return -1;
+	}
+
+	state->dir = bftw_file_opendir(state, file, state->path);
+	if (!state->dir) {
 		state->direrror = errno;
 	}
 
