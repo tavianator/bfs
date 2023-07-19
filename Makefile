@@ -162,7 +162,7 @@ endif
 
 ifneq ($(filter release,$(MAKECMDGOALS)),)
 LOCAL_CPPFLAGS += -DNDEBUG
-CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto
+CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto=auto
 endif
 
 ALL_CPPFLAGS = $(LOCAL_CPPFLAGS) $(CPPFLAGS) $(EXTRA_CPPFLAGS)
