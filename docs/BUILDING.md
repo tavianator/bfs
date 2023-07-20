@@ -49,7 +49,7 @@ You can combine multiple flags and other targets (e.g. `make asan ubsan check`),
 ### Flags
 
 Other flags are controlled with `make` variables and/or environment variables.
-Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
+Here are some of the common ones; check the [`GNUmakefile`](/GNUmakefile) for more.
 
 | Flag                             | Description                                 |
 |----------------------------------|---------------------------------------------|
@@ -84,7 +84,7 @@ These dependencies are optional, and can be turned off at build time if necessar
 
 ### Dependency tracking
 
-The build system automatically tracks header dependencies with the `-M` family of compiler options (see `DEPFLAGS` in the [`Makefile`](/Makefile)).
+The build system automatically tracks header dependencies with the `-M` family of compiler options (see `DEPFLAGS` in the [`GNUmakefile`](/GNUmakefile)).
 So if you edit a header file, `make` will rebuild the necessary object files ensuring they don't go out of sync.
 
 We go one step further than most build systems by tracking the flags that were used for the previous compilation.

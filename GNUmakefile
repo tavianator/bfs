@@ -174,7 +174,7 @@ ALL_LDLIBS = $(LOCAL_LDLIBS) $(LDLIBS) $(EXTRA_LDLIBS)
 bfs: $(BIN)/bfs
 .PHONY: bfs
 
-# Goals that are treated like flags by this Makefile
+# Goals that are treated like flags by this makefile
 FLAG_GOALS := asan lsan msan tsan ubsan gcov release
 
 # These are the remaining non-flag goals
