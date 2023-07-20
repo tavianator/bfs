@@ -218,8 +218,8 @@ Installation
 <strong><a href="https://pkgs.alpinelinux.org/packages?name=bfs">Alpine Linux</a></strong>
 # apk add bfs
 
-<strong><a href="https://aur.archlinux.org/packages/bfs">Arch Linux</a></strong>
-(Available in the AUR)
+<strong><a href="https://archlinux.org/packages/extra/x86_64/bfs/">Arch Linux</a></strong>
+# pacman -S bfs
 
 <strong><a href="https://packages.debian.org/sid/bfs">Debian</a>/<a href="https://packages.ubuntu.com/kinetic/bfs">Ubuntu</a></strong>
 # apt install bfs
