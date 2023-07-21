@@ -241,6 +241,7 @@ LIBBFS := \
     $(OBJ)/src/dstring.o \
     $(OBJ)/src/eval.o \
     $(OBJ)/src/exec.o \
+    $(OBJ)/src/expr.o \
     $(OBJ)/src/fsade.o \
     $(OBJ)/src/ioq.o \
     $(OBJ)/src/mtab.o \
