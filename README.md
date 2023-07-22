@@ -79,6 +79,19 @@ On the other hand, `bfs` lists files from shallowest to deepest, so you never ha
 <td width="506" valign="top">
 
 ```console
+$ bfs haystack
+haystack
+haystack/deep
+haystack/shallow
+haystack/deep/1
+haystack/shallow/needle
+...
+```
+
+</td>
+<td width="506" valign="top">
+
+```console
 $ find haystack
 haystack
 haystack/deep
@@ -89,19 +102,6 @@ haystack/deep/1/2/3/4
 ...
 haystack/shallow
 haystack/shallow/needle
-```
-
-</td>
-<td width="506" valign="top">
-
-```console
-$ bfs haystack
-haystack
-haystack/deep
-haystack/shallow
-haystack/deep/1
-haystack/shallow/needle
-...
 ```
 
 </td>
