@@ -239,8 +239,8 @@ Installation
 <strong><a href="https://ports.macports.org/port/bfs/">MacPorts</a></strong>
 # port install bfs
 
-<strong><a href="https://github.com/tavianator/homebrew-tap/blob/master/Formula/bfs.rb">Homebrew</a></strong>
-$ brew install tavianator/tap/bfs
+<strong><a href="https://formulae.brew.sh/formula/bfs">Homebrew</a></strong>
+$ brew install bfs
 </pre>
 </details>
 
