@@ -241,7 +241,7 @@ static inline uint8_t bswap8(uint8_t n) {
 
 #define TRAILING_ZEROS(type, suffix, width) \
 	static inline int trailing_zeros##suffix(type n) { \
-		return n ? UINT_BUILTIN(ctz, suffix)(n) : width; \
+		return n ? UINT_BUILTIN(ctz, suffix)(n) : (int)width; \
 	}
 
 #define FIRST_TRAILING_ONE(type, suffix, width) \
