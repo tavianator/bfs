@@ -162,7 +162,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 	}
 
 	// Callers shouldn't have to check anything except the times
-	const unsigned int guaranteed = STATX_BASIC_STATS ^ (STATX_ATIME | STATX_CTIME | STATX_MTIME);
+	const unsigned int guaranteed = STATX_BASIC_STATS & ~(STATX_ATIME | STATX_CTIME | STATX_MTIME);
 	if ((xbuf.stx_mask & guaranteed) != guaranteed) {
 		errno = ENOTSUP;
 		return -1;
@@ -173,43 +173,27 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 	buf->dev = xmakedev(xbuf.stx_dev_major, xbuf.stx_dev_minor);
 	buf->mask |= BFS_STAT_DEV;
 
-	if (xbuf.stx_mask & STATX_INO) {
-		buf->ino = xbuf.stx_ino;
-		buf->mask |= BFS_STAT_INO;
-	}
+	buf->ino = xbuf.stx_ino;
+	buf->mask |= BFS_STAT_INO;
 
 	buf->mode = xbuf.stx_mode;
-	if (xbuf.stx_mask & STATX_TYPE) {
-		buf->mask |= BFS_STAT_TYPE;
-	}
-	if (xbuf.stx_mask & STATX_MODE) {
-		buf->mask |= BFS_STAT_MODE;
-	}
+	buf->mask |= BFS_STAT_TYPE;
+	buf->mask |= BFS_STAT_MODE;
 
-	if (xbuf.stx_mask & STATX_NLINK) {
-		buf->nlink = xbuf.stx_nlink;
-		buf->mask |= BFS_STAT_NLINK;
-	}
+	buf->nlink = xbuf.stx_nlink;
+	buf->mask |= BFS_STAT_NLINK;
 
-	if (xbuf.stx_mask & STATX_GID) {
-		buf->gid = xbuf.stx_gid;
-		buf->mask |= BFS_STAT_GID;
-	}
+	buf->gid = xbuf.stx_gid;
+	buf->mask |= BFS_STAT_GID;
 
-	if (xbuf.stx_mask & STATX_UID) {
-		buf->uid = xbuf.stx_uid;
-		buf->mask |= BFS_STAT_UID;
-	}
+	buf->uid = xbuf.stx_uid;
+	buf->mask |= BFS_STAT_UID;
 
-	if (xbuf.stx_mask & STATX_SIZE) {
-		buf->size = xbuf.stx_size;
-		buf->mask |= BFS_STAT_SIZE;
-	}
+	buf->size = xbuf.stx_size;
+	buf->mask |= BFS_STAT_SIZE;
 
-	if (xbuf.stx_mask & STATX_BLOCKS) {
-		buf->blocks = xbuf.stx_blocks;
-		buf->mask |= BFS_STAT_BLOCKS;
-	}
+	buf->blocks = xbuf.stx_blocks;
+	buf->mask |= BFS_STAT_BLOCKS;
 
 	buf->rdev = xmakedev(xbuf.stx_rdev_major, xbuf.stx_rdev_minor);
 	buf->mask |= BFS_STAT_RDEV;
