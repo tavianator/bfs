@@ -5,6 +5,7 @@
 #include "bit.h"
 #include "config.h"
 #include "diag.h"
+#include "thread.h"
 #include "xregex.h"
 #include <ctype.h>
 #include <errno.h>
@@ -580,16 +581,39 @@ size_t xstrwidth(const char *str) {
 	return ret;
 }
 
+/**
+ * Character type flags.
+ */
+enum ctype {
+	IS_PRINT = 1 << 0,
+	IS_SPACE = 1 << 1,
+};
+
+/** Cached ctypes. */
+static unsigned char ctype_cache[UCHAR_MAX + 1];
+
+/** Initialize the ctype cache. */
+static void char_cache_init(void) {
+	for (size_t c = 0; c <= UCHAR_MAX; ++c) {
+		if (isprint(c)) {
+			ctype_cache[c] |= IS_PRINT;
+		}
+		if (isspace(c)) {
+			ctype_cache[c] |= IS_SPACE;
+		}
+	}
+}
+
 /** Check if a character is printable. */
 static bool xisprint(unsigned char c, enum wesc_flags flags) {
-	if (isprint(c)) {
+	if (ctype_cache[c] & IS_PRINT) {
 		return true;
 	}
 
 	// Technically a literal newline is safe inside single quotes, but $'\n'
 	// is much nicer than '
 	// '
-	if (!(flags & WESC_SHELL) && isspace(c)) {
+	if (!(flags & WESC_SHELL) && (ctype_cache[c] & IS_SPACE)) {
 		return true;
 	}
 
@@ -611,6 +635,9 @@ static bool xiswprint(wchar_t c, enum wesc_flags flags) {
 
 /** Get the length of the longest printable prefix of a string. */
 static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) {
+	static pthread_once_t once = PTHREAD_ONCE_INIT;
+	call_once(&once, char_cache_init);
+
 	// Fast path: avoid multibyte checks
 	size_t i;
 	for (i = 0; i < len; ++i) {
