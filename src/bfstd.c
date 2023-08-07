@@ -639,17 +639,34 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 	call_once(&once, char_cache_init);
 
 	// Fast path: avoid multibyte checks
-	size_t i;
-	for (i = 0; i < len; ++i) {
+	size_t i, word;
+	for (i = 0; i + sizeof(word) <= len;) {
+		// Word-at-a-time isascii()
+		memcpy(&word, str + i, sizeof(word));
+		// 0xFFFF... / 0xFF == 0x10101...
+		size_t mask = (SIZE_MAX / 0xFF) << 7;
+		if (word & mask) {
+			goto multibyte;
+		}
+
+		for (size_t j = 0; j < sizeof(word); ++i, ++j) {
+			if (!xisprint(str[i], flags)) {
+				return i;
+			}
+		}
+	}
+
+	for (; i < len; ++i) {
 		unsigned char c = str[i];
 		if (!isascii(c)) {
-			break;
+			goto multibyte;
 		}
 		if (!xisprint(c, flags)) {
 			return i;
 		}
 	}
 
+multibyte:
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
 
