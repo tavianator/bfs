@@ -666,8 +666,8 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 		}
 	}
 
-multibyte:
 	mbstate_t mb;
+multibyte:
 	memset(&mb, 0, sizeof(mb));
 
 	while (i < len) {
