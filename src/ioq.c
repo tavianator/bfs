@@ -146,10 +146,15 @@ static struct ioqq *ioqq_create(size_t size) {
 	return ioqq;
 }
 
+/** Get the monitor associated with a slot. */
+static struct ioq_monitor *ioq_slot_monitor(struct ioqq *ioqq, ioq_slot *slot) {
+	size_t i = slot - ioqq->slots;
+	return &ioqq->monitors[i & ioqq->monitor_mask];
+}
+
 /** Atomically wait for a slot to change. */
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
-	size_t i = slot - ioqq->slots;
-	struct ioq_monitor *monitor = &ioqq->monitors[i & ioqq->monitor_mask];
+	struct ioq_monitor *monitor = ioq_slot_monitor(ioqq, slot);
 	mutex_lock(&monitor->mutex);
 
 	uintptr_t ret = load(slot, relaxed);
@@ -178,8 +183,7 @@ done:
 
 /** Wake up any threads waiting on a slot. */
 static void ioq_slot_wake(struct ioqq *ioqq, ioq_slot *slot) {
-	size_t i = slot - ioqq->slots;
-	struct ioq_monitor *monitor = &ioqq->monitors[i & ioqq->monitor_mask];
+	struct ioq_monitor *monitor = ioq_slot_monitor(ioqq, slot);
 
 	// The following implementation would clearly avoid the missed wakeup
 	// issue mentioned above in ioq_slot_wait():
