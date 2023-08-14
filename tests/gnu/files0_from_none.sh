@@ -1,1 +1,1 @@
-! printf "" | invoke_bfs -files0-from -
+printf "" | bfs_diff -files0-from -

@@ -194,8 +194,6 @@ struct parser_state {
 	char **mount_arg;
 	/** An "-xdev" argument, if any. */
 	char **xdev_arg;
-	/** A "-files0-from" argument, if any. */
-	char **files0_arg;
 	/** A "-files0-from -" argument, if any. */
 	char **files0_stdin_arg;
 	/** An "-ok"-type expression, if any. */
@@ -1318,7 +1316,6 @@ static struct bfs_expr *parse_files0_from(struct parser_state *state, int arg1, 
 		return NULL;
 	}
 
-	state->files0_arg = expr->argv;
 	const char *from = expr->argv[1];
 
 	FILE *file;
@@ -1350,7 +1347,7 @@ static struct bfs_expr *parse_files0_from(struct parser_state *state, int arg1, 
 	}
 
 	if (file == stdin) {
-		state->files0_stdin_arg = state->files0_arg;
+		state->files0_stdin_arg = expr->argv;
 	} else {
 		fclose(file);
 	}
@@ -3720,7 +3717,6 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.prune_arg = NULL,
 		.mount_arg = NULL,
 		.xdev_arg = NULL,
-		.files0_arg = NULL,
 		.files0_stdin_arg = NULL,
 		.ok_expr = NULL,
 		.now = ctx->now,
@@ -3748,11 +3744,8 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	if (darray_length(ctx->paths) == 0) {
-		if (!state.implicit_root) {
-			parse_argv_error(&state, state.files0_arg, 2, "No root paths specified.\n");
-			goto fail;
-		} else if (parse_root(&state, ".") != 0) {
+	if (darray_length(ctx->paths) == 0 && state.implicit_root) {
+		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}
 	}
