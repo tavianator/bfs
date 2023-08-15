@@ -728,6 +728,13 @@ instead.
 .TP
 .B \-prune
 Don't descend into this directory.
+This has no effect if
+.B \-depth
+is enabled (either explicitly, or implicitly by
+.BR \-delete ).
+Use
+.B \-exclude
+instead in that case.
 .TP
 .B \-quit
 Quit immediately.
