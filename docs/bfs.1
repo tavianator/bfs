@@ -329,11 +329,40 @@ Ignored; for compatibility with GNU find.
 \fB\-regextype \fITYPE\fR
 Use
 .IR TYPE -flavored
-regexes (default:
-.IR posix-basic ;
-see
-.B \-regextype
-.IR help ).
+regular expressions.
+The possible types are
+.RS
+.TP
+.I posix-basic
+POSIX basic regular expressions (the default).
+.TP
+.I posix-extended
+POSIX extended resular expressions.
+.TP
+.I ed
+Like
+.BR ed (1)
+(same as
+.IR posix-basic ).
+.TP
+.I emacs
+Like
+.BR emacs (1).
+.TP
+.I grep
+Like
+.BR grep (1).
+.TP
+.I sed
+Like
+.BR sed (1)
+(same as
+.IR posix-basic ).
+.PP
+See
+.BR regex (7)
+for a description of regular expression syntax.
+.RE
 .TP
 .B \-status
 Display a status bar while searching.
