@@ -575,21 +575,46 @@ Find files that occupy fewer disk blocks than expected.
 .TP
 \fB\-type\fR [\fIbcdlpfswD\fR]
 Find files of the given type.
-Possible types are
+The possible types are
+.PP
+.RS
+\(bu
 .IR b lock
-device,
+device
+.br
+\(bu
 .IR c haracter
-device,
-.IR d irectory,
-symbolic
-.IR l ink,
-.IR p ipe,
-regular
-.IR f ile,
-.IR s ocket,
-.IR w hiteout,
-and
-.IR D oor.
+device
+.br
+\(bu
+.IR d irectory
+.br
+\(bu
+.IR l ink
+(symbolic)
+.br
+\(bu
+.IR p ipe
+.br
+\(bu
+.IR f ile
+(regular)
+.br
+\(bu
+.IR s ocket
+.br
+\(bu
+.IR w hiteout
+.br
+\(bu
+.IR D oor
+.PP
+Multiple types can be given at once, separated by commas.
+For example,
+.B \-type
+.I d,f
+matches both directories and regular files.
+.RE
 .TP
 \fB\-used\fR [\fI\-+\fR]\fIN\fR
 Find files last accessed
