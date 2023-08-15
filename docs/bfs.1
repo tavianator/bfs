@@ -90,7 +90,7 @@ Follow all symbolic links.
 Never follow symbolic links (the default).
 .TP
 .B \-E
-Use extended regular expressions (same as \fB\-regextype posix-extended\fR).
+Use extended regular expressions (same as \fB\-regextype \fIposix-extended\fR).
 .TP
 .B \-X
 Filter out files with
@@ -432,9 +432,9 @@ Find files the current user can execute/read/write.
 Always false/true.
 .RE
 .TP
-.B \-fstype TYPE
+\fB\-fstype \fITYPE\fR
 Find files on file systems with the given
-.BR TYPE .
+.IR TYPE .
 .PP
 \fB\-gid\fR [\fI\-+\fR]\fIN\fR
 .br
@@ -632,7 +632,9 @@ but run the command in the same directory as the found file(s).
 .RE
 .TP
 \fB\-exit\fR [\fISTATUS\fR]
-Exit immediately with the given status (0 if unspecified).
+Exit immediately with the given status
+.RI ( 0
+if unspecified).
 .PP
 \fB\-fls \fIFILE\fR
 .br
