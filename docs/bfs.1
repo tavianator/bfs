@@ -554,14 +554,21 @@ See
 for examples of the timestamp format.
 .TP
 \fB\-size\fR [\fI\-+\fR]\fIN\fR[\fIcwbkMGTP\fR]
-Find files with the given size, in 1-byte
-.IR c haracters,
-2-byte
-.IR w ords,
-512-byte
-.IR b locks
-(default), or
-.IR k iB/ M iB/ G iB/ T iB/ P iB.
+Find files with the given size.
+The unit can be one of
+.PP
+.RS
+.nf
+\(bu \fIc\fRhars  (1 byte)
+\(bu \fIw\fRords  (2 bytes)
+\(bu \fIb\fRlocks (512 bytes, the default)
+\(bu \fIk\fRiB    (1024 bytes)
+\(bu \fIM\fRiB    (1024 kiB)
+\(bu \fIG\fRiB    (1024 MiB)
+\(bu \fIT\fRiB    (1024 GiB)
+\(bu \fIP\fRiB    (1024 TiB)
+.fi
+.RE
 .TP
 .B \-sparse
 Find files that occupy fewer disk blocks than expected.
