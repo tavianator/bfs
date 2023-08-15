@@ -794,7 +794,17 @@ Specifies the pager used for
 .B \-help
 output.
 Defaults to
+.BR less (1),
+if found on the current
+.BR PATH ,
+otherwise
 .BR more (1).
+.TP
+.B PATH
+Used to resolve executables for
+.BR \-exec [ dir ]
+and
+.BR \-ok [ dir ].
 .TP
 .B POSIXLY_CORRECT
 Makes
