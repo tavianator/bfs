@@ -811,10 +811,31 @@ Makes
 .B bfs
 conform more strictly to the POSIX.1-2017 specification for
 .BR find (1).
-Currently this just disables warnings by default.
+Currently this has two effects:
+.RS
+.IP \(bu
+Disables warnings by default, because POSIX prohibits writing to standard error (except for the
+.B \-ok
+prompt), unless the command also fails with a non-zero exit status.
+.IP \(bu
+Makes
+.B \-ls
+and
+.B \-fls
+use 512-byte blocks instead of 1024-byte blocks.
+(POSIX does not specify these actions, but BSD
+.BR find (1)
+implementations use 512-byte blocks, while GNU
+.BR find (1)
+uses 1024-byte blocks by default.)
+.PP
 It does not disable
 .BR bfs 's
 various extensions to the base POSIX functionality.
+.B POSIXLY_CORRECT
+has the same effects on GNU
+.BR find (1).
+.RE
 .SH EXAMPLES
 .TP
 .B bfs
