@@ -131,6 +131,7 @@
 #include "diag.h"
 #include "dir.h"
 #include "sanity.h"
+#include "stat.h"
 #include "thread.h"
 #include <assert.h>
 #include <errno.h>
@@ -432,6 +433,10 @@ struct ioq {
 
 	/** ioq_ent arena. */
 	struct arena ents;
+#if BFS_USE_LIBURING && BFS_USE_STATX
+	/** struct statx arena. */
+	struct arena xbufs;
+#endif
 
 	/** Pending I/O requests. */
 	struct ioqq *pending;
@@ -479,6 +484,12 @@ static void ioq_dispatch_sync(struct ioq *ioq, struct ioq_ent *ent) {
 		case IOQ_CLOSEDIR:
 			ent->result = try(bfs_closedir(ent->closedir.dir));
 			return;
+
+		case IOQ_STAT: {
+			struct ioq_stat *args = &ent->stat;
+			ent->result = try(bfs_stat(args->dfd, args->path, args->flags, args->buf));
+			return;
+		}
 	}
 
 	bfs_bug("Unknown ioq_op %d", (int)ent->op);
@@ -549,6 +560,17 @@ static struct io_uring_sqe *ioq_dispatch_async(struct io_uring *ring, struct ioq
 			io_uring_prep_close(sqe, bfs_unwrapdir(ent->closedir.dir));
 #endif
 			return sqe;
+
+		case IOQ_STAT: {
+#if BFS_USE_STATX
+			sqe = io_uring_get_sqe(ring);
+			struct ioq_stat *args = &ent->stat;
+			int flags = bfs_statx_flags(args->flags);
+			unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
+			io_uring_prep_statx(sqe, args->dfd, args->path, flags, mask, args->xbuf);
+#endif
+			return sqe;
+		}
 	}
 
 	bfs_bug("Unknown ioq_op %d", (int)ent->op);
@@ -597,21 +619,41 @@ static void ioq_reap_cqe(struct ioq_ring_state *state, struct io_uring_cqe *cqe)
 	io_uring_cqe_seen(ring, cqe);
 	--state->submitted;
 
-	if (ent->op == IOQ_OPENDIR && ent->result >= 0) {
-		int fd = ent->result;
-		if (ioq_check_cancel(ioq, ent)) {
-			xclose(fd);
-			return;
-		}
-
-		struct ioq_opendir *args = &ent->opendir;
-		ent->result = try(bfs_opendir(args->dir, fd, NULL, args->flags));
-		if (ent->result >= 0) {
-			// TODO: io_uring_prep_getdents()
-			bfs_polldir(args->dir);
-		}
+	if (ent->result < 0) {
+		goto push;
 	}
 
+	switch (ent->op) {
+		case IOQ_OPENDIR: {
+			int fd = ent->result;
+			if (ioq_check_cancel(ioq, ent)) {
+				xclose(fd);
+				return;
+			}
+
+			struct ioq_opendir *args = &ent->opendir;
+			ent->result = try(bfs_opendir(args->dir, fd, NULL, args->flags));
+			if (ent->result >= 0) {
+				// TODO: io_uring_prep_getdents()
+				bfs_polldir(args->dir);
+			}
+
+			break;
+		}
+
+#if BFS_USE_STATX
+		case IOQ_STAT: {
+			struct ioq_stat *args = &ent->stat;
+			ent->result = try(bfs_statx_convert(args->buf, args->xbuf));
+			break;
+		}
+#endif
+
+		default:
+			break;
+	}
+
+push:
 	ioqq_push(ioq->ready, ent);
 }
 
@@ -689,7 +731,12 @@ struct ioq *ioq_create(size_t depth, size_t nthreads) {
 	}
 
 	ioq->depth = depth;
+
 	ARENA_INIT(&ioq->ents, struct ioq_ent);
+
+#if BFS_USE_LIBURING && BFS_USE_STATX
+	ARENA_INIT(&ioq->xbufs, struct statx);
+#endif
 
 	ioq->pending = ioqq_create(depth);
 	if (!ioq->pending) {
@@ -807,6 +854,30 @@ int ioq_closedir(struct ioq *ioq, struct bfs_dir *dir, void *ptr) {
 	return 0;
 }
 
+int ioq_stat(struct ioq *ioq, int dfd, const char *path, enum bfs_stat_flags flags, struct bfs_stat *buf, void *ptr) {
+	struct ioq_ent *ent = ioq_request(ioq, IOQ_STAT, ptr);
+	if (!ent) {
+		return -1;
+	}
+
+	struct ioq_stat *args = &ent->stat;
+	args->dfd = dfd;
+	args->path = path;
+	args->flags = flags;
+	args->buf = buf;
+
+#if BFS_USE_LIBURING && BFS_USE_STATX
+	args->xbuf = arena_alloc(&ioq->xbufs);
+	if (!args->xbuf) {
+		ioq_free(ioq, ent);
+		return -1;
+	}
+#endif
+
+	ioqq_push(ioq->pending, ent);
+	return 0;
+}
+
 struct ioq_ent *ioq_pop(struct ioq *ioq, bool block) {
 	if (ioq->size == 0) {
 		return NULL;
@@ -818,6 +889,12 @@ struct ioq_ent *ioq_pop(struct ioq *ioq, bool block) {
 void ioq_free(struct ioq *ioq, struct ioq_ent *ent) {
 	bfs_assert(ioq->size > 0);
 	--ioq->size;
+
+#if BFS_USE_LIBURING && BFS_USE_STATX
+	if (ent->op == IOQ_STAT) {
+		arena_free(&ioq->xbufs, ent->stat.xbuf);
+	}
+#endif
 
 	arena_free(&ioq->ents, ent);
 }
@@ -848,6 +925,9 @@ void ioq_destroy(struct ioq *ioq) {
 	ioqq_destroy(ioq->ready);
 	ioqq_destroy(ioq->pending);
 
+#if BFS_USE_LIBURING && BFS_USE_STATX
+	arena_destroy(&ioq->xbufs);
+#endif
 	arena_destroy(&ioq->ents);
 
 	free(ioq);

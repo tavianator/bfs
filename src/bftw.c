@@ -631,6 +631,9 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 			SLIST_APPEND(&state->to_read, file, to_read);
 		}
 		break;
+
+	case IOQ_STAT:
+		break;
 	}
 
 	ioq_free(ioq, ent);

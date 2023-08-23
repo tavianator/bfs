@@ -10,6 +10,7 @@
 
 #include "config.h"
 #include "dir.h"
+#include "stat.h"
 #include <stddef.h>
 
 /**
@@ -27,6 +28,8 @@ enum ioq_op {
 	IOQ_OPENDIR,
 	/** ioq_closedir(). */
 	IOQ_CLOSEDIR,
+	/** ioq_stat(). */
+	IOQ_STAT,
 };
 
 /**
@@ -59,6 +62,14 @@ struct ioq_ent {
 		struct ioq_closedir {
 			struct bfs_dir *dir;
 		} closedir;
+		/** ioq_stat() args. */
+		struct ioq_stat {
+			int dfd;
+			const char *path;
+			enum bfs_stat_flags flags;
+			struct bfs_stat *buf;
+			void *xbuf;
+		} stat;
 	};
 };
 
@@ -126,6 +137,26 @@ int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path,
  *         0 on success, or -1 on failure.
  */
 int ioq_closedir(struct ioq *ioq, struct bfs_dir *dir, void *ptr);
+
+/**
+ * Asynchronous bfs_stat().
+ *
+ * @param ioq
+ *         The I/O queue.
+ * @param dfd
+ *         The base file descriptor.
+ * @param path
+ *         The path to stat, relative to dfd.
+ * @param flags
+ *         Flags that affect the lookup.
+ * @param buf
+ *         A place to store the stat buffer, if successful.
+ * @param ptr
+ *         An arbitrary pointer to associate with the request.
+ * @return
+ *         0 on success, or -1 on failure.
+ */
+int ioq_stat(struct ioq *ioq, int dfd, const char *path, enum bfs_stat_flags flags, struct bfs_stat *buf, void *ptr);
 
 /**
  * Pop a response from the queue.
