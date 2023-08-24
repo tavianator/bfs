@@ -3,6 +3,7 @@
 
 #include "../src/bfstd.h"
 #include "../src/config.h"
+#include "../src/sanity.h"
 #include "../src/xtime.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -172,6 +173,8 @@ int main(int argc, char *argv[]) {
 	if (marg) {
 		char *end;
 		long mode = strtol(marg, &end, 8);
+		// https://github.com/llvm/llvm-project/issues/64946
+		sanitize_init(&end);
 		if (*marg && !*end && mode >= 0 && mode < 01000) {
 			args.fmode = args.dmode = mode;
 		} else {

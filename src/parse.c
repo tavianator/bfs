@@ -582,6 +582,9 @@ static const char *parse_int(const struct parser_state *state, char **arg, const
 		}
 	}
 
+	// https://github.com/llvm/llvm-project/issues/64946
+	sanitize_init(&endptr);
+
 	if (endptr == str) {
 		goto bad;
 	}
