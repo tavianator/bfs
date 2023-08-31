@@ -20,12 +20,16 @@ static void *MISSING = &MISSING;
 typedef void *bfs_getent_fn(const void *key, void *ptr, size_t bufsize);
 
 /** Shared scaffolding for get{pw,gr}{nam,?id}_r(). */
-static void *bfs_getent(bfs_getent_fn *fn, const void *key, struct trie_leaf *leaf, struct varena *varena, size_t bufsize) {
+static void *bfs_getent(bfs_getent_fn *fn, const void *key, struct trie_leaf *leaf, struct varena *varena) {
 	if (leaf->value) {
 		errno = 0;
 		return leaf->value == MISSING ? NULL : leaf->value;
 	}
 
+	// _SC_GET{PW,GR}_R_SIZE_MAX tend to be fairly large (~1K).  That's okay
+	// for temporary allocations, but for these long-lived ones, let's start
+	// with a smaller buffer.
+	size_t bufsize = 128;
 	void *ptr = varena_alloc(varena, bufsize);
 	if (!ptr) {
 		return NULL;
@@ -63,8 +67,6 @@ struct bfs_passwd {
 };
 
 struct bfs_users {
-	/** Initial buffer size for getpw*_r(). */
-	size_t bufsize;
 	/** bfs_passwd arena. */
 	struct varena varena;
 	/** A map from usernames to entries. */
@@ -77,13 +79,6 @@ struct bfs_users *bfs_users_new(void) {
 	struct bfs_users *users = ALLOC(struct bfs_users);
 	if (!users) {
 		return NULL;
-	}
-
-	long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-	if (bufsize > 0) {
-		users->bufsize = bufsize;
-	} else {
-		users->bufsize = 1024;
 	}
 
 	VARENA_INIT(&users->varena, struct bfs_passwd, buf);
@@ -107,7 +102,7 @@ const struct passwd *bfs_getpwnam(struct bfs_users *users, const char *name) {
 		return NULL;
 	}
 
-	return bfs_getent(bfs_getpwnam_impl, name, leaf, &users->varena, users->bufsize);
+	return bfs_getent(bfs_getpwnam_impl, name, leaf, &users->varena);
 }
 
 /** bfs_getent() callback for getpwuid_r(). */
@@ -126,7 +121,7 @@ const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid) {
 		return NULL;
 	}
 
-	return bfs_getent(bfs_getpwuid_impl, &uid, leaf, &users->varena, users->bufsize);
+	return bfs_getent(bfs_getpwuid_impl, &uid, leaf, &users->varena);
 }
 
 void bfs_users_flush(struct bfs_users *users) {
@@ -153,8 +148,6 @@ struct bfs_group {
 };
 
 struct bfs_groups {
-	/** Initial buffer size for getgr*_r(). */
-	size_t bufsize;
 	/** bfs_group arena. */
 	struct varena varena;
 	/** A map from group names to entries. */
@@ -167,13 +160,6 @@ struct bfs_groups *bfs_groups_new(void) {
 	struct bfs_groups *groups = ALLOC(struct bfs_groups);
 	if (!groups) {
 		return NULL;
-	}
-
-	long bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
-	if (bufsize > 0) {
-		groups->bufsize = bufsize;
-	} else {
-		groups->bufsize = 1024;
 	}
 
 	VARENA_INIT(&groups->varena, struct bfs_group, buf);
@@ -197,7 +183,7 @@ const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name) {
 		return NULL;
 	}
 
-	return bfs_getent(bfs_getgrnam_impl, name, leaf, &groups->varena, groups->bufsize);
+	return bfs_getent(bfs_getgrnam_impl, name, leaf, &groups->varena);
 }
 
 /** bfs_getent() callback for getgrgid_r(). */
@@ -216,7 +202,7 @@ const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid) {
 		return NULL;
 	}
 
-	return bfs_getent(bfs_getgrgid_impl, &gid, leaf, &groups->varena, groups->bufsize);
+	return bfs_getent(bfs_getgrgid_impl, &gid, leaf, &groups->varena);
 }
 
 void bfs_groups_flush(struct bfs_groups *groups) {
