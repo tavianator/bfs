@@ -283,6 +283,21 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 	return ret;
 }
 
+void *varena_grow(struct varena *varena, void *ptr, size_t *count) {
+	size_t old_count = *count;
+
+	// Round up to the limit of the current size class.  If we're already at
+	// the limit, go to the next size class.
+	size_t new_shift = varena_size_class(varena, old_count + 1) + varena->shift;
+	size_t new_count = (size_t)1 << new_shift;
+
+	ptr = varena_realloc(varena, ptr, old_count, new_count);
+	if (ptr) {
+		*count = new_count;
+	}
+	return ptr;
+}
+
 void varena_free(struct varena *varena, void *ptr, size_t count) {
 	struct arena *arena = varena_get(varena, count);
 	arena_free(arena, ptr);
