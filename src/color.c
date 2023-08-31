@@ -326,8 +326,7 @@ fail:
 
 /** Rebuild the case-insensitive trie after all extensions have been parsed. */
 static int build_iext_trie(struct colors *colors) {
-	trie_destroy(&colors->iext_trie);
-	trie_init(&colors->iext_trie);
+	trie_clear(&colors->iext_trie);
 
 	TRIE_FOR_EACH(&colors->ext_trie, leaf) {
 		size_t len = leaf->length - 1;

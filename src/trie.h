@@ -129,6 +129,11 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 void trie_remove(struct trie *trie, struct trie_leaf *leaf);
 
 /**
+ * Remove all leaves from a trie.
+ */
+void trie_clear(struct trie *trie);
+
+/**
  * Destroy a trie and its contents.
  */
 void trie_destroy(struct trie *trie);

@@ -715,6 +715,14 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 	trie_remove_impl(trie, leaf);
 }
 
+void trie_clear(struct trie *trie) {
+	trie->root = 0;
+	LIST_INIT(trie);
+
+	varena_clear(&trie->leaves);
+	varena_clear(&trie->nodes);
+}
+
 void trie_destroy(struct trie *trie) {
 	varena_destroy(&trie->leaves);
 	varena_destroy(&trie->nodes);
