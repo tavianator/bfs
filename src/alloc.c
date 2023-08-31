@@ -163,11 +163,19 @@ void arena_free(struct arena *arena, void *ptr) {
 	sanitize_free(chunk, arena->size);
 }
 
-void arena_destroy(struct arena *arena) {
+void arena_clear(struct arena *arena) {
 	for (size_t i = 0; i < arena->nslabs; ++i) {
 		free(arena->slabs[i]);
 	}
 	free(arena->slabs);
+
+	arena->chunks = NULL;
+	arena->nslabs = 0;
+	arena->slabs = NULL;
+}
+
+void arena_destroy(struct arena *arena) {
+	arena_clear(arena);
 	sanitize_uninit(arena);
 }
 
@@ -278,6 +286,12 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 void varena_free(struct varena *varena, void *ptr, size_t count) {
 	struct arena *arena = varena_get(varena, count);
 	arena_free(arena, ptr);
+}
+
+void varena_clear(struct varena *varena) {
+	for (size_t i = 0; i < varena->narenas; ++i) {
+		arena_clear(&varena->arenas[i]);
+	}
 }
 
 void varena_destroy(struct varena *varena) {

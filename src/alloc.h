@@ -186,6 +186,11 @@ void *arena_alloc(struct arena *arena);
 void arena_free(struct arena *arena, void *ptr);
 
 /**
+ * Free all allocations from an arena.
+ */
+void arena_clear(struct arena *arena);
+
+/**
  * Destroy an arena, freeing all allocations.
  */
 void arena_destroy(struct arena *arena);
@@ -276,6 +281,11 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
  *         The length of the flexible array.
  */
 void varena_free(struct varena *varena, void *ptr, size_t count);
+
+/**
+ * Free all allocations from a varena.
+ */
+void varena_clear(struct varena *varena);
 
 /**
  * Destroy a varena, freeing all allocations.
