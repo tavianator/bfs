@@ -546,14 +546,10 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 static int xmbrtowc(wchar_t *wc, size_t *i, const char *str, size_t len, mbstate_t *mb) {
 	size_t mblen = mbrtowc(wc, str + *i, len - *i, mb);
 	switch (mblen) {
-	case -1:
-		// Invalid byte sequence
+	case -1: // Invalid byte sequence
+	case -2: // Incomplete byte sequence
 		*i += 1;
 		memset(mb, 0, sizeof(*mb));
-		return -1;
-	case -2:
-		// Incomplete byte sequence
-		*i += len;
 		return -1;
 	default:
 		*i += mblen;

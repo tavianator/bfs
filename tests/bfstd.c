@@ -23,6 +23,15 @@ static void check_base_dir(const char *path, const char *dir, const char *base) 
 	free(xbase);
 }
 
+/** Check the result of wordesc(). */
+static void check_wordesc(const char *str, const char *exp, enum wesc_flags flags) {
+	char buf[256];
+	char *end = buf + sizeof(buf);
+	char *ret = wordesc(buf, end, str, flags);
+	bfs_verify(ret != end);
+	bfs_verify(strcmp(buf, exp) == 0, "wordesc(%s) == %s (!= %s)", str, buf, exp);
+}
+
 int main(void) {
 	// From man 3p basename
 	check_base_dir("usr", ".", "usr");
@@ -35,6 +44,15 @@ int main(void) {
 	check_base_dir("/usr/lib", "/usr", "lib");
 	check_base_dir("//usr//lib//", "//usr", "lib");
 	check_base_dir("/home//dwc//test", "/home//dwc", "test");
+
+	check_wordesc("", "\"\"", WESC_SHELL);
+	check_wordesc("word", "word", WESC_SHELL);
+	check_wordesc("two words", "\"two words\"", WESC_SHELL);
+	check_wordesc("word's", "\"word's\"", WESC_SHELL);
+	check_wordesc("\"word\"", "'\"word\"'", WESC_SHELL);
+	check_wordesc("\"word's\"", "'\"word'\\''s\"'", WESC_SHELL);
+	check_wordesc("\033[1mbold's\033[0m", "$'\\e[1mbold\\'s\\e[0m'", WESC_SHELL | WESC_TTY);
+	check_wordesc("\x7F", "$'\\x7F'", WESC_SHELL | WESC_TTY);
 
 	return EXIT_SUCCESS;
 }
