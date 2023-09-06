@@ -5,6 +5,8 @@
 #include "../src/config.h"
 #include "../src/diag.h"
 #include <errno.h>
+#include <langinfo.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -33,6 +35,11 @@ static void check_wordesc(const char *str, const char *exp, enum wesc_flags flag
 }
 
 int main(void) {
+	// Try to set a UTF-8 locale
+	if (!setlocale(LC_ALL, "C.UTF-8")) {
+		setlocale(LC_ALL, "");
+	}
+
 	// From man 3p basename
 	check_base_dir("usr", ".", "usr");
 	check_base_dir("usr/", ".", "usr");
@@ -53,6 +60,14 @@ int main(void) {
 	check_wordesc("\"word's\"", "'\"word'\\''s\"'", WESC_SHELL);
 	check_wordesc("\033[1mbold's\033[0m", "$'\\e[1mbold\\'s\\e[0m'", WESC_SHELL | WESC_TTY);
 	check_wordesc("\x7F", "$'\\x7F'", WESC_SHELL | WESC_TTY);
+
+	const char *charmap = nl_langinfo(CODESET);
+	if (strcmp(charmap, "UTF-8") == 0) {
+		check_wordesc("\xF0", "$'\\xF0'", WESC_SHELL | WESC_TTY);
+		check_wordesc("\xF0\x9F", "$'\\xF0\\x9F'", WESC_SHELL | WESC_TTY);
+		check_wordesc("\xF0\x9F\x98", "$'\\xF0\\x9F\\x98'", WESC_SHELL | WESC_TTY);
+		check_wordesc("\xF0\x9F\x98\x80", "\xF0\x9F\x98\x80", WESC_SHELL | WESC_TTY);
+	}
 
 	return EXIT_SUCCESS;
 }

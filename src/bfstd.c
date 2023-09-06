@@ -666,9 +666,9 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 multibyte:
 	memset(&mb, 0, sizeof(mb));
 
-	while (i < len) {
+	for (size_t j = i; i < len; i = j) {
 		wchar_t wc;
-		if (xmbrtowc(&wc, &i, str, len, &mb) != 0) {
+		if (xmbrtowc(&wc, &j, str, len, &mb) != 0) {
 			break;
 		}
 		if (!xiswprint(wc, flags)) {
