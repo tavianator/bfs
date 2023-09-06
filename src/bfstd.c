@@ -724,10 +724,9 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len, en
 			safe = xiswprint(wc, flags);
 		}
 
-		for (size_t j = start; j < i; ++j) {
+		for (size_t j = start; safe && j < i; ++j) {
 			if (str[j] == '\'' || str[j] == '\\') {
 				safe = false;
-				break;
 			}
 		}
 
