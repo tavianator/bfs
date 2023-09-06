@@ -180,6 +180,8 @@ struct bftw_cache {
 	struct varena files;
 	/** bfs_dir arena. */
 	struct arena dirs;
+	/** Remaining bfs_dir capacity. */
+	size_t dirlimit;
 };
 
 /** Initialize a cache. */
@@ -187,17 +189,30 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	LIST_INIT(cache);
 	cache->target = NULL;
 	cache->capacity = capacity;
+
 	VARENA_INIT(&cache->files, struct bftw_file, name);
 	bfs_dir_arena(&cache->dirs);
+
+	cache->dirlimit = capacity - 1;
+	if (cache->dirlimit > 1024) {
+		cache->dirlimit = 1024;
+	}
 }
 
 /** Allocate a directory. */
 static struct bfs_dir *bftw_allocdir(struct bftw_cache *cache) {
+	if (cache->dirlimit == 0) {
+		errno = ENOMEM;
+		return NULL;
+	}
+	--cache->dirlimit;
+
 	return arena_alloc(&cache->dirs);
 }
 
 /** Free a directory. */
 static void bftw_freedir(struct bftw_cache *cache, struct bfs_dir *dir) {
+	++cache->dirlimit;
 	arena_free(&cache->dirs, dir);
 }
 
@@ -410,8 +425,6 @@ struct bftw_state {
 	struct bftw_list to_read;
 	/** The queue of unpinned directories to unwrap. */
 	struct bftw_list to_close;
-	/** Available capacity in to_read. */
-	size_t dirlimit;
 
 	/** The queue of files to visit. */
 	struct bftw_list to_visit;
@@ -471,12 +484,6 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
 	SLIST_INIT(&state->to_close);
-
-	size_t dirlimit = args->nopenfd - 1;
-	if (dirlimit > 1024) {
-		dirlimit = 1024;
-	}
-	state->dirlimit = dirlimit;
 
 	SLIST_INIT(&state->to_visit);
 	SLIST_INIT(&state->batch);
@@ -539,7 +546,6 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 			bftw_file_set_dir(cache, file, dir);
 		} else {
 			bftw_freedir(cache, dir);
-			++state->dirlimit;
 		}
 
 		if (!(state->flags & BFTW_SORT)) {
@@ -767,10 +773,6 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 
 /** Open a directory asynchronously. */
 static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
-	if (state->dirlimit == 0) {
-		goto fail;
-	}
-
 	if (bftw_ioq_reserve(state) != 0) {
 		goto fail;
 	}
@@ -801,7 +803,6 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 
 	file->ioqueued = true;
 	--cache->capacity;
-	--state->dirlimit;
 	return 0;
 
 free:
@@ -839,6 +840,7 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
+	struct bftw_cache *cache = &state->cache;
 	bool have_files = state->to_visit.head;
 
 	if (state->flags & BFTW_SORT) {
@@ -850,7 +852,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 		while (!state->to_read.head) {
 			// Block if we have no other files/dirs to visit, or no room in the cache
 			bool have_dirs = state->to_open.head;
-			bool have_room = state->cache.capacity > 0;
+			bool have_room = cache->capacity > 0 && cache->dirlimit > 0;
 			bool block = !(have_dirs || have_files) || !have_room;
 
 			if (bftw_ioq_pop(state, block) < 0) {
@@ -865,10 +867,6 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 	}
 	if (!file) {
 		return false;
-	}
-
-	if (file->dir) {
-		++state->dirlimit;
 	}
 
 	while (file->ioqueued) {
