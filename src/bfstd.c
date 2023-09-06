@@ -5,6 +5,7 @@
 #include "bit.h"
 #include "config.h"
 #include "diag.h"
+#include "sanity.h"
 #include "thread.h"
 #include "xregex.h"
 #include <ctype.h>
@@ -590,11 +591,20 @@ static unsigned char ctype_cache[UCHAR_MAX + 1];
 
 /** Initialize the ctype cache. */
 static void char_cache_init(void) {
+#if __FreeBSD__ && SANITIZE_MEMORY
+// Work around https://github.com/llvm/llvm-project/issues/65532
+#  define bfs_isprint (isprint)
+#  define bfs_isspace (isspace)
+#else
+#  define bfs_isprint isprint
+#  define bfs_isspace isspace
+#endif
+
 	for (size_t c = 0; c <= UCHAR_MAX; ++c) {
-		if (isprint(c)) {
+		if (bfs_isprint(c)) {
 			ctype_cache[c] |= IS_PRINT;
 		}
-		if (isspace(c)) {
+		if (bfs_isspace(c)) {
 			ctype_cache[c] |= IS_SPACE;
 		}
 	}
@@ -618,11 +628,20 @@ static bool xisprint(unsigned char c, enum wesc_flags flags) {
 
 /** Check if a wide character is printable. */
 static bool xiswprint(wchar_t c, enum wesc_flags flags) {
-	if (iswprint(c)) {
+#if __FreeBSD__ && SANITIZE_MEMORY
+// Work around https://github.com/llvm/llvm-project/issues/65532
+#  define bfs_iswprint (iswprint)
+#  define bfs_iswspace (iswspace)
+#else
+#  define bfs_iswprint iswprint
+#  define bfs_iswspace iswspace
+#endif
+
+	if (bfs_iswprint(c)) {
 		return true;
 	}
 
-	if (!(flags & WESC_SHELL) && iswspace(c)) {
+	if (!(flags & WESC_SHELL) && bfs_iswspace(c)) {
 		return true;
 	}
 
