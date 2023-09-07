@@ -1,6 +1,24 @@
 3.*
 ===
 
+3.0.2
+-----
+
+**September 6, 2023**
+
+### Changes
+
+- `-files0-from` now allows an empty set of paths to be given, matching GNU findutils 4.9.0
+
+- Reduced memory consumption in multi-threaded searches
+
+- Many man page updates
+
+### Bug fixes
+
+- Fixed an out-of-bounds memory read that could occur when escaping a string containing an incomplete multi-byte character
+
+
 3.0.1
 -----
 
