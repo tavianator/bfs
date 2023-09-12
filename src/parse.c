@@ -1236,6 +1236,7 @@ static struct bfs_expr *parse_depth_limit(struct parser_state *state, int is_min
 static struct bfs_expr *parse_empty(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_empty);
 	if (expr) {
+		// For opendir()
 		expr->ephemeral_fds = 1;
 	}
 	return expr;
@@ -1258,10 +1259,13 @@ static struct bfs_expr *parse_exec(struct parser_state *state, int flags, int ar
 
 	expr->exec = execbuf;
 
+	// For pipe() in bfs_spawn()
 	expr->ephemeral_fds = 2;
+
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
+		// To dup() the parent directory
 		if (execbuf->flags & BFS_EXEC_MULTI) {
-			expr->persistent_fds = 1;
+			++expr->persistent_fds;
 		} else {
 			++expr->ephemeral_fds;
 		}
@@ -1874,9 +1878,8 @@ fail:
 static struct bfs_expr *parse_nogroup(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_nogroup);
 	if (expr) {
-		// Who knows how many FDs getgrgid_r() needs?  Probably at least
-		// one for /etc/group
-		expr->ephemeral_fds = 1;
+		// Who knows how many FDs getgrgid_r() needs?
+		expr->ephemeral_fds = 3;
 	}
 	return expr;
 }
@@ -1912,9 +1915,8 @@ static struct bfs_expr *parse_noleaf(struct parser_state *state, int arg1, int a
 static struct bfs_expr *parse_nouser(struct parser_state *state, int arg1, int arg2) {
 	struct bfs_expr *expr = parse_nullary_test(state, eval_nouser);
 	if (expr) {
-		// Who knows how many FDs getpwuid_r() needs?  Probably at least
-		// one for /etc/passwd
-		expr->ephemeral_fds = 1;
+		// Who knows how many FDs getpwuid_r() needs?
+		expr->ephemeral_fds = 3;
 	}
 	return expr;
 }
