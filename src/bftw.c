@@ -397,6 +397,10 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
  * Holds the current state of the bftw() traversal.
  */
 struct bftw_state {
+	/** The path(s) to start from. */
+	const char **paths;
+	/** The number of starting paths. */
+	size_t npaths;
 	/** bftw() callback. */
 	bftw_callback *callback;
 	/** bftw() callback data. */
@@ -453,6 +457,8 @@ struct bftw_state {
 
 /** Initialize the bftw() state. */
 static int bftw_state_init(struct bftw_state *state, const struct bftw_args *args) {
+	state->paths = args->paths;
+	state->npaths = args->npaths;
 	state->callback = args->callback;
 	state->ptr = args->ptr;
 	state->flags = args->flags;
@@ -1426,45 +1432,52 @@ static int bftw_state_destroy(struct bftw_state *state) {
 }
 
 /**
+ * Shared implementation for all search strategies.
+ */
+static int bftw_impl(struct bftw_state *state) {
+	for (size_t i = 0; i < state->npaths; ++i) {
+		if (bftw_visit(state, state->paths[i]) != 0) {
+			return -1;
+		}
+	}
+	bftw_batch_finish(state);
+
+	while (true) {
+		while (bftw_pop_dir(state)) {
+			if (bftw_opendir(state) != 0) {
+				return -1;
+			}
+			while (bftw_readdir(state) > 0) {
+				if (bftw_visit(state, state->de->name) != 0) {
+					return -1;
+				}
+			}
+			if (bftw_closedir(state) != 0) {
+				return -1;
+			}
+		}
+
+		if (!bftw_pop_file(state)) {
+			break;
+		}
+		if (bftw_visit(state, NULL) != 0) {
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * bftw() implementation for simple breadth-/depth-first search.
  */
-static int bftw_impl(const struct bftw_args *args) {
+static int bftw_walk(const struct bftw_args *args) {
 	struct bftw_state state;
 	if (bftw_state_init(&state, args) != 0) {
 		return -1;
 	}
 
-	for (size_t i = 0; i < args->npaths; ++i) {
-		if (bftw_visit(&state, args->paths[i]) != 0) {
-			goto done;
-		}
-	}
-	bftw_batch_finish(&state);
-
-	while (true) {
-		while (bftw_pop_dir(&state)) {
-			if (bftw_opendir(&state) != 0) {
-				goto done;
-			}
-			while (bftw_readdir(&state) > 0) {
-				if (bftw_visit(&state, state.de->name) != 0) {
-					goto done;
-				}
-			}
-			if (bftw_closedir(&state) != 0) {
-				goto done;
-			}
-		}
-
-		if (!bftw_pop_file(&state)) {
-			break;
-		}
-		if (bftw_visit(&state, NULL) != 0) {
-			break;
-		}
-	}
-
-done:
+	bftw_impl(&state);
 	return bftw_state_destroy(&state);
 }
 
@@ -1472,6 +1485,8 @@ done:
  * Iterative deepening search state.
  */
 struct bftw_ids_state {
+	/** Nested walk state. */
+	struct bftw_state nested;
 	/** The wrapped callback. */
 	bftw_callback *delegate;
 	/** The wrapped callback arguments. */
@@ -1486,12 +1501,8 @@ struct bftw_ids_state {
 	size_t max_depth;
 	/** The set of pruned paths. */
 	struct trie pruned;
-	/** An error code to report. */
-	int error;
 	/** Whether the bottom has been found. */
 	bool bottom;
-	/** Whether to quit the search. */
-	bool quit;
 };
 
 /** Iterative deepening callback function. */
@@ -1535,17 +1546,17 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 			ret = BFTW_PRUNE;
 		}
 		break;
+
 	case BFTW_PRUNE:
 		if (ftwbuf->type == BFS_DIR) {
 			if (!trie_insert_str(&state->pruned, ftwbuf->path)) {
-				state->error = errno;
-				state->quit = true;
+				state->nested.error = errno;
 				ret = BFTW_STOP;
 			}
 		}
 		break;
+
 	case BFTW_STOP:
-		state->quit = true;
 		break;
 	}
 
@@ -1553,7 +1564,7 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 }
 
 /** Initialize iterative deepening state. */
-static void bftw_ids_init(const struct bftw_args *args, struct bftw_ids_state *state, struct bftw_args *ids_args) {
+static int bftw_ids_init(struct bftw_ids_state *state, const struct bftw_args *args) {
 	state->delegate = args->callback;
 	state->ptr = args->ptr;
 	state->visit = BFTW_PRE;
@@ -1561,30 +1572,19 @@ static void bftw_ids_init(const struct bftw_args *args, struct bftw_ids_state *s
 	state->min_depth = 0;
 	state->max_depth = 1;
 	trie_init(&state->pruned);
-	state->error = 0;
 	state->bottom = false;
-	state->quit = false;
 
-	*ids_args = *args;
-	ids_args->callback = bftw_ids_callback;
-	ids_args->ptr = state;
-	ids_args->flags &= ~BFTW_POST_ORDER;
+	struct bftw_args ids_args = *args;
+	ids_args.callback = bftw_ids_callback;
+	ids_args.ptr = state;
+	ids_args.flags &= ~BFTW_POST_ORDER;
+	return bftw_state_init(&state->nested, &ids_args);
 }
 
 /** Finish an iterative deepening search. */
-static int bftw_ids_finish(struct bftw_ids_state *state) {
-	int ret = 0;
-
-	if (state->error) {
-		ret = -1;
-	} else {
-		state->error = errno;
-	}
-
+static int bftw_ids_destroy(struct bftw_ids_state *state) {
 	trie_destroy(&state->pruned);
-
-	errno = state->error;
-	return ret;
+	return bftw_state_destroy(&state->nested);
 }
 
 /**
@@ -1592,15 +1592,15 @@ static int bftw_ids_finish(struct bftw_ids_state *state) {
  */
 static int bftw_ids(const struct bftw_args *args) {
 	struct bftw_ids_state state;
-	struct bftw_args ids_args;
-	bftw_ids_init(args, &state, &ids_args);
+	if (bftw_ids_init(&state, args) != 0) {
+		return -1;
+	}
 
-	while (!state.quit && !state.bottom) {
+	while (!state.bottom) {
 		state.bottom = true;
 
-		if (bftw_impl(&ids_args) != 0) {
-			state.error = errno;
-			state.quit = true;
+		if (bftw_impl(&state.nested) != 0) {
+			goto done;
 		}
 
 		++state.min_depth;
@@ -1611,18 +1611,18 @@ static int bftw_ids(const struct bftw_args *args) {
 		state.visit = BFTW_POST;
 		state.force_visit = true;
 
-		while (!state.quit && state.min_depth > 0) {
+		while (state.min_depth > 0) {
 			--state.max_depth;
 			--state.min_depth;
 
-			if (bftw_impl(&ids_args) != 0) {
-				state.error = errno;
-				state.quit = true;
+			if (bftw_impl(&state.nested) != 0) {
+				goto done;
 			}
 		}
 	}
 
-	return bftw_ids_finish(&state);
+done:
+	return bftw_ids_destroy(&state);
 }
 
 /**
@@ -1630,39 +1630,38 @@ static int bftw_ids(const struct bftw_args *args) {
  */
 static int bftw_eds(const struct bftw_args *args) {
 	struct bftw_ids_state state;
-	struct bftw_args ids_args;
-	bftw_ids_init(args, &state, &ids_args);
+	if (bftw_ids_init(&state, args) != 0) {
+		return -1;
+	}
 
-	while (!state.quit && !state.bottom) {
+	while (!state.bottom) {
 		state.bottom = true;
 
-		if (bftw_impl(&ids_args) != 0) {
-			state.error = errno;
-			state.quit = true;
+		if (bftw_impl(&state.nested) != 0) {
+			goto done;
 		}
 
 		state.min_depth = state.max_depth;
 		state.max_depth *= 2;
 	}
 
-	if (!state.quit && (args->flags & BFTW_POST_ORDER)) {
+	if (args->flags & BFTW_POST_ORDER) {
 		state.visit = BFTW_POST;
 		state.min_depth = 0;
-		ids_args.flags |= BFTW_POST_ORDER;
+		state.nested.flags |= BFTW_POST_ORDER;
 
-		if (bftw_impl(&ids_args) != 0) {
-			state.error = errno;
-		}
+		bftw_impl(&state.nested);
 	}
 
-	return bftw_ids_finish(&state);
+done:
+	return bftw_ids_destroy(&state);
 }
 
 int bftw(const struct bftw_args *args) {
 	switch (args->strategy) {
 	case BFTW_BFS:
 	case BFTW_DFS:
-		return bftw_impl(args);
+		return bftw_walk(args);
 	case BFTW_IDS:
 		return bftw_ids(args);
 	case BFTW_EDS:
