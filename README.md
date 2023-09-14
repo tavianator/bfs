@@ -214,6 +214,13 @@ Installation
 </summary>
 <p></p>
 
+<table>
+<tbody>
+<tr><th>Linux</th><th>macOS</th></tr>
+
+<tr>
+<td width="506" valign="top" rowspan="3">
+
 <pre>
 <strong><a href="https://pkgs.alpinelinux.org/packages?name=bfs">Alpine Linux</a></strong>
 # apk add bfs
@@ -227,21 +234,45 @@ Installation
 <strong><a href="https://src.fedoraproject.org/rpms/bfs">Fedora Linux</a></strong>
 # dnf install bfs
 
+<strong><a href="https://packages.guix.gnu.org/packages/bfs/">GNU Guix</a></strong>
+# guix install bfs
+
 <strong><a href="https://search.nixos.org/packages?channel=unstable&show=bfs&from=0&size=1&sort=relevance&type=packages&query=bfs">NixOS</a></strong>
 # nix-env -i bfs
 
 <strong><a href="https://voidlinux.org/packages/?arch=x86_64&q=bfs">Void Linux</a></strong>
 # xbps-install -S bfs
+</pre>
 
-<strong><a href="https://www.freshports.org/sysutils/bfs">FreeBSD</a></strong>
-# pkg install bfs
+</td>
+<td width="506" valign="top">
+
+<pre>
+<strong><a href="https://formulae.brew.sh/formula/bfs">Homebrew</a></strong>
+$ brew install bfs
 
 <strong><a href="https://ports.macports.org/port/bfs/">MacPorts</a></strong>
 # port install bfs
-
-<strong><a href="https://formulae.brew.sh/formula/bfs">Homebrew</a></strong>
-$ brew install bfs
 </pre>
+
+</td>
+</tr>
+<tr><th height="1">BSD</th></tr>
+<tr>
+<td width="506" valign="top">
+
+<pre>
+<strong><a href="https://www.freshports.org/sysutils/bfs">FreeBSD</a></strong>
+# pkg install bfs
+
+<strong><a href="https://openports.pl/path/sysutils/bfs">OpenBSD</a></strong>
+# pkg_add bfs
+</pre>
+
+</td>
+</tr>
+</tbody>
+</table>
 </details>
 
 <details>
@@ -276,14 +307,14 @@ Here's how to install them on some common platforms:
 <strong>Void Linux</strong>
 # xbps-install -S acl-{devel,progs} attr-{devel,progs} libcap-{devel,progs} oniguruma-devel
 
-<strong>FreeBSD</strong>
-# pkg install oniguruma
+<strong>Homebrew</strong>
+$ brew install oniguruma
 
 <strong>MacPorts</strong>
 # port install oniguruma6
 
-<strong>Homebrew</strong>
-$ brew install oniguruma
+<strong>FreeBSD</strong>
+# pkg install oniguruma
 </pre>
 
 These dependencies are technically optional, though strongly recommended.
