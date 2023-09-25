@@ -21,6 +21,7 @@
  *     SLIST_INIT(&list);
  *
  *     struct item item;
+ *     SLIST_ITEM_INIT(&item);
  *     SLIST_APPEND(&list, &item);
  *
  * Doubly linked lists are similar:
@@ -39,6 +40,7 @@
  *     LIST_INIT(&list);
  *
  *     struct item item;
+ *     LIST_ITEM_INIT(&item);
  *     LIST_APPEND(&list, &item);
  *
  * Items can be on multiple lists at once:
@@ -71,7 +73,9 @@
  *     LIST_INIT(&items.cache);
  *
  *     struct item item;
+ *     SLIST_ITEM_INIT(&item, chain);
  *     SLIST_APPEND(&items.queue, &item, chain);
+ *     LIST_ITEM_INIT(&item, lru);
  *     LIST_APPEND(&items.cache, &item, lru);
  */
 
@@ -109,14 +113,10 @@
 #define LIST_VOID_(...) ((void)(__VA_ARGS__))
 
 /**
- * Insert an item into a singly-linked list.
+ * Initialize a singly-linked list item.
  *
- * @param list
- *         The list to modify.
- * @param cursor
- *         A pointer to the item to insert after, e.g. &list->head or list->tail.
  * @param item
- *         The item to insert.
+ *         The item to initialize.
  * @param node (optional)
  *         If specified, use item->node.next rather than item->next.
  *
@@ -124,29 +124,21 @@
  *
  * We play some tricks with variadic macros to handle the optional parameter:
  *
- *     SLIST_INSERT(list, cursor, item) => {
- *             item->next = *cursor;
- *             *cursor = item;
- *             list->tail = item->next ? list->tail : &item->next;
- *     }
- *
- *     SLIST_INSERT(list, cursor, item, node) => {
- *             item->node.next = *cursor;
- *             *cursor = item;
- *             list->tail = item->node.next ? list->tail : &item->node.next;
- *     }
+ *     SLIST_ITEM_INIT(item)       => item->next = NULL
+ *     SLIST_ITEM_INIT(item, node) => item->node.next = NULL
  *
  * The first trick is that
  *
- *     #define SLIST_INSERT(list, item, cursor, ...)
+ *     #define SLIST_ITEM_INIT(item, ...)
  *
  * won't work because both commas are required (until C23; see N3033). As a
  * workaround, we dispatch to another macro and add a trailing comma.
  *
- *     SLIST_INSERT(list, cursor, item)       => SLIST_INSERT_(list, cursor, item, )
- *     SLIST_INSERT(list, cursor, item, node) => SLIST_INSERT_(list, cursor, item, node, )
+ *     SLIST_ITEM_INIT(item)       => SLIST_ITEM_INIT_(item, )
+ *     SLIST_ITEM_INIT(item, node) => SLIST_ITEM_INIT_(item, node, )
  */
-#define SLIST_INSERT(list, cursor, ...) SLIST_INSERT_(list, cursor, __VA_ARGS__, )
+#define SLIST_ITEM_INIT(...) \
+	SLIST_ITEM_INIT_(__VA_ARGS__, )
 
 /**
  * Now we need a way to generate either ->next or ->node.next depending on
@@ -186,9 +178,30 @@
 #define LIST_NODE__(dir, node, ignored, dot, ...) node dot dir
 
 /**
- * SLIST_INSERT_() uses LIST_NEXT_() to generate the right name for the list
+ * SLIST_ITEM_INIT_() uses LIST_NEXT_() to generate the right name for the list
  * node, and finally delegates to the actual implementation.
  */
+#define SLIST_ITEM_INIT_(item, ...) \
+	SLIST_ITEM_INIT__((item), LIST_NEXT_(__VA_ARGS__))
+
+#define SLIST_ITEM_INIT__(item, next) \
+	LIST_VOID_(item->next = NULL)
+
+/**
+ * Insert an item into a singly-linked list.
+ *
+ * @param list
+ *         The list to modify.
+ * @param cursor
+ *         A pointer to the item to insert after, e.g. &list->head or list->tail.
+ * @param item
+ *         The item to insert.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
+ */
+#define SLIST_INSERT(list, cursor, ...) \
+	SLIST_INSERT_(list, cursor, __VA_ARGS__, )
+
 #define SLIST_INSERT_(list, cursor, item, ...) \
 	SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__))
 
@@ -304,6 +317,23 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * LIST_PREV_(node, ) => node.prev
  */
 #define LIST_PREV_(...) LIST_NODE_(prev, __VA_ARGS__)
+
+/**
+ * Initialize a doubly-linked list item.
+ *
+ * @param item
+ *         The item to initialize.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
+ */
+#define LIST_ITEM_INIT(...) \
+	LIST_ITEM_INIT_(__VA_ARGS__, )
+
+#define LIST_ITEM_INIT_(item, ...) \
+	LIST_ITEM_INIT__((item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
+
+#define LIST_ITEM_INIT__(item, prev, next) \
+	LIST_VOID_(item->prev = item->next = NULL)
 
 /**
  * Add an item to the tail of a doubly-linked list.
