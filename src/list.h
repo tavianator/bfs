@@ -191,13 +191,19 @@
 	LIST_VOID_(item->next = NULL)
 
 /**
+ * Type-checking macro for singly-linked lists.
+ */
+#define SLIST_CHECK_(list) \
+	(void)sizeof(list->tail - &list->head)
+
+/**
  * Check if a singly-linked list is empty.
  */
 #define SLIST_EMPTY(list) \
 	SLIST_EMPTY_((list))
 
 #define SLIST_EMPTY_(list) \
-	((void)sizeof(list->tail - &list->head), !list->head)
+	(SLIST_CHECK_(list), !list->head)
 
 /**
  * Insert an item into a singly-linked list.
@@ -320,6 +326,29 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 	(list->head ? SLIST_REMOVE_(list, &list->head, __VA_ARGS__) : NULL)
 
 /**
+ * Loop over the items in a singly-linked list.
+ *
+ * @param type
+ *         The list item type.
+ * @param item
+ *         The induction variable name.
+ * @param list
+ *         The list to iterate.
+ * @param node (optional)
+ *         If specified, use head->node.next rather than head->next.
+ */
+#define for_slist(type, item, ...) \
+	for_slist_(type, item, __VA_ARGS__, )
+
+#define for_slist_(type, item, list, ...) \
+	for_slist__(type, item, (list), LIST_NEXT_(__VA_ARGS__))
+
+#define for_slist__(type, item, list, next) \
+	for (type *item = list->head, *_next; \
+	     item && (SLIST_CHECK_(list), _next = item->next, true); \
+	     item = _next)
+
+/**
  * Initialize a doubly-linked list.
  *
  * @param list
@@ -356,13 +385,19 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 	LIST_VOID_(item->prev = item->next = NULL)
 
 /**
+ * Type-checking macro for doubly-linked lists.
+ */
+#define LIST_CHECK_(list) \
+	(void)sizeof(list->tail - list->head)
+
+/**
  * Check if a doubly-linked list is empty.
  */
 #define LIST_EMPTY(list) \
 	LIST_EMPTY_((list))
 
 #define LIST_EMPTY_(list) \
-	((void)sizeof(list->tail - list->head), !list->head)
+	(LIST_CHECK_(list), !list->head)
 
 /**
  * Add an item to the tail of a doubly-linked list.
@@ -455,5 +490,28 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 
 #define LIST_ATTACHED__(list, item, prev, next) \
 	(item->prev || item->next || list->head == item || list->tail == item)
+
+/**
+ * Loop over the items in a doubly-linked list.
+ *
+ * @param type
+ *         The list item type.
+ * @param item
+ *         The induction variable name.
+ * @param list
+ *         The list to iterate.
+ * @param node (optional)
+ *         If specified, use head->node.next rather than head->next.
+ */
+#define for_list(type, item, ...) \
+	for_list_(type, item, __VA_ARGS__, )
+
+#define for_list_(type, item, list, ...) \
+	for_list__(type, item, (list), LIST_NEXT_(__VA_ARGS__))
+
+#define for_list__(type, item, list, next) \
+	for (type *item = list->head, *_next; \
+	     item && (LIST_CHECK_(list), _next = item->next, true); \
+	     item = _next)
 
 #endif // BFS_LIST_H
