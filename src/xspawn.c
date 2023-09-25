@@ -49,8 +49,8 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 }
 
 int bfs_spawn_destroy(struct bfs_spawn *ctx) {
-	while (ctx->head) {
-		free(SLIST_POP(ctx));
+	for_slist (struct bfs_spawn_action, action, ctx) {
+		free(action);
 	}
 
 	return 0;
@@ -68,7 +68,7 @@ static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_sp
 		return NULL;
 	}
 
-	action->next = NULL;
+	SLIST_ITEM_INIT(action);
 	action->op = op;
 	action->in_fd = -1;
 	action->out_fd = -1;
@@ -138,7 +138,7 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
 static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	xclose(pipefd[0]);
 
-	for (const struct bfs_spawn_action *action = ctx ? ctx->head : NULL; action; action = action->next) {
+	for_slist (const struct bfs_spawn_action, action, ctx) {
 		// Move the error-reporting pipe out of the way if necessary...
 		if (action->out_fd == pipefd[1]) {
 			int fd = dup_cloexec(pipefd[1]);
@@ -199,9 +199,8 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 		envp = environ;
 	}
 
-	enum bfs_spawn_flags flags = ctx ? ctx->flags : 0;
 	char *resolved = NULL;
-	if (flags & BFS_SPAWN_USEPATH) {
+	if (ctx->flags & BFS_SPAWN_USEPATH) {
 		exe = resolved = bfs_spawn_resolve(exe);
 		if (!resolved) {
 			return -1;

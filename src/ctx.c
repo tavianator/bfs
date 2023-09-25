@@ -152,7 +152,7 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 	// - the user sees everything relevant before an -ok[dir] prompt
 	// - output from commands is interleaved consistently with bfs
 	// - executed commands can rely on I/O from other bfs actions
-	TRIE_FOR_EACH(&ctx->files, leaf) {
+	for_trie (leaf, &ctx->files) {
 		struct bfs_ctx_file *ctx_file = leaf->value;
 		CFILE *cfile = ctx_file->cfile;
 		if (fflush(cfile->file) == 0) {
@@ -239,7 +239,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		bfs_groups_free(ctx->groups);
 		bfs_users_free(ctx->users);
 
-		TRIE_FOR_EACH(&ctx->files, leaf) {
+		for_trie (leaf, &ctx->files) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
 
 			if (ctx_file->error) {

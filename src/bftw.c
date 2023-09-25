@@ -318,8 +318,7 @@ static size_t bftw_child_nameoff(const struct bftw_file *parent) {
 
 /** Destroy a cache. */
 static void bftw_cache_destroy(struct bftw_cache *cache) {
-	bfs_assert(!cache->head);
-	bfs_assert(!cache->tail);
+	bfs_assert(LIST_EMPTY(cache));
 	bfs_assert(!cache->target);
 
 	varena_destroy(&cache->files);
@@ -347,9 +346,9 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 		file->nameoff = 0;
 	}
 
-	file->next = NULL;
-	file->to_read.next = NULL;
-	file->lru.prev = file->lru.next = NULL;
+	SLIST_ITEM_INIT(file);
+	SLIST_ITEM_INIT(file, to_read);
+	LIST_ITEM_INIT(file, lru);
 
 	file->refcount = 1;
 	file->pincount = 0;
@@ -833,12 +832,11 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 		SLIST_APPEND(&state->to_read, file, to_read);
 	}
 
-	while (state->to_open.head) {
-		if (bftw_ioq_opendir(state, state->to_open.head) == 0) {
-			SLIST_POP(&state->to_open);
-		} else {
+	for_slist (struct bftw_file, dir, &state->to_open) {
+		if (bftw_ioq_opendir(state, dir) != 0) {
 			break;
 		}
+		SLIST_POP(&state->to_open);
 	}
 }
 
@@ -847,7 +845,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
 	struct bftw_cache *cache = &state->cache;
-	bool have_files = state->to_visit.head;
+	bool have_files = !SLIST_EMPTY(&state->to_visit);
 
 	if (state->flags & BFTW_SORT) {
 		// Keep strict breadth-first order when sorting
@@ -855,9 +853,9 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 			return false;
 		}
 	} else {
-		while (!state->to_read.head) {
+		while (SLIST_EMPTY(&state->to_read)) {
 			// Block if we have no other files/dirs to visit, or no room in the cache
-			bool have_dirs = state->to_open.head;
+			bool have_dirs = !SLIST_EMPTY(&state->to_open);
 			bool have_room = cache->capacity > 0 && cache->dirlimit > 0;
 			bool block = !(have_dirs || have_files) || !have_room;
 
@@ -1303,7 +1301,7 @@ static void bftw_list_sort(struct bftw_list *list) {
 	bftw_list_sort(&right);
 
 	// Merge
-	while (left.head && right.head) {
+	while (!SLIST_EMPTY(&left) && !SLIST_EMPTY(&right)) {
 		struct bftw_file *lf = left.head;
 		struct bftw_file *rf = right.head;
 

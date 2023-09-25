@@ -328,7 +328,7 @@ fail:
 static int build_iext_trie(struct colors *colors) {
 	trie_clear(&colors->iext_trie);
 
-	TRIE_FOR_EACH(&colors->ext_trie, leaf) {
+	for_trie (leaf, &colors->ext_trie) {
 		size_t len = leaf->length - 1;
 		if (colors->ext_len < len) {
 			colors->ext_len = len;

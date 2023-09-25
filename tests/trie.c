@@ -70,7 +70,7 @@ int main(void) {
 
 	{
 		size_t i = 0;
-		TRIE_FOR_EACH(&trie, leaf) {
+		for_trie (leaf, &trie) {
 			bfs_verify(leaf == trie_find_str(&trie, keys[i]));
 			bfs_verify(!leaf->prev || leaf->prev->next == leaf);
 			bfs_verify(!leaf->next || leaf->next->prev == leaf);
@@ -107,7 +107,7 @@ int main(void) {
 		}
 	}
 
-	TRIE_FOR_EACH(&trie, leaf) {
+	for_trie (leaf, &trie) {
 		bfs_verify(false);
 	}
 
