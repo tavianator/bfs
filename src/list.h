@@ -188,6 +188,15 @@
 	LIST_VOID_(item->next = NULL)
 
 /**
+ * Check if a singly-linked list is empty.
+ */
+#define SLIST_EMPTY(list) \
+	SLIST_EMPTY_((list))
+
+#define SLIST_EMPTY_(list) \
+	((void)sizeof(list->tail - &list->head), !list->head)
+
+/**
  * Insert an item into a singly-linked list.
  *
  * @param list
@@ -334,6 +343,15 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 
 #define LIST_ITEM_INIT__(item, prev, next) \
 	LIST_VOID_(item->prev = item->next = NULL)
+
+/**
+ * Check if a doubly-linked list is empty.
+ */
+#define LIST_EMPTY(list) \
+	LIST_EMPTY_((list))
+
+#define LIST_EMPTY_(list) \
+	((void)sizeof(list->tail - list->head), !list->head)
 
 /**
  * Add an item to the tail of a doubly-linked list.
