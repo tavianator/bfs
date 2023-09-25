@@ -70,7 +70,9 @@ jobs:
 
       - uses: tailscale/github-action@main
         with:
-          authkey: ${{ secrets.TAILSCALE_KEY }}
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
 
       - name: Configure SSH
         env:
