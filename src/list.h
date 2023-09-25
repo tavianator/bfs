@@ -155,7 +155,8 @@
  *     LIST_NEXT_()       => LIST_NODE_(next, )
  *     LIST_NEXT_(node, ) => LIST_NODE_(next, node, )
  */
-#define LIST_NEXT_(...) LIST_NODE_(next, __VA_ARGS__)
+#define LIST_NEXT_(...) \
+	LIST_NODE_(next, __VA_ARGS__)
 
 /**
  * LIST_NODE_() dispatches to yet another macro:
@@ -163,7 +164,8 @@
  *     LIST_NODE_(next, )       => LIST_NODE__(next,     , . ,   , )
  *     LIST_NODE_(next, node, ) => LIST_NODE__(next, node,   , . , , )
  */
-#define LIST_NODE_(dir, ...) LIST_NODE__(dir, __VA_ARGS__, . , , )
+#define LIST_NODE_(dir, ...) \
+	LIST_NODE__(dir, __VA_ARGS__, . , , )
 
 /**
  * And finally, LIST_NODE__() adds the node and the dot if necessary.
@@ -175,7 +177,8 @@
  *                  ^     ^      ^     ^
  *                 dir   node ignored dot
  */
-#define LIST_NODE__(dir, node, ignored, dot, ...) node dot dir
+#define LIST_NODE__(dir, node, ignored, dot, ...) \
+	node dot dir
 
 /**
  * SLIST_ITEM_INIT_() uses LIST_NEXT_() to generate the right name for the list
@@ -229,7 +232,8 @@
  * @param node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
-#define SLIST_APPEND(list, ...) SLIST_APPEND_(list, __VA_ARGS__, )
+#define SLIST_APPEND(list, ...) \
+	SLIST_APPEND_(list, __VA_ARGS__, )
 
 #define SLIST_APPEND_(list, item, ...) \
 	SLIST_INSERT_(list, (list)->tail, item, __VA_ARGS__)
@@ -244,7 +248,8 @@
  * @param node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
-#define SLIST_PREPEND(list, ...) SLIST_PREPEND_(list, __VA_ARGS__, )
+#define SLIST_PREPEND(list, ...) \
+	SLIST_PREPEND_(list, __VA_ARGS__, )
 
 #define SLIST_PREPEND_(list, item, ...) \
 	SLIST_INSERT_(list, &(list)->head, item, __VA_ARGS__)
@@ -275,7 +280,8 @@
  * @return
  *         The removed item.
  */
-#define SLIST_REMOVE(list, ...) SLIST_REMOVE_(list, __VA_ARGS__, )
+#define SLIST_REMOVE(list, ...) \
+	SLIST_REMOVE_(list, __VA_ARGS__, )
 
 #define SLIST_REMOVE_(list, cursor, ...) \
 	SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__))
@@ -304,10 +310,14 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * @return
  *         The popped item, or NULL if the list was empty.
  */
-#define SLIST_POP(...) SLIST_POP_(__VA_ARGS__, )
+#define SLIST_POP(...) \
+	SLIST_POP_(__VA_ARGS__, )
 
 #define SLIST_POP_(list, ...) \
-	((list)->head ? SLIST_REMOVE_(list, &(list)->head, __VA_ARGS__) : NULL)
+	SLIST_POP__((list), __VA_ARGS__)
+
+#define SLIST_POP__(list, ...) \
+	(list->head ? SLIST_REMOVE_(list, &list->head, __VA_ARGS__) : NULL)
 
 /**
  * Initialize a doubly-linked list.
@@ -318,14 +328,15 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 #define LIST_INIT(list) \
 	LIST_INIT_((list))
 
-#define LIST_INIT_(list) LIST_VOID_( \
-	list->head = list->tail = NULL)
+#define LIST_INIT_(list) \
+	LIST_VOID_(list->head = list->tail = NULL)
 
 /**
  * LIST_PREV_()       => prev
  * LIST_PREV_(node, ) => node.prev
  */
-#define LIST_PREV_(...) LIST_NODE_(prev, __VA_ARGS__)
+#define LIST_PREV_(...) \
+	LIST_NODE_(prev, __VA_ARGS__)
 
 /**
  * Initialize a doubly-linked list item.
@@ -363,7 +374,8 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * @param node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_APPEND(list, ...) LIST_INSERT(list, (list)->tail, __VA_ARGS__)
+#define LIST_APPEND(list, ...) \
+	LIST_INSERT(list, (list)->tail, __VA_ARGS__)
 
 /**
  * Add an item to the head of a doubly-linked list.
@@ -375,7 +387,8 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * @param node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_PREPEND(list, ...) LIST_INSERT(list, NULL, __VA_ARGS__)
+#define LIST_PREPEND(list, ...) \
+	LIST_INSERT(list, NULL, __VA_ARGS__)
 
 /**
  * Insert into a doubly-linked list after the given cursor.
@@ -389,7 +402,8 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * @param node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_INSERT(list, cursor, ...) LIST_INSERT_(list, cursor, __VA_ARGS__, )
+#define LIST_INSERT(list, cursor, ...) \
+	LIST_INSERT_(list, cursor, __VA_ARGS__, )
 
 #define LIST_INSERT_(list, cursor, item, ...) \
 	LIST_INSERT__((list), (cursor), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
@@ -410,7 +424,8 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * @param node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_REMOVE(list, ...) LIST_REMOVE_(list, __VA_ARGS__, )
+#define LIST_REMOVE(list, ...) \
+	LIST_REMOVE_(list, __VA_ARGS__, )
 
 #define LIST_REMOVE_(list, item, ...) \
 	LIST_REMOVE__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
@@ -432,7 +447,8 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  * @return
  *         Whether the item is attached to the list.
  */
-#define LIST_ATTACHED(list, ...) LIST_ATTACHED_(list, __VA_ARGS__, )
+#define LIST_ATTACHED(list, ...) \
+	LIST_ATTACHED_(list, __VA_ARGS__, )
 
 #define LIST_ATTACHED_(list, item, ...) \
 	LIST_ATTACHED__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
