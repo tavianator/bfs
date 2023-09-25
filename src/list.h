@@ -94,16 +94,19 @@
  * don't have to.
  */
 #define SLIST_INIT(list) \
-	LIST_BLOCK_(SLIST_INIT_((list)))
-
-#define SLIST_INIT_(list) \
-	list->head = NULL; \
-	list->tail = &list->head;
+	SLIST_INIT_((list))
 
 /**
- * Wraps a group of statements in a block.
+ * Helper for SLIST_INIT().
  */
-#define LIST_BLOCK_(block) do { block } while (0)
+#define SLIST_INIT_(list) LIST_VOID_( \
+	list->head = NULL, \
+	list->tail = &list->head)
+
+/**
+ * Cast a list of expressions to void.
+ */
+#define LIST_VOID_(...) ((void)(__VA_ARGS__))
 
 /**
  * Insert an item into a singly-linked list.
@@ -187,12 +190,12 @@
  * node, and finally delegates to the actual implementation.
  */
 #define SLIST_INSERT_(list, cursor, item, ...) \
-	LIST_BLOCK_(SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__)))
+	SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_INSERT__(list, cursor, item, next) \
-	item->next = *cursor; \
-	*cursor = item; \
-	list->tail = item->next ? list->tail : &item->next;
+#define SLIST_INSERT__(list, cursor, item, next) LIST_VOID_( \
+	item->next = *cursor, \
+	*cursor = item, \
+	list->tail = item->next ? list->tail : &item->next)
 
 /**
  * Add an item to the tail of a singly-linked list.
@@ -233,14 +236,10 @@
  *         The source list.
  */
 #define SLIST_EXTEND(dest, src) \
-	LIST_BLOCK_(SLIST_EXTEND_((dest), (src)))
+	SLIST_EXTEND_((dest), (src))
 
 #define SLIST_EXTEND_(dest, src) \
-	if (src->head) { \
-		*dest->tail = src->head; \
-		dest->tail = src->tail; \
-		SLIST_INIT(src); \
-	}
+	(src->head ? (*dest->tail = src->head, dest->tail = src->tail, SLIST_INIT(src)) : (void)0)
 
 /**
  * Remove an item from a singly-linked list.
@@ -295,10 +294,10 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
  *         The list to initialize.
  */
 #define LIST_INIT(list) \
-	LIST_BLOCK_(LIST_INIT_((list)))
+	LIST_INIT_((list))
 
-#define LIST_INIT_(list) \
-	list->head = list->tail = NULL;
+#define LIST_INIT_(list) LIST_VOID_( \
+	list->head = list->tail = NULL)
 
 /**
  * LIST_PREV_()       => prev
@@ -345,13 +344,13 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 #define LIST_INSERT(list, cursor, ...) LIST_INSERT_(list, cursor, __VA_ARGS__, )
 
 #define LIST_INSERT_(list, cursor, item, ...) \
-	LIST_BLOCK_(LIST_INSERT__((list), (cursor), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__)))
+	LIST_INSERT__((list), (cursor), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
-#define LIST_INSERT__(list, cursor, item, prev, next) \
-	item->prev = cursor; \
-	item->next = cursor ? cursor->next : list->head; \
-	*(item->prev ? &item->prev->next : &list->head) = item; \
-	*(item->next ? &item->next->prev : &list->tail) = item;
+#define LIST_INSERT__(list, cursor, item, prev, next) LIST_VOID_( \
+	item->prev = cursor, \
+	item->next = cursor ? cursor->next : list->head, \
+	*(item->prev ? &item->prev->next : &list->head) = item, \
+	*(item->next ? &item->next->prev : &list->tail) = item)
 
 /**
  * Remove an item from a doubly-linked list.
@@ -366,12 +365,12 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 #define LIST_REMOVE(list, ...) LIST_REMOVE_(list, __VA_ARGS__, )
 
 #define LIST_REMOVE_(list, item, ...) \
-	LIST_BLOCK_(LIST_REMOVE__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__)))
+	LIST_REMOVE__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
-#define LIST_REMOVE__(list, item, prev, next) \
-	*(item->prev ? &item->prev->next : &list->head) = item->next; \
-	*(item->next ? &item->next->prev : &list->tail) = item->prev; \
-	item->prev = item->next = NULL;
+#define LIST_REMOVE__(list, item, prev, next) LIST_VOID_( \
+	*(item->prev ? &item->prev->next : &list->head) = item->next, \
+	*(item->next ? &item->next->prev : &list->tail) = item->prev, \
+	item->prev = item->next = NULL)
 
 /**
  * Check if an item is attached to a doubly-linked list.
