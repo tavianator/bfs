@@ -53,50 +53,95 @@
 #ifndef CHAR_WIDTH
 #  define CHAR_WIDTH CHAR_BIT
 #endif
+
+// See https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+
+#ifndef USHRT_WIDTH
+#  ifdef __SHRT_WIDTH__
+#    define USHRT_WIDTH __SHRT_WIDTH__
+#  else
+#    define USHRT_WIDTH UMAX_WIDTH(USHRT_MAX)
+#  endif
+#endif
+
+#ifndef UINT_WIDTH
+#  ifdef __INT_WIDTH__
+#    define UINT_WIDTH __INT_WIDTH__
+#  else
+#    define UINT_WIDTH UMAX_WIDTH(UINT_MAX)
+#  endif
+#endif
+
+#ifndef ULONG_WIDTH
+#  ifdef __LONG_WIDTH__
+#    define ULONG_WIDTH __LONG_WIDTH__
+#  else
+#    define ULONG_WIDTH UMAX_WIDTH(ULONG_MAX)
+#  endif
+#endif
+
+#ifndef ULLONG_WIDTH
+#  ifdef __LONG_LONG_WIDTH__
+#    define ULLONG_WIDTH __LONG_LONG_WIDTH__
+#  elif defined(__LLONG_WIDTH__) // Clang
+#    define ULLONG_WIDTH __LLONG_WIDTH__
+#  else
+#    define ULLONG_WIDTH UMAX_WIDTH(ULLONG_MAX)
+#  endif
+#endif
+
+#ifndef SIZE_WIDTH
+#  ifdef __SIZE_WIDTH__
+#    define SIZE_WIDTH __SIZE_WIDTH__
+#  else
+#    define SIZE_WIDTH UMAX_WIDTH(SIZE_MAX)
+#  endif
+#endif
+
+#ifndef PTRDIFF_WIDTH
+#  ifdef __PTRDIFF_WIDTH__
+#    define PTRDIFF_WIDTH __PTRDIFF_WIDTH__
+#  else
+#    define PTRDIFF_WIDTH UMAX_WIDTH(PTRDIFF_MAX)
+#  endif
+#endif
+
+#ifndef UINTPTR_WIDTH
+#  ifdef __INTPTR_WIDTH__
+#    define INTPTR_WIDTH __INTPTR_WIDTH__
+#  else
+#    define UINTPTR_WIDTH UMAX_WIDTH(UINTPTR_MAX)
+#  endif
+#endif
+
+#ifndef UINTMAX_WIDTH
+#  ifdef __INTMAX_WIDTH__
+#    define UINTMAX_WIDTH __INTMAX_WIDTH__
+#  else
+#    define UINTMAX_WIDTH UMAX_WIDTH(UINTMAX_MAX)
+#  endif
+#endif
+
 #ifndef UCHAR_WIDTH
 #  define UCHAR_WIDTH CHAR_WIDTH
 #endif
 #ifndef SCHAR_WIDTH
 #  define SCHAR_WIDTH CHAR_WIDTH
 #endif
-#ifndef USHRT_WIDTH
-#  define USHRT_WIDTH UMAX_WIDTH(USHRT_MAX)
-#endif
 #ifndef SHRT_WIDTH
 #  define SHRT_WIDTH USHRT_WIDTH
-#endif
-#ifndef UINT_WIDTH
-#  define UINT_WIDTH UMAX_WIDTH(UINT_MAX)
 #endif
 #ifndef INT_WIDTH
 #  define INT_WIDTH UINT_WIDTH
 #endif
-#ifndef ULONG_WIDTH
-#  define ULONG_WIDTH UMAX_WIDTH(ULONG_MAX)
-#endif
 #ifndef LONG_WIDTH
 #  define LONG_WIDTH ULONG_WIDTH
-#endif
-#ifndef ULLONG_WIDTH
-#  define ULLONG_WIDTH UMAX_WIDTH(ULLONG_MAX)
 #endif
 #ifndef LLONG_WIDTH
 #  define LLONG_WIDTH ULLONG_WIDTH
 #endif
-#ifndef SIZE_WIDTH
-#  define SIZE_WIDTH UMAX_WIDTH(SIZE_MAX)
-#endif
-#ifndef PTRDIFF_WIDTH
-#  define PTRDIFF_WIDTH (UMAX_WIDTH(PTRDIFF_MAX) + 1)
-#endif
-#ifndef UINTPTR_WIDTH
-#  define UINTPTR_WIDTH UMAX_WIDTH(UINTPTR_MAX)
-#endif
 #ifndef INTPTR_WIDTH
 #  define INTPTR_WIDTH UINTPTR_WIDTH
-#endif
-#ifndef UINTMAX_WIDTH
-#  define UINTMAX_WIDTH UMAX_WIDTH(UINTMAX_MAX)
 #endif
 #ifndef INTMAX_WIDTH
 #  define INTMAX_WIDTH UINTMAX_WIDTH
