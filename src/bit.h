@@ -108,7 +108,7 @@
 
 #ifndef UINTPTR_WIDTH
 #  ifdef __INTPTR_WIDTH__
-#    define INTPTR_WIDTH __INTPTR_WIDTH__
+#    define UINTPTR_WIDTH __INTPTR_WIDTH__
 #  else
 #    define UINTPTR_WIDTH UMAX_WIDTH(UINTPTR_MAX)
 #  endif
