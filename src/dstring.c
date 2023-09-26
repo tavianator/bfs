@@ -4,6 +4,7 @@
 #include "dstring.h"
 #include "alloc.h"
 #include "bit.h"
+#include "config.h"
 #include "diag.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -16,11 +17,11 @@
 struct dstring {
 	size_t capacity;
 	size_t length;
-	char data[];
+	alignas(dchar) char data[];
 };
 
 /** Get the string header from the string data pointer. */
-static struct dstring *dstrheader(const char *dstr) {
+static struct dstring *dstrheader(const dchar *dstr) {
 	return (struct dstring *)(dstr - offsetof(struct dstring, data));
 }
 
@@ -30,7 +31,7 @@ static size_t dstrsize(size_t capacity) {
 }
 
 /** Allocate a dstring with the given contents. */
-static char *dstralloc_impl(size_t capacity, size_t length, const char *data) {
+static dchar *dstralloc_impl(size_t capacity, size_t length, const char *data) {
 	// Avoid reallocations for small strings
 	if (capacity < 7) {
 		capacity = 7;
@@ -49,31 +50,31 @@ static char *dstralloc_impl(size_t capacity, size_t length, const char *data) {
 	return header->data;
 }
 
-char *dstralloc(size_t capacity) {
+dchar *dstralloc(size_t capacity) {
 	return dstralloc_impl(capacity, 0, "");
 }
 
-char *dstrdup(const char *str) {
+dchar *dstrdup(const char *str) {
 	return dstrxdup(str, strlen(str));
 }
 
-char *dstrndup(const char *str, size_t n) {
+dchar *dstrndup(const char *str, size_t n) {
 	return dstrxdup(str, strnlen(str, n));
 }
 
-char *dstrddup(const char *dstr) {
+dchar *dstrddup(const dchar *dstr) {
 	return dstrxdup(dstr, dstrlen(dstr));
 }
 
-char *dstrxdup(const char *str, size_t len) {
+dchar *dstrxdup(const char *str, size_t len) {
 	return dstralloc_impl(len, len, str);
 }
 
-size_t dstrlen(const char *dstr) {
+size_t dstrlen(const dchar *dstr) {
 	return dstrheader(dstr)->length;
 }
 
-int dstreserve(char **dstr, size_t capacity) {
+int dstreserve(dchar **dstr, size_t capacity) {
 	if (!*dstr) {
 		*dstr = dstralloc(capacity);
 		return *dstr ? 0 : -1;
@@ -96,7 +97,7 @@ int dstreserve(char **dstr, size_t capacity) {
 	return 0;
 }
 
-int dstresize(char **dstr, size_t length) {
+int dstresize(dchar **dstr, size_t length) {
 	if (dstreserve(dstr, length) != 0) {
 		return -1;
 	}
@@ -107,19 +108,19 @@ int dstresize(char **dstr, size_t length) {
 	return 0;
 }
 
-int dstrcat(char **dest, const char *src) {
+int dstrcat(dchar **dest, const char *src) {
 	return dstrxcat(dest, src, strlen(src));
 }
 
-int dstrncat(char **dest, const char *src, size_t n) {
+int dstrncat(dchar **dest, const char *src, size_t n) {
 	return dstrxcat(dest, src, strnlen(src, n));
 }
 
-int dstrdcat(char **dest, const char *src) {
+int dstrdcat(dchar **dest, const dchar *src) {
 	return dstrxcat(dest, src, dstrlen(src));
 }
 
-int dstrxcat(char **dest, const char *src, size_t len) {
+int dstrxcat(dchar **dest, const char *src, size_t len) {
 	size_t oldlen = dstrlen(*dest);
 	size_t newlen = oldlen + len;
 
@@ -131,23 +132,23 @@ int dstrxcat(char **dest, const char *src, size_t len) {
 	return 0;
 }
 
-int dstrapp(char **str, char c) {
+int dstrapp(dchar **str, char c) {
 	return dstrxcat(str, &c, 1);
 }
 
-int dstrcpy(char **dest, const char *src) {
+int dstrcpy(dchar **dest, const char *src) {
 	return dstrxcpy(dest, src, strlen(src));
 }
 
-int dstrncpy(char **dest, const char *src, size_t n) {
+int dstrncpy(dchar **dest, const char *src, size_t n) {
 	return dstrxcpy(dest, src, strnlen(src, n));
 }
 
-int dstrdcpy(char **dest, const char *src) {
+int dstrdcpy(dchar **dest, const dchar *src) {
 	return dstrxcpy(dest, src, dstrlen(src));
 }
 
-int dstrxcpy(char **dest, const char *src, size_t len) {
+int dstrxcpy(dchar **dest, const char *src, size_t len) {
 	if (dstresize(dest, len) != 0) {
 		return -1;
 	}
@@ -160,7 +161,7 @@ char *dstrprintf(const char *format, ...) {
 	va_list args;
 
 	va_start(args, format);
-	char *str = dstrvprintf(format, args);
+	dchar *str = dstrvprintf(format, args);
 	va_end(args);
 
 	return str;
@@ -168,7 +169,7 @@ char *dstrprintf(const char *format, ...) {
 
 char *dstrvprintf(const char *format, va_list args) {
 	// Guess a capacity to try to avoid reallocating
-	char *str = dstralloc(2*strlen(format));
+	dchar *str = dstralloc(2*strlen(format));
 	if (!str) {
 		return NULL;
 	}
@@ -181,7 +182,7 @@ char *dstrvprintf(const char *format, va_list args) {
 	return str;
 }
 
-int dstrcatf(char **str, const char *format, ...) {
+int dstrcatf(dchar **str, const char *format, ...) {
 	va_list args;
 
 	va_start(args, format);
@@ -191,7 +192,7 @@ int dstrcatf(char **str, const char *format, ...) {
 	return ret;
 }
 
-int dstrvcatf(char **str, const char *format, va_list args) {
+int dstrvcatf(dchar **str, const char *format, va_list args) {
 	// Guess a capacity to try to avoid calling vsnprintf() twice
 	size_t len = dstrlen(*str);
 	dstreserve(str, len + 2*strlen(format));
@@ -232,11 +233,11 @@ fail:
 	return -1;
 }
 
-int dstrescat(char **dest, const char *str, enum wesc_flags flags) {
+int dstrescat(dchar **dest, const char *str, enum wesc_flags flags) {
 	return dstrnescat(dest, str, SIZE_MAX, flags);
 }
 
-int dstrnescat(char **dest, const char *str, size_t n, enum wesc_flags flags) {
+int dstrnescat(dchar **dest, const char *str, size_t n, enum wesc_flags flags) {
 	size_t len = *dest ? dstrlen(*dest) : 0;
 
 	// Worst case growth is `ccc...` => $'\xCC\xCC\xCC...'
@@ -254,7 +255,7 @@ int dstrnescat(char **dest, const char *str, size_t n, enum wesc_flags flags) {
 	return dstresize(dest, cur - *dest);
 }
 
-void dstrfree(char *dstr) {
+void dstrfree(dchar *dstr) {
 	if (dstr) {
 		free(dstrheader(dstr));
 	}

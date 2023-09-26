@@ -435,7 +435,7 @@ struct bftw_state {
 	struct bftw_list batch;
 
 	/** The current path. */
-	char *path;
+	dchar *path;
 	/** The current file. */
 	struct bftw_file *file;
 	/** The previous file. */

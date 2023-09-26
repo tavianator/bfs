@@ -558,8 +558,8 @@ static int unescape(char **str, const char *value, char end, const char **next) 
 /** Parse the GNU $LS_COLORS format. */
 static int parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
 	int ret = -1;
-	char *key = NULL;
-	char *value = NULL;
+	dchar *key = NULL;
+	dchar *value = NULL;
 
 	for (const char *chunk = ls_colors, *next; chunk; chunk = next) {
 		if (chunk[0] == '*') {
@@ -943,7 +943,7 @@ static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, 
 		goto out;
 	}
 
-	char *at_path;
+	dchar *at_path;
 	int at_fd;
 	if (path == ftwbuf->path) {
 		if (ftwbuf->depth == 0) {

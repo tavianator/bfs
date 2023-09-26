@@ -129,7 +129,7 @@ BFS_FORMATTER(2, 3)
 static int bfs_bar_printf(struct bfs_bar *bar, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	char *str = dstrvprintf(format, args);
+	dchar *str = dstrvprintf(format, args);
 	va_end(args);
 
 	if (!str) {

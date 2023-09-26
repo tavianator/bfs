@@ -227,7 +227,7 @@ static char *bfs_exec_format_arg(char *arg, const char *path) {
 		return arg;
 	}
 
-	char *ret = dstralloc(0);
+	dchar *ret = dstralloc(0);
 	if (!ret) {
 		return NULL;
 	}
@@ -259,7 +259,7 @@ err:
 /** Free a formatted argument. */
 static void bfs_exec_free_arg(char *arg, const char *tmpl) {
 	if (arg != tmpl) {
-		dstrfree(arg);
+		dstrfree((dchar *)arg);
 	}
 }
 

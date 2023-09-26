@@ -158,7 +158,7 @@ static void bfs_argv_diag(const struct bfs_ctx *ctx, const bool args[], bool war
 		bfs_error_prefix(ctx);
 	}
 
-	char **argv = ZALLOC_ARRAY(char *, ctx->argc);
+	dchar **argv = ZALLOC_ARRAY(dchar *, ctx->argc);
 	if (!argv) {
 		return;
 	}

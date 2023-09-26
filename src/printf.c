@@ -38,7 +38,7 @@ struct bfs_printf {
 	/** The printing function to invoke. */
 	bfs_printf_fn *fn;
 	/** String data associated with this directive. */
-	char *str;
+	dchar *str;
 	/** The stat field to print. */
 	enum bfs_stat_field stat_field;
 	/** Character data associated with this directive. */
@@ -596,7 +596,7 @@ static int append_directive(const struct bfs_ctx *ctx, struct bfs_printf **forma
 int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const char *format) {
 	expr->printf = NULL;
 
-	char *literal = dstralloc(0);
+	dchar *literal = dstralloc(0);
 	if (!literal) {
 		bfs_perror(ctx, "dstralloc()");
 		goto error;

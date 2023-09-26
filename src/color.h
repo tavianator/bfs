@@ -9,6 +9,7 @@
 #define BFS_COLOR_H
 
 #include "config.h"
+#include "dstring.h"
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -41,7 +42,7 @@ typedef struct CFILE {
 	/** The color table to use, if any. */
 	const struct colors *colors;
 	/** A buffer for colored formatting. */
-	char *buffer;
+	dchar *buffer;
 	/** Whether the next ${rs} is actually necessary. */
 	bool need_reset;
 	/** Whether to close the underlying stream. */

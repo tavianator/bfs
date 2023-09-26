@@ -37,7 +37,7 @@
 static const char *fake_at(const struct BFTW *ftwbuf) {
 	static atomic int proc_works = -1;
 
-	char *path = NULL;
+	dchar *path = NULL;
 	if (ftwbuf->at_fd == AT_FDCWD || load(&proc_works, relaxed) == 0) {
 		goto fail;
 	}
@@ -69,7 +69,7 @@ fail:
 
 static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 	if (path != ftwbuf->path) {
-		dstrfree((char *)path);
+		dstrfree((dchar *)path);
 	}
 }
 

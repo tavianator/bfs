@@ -13,13 +13,32 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+/** Marker type for dynamic strings. */
+#if __clang__
+// Abuse __attribute__(aligned) to make a type that allows
+//
+//     dchar * -> char *
+//
+// conversions, but warns on
+//
+//     char * -> dchar *
+//
+// (with Clang's -Walign-mismatch).  The alignment is not a lie, due to the
+// layout of struct dstring, but we only enable this on Clang because GCC
+// tracks alignment through array accesses, reporting UBSan errors on (and
+// maybe even miscompiling) dstr[1].
+typedef __attribute__((aligned(alignof(size_t)))) char dchar;
+#else
+typedef char dchar;
+#endif
+
 /**
  * Allocate a dynamic string.
  *
  * @param capacity
  *         The initial capacity of the string.
  */
-char *dstralloc(size_t capacity);
+dchar *dstralloc(size_t capacity);
 
 /**
  * Create a dynamic copy of a string.
@@ -27,7 +46,7 @@ char *dstralloc(size_t capacity);
  * @param str
  *         The NUL-terminated string to copy.
  */
-char *dstrdup(const char *str);
+dchar *dstrdup(const char *str);
 
 /**
  * Create a length-limited dynamic copy of a string.
@@ -37,7 +56,7 @@ char *dstrdup(const char *str);
  * @param n
  *         The maximum number of characters to copy from str.
  */
-char *dstrndup(const char *str, size_t n);
+dchar *dstrndup(const char *str, size_t n);
 
 /**
  * Create a dynamic copy of a dynamic string.
@@ -45,7 +64,7 @@ char *dstrndup(const char *str, size_t n);
  * @param dstr
  *         The dynamic string to copy.
  */
-char *dstrddup(const char *dstr);
+dchar *dstrddup(const dchar *dstr);
 
 /**
  * Create an exact-sized dynamic copy of a string.
@@ -55,7 +74,7 @@ char *dstrddup(const char *dstr);
  * @param len
  *         The length of the string, which may include internal NUL bytes.
  */
-char *dstrxdup(const char *str, size_t len);
+dchar *dstrxdup(const char *str, size_t len);
 
 /**
  * Get a dynamic string's length.
@@ -65,7 +84,7 @@ char *dstrxdup(const char *str, size_t len);
  * @return
  *         The length of dstr.
  */
-size_t dstrlen(const char *dstr);
+size_t dstrlen(const dchar *dstr);
 
 /**
  * Reserve some capacity in a dynamic string.
@@ -77,7 +96,7 @@ size_t dstrlen(const char *dstr);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstreserve(char **dstr, size_t capacity);
+int dstreserve(dchar **dstr, size_t capacity);
 
 /**
  * Resize a dynamic string.
@@ -89,7 +108,7 @@ int dstreserve(char **dstr, size_t capacity);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstresize(char **dstr, size_t length);
+int dstresize(dchar **dstr, size_t length);
 
 /**
  * Append to a dynamic string.
@@ -100,7 +119,7 @@ int dstresize(char **dstr, size_t length);
  *         The string to append.
  * @return 0 on success, -1 on failure.
  */
-int dstrcat(char **dest, const char *src);
+int dstrcat(dchar **dest, const char *src);
 
 /**
  * Append to a dynamic string.
@@ -114,7 +133,7 @@ int dstrcat(char **dest, const char *src);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstrncat(char **dest, const char *src, size_t n);
+int dstrncat(dchar **dest, const char *src, size_t n);
 
 /**
  * Append a dynamic string to another dynamic string.
@@ -126,7 +145,7 @@ int dstrncat(char **dest, const char *src, size_t n);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstrdcat(char **dest, const char *src);
+int dstrdcat(dchar **dest, const dchar *src);
 
 /**
  * Append to a dynamic string.
@@ -140,7 +159,7 @@ int dstrdcat(char **dest, const char *src);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstrxcat(char **dest, const char *src, size_t len);
+int dstrxcat(dchar **dest, const char *src, size_t len);
 
 /**
  * Append a single character to a dynamic string.
@@ -152,7 +171,7 @@ int dstrxcat(char **dest, const char *src, size_t len);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstrapp(char **str, char c);
+int dstrapp(dchar **str, char c);
 
 /**
  * Copy a string into a dynamic string.
@@ -164,7 +183,7 @@ int dstrapp(char **str, char c);
  * @returns
  *         0 on success, -1 on failure.
  */
-int dstrcpy(char **dest, const char *str);
+int dstrcpy(dchar **dest, const char *str);
 
 /**
  * Copy a dynamic string into another one.
@@ -176,7 +195,7 @@ int dstrcpy(char **dest, const char *str);
  * @returns
  *         0 on success, -1 on failure.
  */
-int dstrdcpy(char **dest, const char *str);
+int dstrdcpy(dchar **dest, const dchar *str);
 
 /**
  * Copy a string into a dynamic string.
@@ -190,7 +209,7 @@ int dstrdcpy(char **dest, const char *str);
  * @returns
  *         0 on success, -1 on failure.
  */
-int dstrncpy(char **dest, const char *str, size_t n);
+int dstrncpy(dchar **dest, const char *str, size_t n);
 
 /**
  * Copy a string into a dynamic string.
@@ -204,7 +223,7 @@ int dstrncpy(char **dest, const char *str, size_t n);
  * @returns
  *         0 on success, -1 on failure.
  */
-int dstrxcpy(char **dest, const char *str, size_t len);
+int dstrxcpy(dchar **dest, const char *str, size_t len);
 
 /**
  * Create a dynamic string from a format string.
@@ -245,7 +264,7 @@ char *dstrvprintf(const char *format, va_list args);
  *         0 on success, -1 on failure.
  */
 BFS_FORMATTER(2, 3)
-int dstrcatf(char **str, const char *format, ...);
+int dstrcatf(dchar **str, const char *format, ...);
 
 /**
  * Format some text from a va_list onto the end of a dynamic string.
@@ -260,7 +279,7 @@ int dstrcatf(char **str, const char *format, ...);
  *         0 on success, -1 on failure.
  */
 BFS_FORMATTER(2, 0)
-int dstrvcatf(char **str, const char *format, va_list args);
+int dstrvcatf(dchar **str, const char *format, va_list args);
 
 /**
  * Concatenate while shell-escaping.
@@ -274,7 +293,7 @@ int dstrvcatf(char **str, const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstrescat(char **dest, const char *str, enum wesc_flags flags);
+int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
 
 /**
  * Concatenate while shell-escaping.
@@ -290,7 +309,7 @@ int dstrescat(char **dest, const char *str, enum wesc_flags flags);
  * @return
  *         0 on success, -1 on failure.
  */
-int dstrnescat(char **dest, const char *str, size_t n, enum wesc_flags flags);
+int dstrnescat(dchar **dest, const char *str, size_t n, enum wesc_flags flags);
 
 /**
  * Free a dynamic string.
@@ -298,6 +317,6 @@ int dstrnescat(char **dest, const char *str, size_t n, enum wesc_flags flags);
  * @param dstr
  *         The string to free.
  */
-void dstrfree(char *dstr);
+void dstrfree(dchar *dstr);
 
 #endif // BFS_DSTRING_H
