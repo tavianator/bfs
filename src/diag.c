@@ -4,9 +4,9 @@
 #include "diag.h"
 #include "alloc.h"
 #include "bfstd.h"
-#include "ctx.h"
 #include "color.h"
 #include "config.h"
+#include "ctx.h"
 #include "dstring.h"
 #include "expr.h"
 #include <errno.h>
@@ -31,14 +31,14 @@ void bfs_perror(const struct bfs_ctx *ctx, const char *str) {
 	bfs_error(ctx, "%s: %m.\n", str);
 }
 
-void bfs_error(const struct bfs_ctx *ctx, const char *format, ...)  {
+void bfs_error(const struct bfs_ctx *ctx, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
 
-bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...)  {
+bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	bool ret = bfs_vwarning(ctx, format, args);
@@ -46,7 +46,7 @@ bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...)  {
 	return ret;
 }
 
-bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, ...)  {
+bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	bool ret = bfs_vdebug(ctx, flag, format, args);

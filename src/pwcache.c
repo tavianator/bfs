@@ -4,7 +4,6 @@
 #include "pwcache.h"
 #include "alloc.h"
 #include "config.h"
-#include "darray.h"
 #include "trie.h"
 #include <errno.h>
 #include <grp.h>

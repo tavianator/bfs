@@ -55,7 +55,7 @@ void *darray_push(void *da, const void *item, size_t size) {
 	size_t i = header->length++;
 	if (i >= capacity) {
 		capacity *= 2;
-		header = realloc(header, sizeof(*header) + capacity*size);
+		header = realloc(header, sizeof(*header) + capacity * size);
 		if (!header) {
 			// This failure will be detected by darray_check()
 			return da;
@@ -64,7 +64,7 @@ void *darray_push(void *da, const void *item, size_t size) {
 	}
 
 	char *data = darray_data(header);
-	memcpy(data + i*size, item, size);
+	memcpy(data + i * size, item, size);
 	return data;
 }
 

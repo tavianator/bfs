@@ -21,4 +21,3 @@ struct bfs_ctx;
 int bfs_optimize(struct bfs_ctx *ctx);
 
 #endif // BFS_OPT_H
-

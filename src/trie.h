@@ -4,8 +4,8 @@
 #ifndef BFS_TRIE_H
 #define BFS_TRIE_H
 
-#include "config.h"
 #include "alloc.h"
+#include "config.h"
 #include "list.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -143,6 +143,6 @@ void trie_destroy(struct trie *trie);
  * Iterate over the leaves of a trie.
  */
 #define for_trie(leaf, trie) \
-	for_list(struct trie_leaf, leaf, trie)
+	for_list (struct trie_leaf, leaf, trie)
 
 #endif // BFS_TRIE_H

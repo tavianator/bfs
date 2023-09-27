@@ -168,7 +168,6 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 		} else if (cfile == ctx->cout) {
 			bfs_error(ctx, "(standard output): %m.\n");
 		}
-
 	}
 
 	// Flush the user/group caches, in case the executed command edits the

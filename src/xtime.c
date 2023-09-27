@@ -81,7 +81,7 @@ static int safe_add(int *value, int delta) {
 
 static int floor_div(int n, int d) {
 	int a = n < 0;
-	return (n + a)/d - a;
+	return (n + a) / d - a;
 }
 
 static int wrap(int *value, int max, int *next) {
@@ -93,7 +93,7 @@ static int wrap(int *value, int max, int *next) {
 static int month_length(int year, int month) {
 	static const int month_lengths[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 	int ret = month_lengths[month];
-	if (month == 1 && year%4 == 0 && (year%100 != 0 || (year + 300)%400 == 0)) {
+	if (month == 1 && year % 4 == 0 && (year % 100 != 0 || (year + 300) % 400 == 0)) {
 		++ret;
 	}
 	return ret;
@@ -156,13 +156,13 @@ int xtimegm(struct tm *tm, time_t *timep) {
 		leap_days = floor_div(tm->tm_year + 3, 4) - floor_div(tm->tm_year + 99, 100) + floor_div(tm->tm_year + 299, 400) - 17;
 	}
 
-	long long epoch_days = 365LL*(tm->tm_year - 70) + leap_days + tm->tm_yday;
-	tm->tm_wday = (epoch_days + 4)%7;
+	long long epoch_days = 365LL * (tm->tm_year - 70) + leap_days + tm->tm_yday;
+	tm->tm_wday = (epoch_days + 4) % 7;
 	if (tm->tm_wday < 0) {
 		tm->tm_wday += 7;
 	}
 
-	long long epoch_time = tm->tm_sec + 60*(tm->tm_min + 60*(tm->tm_hour + 24*epoch_days));
+	long long epoch_time = tm->tm_sec + 60 * (tm->tm_min + 60 * (tm->tm_hour + 24 * epoch_days));
 	*timep = (time_t)epoch_time;
 	if ((long long)*timep != epoch_time) {
 		goto overflow;
@@ -296,7 +296,7 @@ end:
 			goto error;
 		}
 
-		int offset = 60*tz_hour + tz_min;
+		int offset = 60 * tz_hour + tz_min;
 		if (tz_negative) {
 			result->tv_sec -= offset;
 		} else {

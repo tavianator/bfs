@@ -5,9 +5,9 @@
 #include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
-#include "ctx.h"
 #include "color.h"
 #include "config.h"
+#include "ctx.h"
 #include "diag.h"
 #include "dstring.h"
 #include "xspawn.h"
@@ -348,7 +348,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 
 	if (execbuf->flags & BFS_EXEC_MULTI) {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments] (size %zu)\n",
-		               execbuf->argv[0], execbuf->argc - 1, execbuf->arg_size);
+			execbuf->argv[0], execbuf->argc - 1, execbuf->arg_size);
 	} else {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
 	}
@@ -471,7 +471,7 @@ static bool bfs_exec_args_remain(const struct bfs_exec *execbuf) {
 static size_t bfs_exec_estimate_max(const struct bfs_exec *execbuf) {
 	size_t min = execbuf->arg_min;
 	size_t max = execbuf->arg_max;
-	return min + (max - min)/2;
+	return min + (max - min) / 2;
 }
 
 /** Update the ARG_MAX lower bound from a successful execution. */
@@ -486,7 +486,7 @@ static void bfs_exec_update_min(struct bfs_exec *execbuf) {
 
 		size_t estimate = bfs_exec_estimate_max(execbuf);
 		bfs_exec_debug(execbuf, "ARG_MAX between [%zu, %zu], trying %zu\n",
-		               execbuf->arg_min, execbuf->arg_max, estimate);
+			execbuf->arg_min, execbuf->arg_max, estimate);
 	}
 }
 
@@ -502,7 +502,7 @@ static size_t bfs_exec_update_max(struct bfs_exec *execbuf) {
 
 	// Trim a fraction off the max size to avoid repeated failures near the
 	// top end of the working range
-	size -= size/16;
+	size -= size / 16;
 	if (size < execbuf->arg_max) {
 		execbuf->arg_max = size;
 
@@ -515,7 +515,7 @@ static size_t bfs_exec_update_max(struct bfs_exec *execbuf) {
 	// Binary search for a more precise bound
 	size_t estimate = bfs_exec_estimate_max(execbuf);
 	bfs_exec_debug(execbuf, "ARG_MAX between [%zu, %zu], trying %zu\n",
-	               execbuf->arg_min, execbuf->arg_max, estimate);
+		execbuf->arg_min, execbuf->arg_max, estimate);
 	return estimate;
 }
 
@@ -589,7 +589,7 @@ static bool bfs_exec_would_overflow(const struct bfs_exec *execbuf, const char *
 	size_t next_size = execbuf->arg_size + bfs_exec_arg_size(arg);
 	if (next_size > arg_max) {
 		bfs_exec_debug(execbuf, "Command size (%zu) would exceed maximum (%zu), executing buffered command\n",
-		               next_size, arg_max);
+			next_size, arg_max);
 		return true;
 	}
 
@@ -601,7 +601,7 @@ static int bfs_exec_push(struct bfs_exec *execbuf, char *arg) {
 	execbuf->argv[execbuf->argc] = arg;
 
 	if (execbuf->argc + 1 >= execbuf->argv_cap) {
-		size_t cap = 2*execbuf->argv_cap;
+		size_t cap = 2 * execbuf->argv_cap;
 		char **argv = realloc(execbuf->argv, sizeof_array(char *, cap));
 		if (!argv) {
 			return -1;

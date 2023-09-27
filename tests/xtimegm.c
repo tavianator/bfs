@@ -42,9 +42,9 @@ static bool tm_equal(const struct tm *tma, const struct tm *tmb) {
 
 static void tm_print(FILE *file, const struct tm *tm) {
 	fprintf(file, "Y%d M%d D%d  h%d m%d s%d  wd%d yd%d%s\n",
-	        tm->tm_year, tm->tm_mon, tm->tm_mday,
-	        tm->tm_hour, tm->tm_min, tm->tm_sec,
-	        tm->tm_wday, tm->tm_yday,
+		tm->tm_year, tm->tm_mon, tm->tm_mday,
+		tm->tm_hour, tm->tm_min, tm->tm_sec,
+		tm->tm_wday, tm->tm_yday,
 		tm->tm_isdst ? (tm->tm_isdst < 0 ? " (DST?)" : " (DST)") : "");
 }
 

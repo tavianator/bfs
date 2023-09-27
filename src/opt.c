@@ -535,8 +535,8 @@ static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct 
 	expr->pure = lhs->pure && rhs->pure;
 	expr->always_true = lhs->always_true && rhs->always_true;
 	expr->always_false = lhs->always_false || rhs->always_false;
-	expr->cost = lhs->cost + lhs->probability*rhs->cost;
-	expr->probability = lhs->probability*rhs->probability;
+	expr->cost = lhs->cost + lhs->probability * rhs->cost;
+	expr->probability = lhs->probability * rhs->probability;
 
 	return expr;
 }
@@ -606,8 +606,8 @@ static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct b
 	expr->pure = lhs->pure && rhs->pure;
 	expr->always_true = lhs->always_true || rhs->always_true;
 	expr->always_false = lhs->always_false && rhs->always_false;
-	expr->cost = lhs->cost + (1 - lhs->probability)*rhs->cost;
-	expr->probability = lhs->probability + rhs->probability - lhs->probability*rhs->probability;
+	expr->cost = lhs->cost + (1 - lhs->probability) * rhs->cost;
+	expr->probability = lhs->probability + rhs->probability - lhs->probability * rhs->probability;
 
 	return expr;
 }
@@ -1078,7 +1078,6 @@ static const struct {
 	{eval_xattrname, 0.01},
 };
 
-
 /**
  * Table of simple predicates.
  */
@@ -1331,7 +1330,7 @@ static bool reorder_expr_recursive(const struct opt_state *state, struct bfs_exp
 	if (expr->eval_fn == eval_and || expr->eval_fn == eval_or) {
 		if (lhs->pure && rhs->pure) {
 			float rhs_prob = expr->eval_fn == eval_and ? rhs->probability : 1.0 - rhs->probability;
-			float swapped_cost = rhs->cost + rhs_prob*lhs->cost;
+			float swapped_cost = rhs->cost + rhs_prob * lhs->cost;
 			ret |= reorder_expr(state, expr, swapped_cost);
 		}
 	}

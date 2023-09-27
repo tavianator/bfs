@@ -3,9 +3,9 @@
 
 #include "fsade.h"
 #include "atomic.h"
-#include "config.h"
 #include "bfstd.h"
 #include "bftw.h"
+#include "config.h"
 #include "dir.h"
 #include "dstring.h"
 #include "sanity.h"
@@ -292,7 +292,7 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	ssize_t len;
 
 #if BFS_USE_SYS_EXTATTR_H
-	ssize_t (*extattr_list)(const char *, int, void*, size_t) =
+	ssize_t (*extattr_list)(const char *, int, void *, size_t) =
 		ftwbuf->type == BFS_LNK ? extattr_list_link : extattr_list_file;
 
 	len = extattr_list(path, EXTATTR_NAMESPACE_SYSTEM, NULL, 0);
@@ -331,7 +331,7 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 	ssize_t len;
 
 #if BFS_USE_SYS_EXTATTR_H
-	ssize_t (*extattr_get)(const char *, int, const char *, void*, size_t) =
+	ssize_t (*extattr_get)(const char *, int, const char *, void *, size_t) =
 		ftwbuf->type == BFS_LNK ? extattr_get_link : extattr_get_file;
 
 	len = extattr_get(path, EXTATTR_NAMESPACE_SYSTEM, name, NULL, 0);

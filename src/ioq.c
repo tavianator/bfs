@@ -9,8 +9,8 @@
 #include "config.h"
 #include "diag.h"
 #include "dir.h"
-#include "thread.h"
 #include "sanity.h"
+#include "thread.h"
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>

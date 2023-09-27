@@ -113,14 +113,14 @@ static int bfs_printf_ctime(CFILE *cfile, const struct bfs_printf *directive, co
 	}
 
 	BFS_PRINTF_BUF(buf, "%s %s %2d %.2d:%.2d:%.2d.%09ld0 %4d",
-	               days[tm.tm_wday],
-	               months[tm.tm_mon],
-	               tm.tm_mday,
-	               tm.tm_hour,
-	               tm.tm_min,
-	               tm.tm_sec,
-	               (long)ts->tv_nsec,
-	               1900 + tm.tm_year);
+		days[tm.tm_wday],
+		months[tm.tm_mon],
+		tm.tm_mday,
+		tm.tm_hour,
+		tm.tm_min,
+		tm.tm_sec,
+		(long)ts->tv_nsec,
+		1900 + tm.tm_year);
 
 	return dyn_fprintf(cfile->file, directive, buf);
 }
@@ -152,19 +152,19 @@ static int bfs_printf_strftime(CFILE *cfile, const struct bfs_printf *directive,
 		break;
 	case '+':
 		ret = snprintf(buf, sizeof(buf), "%4d-%.2d-%.2d+%.2d:%.2d:%.2d.%09ld0",
-		               1900 + tm.tm_year,
-		               tm.tm_mon + 1,
-		               tm.tm_mday,
-		               tm.tm_hour,
-		               tm.tm_min,
-		               tm.tm_sec,
-		               (long)ts->tv_nsec);
+			1900 + tm.tm_year,
+			tm.tm_mon + 1,
+			tm.tm_mday,
+			tm.tm_hour,
+			tm.tm_min,
+			tm.tm_sec,
+			(long)ts->tv_nsec);
 		break;
 	case 'k':
 		ret = snprintf(buf, sizeof(buf), "%2d", tm.tm_hour);
 		break;
 	case 'l':
-		ret = snprintf(buf, sizeof(buf), "%2d", (tm.tm_hour + 11)%12 + 1);
+		ret = snprintf(buf, sizeof(buf), "%2d", (tm.tm_hour + 11) % 12 + 1);
 		break;
 	case 's':
 		ret = snprintf(buf, sizeof(buf), "%lld", (long long)ts->tv_sec);
@@ -174,10 +174,10 @@ static int bfs_printf_strftime(CFILE *cfile, const struct bfs_printf *directive,
 		break;
 	case 'T':
 		ret = snprintf(buf, sizeof(buf), "%.2d:%.2d:%.2d.%09ld0",
-			       tm.tm_hour,
-			       tm.tm_min,
-			       tm.tm_sec,
-			       (long)ts->tv_nsec);
+			tm.tm_hour,
+			tm.tm_min,
+			tm.tm_sec,
+			(long)ts->tv_nsec);
 		break;
 
 	// POSIX strftime() features
@@ -202,7 +202,7 @@ static int bfs_printf_b(CFILE *cfile, const struct bfs_printf *directive, const 
 		return -1;
 	}
 
-	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 511)/512;
+	uintmax_t blocks = ((uintmax_t)statbuf->blocks * BFS_STAT_BLKSIZE + 511) / 512;
 	BFS_PRINTF_BUF(buf, "%ju", blocks);
 	return dyn_fprintf(cfile->file, directive, buf);
 }
@@ -338,7 +338,7 @@ static int bfs_printf_k(CFILE *cfile, const struct bfs_printf *directive, const 
 		return -1;
 	}
 
-	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + 1023)/1024;
+	uintmax_t blocks = ((uintmax_t)statbuf->blocks * BFS_STAT_BLKSIZE + 1023) / 1024;
 	BFS_PRINTF_BUF(buf, "%ju", blocks);
 	return dyn_fprintf(cfile->file, directive, buf);
 }
@@ -452,7 +452,7 @@ static int bfs_printf_S(CFILE *cfile, const struct bfs_printf *directive, const 
 	if (statbuf->size == 0 && statbuf->blocks == 0) {
 		sparsity = 1.0;
 	} else {
-		sparsity = (double)BFS_STAT_BLKSIZE*statbuf->blocks/statbuf->size;
+		sparsity = (double)BFS_STAT_BLKSIZE * statbuf->blocks / statbuf->size;
 	}
 	return dyn_fprintf(cfile->file, directive, sparsity);
 }

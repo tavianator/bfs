@@ -239,7 +239,7 @@ bool eval_time(const struct bfs_expr *expr, struct bfs_eval *state) {
 	time_t diff = timespec_diff(&expr->reftime, time);
 	switch (expr->time_unit) {
 	case BFS_DAYS:
-		diff /= 60*24;
+		diff /= 60 * 24;
 		fallthru;
 	case BFS_MINUTES:
 		diff /= 60;
@@ -271,7 +271,7 @@ bool eval_used(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	long long day_seconds = 60*60*24;
+	long long day_seconds = 60 * 60 * 24;
 	diff = (diff + day_seconds - 1) / day_seconds;
 	return bfs_expr_cmp(expr, diff);
 }
@@ -685,7 +685,7 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 
 	uintmax_t ino = statbuf->ino;
 	uintmax_t block_size = ctx->posixly_correct ? 512 : 1024;
-	uintmax_t blocks = ((uintmax_t)statbuf->blocks*BFS_STAT_BLKSIZE + block_size - 1)/block_size;
+	uintmax_t blocks = ((uintmax_t)statbuf->blocks * BFS_STAT_BLKSIZE + block_size - 1) / block_size;
 	char mode[11];
 	xstrmode(statbuf->mode, mode);
 	char acl = bfs_check_acl(ftwbuf) > 0 ? '+' : ' ';
@@ -721,8 +721,8 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 
 	time_t time = statbuf->mtime.tv_sec;
 	time_t now = ctx->now.tv_sec;
-	time_t six_months_ago = now - 6*30*24*60*60;
-	time_t tomorrow = now + 24*60*60;
+	time_t six_months_ago = now - 6 * 30 * 24 * 60 * 60;
+	time_t tomorrow = now + 24 * 60 * 60;
 	struct tm tm;
 	if (xlocaltime(&time, &tm) != 0) {
 		goto error;
@@ -823,7 +823,6 @@ bool eval_fprintx(const struct bfs_expr *expr, struct bfs_eval *state) {
 		++path;
 	}
 
-
 	if (fputc('\n', file) == EOF) {
 		goto error;
 	}
@@ -905,7 +904,7 @@ bool eval_size(const struct bfs_expr *expr, struct bfs_eval *state) {
 	};
 
 	off_t scale = scales[expr->size_unit];
-	off_t size = (statbuf->size + scale - 1)/scale; // Round up
+	off_t size = (statbuf->size + scale - 1) / scale; // Round up
 	return bfs_expr_cmp(expr, size);
 }
 
@@ -918,7 +917,7 @@ bool eval_sparse(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	blkcnt_t expected = (statbuf->size + BFS_STAT_BLKSIZE - 1)/BFS_STAT_BLKSIZE;
+	blkcnt_t expected = (statbuf->size + BFS_STAT_BLKSIZE - 1) / BFS_STAT_BLKSIZE;
 	return statbuf->blocks < expected;
 }
 

@@ -169,7 +169,7 @@ char *dstrprintf(const char *format, ...) {
 
 char *dstrvprintf(const char *format, va_list args) {
 	// Guess a capacity to try to avoid reallocating
-	dchar *str = dstralloc(2*strlen(format));
+	dchar *str = dstralloc(2 * strlen(format));
 	if (!str) {
 		return NULL;
 	}
@@ -195,7 +195,7 @@ int dstrcatf(dchar **str, const char *format, ...) {
 int dstrvcatf(dchar **str, const char *format, va_list args) {
 	// Guess a capacity to try to avoid calling vsnprintf() twice
 	size_t len = dstrlen(*str);
-	dstreserve(str, len + 2*strlen(format));
+	dstreserve(str, len + 2 * strlen(format));
 	size_t cap = dstrheader(*str)->capacity;
 
 	va_list copy;

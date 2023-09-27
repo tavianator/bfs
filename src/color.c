@@ -1143,11 +1143,11 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 	if (verbose) {
 		double rate = 0.0, time = 0.0;
 		if (expr->evaluations) {
-			rate = 100.0*expr->successes/expr->evaluations;
-			time = (1.0e9*expr->elapsed.tv_sec + expr->elapsed.tv_nsec)/expr->evaluations;
+			rate = 100.0 * expr->successes / expr->evaluations;
+			time = (1.0e9 * expr->elapsed.tv_sec + expr->elapsed.tv_nsec) / expr->evaluations;
 		}
 		if (cbuff(cfile, " [${ylw}%zu${rs}/${ylw}%zu${rs}=${ylw}%g%%${rs}; ${ylw}%gns${rs}]",
-		          expr->successes, expr->evaluations, rate, time)) {
+			    expr->successes, expr->evaluations, rate, time)) {
 			return -1;
 		}
 	}

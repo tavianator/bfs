@@ -8,8 +8,8 @@
 #ifndef BFS_DIAG_H
 #define BFS_DIAG_H
 
-#include "ctx.h"
 #include "config.h"
+#include "ctx.h"
 #include <stdarg.h>
 
 /**

@@ -700,7 +700,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	}
 
 	if (child_index < parent_size) {
-		memmove(child, child + 1, (parent_size - child_index)*sizeof(*child));
+		memmove(child, child + 1, (parent_size - child_index) * sizeof(*child));
 	}
 
 	if (has_single_bit(parent_size)) {

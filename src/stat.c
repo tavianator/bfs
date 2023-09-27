@@ -10,8 +10,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
 #  define BFS_HAS_LIBC_STATX true

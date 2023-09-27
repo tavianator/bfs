@@ -41,8 +41,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -1797,10 +1797,10 @@ static int parse_reftime(const struct parser_state *state, struct bfs_expr *expr
 #else
 	int gmtoff = -timezone;
 #endif
-	int tz_hour = gmtoff/3600;
-	int tz_min = (labs(gmtoff)/60)%60;
+	int tz_hour = gmtoff / 3600;
+	int tz_min = (labs(gmtoff) / 60) % 60;
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d%+03d:%02d\n",
-	        year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
+		year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
 
 	if (xgmtime(&state->now.tv_sec, &tm) != 0) {
 		parse_perror(state, "xgmtime()");
@@ -1832,8 +1832,8 @@ static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int 
 	expr->stat_field = parse_newerxy_field(arg[6]);
 	if (!expr->stat_field) {
 		parse_expr_error(state, expr,
-		                 "For ${blu}-newer${bld}XY${rs}, ${bld}X${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, or ${bld}B${rs}, not ${err}%c${rs}.\n",
-		                 arg[6]);
+			"For ${blu}-newer${bld}XY${rs}, ${bld}X${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, or ${bld}B${rs}, not ${err}%c${rs}.\n",
+			arg[6]);
 		goto fail;
 	}
 
@@ -1845,8 +1845,8 @@ static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int 
 		enum bfs_stat_field field = parse_newerxy_field(arg[7]);
 		if (!field) {
 			parse_expr_error(state, expr,
-			                 "For ${blu}-newer${bld}XY${rs}, ${bld}Y${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, ${bld}B${rs}, or ${bld}t${rs}, not ${err}%c${rs}.\n",
-			                 arg[7]);
+				"For ${blu}-newer${bld}XY${rs}, ${bld}Y${rs} should be ${bld}a${rs}, ${bld}c${rs}, ${bld}m${rs}, ${bld}B${rs}, or ${bld}t${rs}, not ${err}%c${rs}.\n",
+				arg[7]);
 			goto fail;
 		}
 
@@ -1854,7 +1854,6 @@ static struct bfs_expr *parse_newerxy(struct parser_state *state, int arg1, int 
 		if (stat_arg(state, &expr->argv[1], &sb) != 0) {
 			goto fail;
 		}
-
 
 		const struct timespec *reftime = bfs_stat_time(&sb, field);
 		if (!reftime) {
@@ -1905,7 +1904,7 @@ static struct bfs_expr *parse_nohidden(struct parser_state *state, int arg1, int
  */
 static struct bfs_expr *parse_noleaf(struct parser_state *state, int arg1, int arg2) {
 	parse_warning(state, "${ex}%s${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n",
-	              BFS_COMMAND, state->argv[0]);
+		BFS_COMMAND, state->argv[0]);
 	return parse_nullary_option(state);
 }
 
@@ -2730,12 +2729,12 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
 	}
 
 	cfprintf(cout, "Usage: ${ex}%s${rs} [${cyn}flags${rs}...] [${mag}paths${rs}...] [${blu}expression${rs}...]\n\n",
-		 state->command);
+		state->command);
 
 	cfprintf(cout, "${ex}%s${rs} is compatible with ${ex}find${rs}, with some extensions. "
-		       "${cyn}Flags${rs} (${cyn}-H${rs}/${cyn}-L${rs}/${cyn}-P${rs} etc.), ${mag}paths${rs},\n"
-		       "and ${blu}expressions${rs} may be freely mixed in any order.\n\n",
-		 BFS_COMMAND);
+	               "${cyn}Flags${rs} (${cyn}-H${rs}/${cyn}-L${rs}/${cyn}-P${rs} etc.), ${mag}paths${rs},\n"
+	               "and ${blu}expressions${rs} may be freely mixed in any order.\n\n",
+		BFS_COMMAND);
 
 	cfprintf(cout, "${bld}Flags:${rs}\n\n");
 
@@ -2807,7 +2806,7 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
 	cfprintf(cout, "  ${blu}-ignore_readdir_race${rs}\n");
 	cfprintf(cout, "  ${blu}-noignore_readdir_race${rs}\n");
 	cfprintf(cout, "      Whether to report an error if ${ex}%s${rs} detects that the file tree is modified\n",
-	         BFS_COMMAND);
+		BFS_COMMAND);
 	cfprintf(cout, "      during the search (default: ${blu}-noignore_readdir_race${rs})\n");
 	cfprintf(cout, "  ${blu}-maxdepth${rs} ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
@@ -3462,14 +3461,14 @@ static struct bfs_expr *parse_whole_expr(struct parser_state *state) {
 
 	if (state->mount_arg && state->xdev_arg) {
 		parse_conflict_warning(state, state->mount_arg, 1, state->xdev_arg, 1,
-		                       "${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n",
-		                       state->xdev_arg[0], state->mount_arg[0]);
+			"${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n",
+			state->xdev_arg[0], state->mount_arg[0]);
 	}
 
 	if (state->ctx->warn && state->depth_arg && state->prune_arg) {
 		parse_conflict_warning(state, state->depth_arg, 1, state->prune_arg, 1,
-		                       "${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n",
-		                       state->prune_arg[0], state->depth_arg[0]);
+			"${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n",
+			state->prune_arg[0], state->depth_arg[0]);
 
 		if (state->interactive) {
 			bfs_warning(state->ctx, "Do you want to continue? ");
@@ -3483,8 +3482,8 @@ static struct bfs_expr *parse_whole_expr(struct parser_state *state) {
 
 	if (state->ok_expr && state->files0_stdin_arg) {
 		parse_conflict_error(state, state->ok_expr->argv, state->ok_expr->argc, state->files0_stdin_arg, 2,
-		                     "${blu}%s${rs} conflicts with ${blu}%s${rs} ${bld}%s${rs}.\n",
-		                     state->ok_expr->argv[0], state->files0_stdin_arg[0], state->files0_stdin_arg[1]);
+			"${blu}%s${rs} conflicts with ${blu}%s${rs} ${bld}%s${rs}.\n",
+			state->ok_expr->argv[0], state->files0_stdin_arg[0], state->files0_stdin_arg[1]);
 		goto fail;
 	}
 
@@ -3644,7 +3643,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 static void dump_costs(const struct bfs_ctx *ctx) {
 	const struct bfs_expr *expr = ctx->expr;
 	bfs_debug(ctx, DEBUG_COST, "       Cost: ~${ylw}%g${rs}\n", expr->cost);
-	bfs_debug(ctx, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0*expr->probability);
+	bfs_debug(ctx, DEBUG_COST, "Probability: ~${ylw}%g%%${rs}\n", 100.0 * expr->probability);
 }
 
 struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
@@ -3654,7 +3653,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	static char* default_argv[] = {BFS_COMMAND, NULL};
+	static char *default_argv[] = {BFS_COMMAND, NULL};
 	if (argc < 1) {
 		argc = 1;
 		argv = default_argv;

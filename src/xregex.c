@@ -5,8 +5,8 @@
 #include "alloc.h"
 #include "config.h"
 #include "diag.h"
-#include "thread.h"
 #include "sanity.h"
+#include "thread.h"
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>

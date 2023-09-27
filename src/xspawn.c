@@ -187,7 +187,7 @@ fail:
 
 	// In case of a write error, the parent will still see that we exited
 	// unsuccessfully, but won't know why
-	(void) xwrite(pipefd[1], &error, sizeof(error));
+	(void)xwrite(pipefd[1], &error, sizeof(error));
 
 	xclose(pipefd[1]);
 	_Exit(127);

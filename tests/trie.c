@@ -120,11 +120,11 @@ int main(void) {
 	bfs_verify(!trie_find_mem(&trie, longstr, longsize));
 	bfs_verify(trie_insert_mem(&trie, longstr, longsize));
 
-	memset(longstr + longsize/2, 0xAB, longsize/2);
+	memset(longstr + longsize / 2, 0xAB, longsize / 2);
 	bfs_verify(!trie_find_mem(&trie, longstr, longsize));
 	bfs_verify(trie_insert_mem(&trie, longstr, longsize));
 
-	memset(longstr, 0xAA, longsize/2);
+	memset(longstr, 0xAA, longsize / 2);
 	bfs_verify(!trie_find_mem(&trie, longstr, longsize));
 	bfs_verify(trie_insert_mem(&trie, longstr, longsize));
 
