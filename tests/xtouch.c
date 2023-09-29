@@ -48,31 +48,40 @@ static int at_flags(const struct args *args) {
 
 /** Create any parent directories of the given path. */
 static int mkdirs(const char *path, mode_t mode) {
-	char *copy = strdup(path);
-	if (!copy) {
-		return -1;
+	int ret = -1;
+	char *dir = xdirname(path);
+	if (!dir) {
+		goto err;
 	}
 
-	int ret = -1;
-	char *cur = copy + strspn(copy, "/");
-	while (true) {
+	if (strcmp(dir, ".") == 0) {
+		goto done;
+	}
+
+	// Optimistically try the immediate parent first
+	if (mkdir(dir, mode) == 0 || errno == EEXIST) {
+		goto done;
+	}
+
+	// Create the parents one-at-a-time
+	char *cur = dir + strspn(dir, "/");
+	while (*cur) {
 		cur += strcspn(cur, "/");
-
 		char *next = cur + strspn(cur, "/");
-		if (!*next) {
-			ret = 0;
-			break;
-		}
 
+		char c = *cur;
 		*cur = '\0';
-		if (mkdir(copy, mode) != 0 && errno != EEXIST) {
-			break;
+		if (mkdir(dir, mode) != 0 && errno != EEXIST) {
+			goto err;
 		}
-		*cur = '/';
+		*cur = c;
 		cur = next;
 	}
 
-	free(copy);
+done:
+	ret = 0;
+err:
+	free(dir);
 	return ret;
 }
 
