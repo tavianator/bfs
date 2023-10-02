@@ -389,18 +389,19 @@ function make_deep() {
     name="${name}${name}${name}${name}"
     name="${name:0:255}"
 
-    # 4 * 256 - 1 == 1023
-    local names="$name/$name/$name/$name"
-
     for i in {0..9} A B C D E F; do
         "$XTOUCH" -p "$1/$i/$name"
 
-        # 4 * 1024 == 4096 == PATH_MAX
-        for _ in {1..4}; do
-            mv "$1/$i/$name" "$1/"
-            mkdir -p "$1/$i/$names"
-            mv "$1/$name" "$1/$i/$names/"
-        done
+        (
+            cd "$1/$i"
+
+            # 8 * 512 == 4096 >= PATH_MAX
+            for _ in {1..8}; do
+                mv "$name" ..
+                mkdir -p "$name/$name"
+                mv "../$name" "$name/$name/"
+            done
+        )
     done
 }
 make_deep "$TMP/deep"
