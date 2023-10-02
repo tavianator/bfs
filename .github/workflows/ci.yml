@@ -28,9 +28,10 @@ jobs:
               libcap-dev \
               libcap2:i386 \
               libonig-dev \
-              libonig5:i386
+              libonig5:i386 \
+              liburing-dev
           # Ubuntu doesn't let you install the -dev packages for both amd64 and
-          # i386 at once, so we make our own symlinks to fix -m32 -lacl -lattr -lcap
+          # i386 at once, so we make our own symlinks to fix -m32 -lacl -l...
           sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
           sudo ln -s libattr.so.1 /lib/i386-linux-gnu/libattr.so
           sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so

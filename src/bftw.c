@@ -470,21 +470,34 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	state->error = 0;
 
-	if (args->nopenfd < 1) {
+	if (args->nopenfd < 2) {
 		errno = EMFILE;
 		return -1;
 	}
-	bftw_cache_init(&state->cache, args->nopenfd);
 
-	state->nthreads = args->nthreads;
-	if (state->nthreads > 0) {
-		state->ioq = ioq_create(4096, state->nthreads);
+	size_t nopenfd = args->nopenfd;
+	size_t qdepth = 4096;
+	size_t nthreads = args->nthreads;
+
+#if BFS_USE_LIBURING
+	// io_uring uses one fd per ring, ioq uses one ring per thread
+	if (nthreads >= nopenfd - 1) {
+		nthreads = nopenfd - 2;
+	}
+	nopenfd -= nthreads;
+#endif
+
+	bftw_cache_init(&state->cache, nopenfd);
+
+	if (nthreads > 0) {
+		state->ioq = ioq_create(qdepth, nthreads);
 		if (!state->ioq) {
 			return -1;
 		}
 	} else {
 		state->ioq = NULL;
 	}
+	state->nthreads = nthreads;
 
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
