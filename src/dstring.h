@@ -14,19 +14,14 @@
 #include <stddef.h>
 
 /** Marker type for dynamic strings. */
-#if __clang__
+#if BFS_LINT && __clang__
 // Abuse __attribute__(aligned) to make a type that allows
 //
 //     dchar * -> char *
 //
-// conversions, but warns on
+// conversions, but warns (with Clang's -Walign-mismatch) on
 //
 //     char * -> dchar *
-//
-// (with Clang's -Walign-mismatch).  The alignment is not a lie, due to the
-// layout of struct dstring, but we only enable this on Clang because GCC
-// tracks alignment through array accesses, reporting UBSan errors on (and
-// maybe even miscompiling) dstr[1].
 typedef __attribute__((aligned(alignof(size_t)))) char dchar;
 #else
 typedef char dchar;
