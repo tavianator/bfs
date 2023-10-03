@@ -49,10 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          brew install coreutils
-
       - name: Run tests
         run: |
           make -j$(sysctl -n hw.ncpu) distcheck
