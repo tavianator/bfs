@@ -166,6 +166,13 @@ LOCAL_CFLAGS += --coverage
 LOCAL_CFLAGS := $(patsubst -std=c%,-std=gnu%,$(LOCAL_CFLAGS))
 endif
 
+ifneq ($(filter lint,$(MAKECMDGOALS)),)
+LOCAL_CPPFLAGS += \
+    -D_FORTIFY_SOURCE=3 \
+    -DBFS_LINT
+LOCAL_CFLAGS += -Werror -O2
+endif
+
 ifneq ($(filter release,$(MAKECMDGOALS)),)
 LOCAL_CPPFLAGS += -DNDEBUG
 CFLAGS := $(DEFAULT_CFLAGS) -O3 -flto=auto
@@ -181,7 +188,7 @@ bfs: $(BIN)/bfs
 .PHONY: bfs
 
 # Goals that are treated like flags by this makefile
-FLAG_GOALS := asan lsan msan tsan ubsan gcov release
+FLAG_GOALS := asan lsan msan tsan ubsan gcov lint release
 
 # These are the remaining non-flag goals
 GOALS := $(filter-out $(FLAG_GOALS),$(MAKECMDGOALS))
