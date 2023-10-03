@@ -71,17 +71,10 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-        run: |
-          mkdir ~/.ssh
-          printf '%s' "$SSH_KEY" >~/.ssh/github-actions
-          chmod 0600 ~/.ssh/github-actions
-          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' "$(tailscale ip -6 spurion)" >~/.ssh/config
-
       - name: Run tests
         run: |
           spurion=$(tailscale ip -6 spurion)
+          mkdir ~/.ssh
+          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n' "$spurion" >~/.ssh/config
           rsync -rl --delete . "[$spurion]:bfs"
-          ssh "$spurion" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck CC=clang16'
+          ssh "$spurion" '. ~/.ssh/rc; gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck CC=clang16'
