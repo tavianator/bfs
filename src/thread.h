@@ -97,7 +97,7 @@
 /**
  * Wrapper for pthread_once().
  */
-#define call_once(once, fn) \
+#define invoke_once(once, fn) \
 	thread_verify(pthread_once(once, fn), errno == 0)
 
 #endif // BFS_THREAD_H

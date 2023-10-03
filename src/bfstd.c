@@ -651,7 +651,7 @@ static bool xiswprint(wchar_t c, enum wesc_flags flags) {
 /** Get the length of the longest printable prefix of a string. */
 static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) {
 	static pthread_once_t once = PTHREAD_ONCE_INIT;
-	call_once(&once, char_cache_init);
+	invoke_once(&once, char_cache_init);
 
 	// Fast path: avoid multibyte checks
 	size_t i, word;

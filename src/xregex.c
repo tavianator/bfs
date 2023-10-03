@@ -107,7 +107,7 @@ static void bfs_onig_once(void) {
 /** Initialize Oniguruma. */
 static int bfs_onig_initialize(OnigEncoding *enc) {
 	static pthread_once_t once = PTHREAD_ONCE_INIT;
-	call_once(&once, bfs_onig_once);
+	invoke_once(&once, bfs_onig_once);
 
 	*enc = bfs_onig_enc;
 	return bfs_onig_status;
