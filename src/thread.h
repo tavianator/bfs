@@ -8,6 +8,7 @@
 #ifndef BFS_THREAD_H
 #define BFS_THREAD_H
 
+#include "bfstd.h"
 #include "config.h"
 #include "diag.h"
 #include <errno.h>
@@ -23,7 +24,7 @@
 #endif
 
 #define thread_verify(expr, cond) \
-	bfs_verify((errno = (expr), (cond)), "%s: %s", #expr, strerror(errno))
+	bfs_verify((errno = (expr), (cond)), "%s: %s", #expr, xstrerror(errno))
 
 /**
  * Wrapper for pthread_create().

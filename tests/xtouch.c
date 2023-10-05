@@ -197,14 +197,14 @@ int main(int argc, char *argv[]) {
 	if (rarg) {
 		struct stat buf;
 		if (fstatat(AT_FDCWD, rarg, &buf, at_flags(&args)) != 0) {
-			fprintf(stderr, "%s: '%s': %s\n", cmd, rarg, strerror(errno));
+			fprintf(stderr, "%s: '%s': %s\n", cmd, rarg, xstrerror(errno));
 			return EXIT_FAILURE;
 		}
 		times[0] = buf.st_atim;
 		times[1] = buf.st_mtim;
 	} else if (darg) {
 		if (xgetdate(darg, &times[0]) != 0) {
-			fprintf(stderr, "%s: Parsing time '%s' failed: %s\n", cmd, darg, strerror(errno));
+			fprintf(stderr, "%s: Parsing time '%s' failed: %s\n", cmd, darg, xstrerror(errno));
 			return EXIT_FAILURE;
 		}
 		times[1] = times[0];
@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
 	for (; optind < argc; ++optind) {
 		const char *path = argv[optind];
 		if (xtouch(&args, path) != 0) {
-			fprintf(stderr, "%s: '%s': %s\n", cmd, path, strerror(errno));
+			fprintf(stderr, "%s: '%s': %s\n", cmd, path, xstrerror(errno));
 			ret = EXIT_FAILURE;
 		}
 	}

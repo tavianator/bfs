@@ -19,7 +19,7 @@
  * Print an error message.
  */
 static void errmsg(const char *cmd, const char *path) {
-	fprintf(stderr, "%s: '%s': %s.\n", cmd, path, strerror(errno));
+	fprintf(stderr, "%s: '%s': %s.\n", cmd, path, xstrerror(errno));
 }
 
 /**

@@ -3,6 +3,7 @@
 
 #include "xregex.h"
 #include "alloc.h"
+#include "bfstd.h"
 #include "config.h"
 #include "diag.h"
 #include "sanity.h"
@@ -274,7 +275,7 @@ void bfs_regfree(struct bfs_regex *regex) {
 
 char *bfs_regerror(const struct bfs_regex *regex) {
 	if (!regex) {
-		return strdup(strerror(ENOMEM));
+		return strdup(xstrerror(ENOMEM));
 	}
 
 #if BFS_USE_ONIGURUMA

@@ -1376,7 +1376,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 
 	if (ftwbuf->type == BFS_ERROR) {
 		if (!eval_should_ignore(&state, ftwbuf->error)) {
-			eval_error(&state, "%s.\n", strerror(ftwbuf->error));
+			eval_error(&state, "%s.\n", xstrerror(ftwbuf->error));
 		}
 		state.action = BFTW_PRUNE;
 		goto done;

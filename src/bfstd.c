@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
+#include <locale.h>
 #include <nl_types.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -274,6 +275,48 @@ char *xstpencpy(char *dest, char *end, const char *src, size_t n) {
 		end[-1] = '\0';
 		return end;
 	}
+}
+
+const char *xstrerror(int errnum) {
+	int saved = errno;
+	const char *ret = NULL;
+	static thread_local char buf[256];
+
+#if __APPLE__
+	// No strerror_l() on macOS
+	if (strerror_r(errnum, buf, sizeof(buf)) == 0) {
+		ret = buf;
+	}
+#else
+#  if __NetBSD__
+	// NetBSD has no thread-specific locales
+	locale_t loc = LC_GLOBAL_LOCALE;
+#  else
+	locale_t loc = uselocale((locale_t)0);
+#  endif
+
+	locale_t copy = loc;
+	if (copy == LC_GLOBAL_LOCALE) {
+		copy = duplocale(copy);
+	}
+
+	if (copy != (locale_t)0) {
+		ret = strerror_l(errnum, loc);
+	}
+
+	if (loc == LC_GLOBAL_LOCALE) {
+		freelocale(copy);
+	}
+#endif
+
+	if (!ret) {
+		// Fallback for strerror_[lr]() or duplocale() failures
+		snprintf(buf, sizeof(buf), "Unknown error %d", errnum);
+		ret = buf;
+	}
+
+	errno = saved;
+	return ret;
 }
 
 void xstrmode(mode_t mode, char str[11]) {

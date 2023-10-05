@@ -1239,7 +1239,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 				break;
 
 			case 'm':
-				if (dstrcat(&cfile->buffer, strerror(error)) != 0) {
+				if (dstrcat(&cfile->buffer, xstrerror(error)) != 0) {
 					return -1;
 				}
 				break;

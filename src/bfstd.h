@@ -167,6 +167,17 @@ char *xstpecpy(char *dest, char *end, const char *src);
 char *xstpencpy(char *dest, char *end, const char *src, size_t n);
 
 /**
+ * Thread-safe strerror().
+ *
+ * @param errnum
+ *         An error number.
+ * @return
+ *         A string describing that error, which remains valid until the next
+ *         xstrerror() call in the same thread.
+ */
+const char *xstrerror(int errnum);
+
+/**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
  * @param mode

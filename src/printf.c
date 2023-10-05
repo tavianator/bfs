@@ -744,7 +744,7 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 				if (!directive.ptr) {
 					int error = errno;
 					bfs_expr_error(ctx, expr);
-					bfs_error(ctx, "Couldn't parse the mount table: %s.\n", strerror(error));
+					bfs_error(ctx, "Couldn't parse the mount table: %s.\n", xstrerror(error));
 					goto directive_error;
 				}
 				break;
