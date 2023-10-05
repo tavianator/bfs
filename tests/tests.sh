@@ -19,7 +19,11 @@ export UBSAN_OPTIONS="$SAN_OPTIONS"
 export LS_COLORS=""
 unset BFS_COLORS
 
-if [ -t 1 ]; then
+function color_fd() {
+    [ -z "${NO_COLOR:-}" ] && [ -t "$1" ]
+}
+
+if color_fd 1; then
     BLD=$'\033[01m'
     RED=$'\033[01;31m'
     GRN=$'\033[01;32m'
@@ -443,7 +447,7 @@ fi
 
 function bfs_verbose() {
     if [ "$VERBOSE_COMMANDS" ]; then
-        if [ -t 3 ]; then
+        if color_fd 3; then
             printf "${GRN}%q${RST} " "${BFS[@]}" >&3
 
             local expr_started=
@@ -493,7 +497,7 @@ function check_exit() {
 }
 
 # Detect colored diff support
-if [ -t 2 ] && diff --color=always /dev/null /dev/null 2>/dev/null; then
+if color_fd 2 && diff --color=always /dev/null /dev/null 2>/dev/null; then
     DIFF="diff --color=always"
 else
     DIFF="diff"
@@ -634,7 +638,7 @@ function update_eol() {
 
 if [ "$VERBOSE_TESTS" ]; then
     BOL=''
-elif [ -t 1 ]; then
+elif color_fd 1; then
     BOL='\r\033[K'
 
     # Workaround for bash 4: checkwinsize is off by default.  We can turn it on,
@@ -651,12 +655,14 @@ passed=0
 failed=0
 skipped=0
 
+if color_fd 1 || [ "$VERBOSE_TESTS" ]; then
+    TEST_FMT="${BOL}${YLW}%s${RST}${EOL}"
+else
+    TEST_FMT="."
+fi
+
 for TEST in "${TEST_CASES[@]}"; do
-    if [[ -t 1 || "$VERBOSE_TESTS" ]]; then
-        printf "${BOL}${YLW}%s${RST}${EOL}" "$TEST"
-    else
-        printf "."
-    fi
+    printf "$TEST_FMT" "$TEST"
 
     OUT="$TMP/$TEST.out"
     mkdir -p "${OUT%/*}"
