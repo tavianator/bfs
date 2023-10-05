@@ -13,7 +13,7 @@
 
 #define BFS_CAN_CHECK_ACL BFS_USE_SYS_ACL_H
 
-#if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_USE_SYS_CAPABILITY_H && !__FreeBSD__
+#if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_USE_SYS_CAPABILITY_H
 #  include <sys/capability.h>
 #  ifdef CAP_CHOWN
 #    define BFS_CAN_CHECK_CAPABILITIES true
