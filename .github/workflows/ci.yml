@@ -16,6 +16,7 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update -y
           sudo apt-get install -y \
+              expect \
               gcc-multilib \
               libgcc-s1:i386 \
               acl \
@@ -48,6 +49,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          brew install expect
 
       - name: Run tests
         run: |
