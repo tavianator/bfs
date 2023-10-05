@@ -59,6 +59,9 @@
 #if __has_include(<sys/xattr.h>)
 #  define BFS_HAS_SYS_XATTR_H true
 #endif
+#if __has_include(<threads.h>)
+#  define BFS_HAS_THREADS_H true
+#endif
 #if __has_include(<util.h>)
 #  define BFS_HAS_UTIL_H true
 #endif
@@ -74,6 +77,7 @@
 #define BFS_HAS_SYS_PARAM_H true
 #define BFS_HAS_SYS_SYSMACROS_H __GLIBC__
 #define BFS_HAS_SYS_XATTR_H __linux__
+#define BFS_HAS_THREADS_H (!__STDC_NO_THREADS__)
 #define BFS_HAS_UTIL_H __NetBSD__
 
 #endif // !__has_include
@@ -104,6 +108,9 @@
 #endif
 #ifndef BFS_USE_SYS_XATTR_H
 #  define BFS_USE_SYS_XATTR_H BFS_HAS_SYS_XATTR_H
+#endif
+#ifndef BFS_USE_THREADS_H
+#  define BFS_USE_THREADS_H BFS_HAS_THREADS_H
 #endif
 #ifndef BFS_USE_UTIL_H
 #  define BFS_USE_UTIL_H BFS_HAS_UTIL_H

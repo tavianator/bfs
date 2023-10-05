@@ -8,10 +8,19 @@
 #ifndef BFS_THREAD_H
 #define BFS_THREAD_H
 
+#include "config.h"
 #include "diag.h"
 #include <errno.h>
 #include <pthread.h>
 #include <string.h>
+
+#if __STDC_VERSION__ < 202311L && !defined(thread_local)
+#  if BFS_USE_THREADS_H
+#    include <threads.h>
+#  else
+#    define thread_local _Thread_local
+#  endif
+#endif
 
 #define thread_verify(expr, cond) \
 	bfs_verify((errno = (expr), (cond)), "%s: %s", #expr, strerror(errno))
