@@ -1,13 +1,12 @@
 <div align="center">
 
-<h1>
-<code>bfs</code>
-<br clear="all">
+# `bfs`
+
 <a href="https://github.com/tavianator/bfs/releases"><img src="https://img.shields.io/github/v/tag/tavianator/bfs?label=version" alt="Version" align="left"></a>
 <a href="/LICENSE"><img src="https://img.shields.io/badge/license-0BSD-blue.svg" alt="License" align="left"></a>
 <a href="https://github.com/tavianator/bfs/actions/workflows/ci.yml"><img src="https://github.com/tavianator/bfs/actions/workflows/ci.yml/badge.svg" alt="CI Status" align="right"></a>
 <a href="https://codecov.io/gh/tavianator/bfs"><img src="https://img.shields.io/codecov/c/github/tavianator/bfs?token=PpBVuozOVC" alt="Code coverage" align="right"/></a>
-</h1>
+<br clear="all">
 
 **[Features]   •   [Installation]   •   [Usage]   •   [Building]   •   [Hacking]   •   [Changelog]**
 
