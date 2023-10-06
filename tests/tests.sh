@@ -488,6 +488,20 @@ function invoke_bfs() {
     fi
 }
 
+function bfs_pty() {
+    command -v unbuffer &>/dev/null || skip
+
+    bfs_verbose "$@"
+    unbuffer bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@"
+    local status="$?"
+
+    if ((status > 125)); then
+        exit "$status"
+    else
+        return "$status"
+    fi
+}
+
 function check_exit() {
     local expected="$1"
     local actual="0"
