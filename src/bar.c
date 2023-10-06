@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "bar.h"
+#include "atomic.h"
 #include "bfstd.h"
 #include "bit.h"
 #include "config.h"
@@ -16,8 +17,8 @@
 
 struct bfs_bar {
 	int fd;
-	volatile sig_atomic_t width;
-	volatile sig_atomic_t height;
+	atomic unsigned int width;
+	atomic unsigned int height;
 };
 
 /** The global status bar instance. */
@@ -33,8 +34,8 @@ static int bfs_bar_getsize(struct bfs_bar *bar) {
 		return -1;
 	}
 
-	bar->width = ws.ws_col;
-	bar->height = ws.ws_row;
+	store(&bar->width, ws.ws_col, relaxed);
+	store(&bar->height, ws.ws_row, relaxed);
 	return 0;
 #else
 	errno = ENOTSUP;
@@ -74,8 +75,9 @@ static int bfs_bar_resize(struct bfs_bar *bar) {
 		"\033[;"; // DECSTBM: Set scrollable region
 
 	// DECSTBM takes the height as the second argument
+	unsigned int height = load(&bar->height, relaxed);
 	char *ptr = esc_seq + strlen(esc_seq);
-	ptr = ass_itoa(ptr, bar->height - 1);
+	ptr = ass_itoa(ptr, height - 1);
 
 	strcpy(ptr,
 		"r"      // DECSTBM
@@ -178,13 +180,14 @@ struct bfs_bar *bfs_bar_show(void) {
 	sigaction(SIGWINCH, &sa, NULL);
 #endif
 
+	unsigned int height = load(&the_bar.height, relaxed);
 	bfs_bar_printf(&the_bar,
 		"\n"        // Make space for the bar
 		"\0337"     // DECSC: Save cursor
 		"\033[;%ur" // DECSTBM: Set scrollable region
 		"\0338"     // DECRC: Restore cursor
 		"\033[1A",  // CUU: Move cursor up 1 row
-		(unsigned int)(the_bar.height - 1)
+		height - 1
 	);
 
 	return &the_bar;
@@ -197,10 +200,11 @@ fail:
 }
 
 unsigned int bfs_bar_width(const struct bfs_bar *bar) {
-	return bar->width;
+	return load(&bar->width, relaxed);
 }
 
 int bfs_bar_update(struct bfs_bar *bar, const char *str) {
+	unsigned int height = load(&bar->height, relaxed);
 	return bfs_bar_printf(bar,
 		"\0337"      // DECSC: Save cursor
 		"\033[%u;0f" // HVP: Move cursor to row, column
@@ -209,7 +213,7 @@ int bfs_bar_update(struct bfs_bar *bar, const char *str) {
 		"%s"
 		"\033[27m"   // SGR reverse video off
 		"\0338",     // DECRC: Restore cursor
-		(unsigned int)bar->height,
+		height,
 		str
 	);
 }
