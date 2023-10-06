@@ -132,11 +132,11 @@ void *zalloc(size_t align, size_t size);
 
 /** Allocate memory for an array. */
 #define ALLOC_ARRAY(type, count) \
-	(type *)alloc(alignof(type), sizeof_array(type, count));
+	(type *)alloc(alignof(type), sizeof_array(type, count))
 
 /** Allocate zeroed memory for an array. */
 #define ZALLOC_ARRAY(type, count) \
-	(type *)zalloc(alignof(type), sizeof_array(type, count));
+	(type *)zalloc(alignof(type), sizeof_array(type, count))
 
 /** Allocate memory for a flexible struct. */
 #define ALLOC_FLEX(type, member, count) \

@@ -3,6 +3,7 @@
 
 #include "../src/alloc.h"
 #include "../src/diag.h"
+#include <errno.h>
 #include <stdlib.h>
 
 int main(void) {
@@ -13,12 +14,19 @@ int main(void) {
 	};
 	bfs_verify(sizeof_flex(struct flexible, bar, 0) >= sizeof(struct flexible));
 	bfs_verify(sizeof_flex(struct flexible, bar, 16) % alignof(struct flexible) == 0);
-	bfs_verify(sizeof_flex(struct flexible, bar, SIZE_MAX / sizeof(int) + 1)
-	           == align_floor(alignof(struct flexible), SIZE_MAX));
+
+	size_t too_many = SIZE_MAX / sizeof(int) + 1;
+	bfs_verify(sizeof_flex(struct flexible, bar, too_many) == align_floor(alignof(struct flexible), SIZE_MAX));
 
 	// Corner case: sizeof(type) > align_ceil(alignof(type), offsetof(type, member))
 	// Doesn't happen in typical ABIs
 	bfs_verify(flex_size(8, 16, 4, 4, 1) == 16);
+
+	// Make sure we detect allocation size overflows
+	bfs_verify(ALLOC_ARRAY(int, too_many) == NULL && errno == EOVERFLOW);
+	bfs_verify(ZALLOC_ARRAY(int, too_many) == NULL && errno == EOVERFLOW);
+	bfs_verify(ALLOC_FLEX(struct flexible, bar, too_many) == NULL && errno == EOVERFLOW);
+	bfs_verify(ZALLOC_FLEX(struct flexible, bar, too_many) == NULL && errno == EOVERFLOW);
 
 	// varena tests
 	struct varena varena;
