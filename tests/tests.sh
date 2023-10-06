@@ -488,11 +488,17 @@ function invoke_bfs() {
     fi
 }
 
+if command -v unbuffer &>/dev/null; then
+    UNBUFFER=unbuffer
+elif command -v expect_unbuffer &>/dev/null; then
+    UNBUFFER=expect_unbuffer
+fi
+
 function bfs_pty() {
-    command -v unbuffer &>/dev/null || skip
+    test -n "$UNBUFFER" || skip
 
     bfs_verbose "$@"
-    unbuffer bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@"
+    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@"
     local status="$?"
 
     if ((status > 125)); then
