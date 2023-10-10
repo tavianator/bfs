@@ -19,6 +19,7 @@ COMPLETE_DEFAULT=(linux rust chromium)
 EARLY_QUIT_DEFAULT=(chromium)
 PRINT_DEFAULT=(linux)
 STRATEGIES_DEFAULT=(linux)
+JOBS_DEFAULT=(rust)
 
 usage() {
     printf 'Usage: tailfin run %s [--default]\n' "${BASH_SOURCE[0]}"
@@ -35,15 +36,19 @@ usage() {
 
     printf '  --early-quit[=CORPUS]\n'
     printf '      Early quitting benchmark.  \n'
-    printf '      Default corpus is --early-quit=chromium\n\n' "${EARLY_QUIT_DEFAULT[*]}"
+    printf '      Default corpus is --early-quit=%s\n\n' "${EARLY_QUIT_DEFAULT[*]}"
 
     printf '  --print[=CORPUS]\n'
     printf '      Path printing benchmark.  \n'
-    printf '      Default corpus is --print=linux\n\n' "${PRINT_DEFAULT[*]}"
+    printf '      Default corpus is --print=%s\n\n' "${PRINT_DEFAULT[*]}"
 
     printf '  --strategies[=CORPUS]\n'
     printf '      Search strategy benchmark.\n'
-    printf '      Default corpus is --strategies=linux\n\n' "${STRATEGIES_DEFAULT[*]}"
+    printf '      Default corpus is --strategies=%s\n\n' "${STRATEGIES_DEFAULT[*]}"
+
+    printf '  --jobs[=CORPUS]\n'
+    printf '      Parallelism benchmark.\n'
+    printf '      Default corpus is --jobs=%s\n\n' "${JOBS_DEFAULT[*]}"
 
     printf '  --build=COMMIT\n'
     printf '      Build this bfs commit and benchmark it.  Specify multiple times to\n'
@@ -103,6 +108,7 @@ setup() {
     EARLY_QUIT=()
     PRINT=()
     STRATEGIES=()
+    JOBS=()
 
     for arg; do
         case "$arg" in
@@ -159,11 +165,18 @@ setup() {
             --strategies=*)
                 read -ra STRATEGIES <<<"${arg#*=}"
                 ;;
+            --jobs)
+                JOBS=("${JOBS_DEFAULT[@]}")
+                ;;
+            --jobs=*)
+                read -ra JOBS <<<"${arg#*=}"
+                ;;
             --default)
                 COMPLETE=("${COMPLETE_DEFAULT[@]}")
                 EARLY_QUIT=("${EARLY_QUIT_DEFAULT[@]}")
                 PRINT=("${PRINT_DEFAULT[@]}")
                 STRATEGIES=("${STRATEGIES_DEFAULT[@]}")
+                JOBS=("${JOBS_DEFAULT[@]}")
                 ;;
             --help)
                 usage
@@ -187,7 +200,7 @@ setup() {
     as-user mkdir -p bench/corpus
 
     declare -A cloned=()
-    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}"; do
+    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}"; do
         if ((cloned["$corpus"])); then
             continue
         fi
@@ -236,6 +249,7 @@ setup() {
     export_array EARLY_QUIT
     export_array PRINT
     export_array STRATEGIES
+    export_array JOBS
 
     if ((UID == 0)); then
         turbo-off
@@ -446,6 +460,50 @@ bench-strategies() {
     fi
 }
 
+# Benchmark parallelism
+bench-jobs-corpus() {
+    subgroup '%s' "$1"
+
+    if ((${#BFS[@]} + ${#FD[@]} == 1)); then
+        cmds=()
+        for bfs in "${BFS[@]}"; do
+            cmds+=("$bfs -j"{1,2,3,4,6,8,12,16}" $2 -false")
+        done
+
+        for fd in "${FD[@]}"; do
+            cmds+=("$fd -j"{1,2,3,4,6,8,12,16}" -u '^$' $2")
+        done
+
+        do-hyperfine "${cmds[@]}"
+    else
+        for j in 1 2 3 4 6 8 12 16; do
+            subsubgroup '`-j%d`' $j
+
+            cmds=()
+            for bfs in "${BFS[@]}"; do
+                cmds+=("$bfs -j$j $2 -false")
+            done
+
+            for fd in "${FD[@]}"; do
+                cmds+=("$fd -j$j -u '^$' $2")
+            done
+
+            do-hyperfine "${cmds[@]}"
+        done
+    fi
+}
+
+# All parallelism benchmarks
+bench-jobs() {
+    if (($#)); then
+        group "Parallelism"
+
+        for corpus; do
+            bench-jobs-corpus "$corpus ${TAGS[$corpus]}" "bench/corpus/$corpus"
+        done
+    fi
+}
+
 # Print benchmarked versions
 bench-versions() {
     subgroup "Versions"
@@ -491,10 +549,12 @@ bench() {
     import_array EARLY_QUIT
     import_array PRINT
     import_array STRATEGIES
+    import_array JOBS
 
     bench-complete "${COMPLETE[@]}"
     bench-early-quit "${EARLY_QUIT[@]}"
     bench-print "${PRINT[@]}"
     bench-strategies "${STRATEGIES[@]}"
+    bench-jobs "${JOBS[@]}"
     bench-details
 }
