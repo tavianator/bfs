@@ -266,17 +266,17 @@ do-hyperfine() {
 
 # Print the header for a benchmark group
 group() {
-    printf '## %s\n\n' "$1" | tee -a "$BENCH_DIR/bench.md"
+    printf "## $1\\n\\n" "${@:2}" | tee -a "$BENCH_DIR/bench.md"
 }
 
 # Print the header for a benchmark subgroup
 subgroup() {
-    printf '### %s\n\n' "$1" | tee -a "$BENCH_DIR/bench.md"
+    printf "### $1\\n\\n" "${@:2}" | tee -a "$BENCH_DIR/bench.md"
 }
 
 # Print the header for a benchmark sub-subgroup
 subsubgroup() {
-    printf '#### %s\n\n' "$1" | tee -a "$BENCH_DIR/bench.md"
+    printf "#### $1\\n\\n" "${@:2}" | tee -a "$BENCH_DIR/bench.md"
 }
 
 # Benchmark the complete traversal of a directory tree
@@ -284,7 +284,7 @@ subsubgroup() {
 bench-complete-corpus() {
     total=$(./bin/bfs "$2" -printf '.' | wc -c)
 
-    subgroup "$1 ($total files)"
+    subgroup "%s (%'d files)" "$1" "$total"
 
     cmds=()
     for bfs in "${BFS[@]}"; do
@@ -318,14 +318,14 @@ bench-early-quit-corpus() {
     dir="$2"
     max_depth=$(./bin/bfs "$dir" -printf '%d\n' | sort -rn | head -n1)
 
-    subgroup "$1 (depth $max_depth)"
+    subgroup '%s (depth %d)' "$1" "$max_depth"
 
     # Save the list of unique filenames, along with their depth
     UNIQ="$BENCH_DIR/uniq"
     ./bin/bfs "$dir" -printf '%d %f\n' | sort -k2 | uniq -uf1 >"$UNIQ"
 
     for ((i = 2; i <= max_depth; i *= 2)); do
-        subsubgroup "Depth $i"
+        subsubgroup 'Depth %d' "$i"
 
         # Sample random uniquely-named files at depth $i
         export FILES="$BENCH_DIR/uniq-$i"
@@ -364,7 +364,7 @@ bench-early-quit() {
 
 # Benchmark printing paths without colors
 bench-print-nocolor() {
-    subsubgroup "$1"
+    subsubgroup '%s' "$1"
 
     cmds=()
     for bfs in "${BFS[@]}"; do
@@ -384,7 +384,7 @@ bench-print-nocolor() {
 
 # Benchmark printing paths with colors
 bench-print-color() {
-    subsubgroup "$1"
+    subsubgroup '%s' "$1"
 
     cmds=()
     for bfs in "${BFS[@]}"; do
@@ -417,10 +417,10 @@ bench-print() {
 
 # Benchmark search strategies
 bench-strategies-corpus() {
-    subgroup "$1"
+    subgroup '%s' "$1"
 
     for bfs in "${BFS[@]}"; do
-        subsubgroup "$bfs"
+        subsubgroup '%s' "$bfs"
         cmds=("$bfs -S "{bfs,dfs,ids,eds}" $2")
         do-hyperfine "${cmds[@]}"
     done
