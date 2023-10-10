@@ -421,7 +421,7 @@ bench-strategies-corpus() {
 
     for bfs in "${BFS[@]}"; do
         subsubgroup '%s' "$bfs"
-        cmds=("$bfs -S "{bfs,dfs,ids,eds}" $2")
+        cmds=("$bfs -S "{bfs,dfs,ids,eds}" $2 -false")
         do-hyperfine "${cmds[@]}"
     done
 }
