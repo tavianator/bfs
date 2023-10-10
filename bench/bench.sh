@@ -419,11 +419,20 @@ bench-print() {
 bench-strategies-corpus() {
     subgroup '%s' "$1"
 
-    for bfs in "${BFS[@]}"; do
-        subsubgroup '%s' "$bfs"
-        cmds=("$bfs -S "{bfs,dfs,ids,eds}" $2 -false")
+    if ((${#BFS[@]} == 1)); then
+        cmds=("$BFS -S "{bfs,dfs,ids,eds}" $2 -false")
         do-hyperfine "${cmds[@]}"
-    done
+    else
+        for S in bfs dfs ids eds; do
+            subsubgroup '`-S %s`' "$S"
+
+            cmds=()
+            for bfs in "${BFS[@]}"; do
+                cmds+=("$bfs -S $S $2 -false")
+            done
+            do-hyperfine "${cmds[@]}"
+        done
+    fi
 }
 
 # All search strategy benchmarks
