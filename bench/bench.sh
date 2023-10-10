@@ -18,7 +18,7 @@ declare -gA TAGS=(
 COMPLETE_DEFAULT=(linux rust chromium)
 EARLY_QUIT_DEFAULT=(chromium)
 PRINT_DEFAULT=(linux)
-STRATEGIES_DEFAULT=(linux)
+STRATEGIES_DEFAULT=(rust)
 JOBS_DEFAULT=(rust)
 
 usage() {
