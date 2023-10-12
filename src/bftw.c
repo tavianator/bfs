@@ -811,8 +811,12 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 		return bftw_close(state, file);
 	}
 
-	if (bftw_cache_reserve(state) != 0) {
-		return -1;
+	// Make room for dup()
+	bftw_cache_pin(cache, file);
+	int ret = bftw_cache_reserve(state);
+	bftw_cache_unpin(cache, file);
+	if (ret != 0) {
+		return ret;
 	}
 
 	int fd = dup_cloexec(file->fd);
