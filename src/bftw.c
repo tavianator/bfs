@@ -862,7 +862,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 
 	if (state->flags & BFTW_SORT) {
 		// Keep strict breadth-first order when sorting
-		if (state->strategy != BFTW_DFS && have_files) {
+		if (state->strategy == BFTW_BFS && have_files) {
 			return false;
 		}
 	} else {
