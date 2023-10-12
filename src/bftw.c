@@ -546,6 +546,17 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	return 0;
 }
 
+/** Unpin a directory, and possibly queue it for unwrapping. */
+static void bftw_unpin_dir(struct bftw_state *state, struct bftw_file *file, bool force) {
+	bftw_cache_unpin(&state->cache, file);
+
+	if (file->dir && (force || file->pincount == 0)) {
+		if (!SLIST_ATTACHED(&state->to_close, file)) {
+			SLIST_APPEND(&state->to_close, file);
+		}
+	}
+}
+
 /** Pop a response from the I/O queue. */
 static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 	struct ioq *ioq = state->ioq;
@@ -582,10 +593,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		++cache->capacity;
 		parent = file->parent;
 		if (parent) {
-			bftw_cache_unpin(cache, parent);
-			if (parent->pincount == 0 && parent->dir) {
-				SLIST_APPEND(&state->to_close, parent);
-			}
+			bftw_unpin_dir(state, parent, false);
 		}
 
 		dir = ent->opendir.dir;
@@ -1285,8 +1293,7 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 
 	struct bftw_file *file = state->file;
 	if (file && file->dir) {
-		bftw_cache_unpin(&state->cache, file);
-		SLIST_APPEND(&state->to_close, file);
+		bftw_unpin_dir(state, file, true);
 	}
 	state->dir = NULL;
 	state->de = NULL;
