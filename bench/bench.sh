@@ -228,7 +228,11 @@ setup() {
                 cd "$worktree"
                 as-user git checkout -qd "$commit" --
                 as-user make -s -j"$nproc" release
-                as-user cp ./bin/bfs "$bin/bfs-$commit"
+                if [ -e ./bin/bfs ]; then
+                    as-user cp ./bin/bfs "$bin/bfs-$commit"
+                else
+                    as-user cp ./bfs "$bin/bfs-$commit"
+                fi
                 as-user make -s clean
             )
         done
