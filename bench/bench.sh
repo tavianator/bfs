@@ -467,7 +467,11 @@ bench-jobs-corpus() {
     if ((${#BFS[@]} + ${#FD[@]} == 1)); then
         cmds=()
         for bfs in "${BFS[@]}"; do
-            cmds+=("$bfs -j"{1,2,3,4,6,8,12,16}" $2 -false")
+            if "$bfs" -j1 -quit &>/dev/null; then
+                cmds+=("$bfs -j"{1,2,3,4,6,8,12,16}" $2 -false")
+            else
+                cmds+=("$bfs $2 -false")
+            fi
         done
 
         for fd in "${FD[@]}"; do
@@ -481,14 +485,20 @@ bench-jobs-corpus() {
 
             cmds=()
             for bfs in "${BFS[@]}"; do
-                cmds+=("$bfs -j$j $2 -false")
+                if "$bfs" -j1 -quit &>/dev/null; then
+                    cmds+=("$bfs -j$j $2 -false")
+                elif ((j == 1)); then
+                    cmds+=("$bfs $2 -false")
+                fi
             done
 
             for fd in "${FD[@]}"; do
                 cmds+=("$fd -j$j -u '^$' $2")
             done
 
-            do-hyperfine "${cmds[@]}"
+            if ((${#cmds[@]})); then
+                do-hyperfine "${cmds[@]}"
+            fi
         done
     fi
 }
