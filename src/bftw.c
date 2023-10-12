@@ -422,6 +422,8 @@ struct bftw_state {
 	/** The number of I/O threads. */
 	size_t nthreads;
 
+	/** A batch of directories to open. */
+	struct bftw_list dir_batch;
 	/** The queue of directories to open. */
 	struct bftw_list to_open;
 	/** The queue of directories to read. */
@@ -429,10 +431,10 @@ struct bftw_state {
 	/** The queue of unpinned directories to unwrap. */
 	struct bftw_list to_close;
 
+	/** A batch of files to enqueue. */
+	struct bftw_list file_batch;
 	/** The queue of files to visit. */
 	struct bftw_list to_visit;
-	/** A batch of files to enqueue. */
-	struct bftw_list batch;
 
 	/** The current path. */
 	dchar *path;
@@ -499,12 +501,14 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 	state->nthreads = nthreads;
 
+
+	SLIST_INIT(&state->dir_batch);
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
 	SLIST_INIT(&state->to_close);
 
+	SLIST_INIT(&state->file_batch);
 	SLIST_INIT(&state->to_visit);
-	SLIST_INIT(&state->batch);
 
 	state->path = NULL;
 	state->file = NULL;
@@ -833,11 +837,32 @@ fail:
 	return -1;
 }
 
+/** Open a batch of directories asynchronously. */
+static void bftw_ioq_opendirs(struct bftw_state *state, struct bftw_list *queue) {
+	for_slist (struct bftw_file, dir, queue) {
+		if (bftw_ioq_opendir(state, dir) != 0) {
+			break;
+		}
+		SLIST_POP(queue);
+	}
+}
+
 /** Push a directory onto the queue. */
 static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 	bfs_assert(file->type == BFS_DIR);
 
-	SLIST_APPEND(&state->to_open, file);
+	struct bftw_list *queue;
+	if (state->strategy == BFTW_BFS || (state->flags & BFTW_BUFFER)) {
+		// In breadth-first mode, or if we're already buffering files,
+		// we can push directly to the to_open queue
+		queue = &state->to_open;
+	} else {
+		// For a depth-first, unbuffered search, add directories to a
+		// batch, then push the patch to the front of the queue
+		queue = &state->dir_batch;
+	}
+
+	SLIST_APPEND(queue, file);
 
 	if (state->flags & BFTW_SORT) {
 		// When sorting, directories are kept in order on the to_read
@@ -845,12 +870,7 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 		SLIST_APPEND(&state->to_read, file, to_read);
 	}
 
-	for_slist (struct bftw_file, dir, &state->to_open) {
-		if (bftw_ioq_opendir(state, dir) != 0) {
-			break;
-		}
-		SLIST_POP(&state->to_open);
-	}
+	bftw_ioq_opendirs(state, queue);
 }
 
 /** Pop a directory to read from the queue. */
@@ -1333,13 +1353,18 @@ static void bftw_list_sort(struct bftw_list *list) {
 /** Finish adding a batch of files. */
 static void bftw_batch_finish(struct bftw_state *state) {
 	if (state->flags & BFTW_SORT) {
-		bftw_list_sort(&state->batch);
+		bftw_list_sort(&state->file_batch);
 	}
 
 	if (state->strategy != BFTW_BFS) {
-		SLIST_EXTEND(&state->batch, &state->to_visit);
+		SLIST_EXTEND(&state->dir_batch, &state->to_open);
+		SLIST_EXTEND(&state->file_batch, &state->to_visit);
 	}
-	SLIST_EXTEND(&state->to_visit, &state->batch);
+
+	SLIST_EXTEND(&state->to_open, &state->dir_batch);
+	SLIST_EXTEND(&state->to_visit, &state->file_batch);
+
+	bftw_ioq_opendirs(state, &state->to_open);
 }
 
 /** Close the current directory. */
@@ -1381,7 +1406,7 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 			file->type = state->de->type;
 		}
 
-		SLIST_APPEND(&state->batch, file);
+		SLIST_APPEND(&state->file_batch, file);
 		return 0;
 	}
 
@@ -1429,7 +1454,8 @@ static int bftw_state_destroy(struct bftw_state *state) {
 		state->ioq = NULL;
 	}
 
-	SLIST_EXTEND(&state->to_visit, &state->batch);
+	SLIST_EXTEND(&state->to_open, &state->dir_batch);
+	SLIST_EXTEND(&state->to_visit, &state->file_batch);
 	do {
 		bftw_gc(state, BFTW_VISIT_NONE);
 	} while (bftw_pop_dir(state) || bftw_pop_file(state));
