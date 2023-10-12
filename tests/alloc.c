@@ -5,6 +5,7 @@
 #include "../src/diag.h"
 #include <errno.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 int main(void) {
 	// Check sizeof_flex()

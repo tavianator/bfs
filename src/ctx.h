@@ -10,37 +10,11 @@
 
 #include "bftw.h"
 #include "config.h"
+#include "diag.h"
 #include "trie.h"
 #include <stddef.h>
 #include <sys/resource.h>
 #include <time.h>
-
-/**
- * Various debugging flags.
- */
-enum debug_flags {
-	/** Print cost estimates. */
-	DEBUG_COST   = 1 << 0,
-	/** Print executed command details. */
-	DEBUG_EXEC   = 1 << 1,
-	/** Print optimization details. */
-	DEBUG_OPT    = 1 << 2,
-	/** Print rate information. */
-	DEBUG_RATES  = 1 << 3,
-	/** Trace the filesystem traversal. */
-	DEBUG_SEARCH = 1 << 4,
-	/** Trace all stat() calls. */
-	DEBUG_STAT   = 1 << 5,
-	/** Print the parse tree. */
-	DEBUG_TREE   = 1 << 6,
-	/** All debug flags. */
-	DEBUG_ALL    = (1 << 7) - 1,
-};
-
-/**
- * Convert a debug flag to a string.
- */
-const char *debug_flag_name(enum debug_flags flag);
 
 /**
  * The execution context for bfs.

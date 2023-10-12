@@ -9,7 +9,6 @@
 #define BFS_DIAG_H
 
 #include "config.h"
-#include "ctx.h"
 #include <stdarg.h>
 
 /**
@@ -84,7 +83,35 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 #  define bfs_assert bfs_verify
 #endif
 
+struct bfs_ctx;
 struct bfs_expr;
+
+/**
+ * Various debugging flags.
+ */
+enum debug_flags {
+	/** Print cost estimates. */
+	DEBUG_COST   = 1 << 0,
+	/** Print executed command details. */
+	DEBUG_EXEC   = 1 << 1,
+	/** Print optimization details. */
+	DEBUG_OPT    = 1 << 2,
+	/** Print rate information. */
+	DEBUG_RATES  = 1 << 3,
+	/** Trace the filesystem traversal. */
+	DEBUG_SEARCH = 1 << 4,
+	/** Trace all stat() calls. */
+	DEBUG_STAT   = 1 << 5,
+	/** Print the parse tree. */
+	DEBUG_TREE   = 1 << 6,
+	/** All debug flags. */
+	DEBUG_ALL    = (1 << 7) - 1,
+};
+
+/**
+ * Convert a debug flag to a string.
+ */
+const char *debug_flag_name(enum debug_flags flag);
 
 /**
  * Like perror(), but decorated like bfs_error().
