@@ -456,6 +456,33 @@ struct bftw_state {
 	struct BFTW ftwbuf;
 };
 
+/** Check if we have to buffer files before visiting them. */
+static bool bftw_must_buffer(const struct bftw_state *state) {
+	if (state->flags & BFTW_SORT) {
+		// Have to buffer the files to sort them
+		return true;
+	}
+
+	if (state->strategy == BFTW_DFS && state->nthreads == 0) {
+		// Without buffering, we would get a not-quite-depth-first
+		// ordering:
+		//
+		//     a
+		//     b
+		//     a/c
+		//     a/c/d
+		//     b/e
+		//     b/e/f
+		//
+		// This is okay for iterative deepening, since the caller only
+		// sees files at the target depth.  We also deem it okay for
+		// parallel searches, since the order is unpredictable anyway.
+		return true;
+	}
+
+	return false;
+}
+
 /** Initialize the bftw() state. */
 static int bftw_state_init(struct bftw_state *state, const struct bftw_args *args) {
 	state->paths = args->paths;
@@ -465,11 +492,6 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	state->flags = args->flags;
 	state->strategy = args->strategy;
 	state->mtab = args->mtab;
-
-	if ((state->flags & BFTW_SORT) || state->strategy == BFTW_DFS) {
-		state->flags |= BFTW_BUFFER;
-	}
-
 	state->error = 0;
 
 	if (args->nopenfd < 2) {
@@ -501,6 +523,9 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 	state->nthreads = nthreads;
 
+	if (bftw_must_buffer(state)) {
+		state->flags |= BFTW_BUFFER;
+	}
 
 	SLIST_INIT(&state->dir_batch);
 	SLIST_INIT(&state->to_open);
