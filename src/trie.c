@@ -325,6 +325,7 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 		return NULL;
 	}
 
+	LIST_ITEM_INIT(leaf);
 	LIST_APPEND(trie, leaf);
 
 	leaf->value = NULL;

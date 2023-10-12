@@ -82,6 +82,7 @@
 #ifndef BFS_LIST_H
 #define BFS_LIST_H
 
+#include "diag.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -206,6 +207,27 @@
 	(SLIST_CHECK_(list), !list->head)
 
 /**
+ * Check if an item is attached to a singly-linked list.
+ *
+ * @param list
+ *         The list to check.
+ * @param item
+ *         The item to check.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
+ * @return
+ *         Whether the item is attached to the list.
+ */
+#define SLIST_ATTACHED(list, ...) \
+	SLIST_ATTACHED_(list, __VA_ARGS__, )
+
+#define SLIST_ATTACHED_(list, item, ...) \
+	SLIST_ATTACHED__((list), (item), LIST_NEXT_(__VA_ARGS__))
+
+#define SLIST_ATTACHED__(list, item, next) \
+	(item->next || list->tail == &item->next)
+
+/**
  * Insert an item into a singly-linked list.
  *
  * @param list
@@ -224,6 +246,7 @@
 	SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__))
 
 #define SLIST_INSERT__(list, cursor, item, next) LIST_VOID_( \
+	bfs_assert(!SLIST_ATTACHED__(list, item, next)), \
 	item->next = *cursor, \
 	*cursor = item, \
 	list->tail = item->next ? list->tail : &item->next)
@@ -426,6 +449,27 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 	LIST_INSERT(list, NULL, __VA_ARGS__)
 
 /**
+ * Check if an item is attached to a doubly-linked list.
+ *
+ * @param list
+ *         The list to check.
+ * @param item
+ *         The item to check.
+ * @param node (optional)
+ *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
+ * @return
+ *         Whether the item is attached to the list.
+ */
+#define LIST_ATTACHED(list, ...) \
+	LIST_ATTACHED_(list, __VA_ARGS__, )
+
+#define LIST_ATTACHED_(list, item, ...) \
+	LIST_ATTACHED__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
+
+#define LIST_ATTACHED__(list, item, prev, next) \
+	(item->prev || item->next || list->head == item || list->tail == item)
+
+/**
  * Insert into a doubly-linked list after the given cursor.
  *
  * @param list
@@ -444,6 +488,7 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 	LIST_INSERT__((list), (cursor), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
 #define LIST_INSERT__(list, cursor, item, prev, next) LIST_VOID_( \
+	bfs_assert(!LIST_ATTACHED__(list, item, prev, next)), \
 	item->prev = cursor, \
 	item->next = cursor ? cursor->next : list->head, \
 	*(item->prev ? &item->prev->next : &list->head) = item, \
@@ -469,27 +514,6 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void 
 	*(item->prev ? &item->prev->next : &list->head) = item->next, \
 	*(item->next ? &item->next->prev : &list->tail) = item->prev, \
 	item->prev = item->next = NULL)
-
-/**
- * Check if an item is attached to a doubly-linked list.
- *
- * @param list
- *         The list to check.
- * @param item
- *         The item to check.
- * @param node (optional)
- *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
- * @return
- *         Whether the item is attached to the list.
- */
-#define LIST_ATTACHED(list, ...) \
-	LIST_ATTACHED_(list, __VA_ARGS__, )
-
-#define LIST_ATTACHED_(list, item, ...) \
-	LIST_ATTACHED__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
-
-#define LIST_ATTACHED__(list, item, prev, next) \
-	(item->prev || item->next || list->head == item || list->tail == item)
 
 /**
  * Loop over the items in a doubly-linked list.
