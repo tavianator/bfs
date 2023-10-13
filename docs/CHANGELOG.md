@@ -1,6 +1,18 @@
 3.*
 ===
 
+3.0.4
+-----
+
+**October 12, 2023**
+
+### Bug Fixes
+
+- Fixed a segfault when reporting errors under musl ([`d40eb87`])
+
+[`d40eb87`]: https://github.com/tavianator/bfs/commit/d40eb87cc00f50a5debb8899eacb7fcf1065badf
+
+
 3.0.3
 -----
 

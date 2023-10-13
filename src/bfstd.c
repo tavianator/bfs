@@ -301,7 +301,7 @@ const char *xstrerror(int errnum) {
 	}
 
 	if (copy != (locale_t)0) {
-		ret = strerror_l(errnum, loc);
+		ret = strerror_l(errnum, copy);
 	}
 
 	if (loc == LC_GLOBAL_LOCALE) {
