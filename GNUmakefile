@@ -6,7 +6,7 @@ VERSION := $(shell git describe --always 2>/dev/null)
 endif
 
 ifndef VERSION
-VERSION := 3.0.3
+VERSION := 3.0.4
 endif
 
 ifndef OS
