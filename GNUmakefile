@@ -126,7 +126,7 @@ ifndef NOLIBS
 USE_ACL := y
 USE_ATTR := y
 USE_LIBCAP := y
-USE_LIBURING := y
+# USE_LIBURING := y
 endif
 
 ifdef USE_ACL
