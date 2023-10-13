@@ -1,16 +1,10 @@
 3.*
 ===
 
-3.1
----
+3.0.3
+-----
 
-**Coming soon**
-
-### New features
-
-- `bfs` now uses `io_uring` on Linux ([#106])
-
-- `bfs` now comes with an official benchmark suite ([#126])
+**October 12, 2023**
 
 ### Changes
 
@@ -26,8 +20,6 @@
 
 - Fixed a linked-list corruption that could lead to an infinite loop on macOS and other non-Linux, non-FreeBSD platforms ([`773f4a4`])
 
-[#106]: https://github.com/tavianator/bfs/pull/106
-[#126]: https://github.com/tavianator/bfs/pull/126
 [`5f16169`]: https://github.com/tavianator/bfs/commit/5f1616912ba3a7a23ce6bce02df3791b73da38ab
 [`2572273`]: https://github.com/tavianator/bfs/commit/257227326fe60fe70e80433fd34d1ebcb2f9f623
 [`a029d95`]: https://github.com/tavianator/bfs/commit/a029d95b5736a74879f32089514a5a6b63d6efbc
