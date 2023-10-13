@@ -495,7 +495,7 @@ elif command -v expect_unbuffer &>/dev/null; then
 fi
 
 function bfs_pty() {
-    test -n "$UNBUFFER" || skip
+    test -n "${UNBUFFER:-}" || skip
 
     bfs_verbose "$@"
     "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@"
