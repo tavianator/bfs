@@ -437,6 +437,8 @@ function make_rainbow() {
 }
 make_rainbow "$TMP/rainbow"
 
+mkdir "$TMP/scratch"
+
 # Close stdin so bfs doesn't think we're interactive
 exec </dev/null
 
