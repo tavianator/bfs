@@ -24,7 +24,7 @@
 static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 	sanitize_uninit(buf, size);
 
-#if __linux__ && __GLIBC__ && !__GLIBC_PREREQ(2, 30)
+#if (__linux__ && __GLIBC__ && !__GLIBC_PREREQ(2, 30)) || __ANDROID__
 	ssize_t ret = syscall(SYS_getdents64, fd, buf, size);
 #elif __linux__
 	ssize_t ret = getdents64(fd, buf, size);
