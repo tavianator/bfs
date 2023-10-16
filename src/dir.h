@@ -87,6 +87,14 @@ struct bfs_dir *bfs_allocdir(void);
 void bfs_dir_arena(struct arena *arena);
 
 /**
+ * bfs_opendir() flags.
+ */
+enum bfs_dir_flags {
+	/** @internal Start of private flags. */
+	BFS_DIR_PRIVATE = 1 << 0,
+};
+
+/**
  * Open a directory.
  *
  * @param dir
@@ -96,10 +104,12 @@ void bfs_dir_arena(struct arena *arena);
  * @param at_path
  *         The path of the directory to open, relative to at_fd.  Pass NULL to
  *         open at_fd itself.
+ * @param flags
+ *         Flags that control which directory entries are listed.
  * @return
  *         0 on success, or -1 on failure.
  */
-int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path);
+int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path, enum bfs_dir_flags flags);
 
 /**
  * Get the file descriptor for a directory.

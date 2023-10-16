@@ -856,7 +856,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 		goto unpin;
 	}
 
-	if (ioq_opendir(state->ioq, dir, dfd, file->name, file) != 0) {
+	if (ioq_opendir(state->ioq, dir, dfd, file->name, 0, file) != 0) {
 		goto free;
 	}
 
@@ -1018,7 +1018,7 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_state *state, struct bftw_f
 		return NULL;
 	}
 
-	if (bfs_opendir(dir, fd, NULL) != 0) {
+	if (bfs_opendir(dir, fd, NULL, 0) != 0) {
 		bftw_freedir(cache, dir);
 		return NULL;
 	}

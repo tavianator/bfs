@@ -96,18 +96,26 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
 	}
 }
 
+/**
+ * Private directory flags.
+ */
+enum {
+	/** We've reached the end of the directory. */
+	BFS_DIR_EOF = BFS_DIR_PRIVATE << 0,
+};
+
 struct bfs_dir {
+	unsigned int flags;
+
 #if BFS_USE_GETDENTS
-	alignas(sys_dirent) int fd;
+	int fd;
 	unsigned short pos;
 	unsigned short size;
-	// sys_dirent buf[];
+	alignas(sys_dirent) char buf[];
 #else
 	DIR *dir;
 	struct dirent *de;
 #endif
-
-	bool eof;
 };
 
 #if BFS_USE_GETDENTS
@@ -125,7 +133,7 @@ void bfs_dir_arena(struct arena *arena) {
 	arena_init(arena, alignof(struct bfs_dir), DIR_SIZE);
 }
 
-int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path) {
+int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path, enum bfs_dir_flags flags) {
 	int fd;
 	if (at_path) {
 		fd = openat(at_fd, at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
@@ -138,6 +146,8 @@ int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path) {
 		errno = EBADF;
 		return -1;
 	}
+
+	dir->flags = flags;
 
 #if BFS_USE_GETDENTS
 	dir->fd = fd;
@@ -154,7 +164,6 @@ int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path) {
 	dir->de = NULL;
 #endif
 
-	dir->eof = false;
 	return 0;
 }
 
@@ -170,14 +179,14 @@ int bfs_polldir(struct bfs_dir *dir) {
 #if BFS_USE_GETDENTS
 	if (dir->pos < dir->size) {
 		return 1;
-	} else if (dir->eof) {
+	} else if (dir->flags & BFS_DIR_EOF) {
 		return 0;
 	}
 
 	char *buf = (char *)(dir + 1);
 	ssize_t size = bfs_getdents(dir->fd, buf, BUF_SIZE);
 	if (size == 0) {
-		dir->eof = true;
+		dir->flags |= BFS_DIR_EOF;
 		return 0;
 	} else if (size < 0) {
 		return -1;
@@ -194,7 +203,7 @@ int bfs_polldir(struct bfs_dir *dir) {
 		if (size > 0) {
 			dir->size += size;
 		} else if (size == 0) {
-			dir->eof = true;
+			dir->flags |= BFS_DIR_EOF;
 		}
 	}
 
@@ -202,7 +211,7 @@ int bfs_polldir(struct bfs_dir *dir) {
 #else // !BFS_USE_GETDENTS
 	if (dir->de) {
 		return 1;
-	} else if (dir->eof) {
+	} else if (dir->flags & BFS_DIR_EOF) {
 		return 0;
 	}
 
@@ -211,7 +220,7 @@ int bfs_polldir(struct bfs_dir *dir) {
 	if (dir->de) {
 		return 1;
 	} else if (errno == 0) {
-		dir->eof = true;
+		dir->flags |= BFS_DIR_EOF;
 		return 0;
 	} else {
 		return -1;

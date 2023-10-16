@@ -8,6 +8,7 @@
 #ifndef BFS_IOQ_H
 #define BFS_IOQ_H
 
+#include "dir.h"
 #include <stddef.h>
 
 /**
@@ -53,6 +54,7 @@ struct ioq_ent {
 			struct bfs_dir *dir;
 			int dfd;
 			const char *path;
+			enum bfs_dir_flags flags;
 		} opendir;
 		/** ioq_closedir() args. */
 		struct ioq_closedir {
@@ -103,12 +105,14 @@ int ioq_close(struct ioq *ioq, int fd, void *ptr);
  *         The base file descriptor.
  * @param path
  *         The path to open, relative to dfd.
+ * @param flags
+ *         Flags that control which directory entries are listed.
  * @param ptr
  *         An arbitrary pointer to associate with the request.
  * @return
  *         0 on success, or -1 on failure.
  */
-int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, void *ptr);
+int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, enum bfs_dir_flags flags, void *ptr);
 
 /**
  * Asynchronous bfs_closedir().

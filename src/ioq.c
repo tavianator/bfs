@@ -348,7 +348,7 @@ static void ioq_handle(struct ioq *ioq, struct ioq_ent *ent) {
 		break;
 
 	case IOQ_OPENDIR:
-		ret = bfs_opendir(ent->opendir.dir, ent->opendir.dfd, ent->opendir.path);
+		ret = bfs_opendir(ent->opendir.dir, ent->opendir.dfd, ent->opendir.path, ent->opendir.flags);
 		if (ret == 0) {
 			bfs_polldir(ent->opendir.dir);
 		}
@@ -505,7 +505,7 @@ static void ioq_ring_reap(struct ioq_ring_state *state) {
 				continue;
 			}
 
-			ent->ret = bfs_opendir(ent->opendir.dir, fd, NULL);
+			ent->ret = bfs_opendir(ent->opendir.dir, fd, NULL, ent->opendir.flags);
 			if (ent->ret == 0) {
 				// TODO: io_uring_prep_getdents()
 				bfs_polldir(ent->opendir.dir);
@@ -659,7 +659,7 @@ int ioq_close(struct ioq *ioq, int fd, void *ptr) {
 	return 0;
 }
 
-int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, void *ptr) {
+int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path, enum bfs_dir_flags flags, void *ptr) {
 	struct ioq_ent *ent = ioq_request(ioq, IOQ_OPENDIR, ptr);
 	if (!ent) {
 		return -1;
@@ -669,6 +669,7 @@ int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path,
 	args->dir = dir;
 	args->dfd = dfd;
 	args->path = path;
+	args->flags = flags;
 
 	ioqq_push(ioq->pending, ent);
 	return 0;

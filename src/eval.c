@@ -427,7 +427,7 @@ bool eval_empty(const struct bfs_expr *expr, struct bfs_eval *state) {
 			return ret;
 		}
 
-		if (bfs_opendir(dir, ftwbuf->at_fd, ftwbuf->at_path) != 0) {
+		if (bfs_opendir(dir, ftwbuf->at_fd, ftwbuf->at_path, 0) != 0) {
 			eval_report_error(state);
 			return ret;
 		}
@@ -1517,8 +1517,8 @@ static int infer_fdlimit(const struct bfs_ctx *ctx, int limit) {
 		goto done;
 	}
 
-	if (bfs_opendir(dir, AT_FDCWD, "/proc/self/fd") != 0
-	    && bfs_opendir(dir, AT_FDCWD, "/dev/fd") != 0) {
+	if (bfs_opendir(dir, AT_FDCWD, "/proc/self/fd", 0) != 0
+	    && bfs_opendir(dir, AT_FDCWD, "/dev/fd", 0) != 0) {
 		goto done;
 	}
 
