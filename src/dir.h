@@ -90,8 +90,10 @@ void bfs_dir_arena(struct arena *arena);
  * bfs_opendir() flags.
  */
 enum bfs_dir_flags {
+	/** Include whiteouts in the results. */
+	BFS_DIR_WHITEOUTS = 1 << 0,
 	/** @internal Start of private flags. */
-	BFS_DIR_PRIVATE = 1 << 0,
+	BFS_DIR_PRIVATE   = 1 << 1,
 };
 
 /**

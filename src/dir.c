@@ -259,7 +259,8 @@ static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
 
 /** Skip ".", "..", and deleted/empty dirents. */
 static int bfs_skipdent(struct bfs_dir *dir, const sys_dirent *de) {
-#if BFS_USE_GETDENTS && __FreeBSD__
+#if BFS_USE_GETDENTS
+#  if __FreeBSD__
 	// Union mounts on FreeBSD have to be de-duplicated in userspace
 	if (dir->flags & BFS_DIR_UNION) {
 		struct trie_leaf *leaf = trie_insert_str(&dir->trie, de->d_name);
@@ -276,7 +277,14 @@ static int bfs_skipdent(struct bfs_dir *dir, const sys_dirent *de) {
 	if (de->d_ino == 0) {
 		return 1;
 	}
-#endif
+#  endif
+
+#  ifdef DT_WHT
+	if (de->d_type == DT_WHT && !(dir->flags & BFS_DIR_WHITEOUTS)) {
+		return 1;
+	}
+#  endif
+#endif // BFS_USE_GETDENTS
 
 	const char *name = de->d_name;
 	return name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'));
