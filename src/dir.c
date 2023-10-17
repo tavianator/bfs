@@ -7,6 +7,7 @@
 #include "config.h"
 #include "diag.h"
 #include "sanity.h"
+#include "trie.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -101,7 +102,9 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
  */
 enum {
 	/** We've reached the end of the directory. */
-	BFS_DIR_EOF = BFS_DIR_PRIVATE << 0,
+	BFS_DIR_EOF   = BFS_DIR_PRIVATE << 0,
+	/** This directory is a union mount we need to dedup manually. */
+	BFS_DIR_UNION = BFS_DIR_PRIVATE << 1,
 };
 
 struct bfs_dir {
@@ -111,6 +114,9 @@ struct bfs_dir {
 	int fd;
 	unsigned short pos;
 	unsigned short size;
+#  if __FreeBSD__
+	struct trie trie;
+#  endif
 	alignas(sys_dirent) char buf[];
 #else
 	DIR *dir;
@@ -153,7 +159,14 @@ int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path, enum bfs_di
 	dir->fd = fd;
 	dir->pos = 0;
 	dir->size = 0;
-#else
+
+#  if __FreeBSD__ && defined(F_ISUNIONSTACK)
+	if (fcntl(fd, F_ISUNIONSTACK) > 0) {
+		dir->flags |= BFS_DIR_UNION;
+		trie_init(&dir->trie);
+	}
+#  endif
+#else // !BFS_USE_GETDENTS
 	dir->dir = fdopendir(fd);
 	if (!dir->dir) {
 		if (at_path) {
@@ -245,11 +258,23 @@ static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
 }
 
 /** Skip ".", "..", and deleted/empty dirents. */
-static bool skip_dirent(const sys_dirent *de) {
-#if __FreeBSD__
+static int bfs_skipdent(struct bfs_dir *dir, const sys_dirent *de) {
+#if BFS_USE_GETDENTS && __FreeBSD__
+	// Union mounts on FreeBSD have to be de-duplicated in userspace
+	if (dir->flags & BFS_DIR_UNION) {
+		struct trie_leaf *leaf = trie_insert_str(&dir->trie, de->d_name);
+		if (!leaf) {
+			return -1;
+		} else if (leaf->value) {
+			return 1;
+		} else {
+			leaf->value = leaf;
+		}
+	}
+
 	// NFS mounts on FreeBSD can return empty dirents with inode number 0
 	if (de->d_ino == 0) {
-		return true;
+		return 1;
 	}
 #endif
 
@@ -274,7 +299,10 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 			return ret;
 		}
 
-		if (skip_dirent(sysde)) {
+		int skip = bfs_skipdent(dir, sysde);
+		if (skip < 0) {
+			return skip;
+		} else if (skip) {
 			continue;
 		}
 
@@ -287,6 +315,16 @@ int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 	}
 }
 
+static void bfs_destroydir(struct bfs_dir *dir) {
+#if BFS_USE_GETDENTS && __FreeBSD__
+	if (dir->flags & BFS_DIR_UNION) {
+		trie_destroy(&dir->trie);
+	}
+#endif
+
+	sanitize_uninit(dir, DIR_SIZE);
+}
+
 int bfs_closedir(struct bfs_dir *dir) {
 #if BFS_USE_GETDENTS
 	int ret = xclose(dir->fd);
@@ -297,7 +335,7 @@ int bfs_closedir(struct bfs_dir *dir) {
 	}
 #endif
 
-	sanitize_uninit(dir, DIR_SIZE);
+	bfs_destroydir(dir);
 	return ret;
 }
 
@@ -309,7 +347,7 @@ int bfs_unwrapdir(struct bfs_dir *dir) {
 	int ret = fdclosedir(dir->dir);
 #endif
 
-	sanitize_uninit(dir, DIR_SIZE);
+	bfs_destroydir(dir);
 	return ret;
 }
 #endif
