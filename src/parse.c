@@ -2514,6 +2514,8 @@ static struct bfs_expr *parse_status(struct parser_state *state, int arg1, int a
  * Parse -x?type [bcdpflsD].
  */
 static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) {
+	struct bfs_ctx *ctx = state->ctx;
+
 	bfs_eval_fn *eval = x ? eval_xtype : eval_type;
 	struct bfs_expr *expr = parse_unary_test(state, eval);
 	if (!expr) {
@@ -2551,6 +2553,7 @@ static struct bfs_expr *parse_type(struct parser_state *state, int x, int arg2) 
 			break;
 		case 'w':
 			expr->num |= 1 << BFS_WHT;
+			ctx->flags |= BFTW_WHITEOUTS;
 			break;
 
 		case '\0':
