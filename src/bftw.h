@@ -156,6 +156,8 @@ enum bftw_flags {
 	BFTW_SORT          = 1 << 8,
 	/** Read each directory into memory before processing its children. */
 	BFTW_BUFFER        = 1 << 9,
+	/** Include whiteouts in the search results. */
+	BFTW_WHITEOUTS     = 1 << 10,
 };
 
 /**

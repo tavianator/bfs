@@ -1572,6 +1572,7 @@ static void dump_bftw_flags(enum bftw_flags flags) {
 	DEBUG_FLAG(flags, BFTW_PRUNE_MOUNTS);
 	DEBUG_FLAG(flags, BFTW_SORT);
 	DEBUG_FLAG(flags, BFTW_BUFFER);
+	DEBUG_FLAG(flags, BFTW_WHITEOUTS);
 
 	bfs_assert(flags == 0, "Missing bftw flag 0x%X", flags);
 }

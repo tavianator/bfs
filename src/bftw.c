@@ -41,6 +41,13 @@ static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, struct bftw_st
 			errno = cache->error;
 		} else if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, flags, &cache->storage) == 0) {
 			cache->buf = &cache->storage;
+#ifdef S_IFWHT
+		} else if (errno == ENOENT && ftwbuf->type == BFS_WHT) {
+			// This matches the behavior of FTS_WHITEOUT on BSD
+			memset(&cache->storage, 0, sizeof(cache->storage));
+			cache->storage.mode = S_IFWHT;
+			cache->buf = &cache->storage;
+#endif
 		} else {
 			cache->error = errno;
 		}
@@ -410,6 +417,8 @@ struct bftw_state {
 	enum bftw_strategy strategy;
 	/** The mount table. */
 	const struct bfs_mtab *mtab;
+	/** bfs_opendir() flags. */
+	enum bfs_dir_flags dir_flags;
 
 	/** The appropriate errno value, if any. */
 	int error;
@@ -492,6 +501,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	state->flags = args->flags;
 	state->strategy = args->strategy;
 	state->mtab = args->mtab;
+	state->dir_flags = 0;
 	state->error = 0;
 
 	if (args->nopenfd < 2) {
@@ -525,6 +535,10 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 
 	if (bftw_must_buffer(state)) {
 		state->flags |= BFTW_BUFFER;
+	}
+
+	if (state->flags & BFTW_WHITEOUTS) {
+		state->dir_flags |= BFS_DIR_WHITEOUTS;
 	}
 
 	SLIST_INIT(&state->dir_batch);
@@ -856,7 +870,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 		goto unpin;
 	}
 
-	if (ioq_opendir(state->ioq, dir, dfd, file->name, 0, file) != 0) {
+	if (ioq_opendir(state->ioq, dir, dfd, file->name, state->dir_flags, file) != 0) {
 		goto free;
 	}
 
@@ -1018,7 +1032,7 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_state *state, struct bftw_f
 		return NULL;
 	}
 
-	if (bfs_opendir(dir, fd, NULL, 0) != 0) {
+	if (bfs_opendir(dir, fd, NULL, state->dir_flags) != 0) {
 		bftw_freedir(cache, dir);
 		return NULL;
 	}
