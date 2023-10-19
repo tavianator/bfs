@@ -83,7 +83,7 @@ EOF
             --caps=cap_dac_override,cap_dac_read_search-eip \
             -- "$0" "$@"
     fi
-elif [ "$EUID" -eq 0 ]; then
+elif ((EUID == 0)); then
     UNLESS=
     if [ "$UNAME" = "Linux" ]; then
 	UNLESS=" unless ${GRN}capsh${RST} is installed"
@@ -142,13 +142,13 @@ EOF
 
 PATTERNS=()
 SUDO=()
-STOP=
-CLEAN=yes
-UPDATE=
-VERBOSE_COMMANDS=
-VERBOSE_ERRORS=
-VERBOSE_SKIPPED=
-VERBOSE_TESTS=
+STOP=0
+CLEAN=1
+UPDATE=0
+VERBOSE_COMMANDS=0
+VERBOSE_ERRORS=0
+VERBOSE_SKIPPED=0
+VERBOSE_TESTS=0
 
 for arg; do
     case "$arg" in
@@ -174,31 +174,31 @@ for arg; do
             read -a SUDO <<<"${arg#*=}"
             ;;
         --stop)
-            STOP=yes
+            STOP=1
             ;;
         --no-clean|--noclean)
-            CLEAN=
+            CLEAN=0
             ;;
         --update)
-            UPDATE=yes
+            UPDATE=1
             ;;
         --verbose=commands)
-            VERBOSE_COMMANDS=yes
+            VERBOSE_COMMANDS=1
             ;;
         --verbose=errors)
-            VERBOSE_ERRORS=yes
+            VERBOSE_ERRORS=1
             ;;
         --verbose=skipped)
-            VERBOSE_SKIPPED=yes
+            VERBOSE_SKIPPED=1
             ;;
         --verbose=tests)
-            VERBOSE_TESTS=yes
+            VERBOSE_TESTS=1
             ;;
         --verbose)
-            VERBOSE_COMMANDS=yes
-            VERBOSE_ERRORS=yes
-            VERBOSE_SKIPPED=yes
-            VERBOSE_TESTS=yes
+            VERBOSE_COMMANDS=1
+            VERBOSE_ERRORS=1
+            VERBOSE_SKIPPED=1
+            VERBOSE_TESTS=1
             ;;
         --help)
             usage
@@ -374,7 +374,7 @@ function cleanup() {
     rm -rf "$TMP"
 }
 
-if [ "$CLEAN" ]; then
+if ((CLEAN)); then
     defer cleanup
 else
     echo "Test files saved to $TMP"
@@ -513,13 +513,13 @@ mkdir "$TMP/scratch"
 # Close stdin so bfs doesn't think we're interactive
 exec </dev/null
 
-if [ "$VERBOSE_COMMANDS" ]; then
+if ((VERBOSE_COMMANDS)); then
     # dup stdout for verbose logging even when redirected
     exec 3>&1
 fi
 
 function bfs_verbose() {
-    if ! [ "$VERBOSE_COMMANDS" ]; then
+    if ((!VERBOSE_COMMANDS)); then
         return
     fi
 
@@ -611,7 +611,7 @@ function sort_output() {
 function diff_output() {
     local GOLD="$TESTS/$TEST.out"
 
-    if [ "$UPDATE" ]; then
+    if ((UPDATE)); then
         cp "$OUT" "$GOLD"
     else
         $DIFF -u "$GOLD" "$OUT" >&2
@@ -633,12 +633,12 @@ function bfs_diff() (
 )
 
 function skip() {
-    if [ "$VERBOSE_SKIPPED" ]; then
+    if ((VERBOSE_SKIPPED)); then
         caller | {
             read -r line file
             cprintf "${BOL}${CYN}%s skipped!${RST} (%s)\n" "$TEST" "$(awk "NR == $line" "$file")"
         }
-    elif [ "$VERBOSE_TESTS" ]; then
+    elif ((VERBOSE_TESTS)); then
         cprintf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
     fi
 
@@ -658,7 +658,7 @@ function closefrom() {
         fi
 
         local fd="${fd##*/}"
-        if [ "$fd" -ge "$1" ]; then
+        if ((fd >= $1)); then
             eval "exec ${fd}<&-"
         fi
     done
@@ -674,7 +674,7 @@ function set_acl() {
             chmod +a "$(id -un) allow read,write" "$1"
             ;;
         FreeBSD)
-            if [ "$(getconf ACL_NFS4 "$1")" -gt 0 ]; then
+            if (($(getconf ACL_NFS4 "$1") > 0)); then
                 setfacl -m "u:$(id -un):rw::allow" "$1"
             else
                 setfacl -m "u:$(id -un):rw" "$1"
@@ -732,7 +732,7 @@ function update_eol() {
     EOL="\\033[${cols}G "
 }
 
-if [ "$VERBOSE_TESTS" ]; then
+if ((VERBOSE_TESTS)); then
     BOL=''
 elif ((COLOR_STDOUT)); then
     BOL='\r\033[K'
@@ -775,7 +775,7 @@ passed=0
 failed=0
 skipped=0
 
-if ((COLOR_STDOUT)) || [ "$VERBOSE_TESTS" ]; then
+if ((COLOR_STDOUT || VERBOSE_TESTS)); then
     TEST_FMT="${BOL}${YLW}%s${RST}${EOL}"
 else
     TEST_FMT="."
@@ -787,7 +787,7 @@ for TEST in "${TEST_CASES[@]}"; do
     OUT="$TMP/$TEST.out"
     mkdir -p "${OUT%/*}"
 
-    if [ "$VERBOSE_ERRORS" ]; then
+    if ((VERBOSE_ERRORS)); then
         run_test "$TESTS/$TEST.sh"
     else
         run_test "$TESTS/$TEST.sh" 2>"$TMP/$TEST.err"
@@ -800,9 +800,9 @@ for TEST in "${TEST_CASES[@]}"; do
         ((++skipped))
     else
         ((++failed))
-        [ "$VERBOSE_ERRORS" ] || cat "$TMP/$TEST.err" >&2
+        ((VERBOSE_ERRORS)) || cat "$TMP/$TEST.err" >&2
         cprintf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
-        [ "$STOP" ] && break
+        ((STOP)) && break
     fi
 done
 
