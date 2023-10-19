@@ -160,12 +160,13 @@ defer() {
 
 # Pop a single command from the defer stack and run it
 pop_defer() {
-    local cmd="${DEFER_CMDS[-1]}"
-    local file="${DEFER_FILES[-1]}"
-    local line="${DEFER_LINES[-1]}"
-    unset "DEFER_CMDS[-1]"
-    unset "DEFER_FILES[-1]"
-    unset "DEFER_LINES[-1]"
+    local i=$((${#DEFER_CMDS[@]} - 1))
+    local cmd="${DEFER_CMDS[$i]}"
+    local file="${DEFER_FILES[$i]}"
+    local line="${DEFER_LINES[$i]}"
+    unset "DEFER_CMDS[$i]"
+    unset "DEFER_FILES[$i]"
+    unset "DEFER_LINES[$i]"
 
     local ret=0
     eval "$cmd" || ret=$?
