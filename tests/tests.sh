@@ -94,7 +94,7 @@ function usage() {
     local pad=$(printf "%*s" ${#0} "")
     cat <<EOF
 Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
-       $pad [${BLU}--noclean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
+       $pad [${BLU}--no-clean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
        $pad [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
@@ -106,7 +106,7 @@ Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo$
   ${BLU}--stop${RST}
       Stop when the first error occurs
 
-  ${BLU}--noclean${RST}
+  ${BLU}--no-clean${RST}
       Keep the test directories around after the run
 
   ${BLU}--update${RST}
@@ -170,7 +170,7 @@ for arg; do
         --stop)
             STOP=yes
             ;;
-        --noclean)
+        --no-clean|--noclean)
             CLEAN=
             ;;
         --update)
