@@ -507,14 +507,15 @@ function bfs_verbose() {
 
 function invoke_bfs() {
     bfs_verbose "$@"
-    "${BFS[@]}" "$@"
-    local status="$?"
+
+    local ret=0
+    "${BFS[@]}" "$@" || ret=$?
 
     # Allow bfs to fail, but not crash
-    if ((status > 125)); then
-        exit "$status"
+    if ((ret > 125)); then
+        exit "$ret"
     else
-        return "$status"
+        return "$ret"
     fi
 }
 
@@ -528,13 +529,14 @@ function bfs_pty() {
     test -n "${UNBUFFER:-}" || skip
 
     bfs_verbose "$@"
-    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@"
-    local status="$?"
 
-    if ((status > 125)); then
-        exit "$status"
+    local ret=0
+    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@" || ret=$?
+
+    if ((ret > 125)); then
+        exit "$ret"
     else
-        return "$status"
+        return "$ret"
     fi
 }
 
