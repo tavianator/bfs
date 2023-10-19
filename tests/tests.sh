@@ -19,29 +19,35 @@ export UBSAN_OPTIONS="$SAN_OPTIONS"
 export LS_COLORS=""
 unset BFS_COLORS
 
+BLD=$'\e[01m'
+RED=$'\e[01;31m'
+GRN=$'\e[01;32m'
+YLW=$'\e[01;33m'
+BLU=$'\e[01;34m'
+MAG=$'\e[01;35m'
+CYN=$'\e[01;36m'
+RST=$'\e[0m'
+
 function color_fd() {
     [ -z "${NO_COLOR:-}" ] && [ -t "$1" ]
 }
 
-if color_fd 1; then
-    BLD=$'\033[01m'
-    RED=$'\033[01;31m'
-    GRN=$'\033[01;32m'
-    YLW=$'\033[01;33m'
-    BLU=$'\033[01;34m'
-    MAG=$'\033[01;35m'
-    CYN=$'\033[01;36m'
-    RST=$'\033[0m'
-else
-    BLD=
-    RED=
-    GRN=
-    YLW=
-    BLU=
-    MAG=
-    CYN=
-    RST=
-fi
+color_fd 1 && COLOR_STDOUT=1 || COLOR_STDOUT=0
+color_fd 2 && COLOR_STDERR=1 || COLOR_STDERR=0
+
+# Filter out escape sequences if necessary
+function color() {
+    if color_fd 1; then
+        cat
+    else
+        sed $'s/\e\\[[^m]*m//g'
+    fi
+}
+
+# printf with auto-detected color support
+function cprintf() {
+    printf "$@" | color
+}
 
 UNAME=$(uname)
 
@@ -59,14 +65,14 @@ fi
 if command -v capsh &>/dev/null; then
     if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
 	if [ -n "${BFS_TRIED_DROP:-}" ]; then
-            cat >&2 <<EOF
+            color >&2 <<EOF
 ${RED}error:${RST} Failed to drop capabilities.
 EOF
 
 	    exit 1
 	fi
 
-        cat >&2 <<EOF
+        color >&2 <<EOF
 ${YLW}warning:${RST} Running as ${BLD}$(id -un)${RST} is not recommended.  Dropping ${BLD}cap_dac_override${RST} and
 ${BLD}cap_dac_read_search${RST}.
 
@@ -83,7 +89,7 @@ elif [ "$EUID" -eq 0 ]; then
 	UNLESS=" unless ${GRN}capsh${RST} is installed"
     fi
 
-    cat >&2 <<EOF
+    color >&2 <<EOF
 ${RED}error:${RST} These tests expect filesystem permissions to be enforced, and therefore
 will not work when run as ${BLD}$(id -un)${RST}${UNLESS}.
 EOF
@@ -92,7 +98,7 @@ fi
 
 function usage() {
     local pad=$(printf "%*s" ${#0} "")
-    cat <<EOF
+    color <<EOF
 Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
        $pad [${BLU}--no-clean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
        $pad [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
@@ -199,7 +205,7 @@ for arg; do
             exit 0
             ;;
         -*)
-            printf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
+            cprintf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
             usage >&2
             exit 1
             ;;
@@ -237,7 +243,7 @@ chown "$(id -u):$(id -g)" "$TMP"
 
 cd "$TESTS"
 
-if (( ${#PATTERNS[@]} == 0 )); then
+if ((${#PATTERNS[@]} == 0)); then
     PATTERNS=("*")
 fi
 
@@ -252,10 +258,10 @@ for TEST in {posix,common,bsd,gnu,bfs}/*.sh; do
     done
 done
 
-if (( ${#TEST_CASES[@]} == 0 )); then
-    printf "${RED}error:${RST} No tests matched" >&2
-    printf " ${BLD}%s${RST}" "${PATTERNS[@]}" >&2
-    printf ".\n\n" >&2
+if ((${#TEST_CASES[@]} == 0)); then
+    cprintf "${RED}error:${RST} No tests matched" >&2
+    cprintf " ${BLD}%s${RST}" "${PATTERNS[@]}" >&2
+    cprintf ".\n\n" >&2
     usage >&2
     exit 1
 fi
@@ -268,27 +274,48 @@ function quote() {
     fi
 }
 
-DEFER=()
-
 # Run a command when this (sub)shell exits
 function defer() {
     trap -- KILL
     if ! trap -p EXIT | grep -q pop_defers; then
-        DEFER=()
+        DEFER_CMDS=()
+        DEFER_LINES=()
+        DEFER_FILES=()
         trap pop_defers EXIT
     fi
-    DEFER+=("$(quote "$@")")
+
+    DEFER_CMDS+=("$(quote "$@")")
+
+    local line file
+    read -r line file < <(caller)
+    DEFER_LINES+=("$line")
+    DEFER_FILES+=("$file")
+}
+
+function report_err() {
+    local file="${1/#*\/tests\//tests\/}"
+    set -- "$file" "${@:2}"
+
+    if ((COLOR_STDERR)); then
+        printf "${BLD}%s:%d:${RST} ${RED}error %d:${RST}\n    %s\n" "$@" >&2
+    else
+        printf "%s:%d: error %d:\n    %s\n" "$@" >&2
+    fi
 }
 
 function pop_defer() {
-    local cmd="${DEFER[-1]}"
-    unset "DEFER[-1]"
+    local cmd="${DEFER_CMDS[-1]}"
+    local file="${DEFER_FILES[-1]}"
+    local line="${DEFER_LINES[-1]}"
+    unset "DEFER_CMDS[-1]"
+    unset "DEFER_FILES[-1]"
+    unset "DEFER_LINES[-1]"
 
     local ret=0
     eval "$cmd" || ret=$?
 
     if ((ret != 0)); then
-        printf 'defer %s: error %d\n' "$cmd" $ret >&2
+        report_err "$file" $line $ret "defer $cmd"
     fi
 
     return $ret
@@ -297,7 +324,7 @@ function pop_defer() {
 function pop_defers() {
     local ret=0
 
-    while ((${#DEFER[@]} > 0)); do
+    while ((${#DEFER_CMDS[@]} > 0)); do
         pop_defer || ret=$?
     done
 
@@ -492,33 +519,34 @@ if [ "$VERBOSE_COMMANDS" ]; then
 fi
 
 function bfs_verbose() {
-    if [ "$VERBOSE_COMMANDS" ]; then
-        if color_fd 3; then
-            printf "${GRN}%q${RST} " "${BFS[@]}" >&3
-
-            local expr_started=
-            for arg; do
-                if [[ $arg == -[A-Z]* ]]; then
-                    printf "${CYN}%q${RST} " "$arg" >&3
-                elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
-                    expr_started=yes
-                    printf "${RED}%q${RST} " "$arg" >&3
-                elif [[ $expr_started && $arg == [\),] ]]; then
-                    printf "${RED}%q${RST} " "$arg" >&3
-                elif [[ $arg == -?* ]]; then
-                    expr_started=yes
-                    printf "${BLU}%q${RST} " "$arg" >&3
-                elif [ "$expr_started" ]; then
-                    printf "${BLD}%q${RST} " "$arg" >&3
-                else
-                    printf "${MAG}%q${RST} " "$arg" >&3
-                fi
-            done
-        else
-            printf '%q ' "${BFS[@]}" "$@" >&3
-        fi
-        printf '\n' >&3
+    if ! [ "$VERBOSE_COMMANDS" ]; then
+        return
     fi
+
+    {
+        printf "${GRN}%q${RST} " "${BFS[@]}"
+
+        local expr_started=
+        for arg; do
+            if [[ $arg == -[A-Z]* ]]; then
+                printf "${CYN}%q${RST} " "$arg"
+            elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
+                expr_started=yes
+                printf "${RED}%q${RST} " "$arg"
+            elif [[ $expr_started && $arg == [\),] ]]; then
+                printf "${RED}%q${RST} " "$arg"
+            elif [[ $arg == -?* ]]; then
+                expr_started=yes
+                printf "${BLU}%q${RST} " "$arg"
+            elif [ "$expr_started" ]; then
+                printf "${BLD}%q${RST} " "$arg"
+            else
+                printf "${MAG}%q${RST} " "$arg"
+            fi
+        done
+
+        printf '\n'
+    } | color >&3
 }
 
 function invoke_bfs() {
@@ -565,7 +593,7 @@ function check_exit() {
 }
 
 # Detect colored diff support
-if color_fd 2 && diff --color=always /dev/null /dev/null 2>/dev/null; then
+if ((COLOR_STDERR)) && diff --color=always /dev/null /dev/null 2>/dev/null; then
     DIFF="diff --color=always"
 else
     DIFF="diff"
@@ -608,10 +636,10 @@ function skip() {
     if [ "$VERBOSE_SKIPPED" ]; then
         caller | {
             read -r line file
-            printf "${BOL}${CYN}%s skipped!${RST} (%s)\n" "$TEST" "$(awk "NR == $line" "$file")"
+            cprintf "${BOL}${CYN}%s skipped!${RST} (%s)\n" "$TEST" "$(awk "NR == $line" "$file")"
         }
     elif [ "$VERBOSE_TESTS" ]; then
-        printf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
+        cprintf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
     fi
 
     exit $EX_SKIP
@@ -706,7 +734,7 @@ function update_eol() {
 
 if [ "$VERBOSE_TESTS" ]; then
     BOL=''
-elif color_fd 1; then
+elif ((COLOR_STDOUT)); then
     BOL='\r\033[K'
 
     # Workaround for bash 4: checkwinsize is off by default.  We can turn it on,
@@ -727,13 +755,11 @@ function callers() {
 }
 
 function debug_err() {
-    local ret=$?
-    local line func file
+    local ret=$? line func file
     callers | while read -r line func file; do
         if [ "$func" = source ]; then
             local cmd="$(awk "NR == $line" "$file" 2>/dev/null)" || :
-            file="${file/#*\/tests\//tests\/}"
-            printf '%s:%d: %s: error %d\n' "$file" "$line" "$cmd" "$ret" >&2
+            report_err "$file" $line $ret "$cmd"
             break
         fi
     done
@@ -749,7 +775,7 @@ passed=0
 failed=0
 skipped=0
 
-if color_fd 1 || [ "$VERBOSE_TESTS" ]; then
+if ((COLOR_STDOUT)) || [ "$VERBOSE_TESTS" ]; then
     TEST_FMT="${BOL}${YLW}%s${RST}${EOL}"
 else
     TEST_FMT="."
@@ -775,7 +801,7 @@ for TEST in "${TEST_CASES[@]}"; do
     else
         ((++failed))
         [ "$VERBOSE_ERRORS" ] || cat "$TMP/$TEST.err" >&2
-        printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
+        cprintf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
         [ "$STOP" ] && break
     fi
 done
@@ -783,12 +809,12 @@ done
 printf "${BOL}"
 
 if ((passed > 0)); then
-    printf "${GRN}tests passed: %d${RST}\n" "$passed"
+    cprintf "${GRN}tests passed: %d${RST}\n" "$passed"
 fi
 if ((skipped > 0)); then
-    printf "${CYN}tests skipped: %s${RST}\n" "$skipped"
+    cprintf "${CYN}tests skipped: %s${RST}\n" "$skipped"
 fi
 if ((failed > 0)); then
-    printf "${RED}tests failed: %s${RST}\n" "$failed"
+    cprintf "${RED}tests failed: %s${RST}\n" "$failed"
     exit 1
 fi
