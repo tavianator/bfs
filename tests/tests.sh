@@ -260,6 +260,14 @@ if (( ${#TEST_CASES[@]} == 0 )); then
     exit 1
 fi
 
+function quote() {
+    printf '%q' "$1"
+    shift
+    if (($# > 0)); then
+        printf ' %q' "$@"
+    fi
+}
+
 DEFER=()
 
 # Run a command when this (sub)shell exits
@@ -269,13 +277,21 @@ function defer() {
         DEFER=()
         trap pop_defers EXIT
     fi
-    DEFER+=("$(printf '%q ' "$@")")
+    DEFER+=("$(quote "$@")")
 }
 
 function pop_defer() {
     local cmd="${DEFER[-1]}"
     unset "DEFER[-1]"
-    eval "$cmd"
+
+    local ret=0
+    eval "$cmd" || ret=$?
+
+    if ((ret != 0)); then
+        printf 'defer %s: error %d\n' "$cmd" $ret >&2
+    fi
+
+    return $ret
 }
 
 function pop_defers() {
@@ -703,6 +719,32 @@ elif color_fd 1; then
     trap update_eol WINCH
 fi
 
+function callers() {
+    local frame=0
+    while caller $frame; do
+        ((++frame))
+    done
+}
+
+function debug_err() {
+    local ret=$?
+    local line func file
+    callers | while read -r line func file; do
+        if [ "$func" = source ]; then
+            local cmd="$(awk "NR == $line" "$file" 2>/dev/null)" || :
+            file="${file/#*\/tests\//tests\/}"
+            printf '%s:%d: %s: error %d\n' "$file" "$line" "$cmd" "$ret" >&2
+            break
+        fi
+    done
+}
+
+function run_test() (
+    set -eE
+    trap debug_err ERR
+    source "$@"
+)
+
 passed=0
 failed=0
 skipped=0
@@ -720,9 +762,9 @@ for TEST in "${TEST_CASES[@]}"; do
     mkdir -p "${OUT%/*}"
 
     if [ "$VERBOSE_ERRORS" ]; then
-        (set -e; . "$TESTS/$TEST.sh")
+        run_test "$TESTS/$TEST.sh"
     else
-        (set -e; . "$TESTS/$TEST.sh") 2>"$TMP/$TEST.err"
+        run_test "$TESTS/$TEST.sh" 2>"$TMP/$TEST.err"
     fi
     status=$?
 
