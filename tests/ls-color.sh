@@ -7,7 +7,7 @@
 
 set -e
 
-function parse_ls_colors() {
+parse_ls_colors() {
     for key; do
         local -n var="$key"
         if [[ "$LS_COLORS" =~ (^|:)$key=(([^:]|\\:)*) ]]; then
@@ -18,7 +18,7 @@ function parse_ls_colors() {
     done
 }
 
-function re_escape() {
+re_escape() {
     # https://stackoverflow.com/a/29613573/502399
     sed 's/[^^]/[&]/g; s/\^/\\^/g' <<<"$1"
 }
@@ -34,7 +34,7 @@ parse_ls_colors rs lc rc ec no
 
 strip="(($(re_escape "$lc$no$rc"))?($(re_escape "$ec")|$(re_escape "$lc$rc")))+"
 
-function ls_color() {
+ls_color() {
     # Strip the leading reset sequence from the ls output
     ls -1d --color "$@" | sed -E "s/^$strip([a-z].*)$strip/\4/; s/^$strip//"
 }

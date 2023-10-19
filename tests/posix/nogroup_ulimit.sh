@@ -1,4 +1,3 @@
-closefrom 4
 ulimit -n 16
 
 # -mindepth 18, but POSIX
