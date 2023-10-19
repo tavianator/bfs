@@ -217,7 +217,7 @@ setup() {
 
         worktree="bench/worktree"
         as-user git worktree add -qd "$worktree"
-        at-exit as-user git worktree remove "$worktree"
+        defer as-user git worktree remove "$worktree"
 
         bin="$(realpath -- "$SETUP_DIR")/bin"
         as-user mkdir "$bin"
@@ -241,7 +241,7 @@ setup() {
         # Work around this with a symlink
         tmp=$(as-user mktemp)
         as-user ln -sf "$bin" "$tmp"
-        at-exit rm "$tmp"
+        defer rm "$tmp"
         export PATH="$tmp:$PATH"
     fi
 
