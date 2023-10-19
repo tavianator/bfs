@@ -6,7 +6,7 @@ clean_scratch
 mkdir scratch/{foo,automnt}
 
 bfs_sudo systemd-mount -A -o bind basic scratch/automnt || skip
-trap "bfs_sudo systemd-umount scratch/automnt" EXIT
+defer bfs_sudo systemd-umount scratch/automnt
 
 before=$(inum scratch/automnt)
 bfs_diff scratch -inum "$before" -prune

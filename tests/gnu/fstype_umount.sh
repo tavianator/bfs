@@ -4,7 +4,7 @@ clean_scratch
 
 mkdir scratch/tmp
 bfs_sudo mount -t tmpfs tmpfs scratch/tmp || skip
-trap "bfs_sudo umount -R scratch/tmp" EXIT
+defer bfs_sudo umount -R scratch/tmp
 
 mkdir scratch/tmp/ram
 bfs_sudo mount -t ramfs ramfs scratch/tmp/ram || skip

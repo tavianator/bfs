@@ -260,6 +260,34 @@ if (( ${#TEST_CASES[@]} == 0 )); then
     exit 1
 fi
 
+DEFER=()
+
+# Run a command when this (sub)shell exits
+function defer() {
+    trap -- KILL
+    if ! trap -p EXIT | grep -q pop_defers; then
+        DEFER=()
+        trap pop_defers EXIT
+    fi
+    DEFER+=("$(printf '%q ' "$@")")
+}
+
+function pop_defer() {
+    local cmd="${DEFER[-1]}"
+    unset "DEFER[-1]"
+    eval "$cmd"
+}
+
+function pop_defers() {
+    local ret=0
+
+    while ((${#DEFER[@]} > 0)); do
+        pop_defer || ret=$?
+    done
+
+    return $ret
+}
+
 function bfs_sudo() {
     if ((${#SUDO[@]})); then
         "${SUDO[@]}" "$@"
@@ -304,7 +332,7 @@ function cleanup() {
 }
 
 if [ "$CLEAN" ]; then
-    trap cleanup EXIT
+    defer cleanup
 else
     echo "Test files saved to $TMP"
 fi

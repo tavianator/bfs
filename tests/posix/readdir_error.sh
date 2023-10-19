@@ -13,7 +13,7 @@ mkfifo scratch/{fever,pid,wait,running}
 ) &
 
 # Kill the parent cat on exit
-trap "kill -9 %1" EXIT
+defer kill -9 %1
 
 # Read the child PID
 read -r pid <scratch/pid

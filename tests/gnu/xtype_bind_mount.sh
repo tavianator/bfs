@@ -5,6 +5,6 @@ clean_scratch
 ln -s /dev/null scratch/link
 
 bfs_sudo mount --bind /dev/null scratch/null || skip
-trap "bfs_sudo umount scratch/null" EXIT
+defer bfs_sudo umount scratch/null
 
 bfs_diff -L scratch -type c

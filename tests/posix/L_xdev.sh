@@ -4,7 +4,7 @@ clean_scratch
 mkdir scratch/{foo,mnt}
 
 bfs_sudo mount -t tmpfs tmpfs scratch/mnt || skip
-trap "bfs_sudo umount scratch/mnt" EXIT
+defer bfs_sudo umount scratch/mnt
 
 ln -s ../mnt scratch/foo/bar
 "$XTOUCH" scratch/mnt/baz
