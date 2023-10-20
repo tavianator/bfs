@@ -37,6 +37,81 @@ struct args {
 	mode_t pmode;
 };
 
+/** Open (and maybe create) a single directory. */
+static int open_dir(const struct args *args, int dfd, const char *path) {
+	int ret = openat(dfd, path, O_SEARCH | O_DIRECTORY);
+
+	if (ret < 0 && errno == ENOENT && (args->flags & CREATE_PARENTS)) {
+		if (mkdirat(dfd, path, args->pmode) == 0 || errno == EEXIST) {
+			ret = openat(dfd, path, O_SEARCH | O_DIRECTORY);
+		}
+	}
+
+	return ret;
+}
+
+/** Open (and maybe create) the parent directory of the path. */
+static int open_parent(const struct args *args, const char **path) {
+	size_t max = xbaseoff(*path);
+	if (max == 0) {
+		return AT_FDCWD;
+	}
+
+	char *dir = strndup(*path, max);
+	if (!dir) {
+		return -1;
+	}
+
+	// Optimistically try the whole path first
+	int dfd = open_dir(args, AT_FDCWD, dir);
+	if (dfd >= 0) {
+		goto done;
+	}
+
+	switch (errno) {
+	case ENAMETOOLONG:
+		break;
+	case ENOENT:
+		if (args->flags & CREATE_PARENTS) {
+			break;
+		} else {
+			goto err;
+		}
+	default:
+		goto err;
+	}
+
+	// Open the parents one-at-a-time
+	dfd = AT_FDCWD;
+	char *cur = dir;
+	while (*cur) {
+		char *next = cur;
+		next += strcspn(next, "/");
+		next += strspn(next, "/");
+
+		char c = *next;
+		*next = '\0';
+
+		int parent = dfd;
+		dfd = open_dir(args, parent, cur);
+		if (parent >= 0) {
+			close_quietly(parent);
+		}
+		if (dfd < 0) {
+			goto err;
+		}
+
+		*next = c;
+		cur = next;
+	}
+
+done:
+	*path += max;
+err:
+	free(dir);
+	return dfd;
+}
+
 /** Compute flags for fstatat()/utimensat(). */
 static int at_flags(const struct args *args) {
 	if (args->flags & NO_FOLLOW) {
@@ -46,80 +121,44 @@ static int at_flags(const struct args *args) {
 	}
 }
 
-/** Create any parent directories of the given path. */
-static int mkdirs(const char *path, mode_t mode) {
-	int ret = -1;
-	char *dir = xdirname(path);
-	if (!dir) {
-		goto err;
-	}
-
-	if (strcmp(dir, ".") == 0) {
-		goto done;
-	}
-
-	// Optimistically try the immediate parent first
-	if (mkdir(dir, mode) == 0 || errno == EEXIST) {
-		goto done;
-	}
-
-	// Create the parents one-at-a-time
-	char *cur = dir + strspn(dir, "/");
-	while (*cur) {
-		cur += strcspn(cur, "/");
-		char *next = cur + strspn(cur, "/");
-
-		char c = *cur;
-		*cur = '\0';
-		if (mkdir(dir, mode) != 0 && errno != EEXIST) {
-			goto err;
-		}
-		*cur = c;
-		cur = next;
-	}
-
-done:
-	ret = 0;
-err:
-	free(dir);
-	return ret;
-}
-
 /** Touch one path. */
 static int xtouch(const struct args *args, const char *path) {
-	int ret = utimensat(AT_FDCWD, path, args->times, at_flags(args));
+	int dfd = open_parent(args, &path);
+	if (dfd < 0 && dfd != AT_FDCWD) {
+		return -1;
+	}
+
+	int ret = utimensat(dfd, path, args->times, at_flags(args));
 	if (ret == 0 || errno != ENOENT) {
-		return ret;
+		goto done;
 	}
 
 	if (args->flags & NO_CREATE) {
-		return 0;
-	} else if (args->flags & CREATE_PARENTS) {
-		if (mkdirs(path, args->pmode) != 0) {
-			return -1;
-		}
+		ret = 0;
+		goto done;
 	}
 
 	size_t len = strlen(path);
 	if (len > 0 && path[len - 1] == '/') {
-		if (mkdir(path, args->dmode) != 0) {
-			return -1;
+		if (mkdirat(dfd, path, args->dmode) == 0) {
+			ret = utimensat(dfd, path, args->times, at_flags(args));
 		}
-
-		return utimensat(AT_FDCWD, path, args->times, at_flags(args));
 	} else {
-		int fd = open(path, O_WRONLY | O_CREAT, args->fmode);
-		if (fd < 0) {
-			return -1;
+		int fd = openat(dfd, path, O_WRONLY | O_CREAT, args->fmode);
+		if (fd >= 0) {
+			if (futimens(fd, args->times) == 0) {
+				ret = xclose(fd);
+			} else {
+				close_quietly(fd);
+			}
 		}
-
-		if (futimens(fd, args->times) != 0) {
-			close_quietly(fd);
-			return -1;
-		}
-
-		return xclose(fd);
 	}
+
+done:
+	if (dfd >= 0) {
+		close_quietly(dfd);
+	}
+	return ret;
 }
 
 int main(int argc, char *argv[]) {
