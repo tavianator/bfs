@@ -14,7 +14,7 @@ update_eol() {
     # Bash gets $COLUMNS from stderr, so if it's redirected use tput instead
     local cols="${COLUMNS-}"
     if [ -z "$cols" ]; then
-        cols=$(tput cols)
+        cols=$(tput cols 2>/dev/tty)
     fi
 
     # Put the cursor at the last column, then write a space so the next
