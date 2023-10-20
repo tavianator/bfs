@@ -8,7 +8,7 @@
 # Print usage information
 usage() {
     local pad=$(printf "%*s" ${#0} "")
-    color <<EOF
+    color cat <<EOF
 Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
        $pad [${BLU}--no-clean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
        $pad [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
@@ -117,7 +117,7 @@ parse_args() {
                 exit 0
                 ;;
             -*)
-                cprintf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
+                color printf "${RED}error:${RST} Unrecognized option '%s'.\n\n" "$arg" >&2
                 usage >&2
                 exit 1
                 ;;
@@ -149,9 +149,9 @@ parse_args() {
     done
 
     if ((${#TEST_CASES[@]} == 0)); then
-        cprintf "${RED}error:${RST} No tests matched" >&2
-        cprintf " ${BLD}%s${RST}" "${PATTERNS[@]}" >&2
-        cprintf ".\n\n" >&2
+        color printf "${RED}error:${RST} No tests matched" >&2
+        color printf " ${BLD}%s${RST}" "${PATTERNS[@]}" >&2
+        color printf ".\n\n" >&2
         usage >&2
         exit 1
     fi

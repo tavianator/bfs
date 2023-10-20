@@ -76,14 +76,14 @@ drop_root() {
     if command -v capsh &>/dev/null; then
         if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
 	    if [ -n "${BFS_TRIED_DROP:-}" ]; then
-                color >&2 <<EOF
+                color cat >&2 <<EOF
 ${RED}error:${RST} Failed to drop capabilities.
 EOF
 
 	        exit 1
 	    fi
 
-            color >&2 <<EOF
+            color cat >&2 <<EOF
 ${YLW}warning:${RST} Running as ${BLD}$(id -un)${RST} is not recommended.  Dropping ${BLD}cap_dac_override${RST} and
 ${BLD}cap_dac_read_search${RST}.
 
@@ -100,7 +100,7 @@ EOF
 	    UNLESS=" unless ${GRN}capsh${RST} is installed"
         fi
 
-        color >&2 <<EOF
+        color cat >&2 <<EOF
 ${RED}error:${RST} These tests expect filesystem permissions to be enforced, and therefore
 will not work when run as ${BLD}$(id -un)${RST}${UNLESS}.
 EOF
@@ -122,7 +122,7 @@ callers() {
 debug() {
     local file="${1/#*\/tests\//tests\/}"
     set -- "$file" "${@:2}"
-    cprintf "${BLD}%s:%d:${RST} %s\n    %s\n" "$@"
+    color printf "${BLD}%s:%d:${RST} %s\n    %s\n" "$@"
 }
 
 ## Deferred cleanup

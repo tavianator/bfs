@@ -93,7 +93,7 @@ run_tests() {
         else
             ((++failed))
             ((VERBOSE_ERRORS)) || cat "$TMP/$TEST.err" >&2
-            cprintf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
+            color printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
             ((STOP)) && break
         fi
     done
@@ -101,13 +101,13 @@ run_tests() {
     printf "${BOL}"
 
     if ((passed > 0)); then
-        cprintf "${GRN}tests passed: %d${RST}\n" "$passed"
+        color printf "${GRN}tests passed: %d${RST}\n" "$passed"
     fi
     if ((skipped > 0)); then
-        cprintf "${CYN}tests skipped: %s${RST}\n" "$skipped"
+        color printf "${CYN}tests skipped: %s${RST}\n" "$skipped"
     fi
     if ((failed > 0)); then
-        cprintf "${RED}tests failed: %s${RST}\n" "$failed"
+        color printf "${RED}tests failed: %s${RST}\n" "$failed"
         exit 1
     fi
 }
@@ -126,7 +126,7 @@ skip() {
             debug "$file" $line "${CYN}$TEST skipped!${RST}" "$(awk "NR == $line" "$file")" >&3
         }
     elif ((VERBOSE_TESTS)); then
-        cprintf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
+        color printf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
     fi
 
     exit $EX_SKIP
@@ -175,39 +175,42 @@ set_acl() {
 }
 
 # Print a bfs invocation for --verbose=commands
-bfs_verbose() (
-    if ((!VERBOSE_COMMANDS)); then
-        return
+bfs_verbose() {
+    if ((VERBOSE_COMMANDS)); then
+        (
+            # Close some fds to make room for the pipe,
+            # even with extremely low ulimit -n
+            exec >&- 4>&-
+            exec >&3 3>&-
+            color bfs_verbose_impl "$@"
+        )
     fi
+}
 
-    # Free up an fd for the pipe
-    exec 4>&-
+bfs_verbose_impl() {
+    printf "${GRN}%q${RST} " "${BFS[@]}"
 
-    {
-        printf "${GRN}%q${RST} " "${BFS[@]}"
+    local expr_started=
+    for arg; do
+        if [[ $arg == -[A-Z]* ]]; then
+            printf "${CYN}%q${RST} " "$arg"
+        elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
+            expr_started=yes
+            printf "${RED}%q${RST} " "$arg"
+        elif [[ $expr_started && $arg == [\),] ]]; then
+            printf "${RED}%q${RST} " "$arg"
+        elif [[ $arg == -?* ]]; then
+            expr_started=yes
+            printf "${BLU}%q${RST} " "$arg"
+        elif [ "$expr_started" ]; then
+            printf "${BLD}%q${RST} " "$arg"
+        else
+            printf "${MAG}%q${RST} " "$arg"
+        fi
+    done
 
-        local expr_started=
-        for arg; do
-            if [[ $arg == -[A-Z]* ]]; then
-                printf "${CYN}%q${RST} " "$arg"
-            elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
-                expr_started=yes
-                printf "${RED}%q${RST} " "$arg"
-            elif [[ $expr_started && $arg == [\),] ]]; then
-                printf "${RED}%q${RST} " "$arg"
-            elif [[ $arg == -?* ]]; then
-                expr_started=yes
-                printf "${BLU}%q${RST} " "$arg"
-            elif [ "$expr_started" ]; then
-                printf "${BLD}%q${RST} " "$arg"
-            else
-                printf "${MAG}%q${RST} " "$arg"
-            fi
-        done
-
-        printf '\n'
-    } | color >&3
-)
+    printf '\n'
+}
 
 # Run the bfs we're testing
 invoke_bfs() {

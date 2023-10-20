@@ -24,20 +24,14 @@ color_fd() {
 color_fd 1 && COLOR_STDOUT=1 || COLOR_STDOUT=0
 color_fd 2 && COLOR_STDERR=1 || COLOR_STDERR=0
 
-# Save these in case the tests unset PATH
-CAT=$(command -v cat)
+# Save this in case the tests unset PATH
 SED=$(command -v sed)
 
 # Filter out escape sequences if necessary
 color() {
     if color_fd 1; then
-        "$CAT"
+        "$@"
     else
-        "$SED" $'s/\e\\[[^m]*m//g'
+        "$@" | "$SED" $'s/\e\\[[^m]*m//g'
     fi
-}
-
-# printf with auto-detected color support
-cprintf() {
-    printf "$@" | color
 }
