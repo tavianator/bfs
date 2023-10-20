@@ -79,24 +79,15 @@ make_deep() {
 
     # $name will be 255 characters, aka _XOPEN_NAME_MAX
     local name="0123456789ABCDEF"
-    name="${name}${name}${name}${name}"
-    name="${name}${name}${name}${name}"
+    name="$name$name$name$name"
+    name="$name$name$name$name"
     name="${name:0:255}"
 
-    for i in {0..9} A B C D E F; do
-        "$XTOUCH" -p "$1/$i/$name"
+    # 4 * 4 * 256 == 4096 >= PATH_MAX
+    local path="$name/$name/$name/$name"
+    path="$path/$path/$path/$path"
 
-        (
-            cd "$1/$i"
-
-            # 8 * 512 == 4096 >= PATH_MAX
-            for _ in {1..8}; do
-                mv "$name" ..
-                mkdir -p "$name/$name"
-                mv "../$name" "$name/$name/"
-            done
-        )
-    done
+    "$XTOUCH" -p "$1"/{{0..9},A,B,C,D,E,F}/"$path/$name"
 }
 
 # Creates a directory structure with many different types, and therefore colors
