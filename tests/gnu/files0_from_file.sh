@@ -1,4 +1,4 @@
-clean_scratch
+FILE="$TMP/$TEST.in"
 cd weirdnames
-invoke_bfs -mindepth 1 -fprintf ../scratch/files0.in "%P\0"
-bfs_diff -files0-from ../scratch/files0.in
+invoke_bfs -mindepth 1 -fprintf "$FILE" "%P\0"
+bfs_diff -files0-from "$FILE"

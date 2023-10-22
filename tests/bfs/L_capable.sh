@@ -1,11 +1,10 @@
 test "$UNAME" = "Linux" || skip
+invoke_bfs . -quit -capable || skip
 
-clean_scratch
+cd "$TEST"
 
-invoke_bfs scratch -quit -capable || skip
+"$XTOUCH" normal capable
+bfs_sudo setcap all+ep capable || skip
+ln -s capable link
 
-"$XTOUCH" scratch/{normal,capable}
-bfs_sudo setcap all+ep scratch/capable || skip
-ln -s capable scratch/link
-
-bfs_diff -L scratch -capable
+bfs_diff -L . -capable

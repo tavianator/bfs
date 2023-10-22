@@ -1,7 +1,7 @@
-clean_scratch
-"$XTOUCH" -p scratch/foo/bar
+cd "$TEST"
+"$XTOUCH" -p foo/bar
 
-chmod a-r scratch/foo
-defer chmod +r scratch/foo
+chmod a-r foo
+defer chmod +r foo
 
-! bfs_diff scratch -depth
+! bfs_diff . -depth

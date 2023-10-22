@@ -76,8 +76,8 @@ run_tests() {
     for TEST in "${TEST_CASES[@]}"; do
         printf "$TEST_FMT" "$TEST"
 
+        mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
-        mkdir -p "${OUT%/*}"
 
         if ((VERBOSE_ERRORS)); then
             run_test "$TESTS/$TEST.sh"
@@ -252,29 +252,29 @@ bfs_pty() {
 
 # Create a directory tree with xattrs in scratch
 make_xattrs() {
-    clean_scratch
+    cd "$TEST"
 
-    "$XTOUCH" scratch/{normal,xattr,xattr_2}
-    ln -s xattr scratch/link
-    ln -s normal scratch/xattr_link
+    "$XTOUCH" normal xattr xattr_2
+    ln -s xattr link
+    ln -s normal xattr_link
 
     case "$UNAME" in
         Darwin)
-            xattr -w bfs_test true scratch/xattr \
-                && xattr -w bfs_test_2 true scratch/xattr_2 \
-                && xattr -s -w bfs_test true scratch/xattr_link
+            xattr -w bfs_test true xattr \
+                && xattr -w bfs_test_2 true xattr_2 \
+                && xattr -s -w bfs_test true xattr_link
             ;;
         FreeBSD)
-            setextattr user bfs_test true scratch/xattr \
-                && setextattr user bfs_test_2 true scratch/xattr_2 \
-                && setextattr -h user bfs_test true scratch/xattr_link
+            setextattr user bfs_test true xattr \
+                && setextattr user bfs_test_2 true xattr_2 \
+                && setextattr -h user bfs_test true xattr_link
             ;;
         *)
             # Linux tmpfs doesn't support the user.* namespace, so we use the security.*
             # namespace, which is writable by root and readable by others
-            bfs_sudo setfattr -n security.bfs_test scratch/xattr \
-                && bfs_sudo setfattr -n security.bfs_test_2 scratch/xattr_2 \
-                && bfs_sudo setfattr -h -n security.bfs_test scratch/xattr_link
+            bfs_sudo setfattr -n security.bfs_test xattr \
+                && bfs_sudo setfattr -n security.bfs_test_2 xattr_2 \
+                && bfs_sudo setfattr -h -n security.bfs_test xattr_link
             ;;
     esac
 }

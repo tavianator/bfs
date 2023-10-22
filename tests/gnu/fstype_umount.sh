@@ -1,12 +1,12 @@
 test "$UNAME" = "Linux" || skip
 
-clean_scratch
+cd "$TEST"
 
-mkdir scratch/tmp
-bfs_sudo mount -t tmpfs tmpfs scratch/tmp || skip
-defer bfs_sudo umount -R scratch/tmp
+mkdir tmp
+bfs_sudo mount -t tmpfs tmpfs tmp || skip
+defer bfs_sudo umount -R tmp
 
-mkdir scratch/tmp/ram
-bfs_sudo mount -t ramfs ramfs scratch/tmp/ram || skip
+mkdir tmp/ram
+bfs_sudo mount -t ramfs ramfs tmp/ram || skip
 
-bfs_diff scratch/tmp -path scratch/tmp -exec "${SUDO[@]}" umount scratch/tmp/ram \; , -fstype ramfs -print
+bfs_diff tmp -path tmp -exec "${SUDO[@]}" umount tmp/ram \; , -fstype ramfs -print

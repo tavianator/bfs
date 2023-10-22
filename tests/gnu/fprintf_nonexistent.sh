@@ -1,1 +1,1 @@
-! invoke_bfs basic -fprintf scratch/nonexistent/path '%p\n'
+! invoke_bfs basic -fprintf nonexistent/path '%p\n'

@@ -1,10 +1,10 @@
 test "$UNAME" = "Linux" || skip
 
-clean_scratch
-"$XTOUCH" scratch/{file,null}
-ln -s /dev/null scratch/link
+cd "$TEST"
+"$XTOUCH" file null
+ln -s /dev/null link
 
-bfs_sudo mount --bind /dev/null scratch/null || skip
-defer bfs_sudo umount scratch/null
+bfs_sudo mount --bind /dev/null null || skip
+defer bfs_sudo umount null
 
-bfs_diff -L scratch -type c
+bfs_diff . -xtype c

@@ -1,27 +1,27 @@
 test "$UNAME" = "Linux" || skip
 
-clean_scratch
-mkfifo scratch/{fever,pid,wait,running}
+cd "$TEST"
+mkfifo hang pid wait running
 
 (
     # Create a zombie process
-    cat scratch/fever >/dev/null &
-    # Write the PID to scratch/pid
-    echo $! >scratch/pid
+    cat hang >/dev/null &
+    # Write the PID to pid
+    echo $! >pid
     # Don't wait on the zombie process
-    exec cat scratch/wait scratch/fever >scratch/running
+    exec cat wait hang >running
 ) &
 
 # Kill the parent cat on exit
 defer kill -9 %1
 
 # Read the child PID
-read -r pid <scratch/pid
+read -r pid <pid
 
 # Make sure the parent cat is running before we kill the child, because bash
 # will wait() on its children
-echo >scratch/wait &
-read -r _ <scratch/running
+echo >wait &
+read -r _ <running
 
 # Turn the child into a zombie
 kill -9 "$pid"

@@ -1,8 +1,8 @@
 # Test for https://github.com/tavianator/bfs/issues/67
 
-clean_scratch
-mkdir scratch/foo
-"$XTOUCH" scratch/foo/{1..256}
+cd "$TEST"
+mkdir foo
+"$XTOUCH" foo/{1..256}
 
-invoke_bfs scratch/foo -delete
-bfs_diff scratch
+invoke_bfs foo -delete
+bfs_diff .

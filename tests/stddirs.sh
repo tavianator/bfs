@@ -136,28 +136,6 @@ make_stddirs() {
     make_weirdnames "$TMP/weirdnames"
     make_deep "$TMP/deep"
     make_rainbow "$TMP/rainbow"
-    mkdir "$TMP/scratch"
-}
-
-# Clean whatever was left in the scratch directory
-clean_scratch() {
-    if [ -e "$TMP/scratch" ]; then
-        # Try to unmount anything left behind
-        if ((${#SUDO[@]})) && command -v mountpoint &>/dev/null; then
-            for path in "$TMP/scratch"/*; do
-                if mountpoint -q "$path"; then
-                    sudo umount "$path"
-                fi
-            done
-        fi
-
-        # Reset any modified permissions
-        chmod -R +rX "$TMP/scratch"
-
-        rm -rf "$TMP/scratch"
-    fi
-
-    mkdir "$TMP/scratch"
 }
 
 # Clean up temporary directories on exit
@@ -168,9 +146,6 @@ clean_stddirs() {
             (cd "$dir" && rm -rf *)
         fi
     done
-
-    # In case a test left anything weird in scratch/
-    clean_scratch
 
     rm -rf "$TMP"
 }

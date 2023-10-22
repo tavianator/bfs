@@ -1,8 +1,8 @@
-clean_scratch
-mkdir scratch/foo
-ln -s foo/bar scratch/bar
+cd "$TEST"
+mkdir foo
+ln -s foo/bar bar
 
-chmod -x scratch/foo
-defer chmod +x scratch/foo
+chmod -x foo
+defer chmod +x foo
 
-! bfs_diff scratch -printf '(%p) (%l) %y %Y\n'
+! bfs_diff . -printf '(%p) (%l) %y %Y\n'

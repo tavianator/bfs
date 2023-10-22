@@ -1,7 +1,7 @@
-"$XTOUCH" -p scratch/foo.out
-ln scratch/foo.out scratch/foo.hard
-ln -s foo.out scratch/foo.soft
+"$XTOUCH" -p "$TEST/foo.out"
+ln "$TEST/foo.out" "$TEST/foo.hard"
+ln -s foo.out "$TEST/foo.soft"
 
-invoke_bfs basic -fprint scratch/foo.out -fprint scratch/foo.hard -fprint scratch/foo.soft
-sort scratch/foo.out >"$OUT"
+invoke_bfs basic -fprint "$TEST/foo.out" -fprint "$TEST/foo.hard" -fprint "$TEST/foo.soft"
+sort "$TEST/foo.out" >"$OUT"
 diff_output

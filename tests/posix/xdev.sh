@@ -1,11 +1,11 @@
 test "$UNAME" = "Darwin" && skip
 
-clean_scratch
-mkdir scratch/{foo,mnt}
+cd "$TEST"
+mkdir foo mnt
 
-bfs_sudo mount -t tmpfs tmpfs scratch/mnt || skip
-defer bfs_sudo umount scratch/mnt
+bfs_sudo mount -t tmpfs tmpfs mnt || skip
+defer bfs_sudo umount mnt
 
-"$XTOUCH" scratch/foo/bar scratch/mnt/baz
+"$XTOUCH" foo/bar mnt/baz
 
-bfs_diff scratch -xdev
+bfs_diff . -xdev

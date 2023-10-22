@@ -1,4 +1,4 @@
-clean_scratch
+cd "$TEST"
 "$XTOUCH" -p scratch/foo/bar/baz
 ln -s foo/bar/baz scratch/link
 ln -s foo/bar/nowhere scratch/broken
