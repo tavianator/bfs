@@ -239,25 +239,41 @@ bfs_verbose() {
 }
 
 bfs_verbose_impl() {
-    printf "${GRN}%q${RST} " "${BFS[@]}"
+    printf "${GRN}%q${RST}" "${BFS[0]}"
+    if ((${#BFS[@]} > 1)); then
+        printf " ${GRN}%q${RST}" "${BFS[1:]}"
+    fi
 
-    local expr_started=
+    local expr_started=0 color
     for arg; do
-        if [[ $arg == -[A-Z]* ]]; then
-            printf "${CYN}%q${RST} " "$arg"
-        elif [[ $arg == [\(!] || $arg == -[ao] || $arg == -and || $arg == -or || $arg == -not ]]; then
-            expr_started=yes
-            printf "${RED}%q${RST} " "$arg"
-        elif [[ $expr_started && $arg == [\),] ]]; then
-            printf "${RED}%q${RST} " "$arg"
-        elif [[ $arg == -?* ]]; then
-            expr_started=yes
-            printf "${BLU}%q${RST} " "$arg"
-        elif [ "$expr_started" ]; then
-            printf "${BLD}%q${RST} " "$arg"
-        else
-            printf "${MAG}%q${RST} " "$arg"
-        fi
+        case "$arg" in
+            -[A-Z]*|-[dsxf]|-j*)
+                color="${CYN}"
+                ;;
+            \(|!|-[ao]|-and|-or|-not|-exclude)
+                expr_started=1
+                color="${RED}"
+                ;;
+            \)|,)
+                if ((expr_started)); then
+                    color="${RED}"
+                else
+                    color="${MAG}"
+                fi
+                ;;
+            -?*)
+                expr_started=1
+                color="${BLU}"
+                ;;
+            *)
+                if ((expr_started)); then
+                    color="${BLD}"
+                else
+                    color="${MAG}"
+                fi
+                ;;
+        esac
+        printf " ${color}%q${RST}" "$arg"
     done
 
     printf '\n'
@@ -336,8 +352,8 @@ make_xattrs() {
 EX_DIFF=20
 
 # Detect colored diff support
-if ((COLOR_STDERR)) && diff --color=always /dev/null /dev/null 2>/dev/null; then
-    DIFF="diff --color=always"
+if diff --color /dev/null /dev/null 2>/dev/null; then
+    DIFF="diff --color"
 else
     DIFF="diff"
 fi
@@ -354,7 +370,7 @@ diff_output() {
     if ((UPDATE)); then
         cp "$OUT" "$GOLD"
     else
-        $DIFF -u "$GOLD" "$OUT" >&2
+        $DIFF -u "$GOLD" "$OUT" >&4
     fi
 }
 
