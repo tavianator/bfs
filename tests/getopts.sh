@@ -5,13 +5,31 @@
 
 ## Argument parsing
 
+if command -v nproc &>/dev/null; then
+    JOBS=$(nproc)
+else
+    JOBS=1
+fi
+PATTERNS=()
+SUDO=()
+STOP=0
+CLEAN=1
+UPDATE=0
+VERBOSE_COMMANDS=0
+VERBOSE_ERRORS=0
+VERBOSE_SKIPPED=0
+VERBOSE_TESTS=0
+
 # Print usage information
 usage() {
     local pad=$(printf "%*s" ${#0} "")
     color cat <<EOF
-Usage: ${GRN}$0${RST} [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
+Usage: ${GRN}$0${RST} [${BLU}-j${RST}${BLD}N${RST}] [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
        $pad [${BLU}--no-clean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
        $pad [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
+
+  [${BLU}-j${RST}${BLD}N${RST}]
+      Run ${BLD}N${RST} tests in parallel (default: ${BLD}$JOBS${RST})
 
   ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
       Set the path to the bfs executable to test (default: ${MAG}./bin/bfs${RST})
@@ -52,20 +70,9 @@ EOF
 
 # Parse the command line
 parse_args() {
-    JOBS=0
-    PATTERNS=()
-    SUDO=()
-    STOP=0
-    CLEAN=1
-    UPDATE=0
-    VERBOSE_COMMANDS=0
-    VERBOSE_ERRORS=0
-    VERBOSE_SKIPPED=0
-    VERBOSE_TESTS=0
-
     for arg; do
         case "$arg" in
-            -j*)
+            -j?*)
                 JOBS="${arg#-j}"
                 ;;
             --bfs=*)
@@ -130,14 +137,6 @@ parse_args() {
                 ;;
         esac
     done
-
-    if ((JOBS == 0)); then
-        if command -v nproc &>/dev/null; then
-            JOBS=$(nproc)
-        else
-            JOBS=1
-        fi
-    fi
 
     # Try to resolve the path to $BFS before we cd, while also supporting
     # --bfs="./bin/bfs -S ids"
