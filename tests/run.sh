@@ -47,7 +47,7 @@ bg_test() {
     if ((VERBOSE_ERRORS)); then
         run_test "$1"
     else
-        run_test "$1" 2>"$TMP/TEST.err"
+        run_test "$1" 2>"$TMP/$TEST.err"
     fi
     ret=$?
 
@@ -59,9 +59,21 @@ bg_test() {
     return $ret
 }
 
-# Reap a background job
-reap() {
-    wait -n
+# Wait for any background job to complete
+if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3))); then
+    wait_any() {
+        wait -n
+    }
+else
+    wait_any() {
+        read -ra jobs < <(jobs -p)
+        wait ${jobs[0]}
+    }
+fi
+
+# Wait for a background test to finish
+wait_test() {
+    wait_any
     ret=$?
     ((BG--))
 
@@ -118,7 +130,7 @@ run_tests() {
         OUT="$TMP/$TEST.out"
 
         if ((BG >= JOBS)); then
-            reap
+            wait_test
         fi
         ((++BG))
 
@@ -126,7 +138,7 @@ run_tests() {
     done
 
     while ((BG > 0)); do
-        reap
+        wait_test
     done
 
     printf "${BOL}"
@@ -144,6 +156,14 @@ run_tests() {
 }
 
 ## Utilities for the tests themselves
+
+# Default return value for failed tests
+EX_FAIL=1
+
+# Fail the current test
+fail() {
+    exit $EX_FAIL
+}
 
 # Return value when a test is skipped
 EX_SKIP=77
@@ -166,9 +186,9 @@ skip() {
 # Run a command and check its exit status
 check_exit() {
     local expected="$1"
-    local actual="0"
+    local actual=0
     shift
-    "$@" || actual="$?"
+    "$@" || actual=$?
     ((actual == expected))
 }
 
@@ -253,9 +273,9 @@ invoke_bfs() {
 
     # Allow bfs to fail, but not crash
     if ((ret > 125)); then
-        exit "$ret"
+        exit $ret
     else
-        return "$ret"
+        return $ret
     fi
 }
 
@@ -275,9 +295,9 @@ bfs_pty() {
     "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@" || ret=$?
 
     if ((ret > 125)); then
-        exit "$ret"
+        exit $ret
     else
-        return "$ret"
+        return $ret
     fi
 }
 

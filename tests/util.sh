@@ -120,7 +120,7 @@ callers() {
 
 # Print a message including path, line number, and command
 debug() {
-    local file="${1/#*\/tests\//tests\/}"
+    local file="${1/#*\/tests\//tests/}"
     set -- "$file" "${@:2}"
     color printf "${BLD}%s:%d:${RST} %s\n    %s\n" "$@"
 }
@@ -136,14 +136,13 @@ quote() {
     fi
 }
 
+DEFER_LEVEL=-1
+
 # Run a command when this (sub)shell exits
 defer() {
-    # Refresh trap state before trap -p
-    # See https://unix.stackexchange.com/a/556888/56202
-    trap -- KILL
-
     # Check if the EXIT trap is already set
-    if ! trap -p EXIT | grep -q pop_defers; then
+    if ((DEFER_LEVEL != BASH_SUBSHELL)); then
+        DEFER_LEVEL=$BASH_SUBSHELL
         DEFER_CMDS=()
         DEFER_LINES=()
         DEFER_FILES=()
