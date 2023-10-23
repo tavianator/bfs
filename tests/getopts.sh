@@ -52,6 +52,7 @@ EOF
 
 # Parse the command line
 parse_args() {
+    JOBS=0
     PATTERNS=()
     SUDO=()
     STOP=0
@@ -64,6 +65,9 @@ parse_args() {
 
     for arg; do
         case "$arg" in
+            -j*)
+                JOBS="${arg#-j}"
+                ;;
             --bfs=*)
                 BFS="${arg#*=}"
                 ;;
@@ -126,6 +130,14 @@ parse_args() {
                 ;;
         esac
     done
+
+    if ((JOBS == 0)); then
+        if command -v nproc &>/dev/null; then
+            JOBS=$(nproc)
+        else
+            JOBS=1
+        fi
+    fi
 
     # Try to resolve the path to $BFS before we cd, while also supporting
     # --bfs="./bin/bfs -S ids"

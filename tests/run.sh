@@ -42,6 +42,42 @@ run_test() (
     source "$@"
 )
 
+# Run a test in the background
+bg_test() {
+    if ((VERBOSE_ERRORS)); then
+        run_test "$1"
+    else
+        run_test "$1" 2>"$TMP/TEST.err"
+    fi
+    ret=$?
+
+    if ((ret != 0 && ret != EX_SKIP)); then
+        ((VERBOSE_ERRORS)) || cat "$TMP/$TEST.err" >&2
+        color printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
+    fi
+
+    return $ret
+}
+
+# Reap a background job
+reap() {
+    wait -n
+    ret=$?
+    ((BG--))
+
+    case $ret in
+        0)
+            ((++passed))
+            ;;
+        $EX_SKIP)
+            ((++skipped))
+            ;;
+        *)
+            ((++failed))
+            ;;
+    esac
+}
+
 # Run all the tests
 run_tests() {
     if ((VERBOSE_TESTS)); then
@@ -70,6 +106,8 @@ run_tests() {
         TEST_FMT="."
     fi
 
+    BG=0
+
     # Turn off set -e (but turn it back on in run_test)
     set +e
 
@@ -79,23 +117,16 @@ run_tests() {
         mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
 
-        if ((VERBOSE_ERRORS)); then
-            run_test "$TESTS/$TEST.sh"
-        else
-            run_test "$TESTS/$TEST.sh" 2>"$TMP/$TEST.err"
+        if ((BG >= JOBS)); then
+            reap
         fi
-        status=$?
+        ((++BG))
 
-        if ((status == 0)); then
-            ((++passed))
-        elif ((status == EX_SKIP)); then
-            ((++skipped))
-        else
-            ((++failed))
-            ((VERBOSE_ERRORS)) || cat "$TMP/$TEST.err" >&2
-            color printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
-            ((STOP)) && break
-        fi
+        bg_test "$TESTS/$TEST.sh" &
+    done
+
+    while ((BG > 0)); do
+        reap
     done
 
     printf "${BOL}"
