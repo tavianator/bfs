@@ -1147,8 +1147,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 	size_t pathmax = width - rhslen - 3;
 	size_t pathwidth = 0;
 	size_t lhslen = 0;
-	mbstate_t mb;
-	memset(&mb, 0, sizeof(mb));
+	mbstate_t mb = {0};
 	for (size_t i = lhslen; lhslen < pathlen; lhslen = i) {
 		wint_t wc = xmbrtowc(status, &i, pathlen, &mb);
 		int cwidth;

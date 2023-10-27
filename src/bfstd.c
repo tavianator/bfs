@@ -593,7 +593,7 @@ wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb) {
 	case -1: // Invalid byte sequence
 	case -2: // Incomplete byte sequence
 		*i += 1;
-		memset(mb, 0, sizeof(*mb));
+		*mb = (mbstate_t){0};
 		return WEOF;
 	default:
 		*i += mblen;
@@ -605,9 +605,7 @@ size_t xstrwidth(const char *str) {
 	size_t len = strlen(str);
 	size_t ret = 0;
 
-	mbstate_t mb;
-	memset(&mb, 0, sizeof(mb));
-
+	mbstate_t mb = {0};
 	for (size_t i = 0; i < len;) {
 		wint_t wc = xmbrtowc(str, &i, len, &mb);
 		if (wc == WEOF) {
@@ -724,9 +722,8 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 		}
 	}
 
-	mbstate_t mb;
-multibyte:
-	memset(&mb, 0, sizeof(mb));
+multibyte:;
+	mbstate_t mb = {0};
 
 	for (size_t j = i; i < len; i = j) {
 		wint_t wc = xmbrtowc(str, &j, len, &mb);
@@ -774,9 +771,7 @@ static const char *dollar_esc(char c) {
 static char *dollar_quote(char *dest, char *end, const char *str, size_t len, enum wesc_flags flags) {
 	dest = xstpecpy(dest, end, "$'");
 
-	mbstate_t mb;
-	memset(&mb, 0, sizeof(mb));
-
+	mbstate_t mb = {0};
 	for (size_t i = 0; i < len;) {
 		size_t start = i;
 		bool safe = false;
