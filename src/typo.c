@@ -3,11 +3,12 @@
 
 #include "typo.h"
 #include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 // Assume QWERTY layout for now
-static const int key_coords[UCHAR_MAX + 1][3] = {
+static const int8_t key_coords[UCHAR_MAX + 1][3] = {
 	['`']  = { 0,  0, 0},
 	['~']  = { 0,  0, 1},
 	['1']  = { 3,  0, 0},
@@ -112,7 +113,7 @@ static const int key_coords[UCHAR_MAX + 1][3] = {
 };
 
 static int char_distance(char a, char b) {
-	const int *ac = key_coords[(unsigned char)a], *bc = key_coords[(unsigned char)b];
+	const int8_t *ac = key_coords[(unsigned char)a], *bc = key_coords[(unsigned char)b];
 	int ret = 0;
 	for (int i = 0; i < 3; ++i) {
 		ret += abs(ac[i] - bc[i]);
