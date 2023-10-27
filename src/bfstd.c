@@ -586,18 +586,18 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 #endif
 }
 
-/** mbrtowc() wrapper. */
-static int xmbrtowc(wchar_t *wc, size_t *i, const char *str, size_t len, mbstate_t *mb) {
-	size_t mblen = mbrtowc(wc, str + *i, len - *i, mb);
+wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb) {
+	wchar_t wc;
+	size_t mblen = mbrtowc(&wc, str + *i, len - *i, mb);
 	switch (mblen) {
 	case -1: // Invalid byte sequence
 	case -2: // Incomplete byte sequence
 		*i += 1;
 		memset(mb, 0, sizeof(*mb));
-		return -1;
+		return WEOF;
 	default:
 		*i += mblen;
-		return 0;
+		return wc;
 	}
 }
 
@@ -609,12 +609,12 @@ size_t xstrwidth(const char *str) {
 	memset(&mb, 0, sizeof(mb));
 
 	for (size_t i = 0; i < len;) {
-		wchar_t wc;
-		if (xmbrtowc(&wc, &i, str, len, &mb) == 0) {
-			ret += wcwidth(wc);
-		} else {
+		wint_t wc = xmbrtowc(str, &i, len, &mb);
+		if (wc == WEOF) {
 			// Assume a single-width '?'
 			++ret;
+		} else {
+			ret += wcwidth(wc);
 		}
 	}
 
@@ -729,8 +729,8 @@ multibyte:
 	memset(&mb, 0, sizeof(mb));
 
 	for (size_t j = i; i < len; i = j) {
-		wchar_t wc;
-		if (xmbrtowc(&wc, &j, str, len, &mb) != 0) {
+		wint_t wc = xmbrtowc(str, &j, len, &mb);
+		if (wc == WEOF) {
 			break;
 		}
 		if (!xiswprint(wc, flags)) {
@@ -781,8 +781,8 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len, en
 		size_t start = i;
 		bool safe = false;
 
-		wchar_t wc;
-		if (xmbrtowc(&wc, &i, str, len, &mb) == 0) {
+		wint_t wc = xmbrtowc(str, &i, len, &mb);
+		if (wc != WEOF) {
 			safe = xiswprint(wc, flags);
 		}
 

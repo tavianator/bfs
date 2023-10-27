@@ -316,7 +316,24 @@ char *xconfstr(int name);
  */
 int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear);
 
-// #include <wchar.h>
+#include <wchar.h>
+
+/**
+ * Error-recovering mbrtowc() wrapper.
+ *
+ * @param str
+ *         The string to convert.
+ * @param i
+ *         The current index.
+ * @param len
+ *         The length of the string.
+ * @param mb
+ *         The multi-byte decoding state.
+ * @return
+ *         The wide character at index *i, or WEOF if decoding fails.  In either
+ *         case, *i will be advanced to the next multi-byte character.
+ */
+wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb);
 
 /**
  * wcswidth() variant that works on narrow strings.

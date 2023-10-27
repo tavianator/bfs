@@ -1114,6 +1114,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
+	dchar *status = NULL;
 	dchar *rhs = dstrprintf(" (visited: %zu, depth: %2zu)", count, ftwbuf->depth);
 	if (!rhs) {
 		return;
@@ -1125,9 +1126,9 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 		rhslen = 0;
 	}
 
-	dchar *status = dstralloc(0);
+	status = dstralloc(0);
 	if (!status) {
-		goto out_rhs;
+		goto out;
 	}
 
 	const char *path = ftwbuf->path;
@@ -1139,20 +1140,14 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 	// Try to make sure even wide characters fit in the status bar
 	size_t pathmax = width - rhslen - 3;
 	size_t pathwidth = 0;
+	size_t lhslen = 0;
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
-	while (pathlen > 0) {
-		wchar_t wc;
-		size_t len = mbrtowc(&wc, path, pathlen, &mb);
+	for (size_t i = lhslen; lhslen < pathlen; lhslen = i) {
+		wint_t wc = xmbrtowc(path, &i, pathlen, &mb);
 		int cwidth;
-		if (len == (size_t)-1) {
+		if (wc == WEOF) {
 			// Invalid byte sequence, assume a single-width '?'
-			len = 1;
-			cwidth = 1;
-			memset(&mb, 0, sizeof(mb));
-		} else if (len == (size_t)-2) {
-			// Incomplete byte sequence, assume a single-width '?'
-			len = pathlen;
 			cwidth = 1;
 		} else {
 			cwidth = wcwidth(wc);
@@ -1164,35 +1159,31 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 		if (pathwidth + cwidth > pathmax) {
 			break;
 		}
-
-		if (dstrncat(&status, path, len) != 0) {
-			goto out_rhs;
-		}
-
-		path += len;
-		pathlen -= len;
 		pathwidth += cwidth;
 	}
 
+	if (dstrncat(&status, path, lhslen) != 0) {
+		goto out;
+	}
 	if (dstrcat(&status, "...") != 0) {
-		goto out_rhs;
+		goto out;
 	}
 
 	while (pathwidth < pathmax) {
 		if (dstrapp(&status, ' ') != 0) {
-			goto out_rhs;
+			goto out;
 		}
 		++pathwidth;
 	}
 
-	if (dstrcat(&status, rhs) != 0) {
-		goto out_rhs;
+	if (dstrdcat(&status, rhs) != 0) {
+		goto out;
 	}
 
 	bfs_bar_update(bar, status);
 
+out:
 	dstrfree(status);
-out_rhs:
 	dstrfree(rhs);
 }
 
