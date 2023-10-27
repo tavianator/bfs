@@ -1137,6 +1137,12 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 		pathlen = strlen(path);
 	}
 
+	// Escape weird filename characters
+	if (dstrnescat(&status, path, pathlen, WESC_TTY) != 0) {
+		goto out;
+	}
+	pathlen = dstrlen(status);
+
 	// Try to make sure even wide characters fit in the status bar
 	size_t pathmax = width - rhslen - 3;
 	size_t pathwidth = 0;
@@ -1144,7 +1150,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 	mbstate_t mb;
 	memset(&mb, 0, sizeof(mb));
 	for (size_t i = lhslen; lhslen < pathlen; lhslen = i) {
-		wint_t wc = xmbrtowc(path, &i, pathlen, &mb);
+		wint_t wc = xmbrtowc(status, &i, pathlen, &mb);
 		int cwidth;
 		if (wc == WEOF) {
 			// Invalid byte sequence, assume a single-width '?'
@@ -1161,10 +1167,8 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 		}
 		pathwidth += cwidth;
 	}
+	dstresize(&status, lhslen);
 
-	if (dstrncat(&status, path, lhslen) != 0) {
-		goto out;
-	}
 	if (dstrcat(&status, "...") != 0) {
 		goto out;
 	}
