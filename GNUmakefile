@@ -250,6 +250,7 @@ LIBBFS := \
     $(OBJ)/src/printf.o \
     $(OBJ)/src/pwcache.o \
     $(OBJ)/src/stat.o \
+    $(OBJ)/src/thread.o \
     $(OBJ)/src/trie.o \
     $(OBJ)/src/typo.o \
     $(OBJ)/src/xregex.o \
