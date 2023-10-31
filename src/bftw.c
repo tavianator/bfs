@@ -627,6 +627,13 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 	return op;
 }
 
+/** Check if we should block on the I/O queue even if not strictly necessary. */
+static bool bftw_ioq_block(const struct bftw_state *state) {
+	// With more than two threads, it is faster to wait for an I/O
+	// operation to complete than it is to do it ourselves
+	return state->nthreads > 2;
+}
+
 /** Try to reserve space in the I/O queue. */
 static int bftw_ioq_reserve(struct bftw_state *state) {
 	struct ioq *ioq = state->ioq;
@@ -638,10 +645,7 @@ static int bftw_ioq_reserve(struct bftw_state *state) {
 		return 0;
 	}
 
-	// With more than two threads, it is faster to wait for an I/O operation
-	// to complete than it is to do it ourselves
-	bool block = state->nthreads > 2;
-	if (bftw_ioq_pop(state, block) < 0) {
+	if (bftw_ioq_pop(state, bftw_ioq_block(state)) < 0) {
 		return -1;
 	}
 
@@ -895,6 +899,11 @@ static void bftw_ioq_opendirs(struct bftw_state *state, struct bftw_list *queue)
 			break;
 		}
 		SLIST_POP(queue);
+
+		if (!bftw_ioq_block(state)) {
+			// Leave some work for the main thread
+			break;
+		}
 	}
 }
 
