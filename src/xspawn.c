@@ -234,7 +234,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	xclose(pipefd[0]);
 	if (nbytes == sizeof(error)) {
 		int wstatus;
-		waitpid(pid, &wstatus, 0);
+		xwaitpid(pid, &wstatus, 0);
 		errno = error;
 		return -1;
 	}

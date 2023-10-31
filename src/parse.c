@@ -2980,7 +2980,7 @@ static struct bfs_expr *parse_help(struct parser_state *state, int arg1, int arg
 
 	if (pager > 0) {
 		cfclose(cout);
-		waitpid(pager, NULL, 0);
+		xwaitpid(pager, NULL, 0);
 	}
 
 	state->just_info = true;

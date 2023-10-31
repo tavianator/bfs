@@ -390,7 +390,7 @@ fail:
 	}
 
 	int wstatus;
-	if (waitpid(pid, &wstatus, 0) < 0) {
+	if (xwaitpid(pid, &wstatus, 0) < 0) {
 		return -1;
 	}
 

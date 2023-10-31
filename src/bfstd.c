@@ -20,6 +20,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <wchar.h>
 #include <wctype.h>
@@ -389,6 +390,14 @@ int xminor(dev_t dev) {
 #else
 	return dev & 0xFF;
 #endif
+}
+
+pid_t xwaitpid(pid_t pid, int *status, int flags) {
+	pid_t ret;
+	do {
+		ret = waitpid(pid, status, flags);
+	} while (ret < 0 && errno == EINTR);
+	return ret;
 }
 
 int dup_cloexec(int fd) {

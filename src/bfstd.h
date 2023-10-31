@@ -213,6 +213,13 @@ int xminor(dev_t dev);
 #  define st_birthtim st_birthtimespec
 #endif
 
+// #include <sys/wait.h>
+
+/**
+ * waitpid() wrapper that handles EINTR.
+ */
+pid_t xwaitpid(pid_t pid, int *status, int flags);
+
 // #include <unistd.h>
 
 /**
