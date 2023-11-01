@@ -430,6 +430,8 @@ struct bftw_state {
 	struct ioq *ioq;
 	/** The number of I/O threads. */
 	size_t nthreads;
+	/** Tracks the imbalance between main thread and background I/O. */
+	long imbalance;
 
 	/** A batch of directories to open. */
 	struct bftw_list dir_batch;
@@ -541,6 +543,8 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 		state->dir_flags |= BFS_DIR_WHITEOUTS;
 	}
 
+	state->imbalance = 0;
+
 	SLIST_INIT(&state->dir_batch);
 	SLIST_INIT(&state->to_open);
 	SLIST_INIT(&state->to_read);
@@ -569,6 +573,12 @@ static void bftw_unpin_dir(struct bftw_state *state, struct bftw_file *file, boo
 			SLIST_APPEND(&state->to_close, file);
 		}
 	}
+}
+
+/** Adjust the I/O queue balance. */
+static void bftw_ioq_balance(struct bftw_state *state, long delta) {
+	// Avoid signed overflow
+	state->imbalance = (unsigned long)state->imbalance + (unsigned long)delta;
 }
 
 /** Pop a response from the I/O queue. */
@@ -627,13 +637,6 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 	return op;
 }
 
-/** Check if we should block on the I/O queue even if not strictly necessary. */
-static bool bftw_ioq_block(const struct bftw_state *state) {
-	// With more than two threads, it is faster to wait for an I/O
-	// operation to complete than it is to do it ourselves
-	return state->nthreads > 2;
-}
-
 /** Try to reserve space in the I/O queue. */
 static int bftw_ioq_reserve(struct bftw_state *state) {
 	struct ioq *ioq = state->ioq;
@@ -641,11 +644,19 @@ static int bftw_ioq_reserve(struct bftw_state *state) {
 		return -1;
 	}
 
+	// With only one background thread, we should balance I/O between it and
+	// the main thread.  With more than one background thread, it's faster
+	// to wait on background I/O than it is to do it on the main thread.
+	bool balance = state->nthreads <= 1;
+	if (balance && state->imbalance < 0) {
+		return -1;
+	}
+
 	if (ioq_capacity(ioq) > 0) {
 		return 0;
 	}
 
-	if (bftw_ioq_pop(state, bftw_ioq_block(state)) < 0) {
+	if (bftw_ioq_pop(state, !balance) < 0) {
 		return -1;
 	}
 
@@ -880,6 +891,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 
 	file->ioqueued = true;
 	--cache->capacity;
+	bftw_ioq_balance(state, -1);
 	return 0;
 
 free:
@@ -899,11 +911,6 @@ static void bftw_ioq_opendirs(struct bftw_state *state, struct bftw_list *queue)
 			break;
 		}
 		SLIST_POP(queue);
-
-		if (!bftw_ioq_block(state)) {
-			// Leave some work for the main thread
-			break;
-		}
 	}
 }
 
@@ -1040,6 +1047,8 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_state *state, struct bftw_f
 	if (!dir) {
 		return NULL;
 	}
+
+	bftw_ioq_balance(state, +1);
 
 	if (bfs_opendir(dir, fd, NULL, state->dir_flags) != 0) {
 		bftw_freedir(cache, dir);
