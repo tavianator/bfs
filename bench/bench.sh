@@ -20,10 +20,11 @@ EARLY_QUIT_DEFAULT=(chromium)
 PRINT_DEFAULT=(linux)
 STRATEGIES_DEFAULT=(rust)
 JOBS_DEFAULT=(rust)
+EXEC_DEFAULT=(linux)
 
 usage() {
-    printf 'Usage: tailfin run %s [--default]\n' "${BASH_SOURCE[0]}"
-    printf '           [--complete] [--early-quit] [--print] [--strategies]\n'
+    printf 'Usage: tailfin run %s\n' "${BASH_SOURCE[0]}"
+    printf '           [--default] [--<BENCHMARK> [--<BENCHMARK>...]]\n'
     printf '           [--build=...] [--bfs] [--find] [--fd]\n'
     printf '           [--no-clean] [--help]\n\n'
 
@@ -49,6 +50,10 @@ usage() {
     printf '  --jobs[=CORPUS]\n'
     printf '      Parallelism benchmark.\n'
     printf '      Default corpus is --jobs=%s\n\n' "${JOBS_DEFAULT[*]}"
+
+    printf '  --exec[=CORPUS]\n'
+    printf '      Process spawning benchmark.\n'
+    printf '      Default corpus is --exec=%s\n\n' "${EXEC_DEFAULT[*]}"
 
     printf '  --build=COMMIT\n'
     printf '      Build this bfs commit and benchmark it.  Specify multiple times to\n'
@@ -109,6 +114,7 @@ setup() {
     PRINT=()
     STRATEGIES=()
     JOBS=()
+    EXEC=()
 
     for arg; do
         case "$arg" in
@@ -171,12 +177,19 @@ setup() {
             --jobs=*)
                 read -ra JOBS <<<"${arg#*=}"
                 ;;
+            --exec)
+                EXEC=("${EXEC_DEFAULT[@]}")
+                ;;
+            --exec=*)
+                read -ra EXEC <<<"${arg#*=}"
+                ;;
             --default)
                 COMPLETE=("${COMPLETE_DEFAULT[@]}")
                 EARLY_QUIT=("${EARLY_QUIT_DEFAULT[@]}")
                 PRINT=("${PRINT_DEFAULT[@]}")
                 STRATEGIES=("${STRATEGIES_DEFAULT[@]}")
                 JOBS=("${JOBS_DEFAULT[@]}")
+                EXEC=("${EXEC_DEFAULT[@]}")
                 ;;
             --help)
                 usage
@@ -200,7 +213,7 @@ setup() {
     as-user mkdir -p bench/corpus
 
     declare -A cloned=()
-    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}"; do
+    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}" "${EXEC[@]}"; do
         if ((cloned["$corpus"])); then
             continue
         fi
@@ -254,6 +267,7 @@ setup() {
     export_array PRINT
     export_array STRATEGIES
     export_array JOBS
+    export_array EXEC
 
     if ((UID == 0)); then
         turbo-off
@@ -518,6 +532,76 @@ bench-jobs() {
     fi
 }
 
+# One file/process
+bench-exec-single() {
+    subsubgroup "One file per process"
+
+    cmds=()
+    for cmd in "${BFS[@]}" "${FIND[@]}"; do
+        cmds+=("$cmd $1 -maxdepth 2 -exec true -- {} \;")
+    done
+
+    for fd in "${FD[@]}"; do
+        cmds+=("$fd -u --search-path $1 --max-depth=2 -x true --")
+        # Without -j1, fd runs multiple processes in parallel, which is unfair
+        cmds+=("$fd -j1 -u --search-path $1 --max-depth=2 -x true --")
+    done
+
+    do-hyperfine "${cmds[@]}"
+}
+
+# Many files/process
+bench-exec-multi() {
+    subsubgroup "Many files per process"
+
+    cmds=()
+    for cmd in "${BFS[@]}" "${FIND[@]}"; do
+        cmds+=("$cmd $1 -exec true -- {} +")
+    done
+
+    for fd in "${FD[@]}"; do
+        cmds+=("$fd -u --search-path $1 -X true --")
+    done
+
+    do-hyperfine "${cmds[@]}"
+}
+
+# Many files, same dir
+bench-exec-chdir() {
+    if ((${#BFS[@]} + ${#FIND[@]} == 0)); then
+        return
+    fi
+
+    subsubgroup "Spawn in parent directory"
+
+    cmds=()
+    for cmd in "${BFS[@]}" "${FIND[@]}"; do
+        cmds+=("$cmd $1 -maxdepth 3 -execdir true -- {} +")
+    done
+
+    do-hyperfine "${cmds[@]}"
+}
+
+# Benchmark process spawning
+bench-exec-corpus() {
+    subgroup '%s' "$1"
+
+    bench-exec-single "$2"
+    bench-exec-multi "$2"
+    bench-exec-chdir "$2"
+}
+
+# All process spawning benchmarks
+bench-exec() {
+    if (($#)); then
+        group "Process spawning"
+
+        for corpus; do
+            bench-exec-corpus "$corpus ${TAGS[$corpus]}" "bench/corpus/$corpus"
+        done
+    fi
+}
+
 # Print benchmarked versions
 bench-versions() {
     subgroup "Versions"
@@ -564,11 +648,13 @@ bench() {
     import_array PRINT
     import_array STRATEGIES
     import_array JOBS
+    import_array EXEC
 
     bench-complete "${COMPLETE[@]}"
     bench-early-quit "${EARLY_QUIT[@]}"
     bench-print "${PRINT[@]}"
     bench-strategies "${STRATEGIES[@]}"
     bench-jobs "${JOBS[@]}"
+    bench-exec "${EXEC[@]}"
     bench-details
 }
