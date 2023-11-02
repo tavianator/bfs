@@ -363,7 +363,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		return -1;
 	}
 
-	if (bfs_spawn_setflags(&spawn, BFS_SPAWN_USEPATH) != 0) {
+	if (bfs_spawn_setflags(&spawn, BFS_SPAWN_USE_PATH) != 0) {
 		goto fail;
 	}
 

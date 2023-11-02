@@ -8,6 +8,8 @@
 #ifndef BFS_XSPAWN_H
 #define BFS_XSPAWN_H
 
+#include "config.h"
+#include <spawn.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 
@@ -16,16 +18,25 @@
  */
 enum bfs_spawn_flags {
 	/** Use the PATH variable to resolve the executable (like execvp()). */
-	BFS_SPAWN_USEPATH = 1 << 0,
+	BFS_SPAWN_USE_PATH  = 1 << 0,
+	/** Whether posix_spawn() can be used. */
+	BFS_SPAWN_USE_POSIX = 1 << 1,
 };
 
 /**
  * bfs_spawn() attributes, controlling the context of the new process.
  */
 struct bfs_spawn {
+	/** Spawn flags. */
 	enum bfs_spawn_flags flags;
+
+	/** Linked list of actions. */
 	struct bfs_spawn_action *head;
 	struct bfs_spawn_action **tail;
+
+	/** pthread_spawn() context, for when we can use it. */
+	posix_spawnattr_t attr;
+	posix_spawn_file_actions_t actions;
 };
 
 /**
@@ -95,7 +106,7 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp);
 
 /**
- * Look up an executable in the current PATH, as BFS_SPAWN_USEPATH or execvp()
+ * Look up an executable in the current PATH, as BFS_SPAWN_USE_PATH or execvp()
  * would do.
  *
  * @param exe

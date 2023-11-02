@@ -8,6 +8,7 @@
 #include "list.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <spawn.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
@@ -43,12 +44,27 @@ struct bfs_spawn_action {
 };
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
-	ctx->flags = 0;
+	ctx->flags = BFS_SPAWN_USE_POSIX;
 	SLIST_INIT(ctx);
+
+	errno = posix_spawnattr_init(&ctx->attr);
+	if (errno != 0) {
+		return -1;
+	}
+
+	errno = posix_spawn_file_actions_init(&ctx->actions);
+	if (errno != 0) {
+		posix_spawnattr_destroy(&ctx->attr);
+		return -1;
+	}
+
 	return 0;
 }
 
 int bfs_spawn_destroy(struct bfs_spawn *ctx) {
+	posix_spawn_file_actions_destroy(&ctx->actions);
+	posix_spawnattr_destroy(&ctx->attr);
+
 	for_slist (struct bfs_spawn_action, action, ctx) {
 		free(action);
 	}
@@ -57,12 +73,12 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 }
 
 int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags) {
-	ctx->flags = flags;
+	ctx->flags |= flags;
 	return 0;
 }
 
-/** Add a spawn action to the chain. */
-static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_spawn_op op) {
+/** Allocate a spawn action. */
+static struct bfs_spawn_action *bfs_spawn_action(enum bfs_spawn_op op) {
 	struct bfs_spawn_action *action = ALLOC(struct bfs_spawn_action);
 	if (!action) {
 		return NULL;
@@ -72,70 +88,122 @@ static struct bfs_spawn_action *bfs_spawn_add(struct bfs_spawn *ctx, enum bfs_sp
 	action->op = op;
 	action->in_fd = -1;
 	action->out_fd = -1;
-
-	SLIST_APPEND(ctx, action);
 	return action;
 }
 
 int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
-	if (fd < 0) {
-		errno = EBADF;
+	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_CLOSE);
+	if (!action) {
 		return -1;
 	}
 
-	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_CLOSE);
-	if (action) {
-		action->out_fd = fd;
-		return 0;
-	} else {
-		return -1;
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		errno = posix_spawn_file_actions_addclose(&ctx->actions, fd);
+		if (errno != 0) {
+			free(action);
+			return -1;
+		}
 	}
+
+	action->out_fd = fd;
+	SLIST_APPEND(ctx, action);
+	return 0;
 }
 
 int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
-	if (oldfd < 0 || newfd < 0) {
-		errno = EBADF;
+	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_DUP2);
+	if (!action) {
 		return -1;
 	}
 
-	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_DUP2);
-	if (action) {
-		action->in_fd = oldfd;
-		action->out_fd = newfd;
-		return 0;
-	} else {
-		return -1;
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		errno = posix_spawn_file_actions_adddup2(&ctx->actions, oldfd, newfd);
+		if (errno != 0) {
+			free(action);
+			return -1;
+		}
 	}
+
+	action->in_fd = oldfd;
+	action->out_fd = newfd;
+	SLIST_APPEND(ctx, action);
+	return 0;
 }
 
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
-	if (fd < 0) {
-		errno = EBADF;
+	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
+	if (!action) {
 		return -1;
 	}
 
-	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_FCHDIR);
-	if (action) {
-		action->in_fd = fd;
-		return 0;
-	} else {
-		return -1;
+#ifndef BFS_HAS_POSIX_SPAWN_FCHDIR
+#  define BFS_HAS_POSIX_SPAWN_FCHDIR __NetBSD__
+#endif
+
+#ifndef BFS_HAS_POSIX_SPAWN_FCHDIR_NP
+#  if __GLIBC__
+#    define BFS_HAS_POSIX_SPAWN_FCHDIR_NP __GLIBC_PREREQ(2, 29)
+#  elif __ANDROID__
+#    define BFS_HAS_POSIX_SPAWN_FCHDIR_NP (__ANDROID_API__ >= 34)
+#  else
+#    define BFS_HAS_POSIX_SPAWN_FCHDIR_NP (__linux__ || __FreeBSD__ || __APPLE__)
+#  endif
+#endif
+
+#if BFS_HAS_POSIX_SPAWN_FCHDIR || BFS_HAS_POSIX_SPAWN_FCHDIR_NP
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+#  if BFS_HAS_POSIX_SPAWN_FCHDIR
+		errno = posix_spawn_file_actions_addfchdir(&ctx->actions, fd);
+#  else
+		errno = posix_spawn_file_actions_addfchdir_np(&ctx->actions, fd);
+#  endif
+		if (errno != 0) {
+			free(action);
+			return -1;
+		}
 	}
+#else
+	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+#endif
+
+	action->in_fd = fd;
+	SLIST_APPEND(ctx, action);
+	return 0;
 }
 
 int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
-	struct bfs_spawn_action *action = bfs_spawn_add(ctx, BFS_SPAWN_SETRLIMIT);
-	if (action) {
-		action->resource = resource;
-		action->rlimit = *rl;
-		return 0;
-	} else {
+	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_SETRLIMIT);
+	if (!action) {
 		return -1;
 	}
+
+	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+
+	action->resource = resource;
+	action->rlimit = *rl;
+	SLIST_APPEND(ctx, action);
+	return 0;
+}
+
+/** bfs_spawn() implementation using posix_spawn(). */
+static pid_t bfs_posix_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+	pid_t ret;
+
+	if (ctx->flags & BFS_SPAWN_USE_PATH) {
+		errno = posix_spawnp(&ret, exe, &ctx->actions, &ctx->attr, argv, envp);
+	} else {
+		errno = posix_spawn(&ret, exe, &ctx->actions, &ctx->attr, argv, envp);
+	}
+
+	if (errno != 0) {
+		ret = -1;
+	}
+
+	return ret;
 }
 
 /** Actually exec() the new process. */
-static void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
+static noreturn void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	xclose(pipefd[0]);
 
 	for_slist (const struct bfs_spawn_action, action, ctx) {
@@ -193,14 +261,10 @@ fail:
 	_Exit(127);
 }
 
-pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
-	extern char **environ;
-	if (!envp) {
-		envp = environ;
-	}
-
+/** bfs_spawn() implementation using fork()/exec(). */
+static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	char *resolved = NULL;
-	if (ctx->flags & BFS_SPAWN_USEPATH) {
+	if (ctx->flags & BFS_SPAWN_USE_PATH) {
 		exe = resolved = bfs_spawn_resolve(exe);
 		if (!resolved) {
 			return -1;
@@ -240,6 +304,19 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 	}
 
 	return pid;
+}
+
+pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+	extern char **environ;
+	if (!envp) {
+		envp = environ;
+	}
+
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		return bfs_posix_spawn(exe, ctx, argv, envp);
+	} else {
+		return bfs_fork_spawn(exe, ctx, argv, envp);
+	}
 }
 
 char *bfs_spawn_resolve(const char *exe) {
