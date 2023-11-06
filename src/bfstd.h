@@ -187,6 +187,13 @@ const char *xstrerror(int errnum);
  */
 void xstrmode(mode_t mode, char str[11]);
 
+#include <sys/resource.h>
+
+/**
+ * Compare two rlim_t values, accounting for infinite limits.
+ */
+int rlim_cmp(rlim_t a, rlim_t b);
+
 #include <sys/types.h>
 
 /**

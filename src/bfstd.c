@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -366,6 +367,38 @@ void xstrmode(mode_t mode, char str[11]) {
 	} else if (mode & 00001) {
 		str[9] = 'x';
 	}
+}
+
+/** Check if an rlimit value is infinite. */
+static bool rlim_isinf(rlim_t r) {
+	// Consider RLIM_{INFINITY,SAVED_{CUR,MAX}} all equally infinite
+	if (r == RLIM_INFINITY) {
+		return true;
+	}
+
+#ifdef RLIM_SAVED_CUR
+	if (r == RLIM_SAVED_CUR) {
+		return true;
+	}
+#endif
+
+#ifdef RLIM_SAVED_MAX
+	if (r == RLIM_SAVED_MAX) {
+		return true;
+	}
+#endif
+
+	return false;
+}
+
+int rlim_cmp(rlim_t a, rlim_t b) {
+	bool a_inf = rlim_isinf(a);
+	bool b_inf = rlim_isinf(b);
+	if (a_inf || b_inf) {
+		return a_inf - b_inf;
+	}
+
+	return (a > b) - (a < b);
 }
 
 dev_t xmakedev(int ma, int mi) {

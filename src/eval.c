@@ -1427,39 +1427,6 @@ done:
 	return state.action;
 }
 
-/** Check if an rlimit value is infinite. */
-static bool rlim_isinf(rlim_t r) {
-	// Consider RLIM_{INFINITY,SAVED_{CUR,MAX}} all equally infinite
-	if (r == RLIM_INFINITY) {
-		return true;
-	}
-
-#ifdef RLIM_SAVED_CUR
-	if (r == RLIM_SAVED_CUR) {
-		return true;
-	}
-#endif
-
-#ifdef RLIM_SAVED_MAX
-	if (r == RLIM_SAVED_MAX) {
-		return true;
-	}
-#endif
-
-	return false;
-}
-
-/** Compare two rlimit values, accounting for RLIM_INFINITY etc. */
-static int rlim_cmp(rlim_t a, rlim_t b) {
-	bool a_inf = rlim_isinf(a);
-	bool b_inf = rlim_isinf(b);
-	if (a_inf || b_inf) {
-		return a_inf - b_inf;
-	}
-
-	return (a > b) - (a < b);
-}
-
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
 static int raise_fdlimit(const struct bfs_ctx *ctx) {
 	rlim_t target = 64 << 10;
