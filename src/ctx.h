@@ -87,10 +87,10 @@ struct bfs_ctx {
 	/** The number of files owned by the context. */
 	int nfiles;
 
-	/** The initial RLIMIT_NOFILE soft limit. */
-	rlim_t nofile_soft;
-	/** The initial RLIMIT_NOFILE hard limit. */
-	rlim_t nofile_hard;
+	/** The initial RLIMIT_NOFILE limits. */
+	struct rlimit orig_nofile;
+	/** The current RLIMIT_NOFILE limits. */
+	struct rlimit cur_nofile;
 
 	/** The current time. */
 	struct timespec now;

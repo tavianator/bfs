@@ -1428,25 +1428,30 @@ done:
 }
 
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
-static int raise_fdlimit(const struct bfs_ctx *ctx) {
+static int raise_fdlimit(struct bfs_ctx *ctx) {
+	rlim_t cur = ctx->orig_nofile.rlim_cur;
+	rlim_t max = ctx->orig_nofile.rlim_max;
+
 	rlim_t target = 64 << 10;
-	if (rlim_cmp(target, ctx->nofile_hard) > 0) {
-		target = ctx->nofile_hard;
+	if (rlim_cmp(target, max) > 0) {
+		target = max;
 	}
 
-	int ret = target;
-
-	if (rlim_cmp(target, ctx->nofile_soft) > 0) {
-		const struct rlimit rl = {
-			.rlim_cur = target,
-			.rlim_max = ctx->nofile_hard,
-		};
-		if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
-			ret = ctx->nofile_soft;
-		}
+	if (rlim_cmp(target, cur) <= 0) {
+		return target;
 	}
 
-	return ret;
+	const struct rlimit rl = {
+		.rlim_cur = target,
+		.rlim_max = max,
+	};
+
+	if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		return cur;
+	}
+
+	ctx->cur_nofile = rl;
+	return target;
 }
 
 /** Preallocate the fd table in the kernel. */
@@ -1581,7 +1586,7 @@ static bool eval_must_buffer(const struct bfs_expr *expr) {
 	return false;
 }
 
-int bfs_eval(const struct bfs_ctx *ctx) {
+int bfs_eval(struct bfs_ctx *ctx) {
 	if (!ctx->expr) {
 		return EXIT_SUCCESS;
 	}

@@ -30,12 +30,10 @@ struct bfs_ctx *bfs_ctx_new(void) {
 
 	trie_init(&ctx->files);
 
-	struct rlimit rl;
-	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+	if (getrlimit(RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
 		goto fail;
 	}
-	ctx->nofile_soft = rl.rlim_cur;
-	ctx->nofile_hard = rl.rlim_max;
+	ctx->cur_nofile = ctx->orig_nofile;
 
 	ctx->users = bfs_users_new();
 	if (!ctx->users) {

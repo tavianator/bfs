@@ -39,7 +39,7 @@ typedef bool bfs_eval_fn(const struct bfs_expr *expr, struct bfs_eval *state);
  * @return
  *         EXIT_SUCCESS on success, otherwise on failure.
  */
-int bfs_eval(const struct bfs_ctx *ctx);
+int bfs_eval(struct bfs_ctx *ctx);
 
 // Predicate evaluation functions
 

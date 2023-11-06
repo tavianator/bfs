@@ -327,8 +327,10 @@ static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf
 
 /** Actually spawn the process. */
 static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
+	const struct bfs_ctx *ctx = execbuf->ctx;
+
 	// Flush the context state for consistency with the external process
-	bfs_ctx_flush(execbuf->ctx);
+	bfs_ctx_flush(ctx);
 
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
 		for (size_t i = 0; i < execbuf->argc; ++i) {
@@ -356,34 +358,30 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 	pid_t pid = -1;
 	int error;
 
-	struct bfs_spawn ctx;
-	if (bfs_spawn_init(&ctx) != 0) {
+	struct bfs_spawn spawn;
+	if (bfs_spawn_init(&spawn) != 0) {
 		return -1;
 	}
 
-	if (bfs_spawn_setflags(&ctx, BFS_SPAWN_USEPATH) != 0) {
+	if (bfs_spawn_setflags(&spawn, BFS_SPAWN_USEPATH) != 0) {
 		goto fail;
 	}
 
 	// Reset RLIMIT_NOFILE, to avoid breaking applications that use select()
-	struct rlimit rl = {
-		.rlim_cur = execbuf->ctx->nofile_soft,
-		.rlim_max = execbuf->ctx->nofile_hard,
-	};
-	if (bfs_spawn_addsetrlimit(&ctx, RLIMIT_NOFILE, &rl) != 0) {
+	if (bfs_spawn_addsetrlimit(&spawn, RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
 		goto fail;
 	}
 
 	if (execbuf->wd_fd >= 0) {
-		if (bfs_spawn_addfchdir(&ctx, execbuf->wd_fd) != 0) {
+		if (bfs_spawn_addfchdir(&spawn, execbuf->wd_fd) != 0) {
 			goto fail;
 		}
 	}
 
-	pid = bfs_spawn(execbuf->argv[0], &ctx, execbuf->argv, NULL);
+	pid = bfs_spawn(execbuf->argv[0], &spawn, execbuf->argv, NULL);
 fail:
 	error = errno;
-	bfs_spawn_destroy(&ctx);
+	bfs_spawn_destroy(&spawn);
 	if (pid < 0) {
 		errno = error;
 		return -1;
@@ -409,9 +407,9 @@ fail:
 		if (!str) {
 			str = "unknown";
 		}
-		bfs_warning(execbuf->ctx, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
+		bfs_warning(ctx, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
 	} else {
-		bfs_warning(execbuf->ctx, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
+		bfs_warning(ctx, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
 	}
 
 	errno = 0;
