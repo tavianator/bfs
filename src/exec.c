@@ -357,6 +357,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 
 	pid_t pid = -1;
 	int error;
+	bool reset_nofile = false;
 
 	struct bfs_spawn spawn;
 	if (bfs_spawn_init(&spawn) != 0) {
@@ -367,20 +368,40 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		goto fail;
 	}
 
-	// Reset RLIMIT_NOFILE, to avoid breaking applications that use select()
-	if (bfs_spawn_addsetrlimit(&spawn, RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
-		goto fail;
-	}
-
 	if (execbuf->wd_fd >= 0) {
 		if (bfs_spawn_addfchdir(&spawn, execbuf->wd_fd) != 0) {
 			goto fail;
 		}
 	}
 
+	// Reset RLIMIT_NOFILE if necessary, to avoid breaking applications that use select()
+	if (rlim_cmp(ctx->orig_nofile.rlim_cur, ctx->cur_nofile.rlim_cur) < 0) {
+		// posix_spawn() doesn't have a setrlimit() action, so adding one would force us
+		// to use the slower fork()/exec() path. Instead, drop the rlimit temporarily in
+		// the parent.  This can race with other threads, but we always recover from
+		// EMFILE in the main thread anyway.
+		if (spawn.flags & BFS_SPAWN_USE_POSIX) {
+			if (setrlimit(RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
+				goto fail;
+			}
+			reset_nofile = true;
+		} else {
+			if (bfs_spawn_addsetrlimit(&spawn, RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
+				goto fail;
+			}
+		}
+	}
+
 	pid = bfs_spawn(execbuf->argv[0], &spawn, execbuf->argv, NULL);
 fail:
 	error = errno;
+
+	if (reset_nofile) {
+		if (setrlimit(RLIMIT_NOFILE, &ctx->cur_nofile) != 0) {
+			bfs_bug("setrlimit(RLIMIT_NOFILE): %s", xstrerror(errno));
+		}
+	}
+
 	bfs_spawn_destroy(&spawn);
 	if (pid < 0) {
 		errno = error;
