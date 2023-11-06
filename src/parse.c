@@ -3670,7 +3670,8 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	enum use_color use_color = COLOR_AUTO;
-	if (getenv("NO_COLOR")) {
+	const char *no_color = getenv("NO_COLOR");
+	if (no_color && *no_color) {
 		// https://no-color.org/
 		use_color = COLOR_NEVER;
 	}
