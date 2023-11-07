@@ -188,15 +188,9 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
 /** bfs_spawn() implementation using posix_spawn(). */
 static pid_t bfs_posix_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	pid_t ret;
-
-	if (ctx->flags & BFS_SPAWN_USE_PATH) {
-		errno = posix_spawnp(&ret, exe, &ctx->actions, &ctx->attr, argv, envp);
-	} else {
-		errno = posix_spawn(&ret, exe, &ctx->actions, &ctx->attr, argv, envp);
-	}
-
+	errno = posix_spawn(&ret, exe, &ctx->actions, &ctx->attr, argv, envp);
 	if (errno != 0) {
-		ret = -1;
+		return -1;
 	}
 
 	return ret;
@@ -263,18 +257,9 @@ fail:
 
 /** bfs_spawn() implementation using fork()/exec(). */
 static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
-	char *resolved = NULL;
-	if (ctx->flags & BFS_SPAWN_USE_PATH) {
-		exe = resolved = bfs_spawn_resolve(exe);
-		if (!resolved) {
-			return -1;
-		}
-	}
-
 	// Use a pipe to report errors from the child
 	int pipefd[2];
 	if (pipe_cloexec(pipefd) != 0) {
-		free(resolved);
 		return -1;
 	}
 
@@ -282,7 +267,6 @@ static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char *
 	if (pid < 0) {
 		close_quietly(pipefd[1]);
 		close_quietly(pipefd[0]);
-		free(resolved);
 		return -1;
 	} else if (pid == 0) {
 		// Child
@@ -291,7 +275,6 @@ static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char *
 
 	// Parent
 	xclose(pipefd[1]);
-	free(resolved);
 
 	int error;
 	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
@@ -307,16 +290,31 @@ static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char *
 }
 
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+	// execvp()/posix_spawnp() are typically implemented with repeated
+	// execv() calls for each $PATH component until one succeeds.  It's
+	// faster to resolve the full path ahead of time.
+	char *resolved = NULL;
+	if (ctx->flags & BFS_SPAWN_USE_PATH) {
+		exe = resolved = bfs_spawn_resolve(exe);
+		if (!resolved) {
+			return -1;
+		}
+	}
+
 	extern char **environ;
 	if (!envp) {
 		envp = environ;
 	}
 
+	pid_t ret;
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
-		return bfs_posix_spawn(exe, ctx, argv, envp);
+		ret = bfs_posix_spawn(exe, ctx, argv, envp);
 	} else {
-		return bfs_fork_spawn(exe, ctx, argv, envp);
+		ret = bfs_fork_spawn(exe, ctx, argv, envp);
 	}
+
+	free(resolved);
+	return ret;
 }
 
 char *bfs_spawn_resolve(const char *exe) {
