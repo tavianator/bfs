@@ -1263,6 +1263,28 @@ static struct bfs_expr *parse_exec(struct parser_state *state, int flags, int ar
 	expr->ephemeral_fds = 2;
 
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
+		// Check for relative paths in $PATH
+		const char *path = getenv("PATH");
+		while (path) {
+			if (*path != '/') {
+				size_t len = strcspn(path, ":");
+				char *comp = strndup(path, len);
+				if (comp) {
+					parse_expr_error(state, expr,
+						"This action would be unsafe, since ${bld}$$PATH${rs} contains the relative path ${bld}%pq${rs}\n", comp);
+					free(comp);
+				} else {
+					parse_perror(state, "strndup()");
+				}
+				goto fail;
+			}
+
+			path = strchr(path, ':');
+			if (path) {
+				++path;
+			}
+		}
+
 		// To dup() the parent directory
 		if (execbuf->flags & BFS_EXEC_MULTI) {
 			++expr->persistent_fds;
@@ -1276,6 +1298,10 @@ static struct bfs_expr *parse_exec(struct parser_state *state, int flags, int ar
 	}
 
 	return expr;
+
+fail:
+	bfs_expr_free(expr);
+	return NULL;
 }
 
 /**
