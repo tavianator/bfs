@@ -124,17 +124,17 @@ run_tests() {
     set +e
 
     for TEST in "${TEST_CASES[@]}"; do
+        if ((BG >= JOBS)); then
+            wait_test
+        fi
+
         printf "$TEST_FMT" "$TEST"
 
         mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
 
-        if ((BG >= JOBS)); then
-            wait_test
-        fi
-        ((++BG))
-
         bg_test "$TESTS/$TEST.sh" &
+        ((++BG))
     done
 
     while ((BG > 0)); do
