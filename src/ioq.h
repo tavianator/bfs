@@ -8,6 +8,7 @@
 #ifndef BFS_IOQ_H
 #define BFS_IOQ_H
 
+#include "config.h"
 #include "dir.h"
 #include <stddef.h>
 
@@ -136,17 +137,7 @@ int ioq_closedir(struct ioq *ioq, struct bfs_dir *dir, void *ptr);
  * @return
  *         The next response, or NULL.
  */
-struct ioq_ent *ioq_pop(struct ioq *ioq);
-
-/**
- * Pop a response from the queue, without blocking.
- *
- * @param ioq
- *         The I/O queue.
- * @return
- *         The next response, or NULL.
- */
-struct ioq_ent *ioq_trypop(struct ioq *ioq);
+struct ioq_ent *ioq_pop(struct ioq *ioq, bool block);
 
 /**
  * Free a queue entry.

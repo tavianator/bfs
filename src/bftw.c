@@ -588,7 +588,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		return -1;
 	}
 
-	struct ioq_ent *ent = block ? ioq_pop(ioq) : ioq_trypop(ioq);
+	struct ioq_ent *ent = ioq_pop(ioq, block);
 	if (!ent) {
 		return -1;
 	}
