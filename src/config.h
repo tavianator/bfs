@@ -185,6 +185,17 @@
 #endif
 
 /**
+ * Warn if a value is unused.
+ */
+#if __has_c_attribute(nodiscard)
+#  define attr_nodiscard [[nodiscard]]
+#elif __has_attribute(nodiscard)
+#  define attr_nodiscard __attribute__((nodiscard))
+#else
+#  define attr_nodiscard
+#endif
+
+/**
  * Hint to avoid inlining a function.
  */
 #if __has_attribute(noinline)
@@ -210,6 +221,44 @@
 #else
 #  define attr_format(fmt, args)
 #endif
+
+/**
+ * Annotates allocator-like functions.
+ */
+#if __has_attribute(malloc)
+#  if __clang__
+#    define attr_malloc(...) attr_nodiscard __attribute__((malloc))
+#  else
+#    define attr_malloc(...) attr_nodiscard __attribute__((malloc(__VA_ARGS__)))
+#  endif
+#else
+#  define attr_malloc(...) attr_nodiscard
+#endif
+
+/**
+ * Specifies that a function returns allocations with a given alignment.
+ */
+#if __has_attribute(alloc_align)
+#  define attr_alloc_align(param) __attribute__((alloc_align(param)))
+#else
+#  define attr_alloc_align(param)
+#endif
+
+/**
+ * Specifies that a function returns allocations with a given size.
+ */
+#if __has_attribute(alloc_size)
+#  define attr_alloc_size(...) __attribute__((alloc_size(__VA_ARGS__)))
+#else
+#  define attr_alloc_size(...)
+#endif
+
+/**
+ * Shorthand for attr_alloc_align() and attr_alloc_size().
+ */
+#define attr_aligned_alloc(align, ...) \
+	attr_alloc_align(align) \
+	attr_alloc_size(__VA_ARGS__)
 
 /**
  * Check if function multiversioning via GNU indirect functions (ifunc) is supported.

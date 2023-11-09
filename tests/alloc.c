@@ -24,6 +24,10 @@ int main(void) {
 	bfs_verify(flex_size(8, 16, 4, 4, 1) == 16);
 
 	// Make sure we detect allocation size overflows
+#if __GNUC__ && !__clang__
+#  pragma GCC diagnostic ignored "-Walloc-size-larger-than="
+#endif
+
 	bfs_verify(ALLOC_ARRAY(int, too_many) == NULL && errno == EOVERFLOW);
 	bfs_verify(ZALLOC_ARRAY(int, too_many) == NULL && errno == EOVERFLOW);
 	bfs_verify(ALLOC_FLEX(struct flexible, bar, too_many) == NULL && errno == EOVERFLOW);

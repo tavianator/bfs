@@ -28,11 +28,20 @@ typedef char dchar;
 #endif
 
 /**
+ * Free a dynamic string.
+ *
+ * @param dstr
+ *         The string to free.
+ */
+void dstrfree(dchar *dstr);
+
+/**
  * Allocate a dynamic string.
  *
  * @param capacity
  *         The initial capacity of the string.
  */
+attr_malloc(dstrfree, 1)
 dchar *dstralloc(size_t capacity);
 
 /**
@@ -41,6 +50,7 @@ dchar *dstralloc(size_t capacity);
  * @param str
  *         The NUL-terminated string to copy.
  */
+attr_malloc(dstrfree, 1)
 dchar *dstrdup(const char *str);
 
 /**
@@ -51,6 +61,7 @@ dchar *dstrdup(const char *str);
  * @param n
  *         The maximum number of characters to copy from str.
  */
+attr_malloc(dstrfree, 1)
 dchar *dstrndup(const char *str, size_t n);
 
 /**
@@ -59,6 +70,7 @@ dchar *dstrndup(const char *str, size_t n);
  * @param dstr
  *         The dynamic string to copy.
  */
+attr_malloc(dstrfree, 1)
 dchar *dstrddup(const dchar *dstr);
 
 /**
@@ -69,6 +81,7 @@ dchar *dstrddup(const dchar *dstr);
  * @param len
  *         The length of the string, which may include internal NUL bytes.
  */
+attr_malloc(dstrfree, 1)
 dchar *dstrxdup(const char *str, size_t len);
 
 /**
@@ -305,13 +318,5 @@ int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
  *         0 on success, -1 on failure.
  */
 int dstrnescat(dchar **dest, const char *str, size_t n, enum wesc_flags flags);
-
-/**
- * Free a dynamic string.
- *
- * @param dstr
- *         The string to free.
- */
-void dstrfree(dchar *dstr);
 
 #endif // BFS_DSTRING_H
