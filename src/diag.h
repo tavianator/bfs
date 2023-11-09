@@ -44,7 +44,7 @@ struct bfs_loc {
 /**
  * Print a message to standard error and abort.
  */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 
 /**
@@ -121,7 +121,7 @@ void bfs_perror(const struct bfs_ctx *ctx, const char *str);
 /**
  * Shorthand for printing error messages.
  */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 void bfs_error(const struct bfs_ctx *ctx, const char *format, ...);
 
 /**
@@ -129,7 +129,7 @@ void bfs_error(const struct bfs_ctx *ctx, const char *format, ...);
  *
  * @return Whether a warning was printed.
  */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...);
 
 /**
@@ -137,25 +137,25 @@ bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...);
  *
  * @return Whether a debug message was printed.
  */
-BFS_FORMATTER(3, 4)
+attr_format(3, 4)
 bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, ...);
 
 /**
  * bfs_error() variant that takes a va_list.
  */
-BFS_FORMATTER(2, 0)
+attr_format(2, 0)
 void bfs_verror(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_warning() variant that takes a va_list.
  */
-BFS_FORMATTER(2, 0)
+attr_format(2, 0)
 bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_debug() variant that takes a va_list.
  */
-BFS_FORMATTER(3, 0)
+attr_format(3, 0)
 bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, va_list args);
 
 /**

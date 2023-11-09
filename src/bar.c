@@ -127,7 +127,7 @@ static void reset_before_death_by(int sig) {
 }
 
 /** printf() to the status bar with a single write(). */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 static int bfs_bar_printf(struct bfs_bar *bar, const char *format, ...) {
 	va_list args;
 	va_start(args, format);

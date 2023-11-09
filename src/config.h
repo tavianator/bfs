@@ -188,9 +188,9 @@
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
 #if __has_attribute(format)
-#  define BFS_FORMATTER(fmt, args) __attribute__((format(printf, fmt, args)))
+#  define attr_format(fmt, args) __attribute__((format(printf, fmt, args)))
 #else
-#  define BFS_FORMATTER(fmt, args)
+#  define attr_format(fmt, args)
 #endif
 
 /**

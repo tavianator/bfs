@@ -230,7 +230,7 @@ int dstrxcpy(dchar **dest, const char *str, size_t len);
  * @return
  *         The created string, or NULL on failure.
  */
-BFS_FORMATTER(1, 2)
+attr_format(1, 2)
 char *dstrprintf(const char *format, ...);
 
 /**
@@ -243,7 +243,7 @@ char *dstrprintf(const char *format, ...);
  * @return
  *         The created string, or NULL on failure.
  */
-BFS_FORMATTER(1, 0)
+attr_format(1, 0)
 char *dstrvprintf(const char *format, va_list args);
 
 /**
@@ -258,7 +258,7 @@ char *dstrvprintf(const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 int dstrcatf(dchar **str, const char *format, ...);
 
 /**
@@ -273,7 +273,7 @@ int dstrcatf(dchar **str, const char *format, ...);
  * @return
  *         0 on success, -1 on failure.
  */
-BFS_FORMATTER(2, 0)
+attr_format(2, 0)
 int dstrvcatf(dchar **str, const char *format, va_list args);
 
 /**

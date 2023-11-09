@@ -1105,7 +1105,7 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 }
 
 /** Format some colored output to the buffer. */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 static int cbuff(CFILE *cfile, const char *format, ...);
 
 /** Dump a parsed expression tree, for debugging. */
@@ -1177,7 +1177,7 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 	return 0;
 }
 
-BFS_FORMATTER(2, 0)
+attr_format(2, 0)
 static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	const struct colors *colors = cfile->colors;
 	int error = errno;

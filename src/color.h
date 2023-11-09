@@ -100,13 +100,13 @@ int cfclose(CFILE *cfile);
  * @return
  *         0 on success, -1 on failure.
  */
-BFS_FORMATTER(2, 3)
+attr_format(2, 3)
 int cfprintf(CFILE *cfile, const char *format, ...);
 
 /**
  * cfprintf() variant that takes a va_list.
  */
-BFS_FORMATTER(2, 0)
+attr_format(2, 0)
 int cvfprintf(CFILE *cfile, const char *format, va_list args);
 
 #endif // BFS_COLOR_H
