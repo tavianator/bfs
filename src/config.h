@@ -202,4 +202,13 @@
 #  endif
 #endif
 
+/**
+ * Apply the target_clones attribute, if available.
+ */
+#if BFS_USE_TARGET_CLONES
+#  define attr_target_clones(...) __attribute__((target_clones(__VA_ARGS__)))
+#else
+#  define attr_target_clones(...)
+#endif
+
 #endif // BFS_CONFIG_H

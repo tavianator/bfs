@@ -94,10 +94,10 @@
 
 bfs_static_assert(CHAR_WIDTH == 8);
 
-#if BFS_USE_TARGET_CLONES && (__i386__ || __x86_64__)
-#  define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
+#if __i386__ || __x86_64__
+#  define trie_clones attr_target_clones("popcnt", "default")
 #else
-#  define TARGET_CLONES_POPCNT
+#  define trie_clones
 #endif
 
 /** Number of bits for the sparse array bitmap, aka the range of a nibble. */
@@ -192,7 +192,7 @@ static unsigned char trie_key_nibble(const void *key, size_t offset) {
  * that case, the first mismatch between the key and the representative will be
  * the depth at which to make a new branch to insert the key.
  */
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_representative(const struct trie *trie, const void *key, size_t length) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
@@ -271,7 +271,7 @@ static bool trie_check_prefix(struct trie_leaf *leaf, size_t skip, const char *k
 	}
 }
 
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const char *key) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
@@ -429,7 +429,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
  *      | Z
  *      +--->...
  */
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, unsigned char nibble) {
 	struct trie_node *node = trie_decode_node(*ptr);
 	unsigned int size = count_ones(node->bitmap);
@@ -552,7 +552,7 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key) {
 	return trie_insert_mem(trie, key, strlen(key) + 1);
 }
 
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	size_t mismatch = trie_mismatch(rep, key, length);
@@ -654,7 +654,7 @@ static int trie_collapse_node(struct trie *trie, uintptr_t *parent, struct trie_
 	return 0;
 }
 
-TARGET_CLONES_POPCNT
+trie_clones
 static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	uintptr_t *child = &trie->root;
 	uintptr_t *parent = NULL;
