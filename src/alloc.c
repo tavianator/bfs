@@ -107,6 +107,7 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 }
 
 /** Allocate a new slab. */
+attr_cold
 static int slab_alloc(struct arena *arena) {
 	void **slabs = realloc(arena->slabs, sizeof_array(void *, arena->nslabs + 1));
 	if (!slabs) {

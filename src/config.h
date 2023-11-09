@@ -185,6 +185,24 @@
 #endif
 
 /**
+ * Hint to avoid inlining a function.
+ */
+#if __has_attribute(noinline)
+#  define attr_noinline __attribute__((noinline))
+#else
+#  define attr_noinline
+#endif
+
+/**
+ * Hint that a function is unlikely to be called.
+ */
+#if __has_attribute(cold)
+#  define attr_cold attr_noinline __attribute__((cold))
+#else
+#  define attr_cold attr_noinline
+#endif
+
+/**
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
 #if __has_attribute(format)
