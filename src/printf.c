@@ -83,9 +83,14 @@ static int dyn_fprintf(FILE *file, const struct bfs_printf *directive, ...) {
 	va_list args;
 	va_start(args, directive);
 
-	BFS_SUPPRESS("-Wformat-nonliteral");
+#if __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#endif
 	int ret = vfprintf(file, directive->str, args);
-	BFS_UNSUPPRESS();
+#if __GNUC__
+#  pragma GCC diagnostic pop
+#endif
 
 	va_end(args);
 	return ret;
@@ -183,9 +188,14 @@ static int bfs_printf_strftime(CFILE *cfile, const struct bfs_printf *directive,
 	// POSIX strftime() features
 	default:
 		format[1] = directive->c;
-		BFS_SUPPRESS("-Wformat-nonliteral");
+#if __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#endif
 		ret = strftime(buf, sizeof(buf), format, &tm);
-		BFS_UNSUPPRESS();
+#if __GNUC__
+#  pragma GCC diagnostic pop
+#endif
 		break;
 	}
 

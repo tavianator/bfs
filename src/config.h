@@ -202,19 +202,4 @@
 #  endif
 #endif
 
-/**
- * Ignore a particular GCC warning for a region of code.
- */
-#if __GNUC__
-#  define BFS_PRAGMA_STRINGIFY(...) _Pragma(#__VA_ARGS__)
-#  define BFS_SUPPRESS(warning) \
-	_Pragma("GCC diagnostic push"); \
-	BFS_PRAGMA_STRINGIFY(GCC diagnostic ignored warning)
-#  define BFS_UNSUPPRESS() \
-	_Pragma("GCC diagnostic pop")
-#else
-#  define BFS_SUPPRESS(warning)
-#  define BFS_UNSUPPRESS()
-#endif
-
 #endif // BFS_CONFIG_H
