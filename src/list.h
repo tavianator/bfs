@@ -317,15 +317,15 @@
 
 #define SLIST_REMOVE__(list, cursor, next) \
 	(list->tail = (*cursor)->next ? list->tail : cursor, \
-	 slist_remove_impl(*cursor, cursor, &(*cursor)->next, list->tail, sizeof(*cursor)))
+	 slist_remove_impl(*cursor, cursor, &(*cursor)->next, sizeof(*cursor)))
 
 // Helper for SLIST_REMOVE()
-static inline void *slist_remove_impl(void *ret, void *cursor, void *next, void *tail, size_t size) {
+static inline void *slist_remove_impl(void *ret, void *cursor, void *next, size_t size) {
 	// ret = *cursor;
 	// *cursor = ret->next;
 	memcpy(cursor, next, size);
-	// ret->next = *list->tail; (NULL)
-	memcpy(next, tail, size);
+	// ret->next = NULL;
+	memset(next, 0, size);
 	return ret;
 }
 
