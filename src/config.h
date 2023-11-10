@@ -8,9 +8,17 @@
 #ifndef BFS_CONFIG_H
 #define BFS_CONFIG_H
 
+// Possible __STDC_VERSION__ values
+
+#define C95 199409L
+#define C99 199901L
+#define C11 201112L
+#define C17 201710L
+#define C23 202311L
+
 #include <stddef.h>
 
-#if __STDC_VERSION__ < 202311L
+#if __STDC_VERSION__ < C23
 #  include <stdalign.h>
 #  include <stdbool.h>
 #  include <stdnoreturn.h>

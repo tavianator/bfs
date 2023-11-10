@@ -12,7 +12,7 @@
 #include <limits.h>
 #include <stdint.h>
 
-#if __STDC_VERSION__ >= 202311L
+#if __STDC_VERSION__ >= C23
 #  include <stdbit.h>
 #endif
 
@@ -173,7 +173,7 @@
 #  define ENDIAN_NATIVE 0
 #endif
 
-#if __STDC_VERSION__ >= 202311L
+#if __STDC_VERSION__ >= C23
 #  define bswap16 stdc_memreverse8u16
 #  define bswap32 stdc_memreverse8u32
 #  define bswap64 stdc_memreverse8u64
@@ -236,7 +236,7 @@ static inline uint8_t bswap8(uint8_t n) {
 
 // C23 polyfill: bit utilities
 
-#if __STDC_VERSION__ >= 202311L
+#if __STDC_VERSION__ >= C23
 #  define count_ones stdc_count_ones
 #  define count_zeros stdc_count_zeros
 #  define rotate_left stdc_rotate_left
@@ -395,6 +395,6 @@ UINT_OVERLOADS(BIT_CEIL)
 #define bit_floor(n) UINT_SELECT(n, bit_floor)(n)
 #define bit_ceil(n) UINT_SELECT(n, bit_ceil)(n)
 
-#endif // __STDC_VERSION__ < 202311L
+#endif // __STDC_VERSION__ < C23
 
 #endif // BFS_BIT_H

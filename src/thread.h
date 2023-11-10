@@ -11,7 +11,7 @@
 #include "config.h"
 #include <pthread.h>
 
-#if __STDC_VERSION__ < 202311L && !defined(thread_local)
+#if __STDC_VERSION__ < C23 && !defined(thread_local)
 #  if BFS_USE_THREADS_H
 #    include <threads.h>
 #  else

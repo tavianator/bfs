@@ -14,7 +14,7 @@
 /**
  * static_assert() with an optional second argument.
  */
-#if __STDC_VERSION__ >= 202311L
+#if __STDC_VERSION__ >= C23
 #  define bfs_static_assert static_assert
 #else
 #  define bfs_static_assert(...) bfs_static_assert_(__VA_ARGS__, #__VA_ARGS__, )
@@ -35,7 +35,7 @@ struct bfs_loc {
 /**
  * Get the current source code location.
  */
-#if __STDC_VERSION__ >= 202311L
+#if __STDC_VERSION__ >= C23
 #  define bfs_location() (&(static const struct bfs_loc)BFS_LOC_INIT)
 #else
 #  define bfs_location() (&(const struct bfs_loc)BFS_LOC_INIT)
