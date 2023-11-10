@@ -117,5 +117,8 @@ int main(void) {
 	verify_eq(bit_floor(0), 0);
 	verify_eq(bit_ceil(0), 1);
 
+	bfs_verify(!has_single_bit(0));
+	bfs_verify(!has_single_bit(UINT32_MAX));
+
 	return EXIT_SUCCESS;
 }
