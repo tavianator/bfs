@@ -119,6 +119,7 @@ int main(void) {
 
 	bfs_verify(!has_single_bit(0));
 	bfs_verify(!has_single_bit(UINT32_MAX));
+	bfs_verify(has_single_bit((uint32_t)1 << (UINT_WIDTH - 1)));
 
 	return EXIT_SUCCESS;
 }

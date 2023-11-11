@@ -350,8 +350,7 @@ UINT_OVERLOADS(FIRST_TRAILING_ONE)
 
 #define HAS_SINGLE_BIT(type, suffix, width) \
 	static inline bool has_single_bit##suffix(type n) { \
-		/** Branchless n && !(n & (n - 1)) */ \
-		return n < (n ^ (n - 1)) + 1; \
+		return n && !(n & (n - 1)); \
 	}
 
 UINT_OVERLOADS(ROTATE_LEFT)
