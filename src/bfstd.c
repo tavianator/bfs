@@ -284,7 +284,7 @@ const char *xstrerror(int errnum) {
 	const char *ret = NULL;
 	static thread_local char buf[256];
 
-#if __APPLE__
+#if __APPLE__ || __COSMOPOLITAN__
 	// No strerror_l() on macOS
 	if (strerror_r(errnum, buf, sizeof(buf)) == 0) {
 		ret = buf;

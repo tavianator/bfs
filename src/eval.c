@@ -1558,7 +1558,9 @@ static const char *dump_bftw_strategy(enum bftw_strategy strategy) {
 
 /** Check if we need to enable BFTW_BUFFER. */
 static bool eval_must_buffer(const struct bfs_expr *expr) {
-#if __FreeBSD__
+#if __COSMOPOLITAN__
+	return true;
+#elif __FreeBSD__
 	// FreeBSD doesn't properly handle adding/removing directory entries
 	// during readdir() on NFS mounts.  Work around it by passing BFTW_BUFFER
 	// whenever we could be mutating the directory ourselves through -delete

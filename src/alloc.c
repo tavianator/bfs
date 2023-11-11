@@ -3,6 +3,7 @@
 
 #include "alloc.h"
 #include "bit.h"
+#include "config.h"
 #include "diag.h"
 #include "sanity.h"
 #include <errno.h>

@@ -179,6 +179,10 @@
  */
 #define cache_align alignas(FALSE_SHARING_SIZE)
 
+#if __COSMOPOLITAN__
+typedef long double max_align_t;
+#endif
+
 // Wrappers for attributes
 
 /**

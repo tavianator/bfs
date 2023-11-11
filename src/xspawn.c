@@ -174,15 +174,38 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_SETRLIMIT);
 	if (!action) {
-		return -1;
+		goto fail;
 	}
 
+#ifdef POSIX_SPAWN_SETRLIMIT
+	short flags;
+	errno = posix_spawnattr_getflags(&ctx->attr, &flags);
+	if (errno != 0) {
+		goto fail;
+	}
+
+	flags |= POSIX_SPAWN_SETRLIMIT;
+	errno = posix_spawnattr_setflags(&ctx->attr, flags);
+	if (errno != 0) {
+		goto fail;
+	}
+
+	errno = posix_spawnattr_setrlimit(&ctx->attr, resource, rl);
+	if (errno != 0) {
+		goto fail;
+	}
+#else
 	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+#endif
 
 	action->resource = resource;
 	action->rlimit = *rl;
 	SLIST_APPEND(ctx, action);
 	return 0;
+
+fail:
+	free(action);
+	return -1;
 }
 
 /** bfs_spawn() implementation using posix_spawn(). */
