@@ -241,7 +241,7 @@ bfs_verbose() {
 bfs_verbose_impl() {
     printf "${GRN}%q${RST}" "${BFS[0]}"
     if ((${#BFS[@]} > 1)); then
-        printf " ${GRN}%q${RST}" "${BFS[1:]}"
+        printf " ${GRN}%q${RST}" "${BFS[@]:1}"
     fi
 
     local expr_started=0 color
