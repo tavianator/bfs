@@ -216,6 +216,10 @@ bfs_static_assert(IOQ_STRIDE % 2 == 1);
 
 /** Destroy an I/O command queue. */
 static void ioqq_destroy(struct ioqq *ioqq) {
+	if (!ioqq) {
+		return;
+	}
+
 	for (size_t i = 0; i < ioqq->monitor_mask + 1; ++i) {
 		ioq_monitor_destroy(&ioqq->monitors[i]);
 	}
