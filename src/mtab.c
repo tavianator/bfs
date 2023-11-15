@@ -59,7 +59,8 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-static inline int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
+attr_maybe_unused
+static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
 	struct bfs_mtab_entry entry = {
 		.path = strdup(path),
 		.type = strdup(type),

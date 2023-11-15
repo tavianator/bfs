@@ -73,7 +73,8 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 }
 
 /** Set some posix_spawnattr flags. */
-static inline int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
+attr_maybe_unused
+static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 	short prev;
 	errno = posix_spawnattr_getflags(&ctx->attr, &prev);
 	if (errno != 0) {

@@ -28,12 +28,11 @@
 #  include <sys/xattr.h>
 #endif
 
-#if BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS
-
 /**
  * Many of the APIs used here don't have *at() variants, but we can try to
  * emulate something similar if /proc/self/fd is available.
  */
+attr_maybe_unused
 static const char *fake_at(const struct BFTW *ftwbuf) {
 	static atomic int proc_works = -1;
 
@@ -67,6 +66,7 @@ fail:
 	return ftwbuf->path;
 }
 
+attr_maybe_unused
 static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 	if (path != ftwbuf->path) {
 		dstrfree((dchar *)path);
@@ -76,6 +76,7 @@ static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 /**
  * Check if an error was caused by the absence of support or data for a feature.
  */
+attr_maybe_unused
 static bool is_absence_error(int error) {
 	// If the OS doesn't support the feature, it's obviously not enabled for
 	// any files
@@ -113,8 +114,6 @@ static bool is_absence_error(int error) {
 
 	return false;
 }
-
-#endif // BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS
 
 #if BFS_CAN_CHECK_ACL
 

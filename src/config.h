@@ -186,7 +186,7 @@ typedef long double max_align_t;
 // Wrappers for attributes
 
 /**
- * Silence compiler warnings about switch/case fall-throughs.
+ * Silence warnings about switch/case fall-throughs.
  */
 #if __has_c_attribute(fallthrough)
 #  define fallthru [[fallthrough]]
@@ -194,6 +194,17 @@ typedef long double max_align_t;
 #  define fallthru __attribute__((fallthrough))
 #else
 #  define fallthru ((void)0)
+#endif
+
+/**
+ * Silence warnings about unused declarations.
+ */
+#if __has_c_attribute(maybe_unused)
+#  define attr_maybe_unused [[maybe_unused]]
+#elif __has_attribute(unused)
+#  define attr_maybe_unused __attribute__((unused))
+#else
+#  define attr_maybe_unused
 #endif
 
 /**
