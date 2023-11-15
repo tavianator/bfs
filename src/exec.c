@@ -362,9 +362,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 		return -1;
 	}
 
-	if (bfs_spawn_setflags(&spawn, BFS_SPAWN_USE_PATH) != 0) {
-		goto fail;
-	}
+	spawn.flags |= BFS_SPAWN_USE_PATH;
 
 	if (execbuf->wd_fd >= 0) {
 		if (bfs_spawn_addfchdir(&spawn, execbuf->wd_fd) != 0) {
@@ -374,7 +372,7 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 
 	// Reset RLIMIT_NOFILE if necessary, to avoid breaking applications that use select()
 	if (rlim_cmp(ctx->orig_nofile.rlim_cur, ctx->cur_nofile.rlim_cur) < 0) {
-		if (bfs_spawn_addsetrlimit(&spawn, RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
+		if (bfs_spawn_setrlimit(&spawn, RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
 			goto fail;
 		}
 	}

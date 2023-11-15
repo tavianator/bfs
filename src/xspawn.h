@@ -34,59 +34,58 @@ struct bfs_spawn {
 	struct bfs_spawn_action *head;
 	struct bfs_spawn_action **tail;
 
-	/** pthread_spawn() context, for when we can use it. */
-	posix_spawnattr_t attr;
+	/** posix_spawn() context, for when we can use it. */
 	posix_spawn_file_actions_t actions;
+	posix_spawnattr_t attr;
 };
 
 /**
  * Create a new bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_init(struct bfs_spawn *ctx);
 
 /**
  * Destroy a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_destroy(struct bfs_spawn *ctx);
 
 /**
- * Set the flags for a bfs_spawn() context.
- *
- * @return 0 on success, -1 on failure.
- */
-int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags);
-
-/**
  * Add a close() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd);
 
 /**
  * Add a dup2() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd);
 
 /**
  * Add an fchdir() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd);
 
 /**
- * Add a setrlimit() action to a bfs_spawn() context.
+ * Apply setrlimit() to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
-int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl);
+int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl);
 
 /**
  * Spawn a new process.

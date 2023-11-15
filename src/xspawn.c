@@ -47,14 +47,14 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 	ctx->flags = BFS_SPAWN_USE_POSIX;
 	SLIST_INIT(ctx);
 
-	errno = posix_spawnattr_init(&ctx->attr);
+	errno = posix_spawn_file_actions_init(&ctx->actions);
 	if (errno != 0) {
 		return -1;
 	}
 
-	errno = posix_spawn_file_actions_init(&ctx->actions);
+	errno = posix_spawnattr_init(&ctx->attr);
 	if (errno != 0) {
-		posix_spawnattr_destroy(&ctx->attr);
+		posix_spawn_file_actions_destroy(&ctx->actions);
 		return -1;
 	}
 
@@ -62,8 +62,8 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 }
 
 int bfs_spawn_destroy(struct bfs_spawn *ctx) {
-	posix_spawn_file_actions_destroy(&ctx->actions);
 	posix_spawnattr_destroy(&ctx->attr);
+	posix_spawn_file_actions_destroy(&ctx->actions);
 
 	for_slist (struct bfs_spawn_action, action, ctx) {
 		free(action);
@@ -72,8 +72,22 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 	return 0;
 }
 
-int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags) {
-	ctx->flags |= flags;
+/** Set some posix_spawnattr flags. */
+static inline int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
+	short prev;
+	errno = posix_spawnattr_getflags(&ctx->attr, &prev);
+	if (errno != 0) {
+		return -1;
+	}
+
+	short next = prev | flags;
+	if (next != prev) {
+		errno = posix_spawnattr_setflags(&ctx->attr, next);
+		if (errno != 0) {
+			return -1;
+		}
+	}
+
 	return 0;
 }
 
@@ -150,13 +164,15 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 #  endif
 #endif
 
-#if BFS_HAS_POSIX_SPAWN_FCHDIR || BFS_HAS_POSIX_SPAWN_FCHDIR_NP
+#if BFS_HAS_POSIX_SPAWN_FCHDIR
+#  define BFS_POSIX_SPAWN_FCHDIR posix_spawn_file_actions_addfchdir
+#elif BFS_HAS_POSIX_SPAWN_FCHDIR_NP
+#  define BFS_POSIX_SPAWN_FCHDIR posix_spawn_file_actions_addfchdir_np
+#endif
+
+#ifdef BFS_POSIX_SPAWN_FCHDIR
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
-#  if BFS_HAS_POSIX_SPAWN_FCHDIR
-		errno = posix_spawn_file_actions_addfchdir(&ctx->actions, fd);
-#  else
-		errno = posix_spawn_file_actions_addfchdir_np(&ctx->actions, fd);
-#  endif
+		errno = BFS_POSIX_SPAWN_FCHDIR(&ctx->actions, fd);
 		if (errno != 0) {
 			free(action);
 			return -1;
@@ -171,22 +187,14 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	return 0;
 }
 
-int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
+int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_SETRLIMIT);
 	if (!action) {
 		goto fail;
 	}
 
 #ifdef POSIX_SPAWN_SETRLIMIT
-	short flags;
-	errno = posix_spawnattr_getflags(&ctx->attr, &flags);
-	if (errno != 0) {
-		goto fail;
-	}
-
-	flags |= POSIX_SPAWN_SETRLIMIT;
-	errno = posix_spawnattr_setflags(&ctx->attr, flags);
-	if (errno != 0) {
+	if (bfs_spawn_addflags(ctx, POSIX_SPAWN_SETRLIMIT) != 0) {
 		goto fail;
 	}
 
