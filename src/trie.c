@@ -95,7 +95,7 @@
 bfs_static_assert(CHAR_WIDTH == 8);
 
 #if __i386__ || __x86_64__
-#  define trie_clones attr_target_clones("popcnt", "default")
+#  define trie_clones attr(target_clones("popcnt", "default"))
 #else
 #  define trie_clones
 #endif

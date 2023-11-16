@@ -301,4 +301,78 @@ typedef long double max_align_t;
 #  define attr_target_clones(...)
 #endif
 
+/**
+ * Shorthand for multiple attributes at once. attr(a, b(c), d) is equivalent to
+ *
+ *     attr_a
+ *     attr_b(c)
+ *     attr_d
+ */
+#define attr(...) \
+	attr__(attr_##__VA_ARGS__, none, none, none, none, none, none, none, none, none)
+
+/**
+ * attr() helper.  For exposition, pretend we support only 2 args, instead of 9.
+ * There are a few cases:
+ *
+ *     attr()
+ *         => attr__(attr_, none, none)
+ *         => attr_                =>
+ *            attr_none            =>
+ *            attr_too_many_none() =>
+ *
+ *     attr(a)
+ *         => attr__(attr_a, none, none)
+ *         => attr_a               => __attribute__((a))
+ *            attr_none            =>
+ *            attr_too_many_none() =>
+ *
+ *     attr(a, b(c))
+ *         => attr__(attr_a, b(c), none, none)
+ *         => attr_a                   => __attribute__((a))
+ *            attr_b(c)                => __attribute__((b(c)))
+ *            attr_too_many_none(none) =>
+ *
+ *     attr(a, b(c), d)
+ *         => attr__(attr_a, b(c), d, none, none)
+ *         => attr_a                      => __attribute__((a))
+ *            attr_b(c)                   => __attribute__((b(c)))
+ *            attr_too_many_d(none, none) => error
+ *
+ * Some attribute names are the same as standard library functions, e.g. printf.
+ * Standard libraries are permitted to define these functions as macros, like
+ *
+ *     #define printf(...) __builtin_printf(__VA_ARGS__)
+ *
+ * The token paste in
+ *
+ *     #define attr(...) attr__(attr_##__VA_ARGS__, none, none)
+ *
+ * is necessary to prevent macro expansion before evaluating attr__().
+ * Otherwise, we could get
+ *
+ *     attr(printf(1, 2))
+ *         => attr__(__builtin_printf(1, 2), none, none)
+ *         => attr____builtin_printf(1, 2)
+ *         => error
+ */
+#define attr__(a1, a2, a3, a4, a5, a6, a7, a8, a9, none, ...) \
+	a1 \
+	attr_##a2 \
+	attr_##a3 \
+	attr_##a4 \
+	attr_##a5 \
+	attr_##a6 \
+	attr_##a7 \
+	attr_##a8 \
+	attr_##a9 \
+	attr_too_many_##none(__VA_ARGS__)
+
+// Ignore `attr_none` from expanding 1-9 argument attr(a1, a2, ...)
+#define attr_none
+// Ignore `attr_` from expanding 0-argument attr()
+#define attr_
+// Only trigger an error on more than 9 arguments
+#define attr_too_many_none(...)
+
 #endif // BFS_CONFIG_H

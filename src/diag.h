@@ -44,8 +44,7 @@ struct bfs_loc {
 /**
  * Print a message to standard error and abort.
  */
-attr_cold
-attr_format(2, 3)
+attr(cold, format(2, 3))
 noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 
 /**
@@ -117,14 +116,13 @@ const char *debug_flag_name(enum debug_flags flag);
 /**
  * Like perror(), but decorated like bfs_error().
  */
-attr_cold
+attr(cold)
 void bfs_perror(const struct bfs_ctx *ctx, const char *str);
 
 /**
  * Shorthand for printing error messages.
  */
-attr_cold
-attr_format(2, 3)
+attr(cold, format(2, 3))
 void bfs_error(const struct bfs_ctx *ctx, const char *format, ...);
 
 /**
@@ -132,8 +130,7 @@ void bfs_error(const struct bfs_ctx *ctx, const char *format, ...);
  *
  * @return Whether a warning was printed.
  */
-attr_cold
-attr_format(2, 3)
+attr(cold, format(2, 3))
 bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...);
 
 /**
@@ -141,71 +138,67 @@ bool bfs_warning(const struct bfs_ctx *ctx, const char *format, ...);
  *
  * @return Whether a debug message was printed.
  */
-attr_cold
-attr_format(3, 4)
+attr(cold, format(3, 4))
 bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, ...);
 
 /**
  * bfs_error() variant that takes a va_list.
  */
-attr_cold
-attr_format(2, 0)
+attr(cold, format(2, 0))
 void bfs_verror(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_warning() variant that takes a va_list.
  */
-attr_cold
-attr_format(2, 0)
+attr(cold, format(2, 0))
 bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args);
 
 /**
  * bfs_debug() variant that takes a va_list.
  */
-attr_cold
-attr_format(3, 0)
+attr(cold, format(3, 0))
 bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, va_list args);
 
 /**
  * Print the error message prefix.
  */
-attr_cold
+attr(cold)
 void bfs_error_prefix(const struct bfs_ctx *ctx);
 
 /**
  * Print the warning message prefix.
  */
-attr_cold
+attr(cold)
 bool bfs_warning_prefix(const struct bfs_ctx *ctx);
 
 /**
  * Print the debug message prefix.
  */
-attr_cold
+attr(cold)
 bool bfs_debug_prefix(const struct bfs_ctx *ctx, enum debug_flags flag);
 
 /**
  * Highlight parts of the command line in an error message.
  */
-attr_cold
+attr(cold)
 void bfs_argv_error(const struct bfs_ctx *ctx, const bool args[]);
 
 /**
  * Highlight parts of an expression in an error message.
  */
-attr_cold
+attr(cold)
 void bfs_expr_error(const struct bfs_ctx *ctx, const struct bfs_expr *expr);
 
 /**
  * Highlight parts of the command line in a warning message.
  */
-attr_cold
+attr(cold)
 bool bfs_argv_warning(const struct bfs_ctx *ctx, const bool args[]);
 
 /**
  * Highlight parts of an expression in a warning message.
  */
-attr_cold
+attr(cold)
 bool bfs_expr_warning(const struct bfs_ctx *ctx, const struct bfs_expr *expr);
 
 #endif // BFS_DIAG_H

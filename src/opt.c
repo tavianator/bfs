@@ -305,7 +305,7 @@ struct opt_state {
 };
 
 /** Log an optimization. */
-attr_format(3, 4)
+attr(format(3, 4))
 static bool opt_debug(const struct opt_state *state, int level, const char *format, ...) {
 	bfs_assert(state->ctx->optlevel >= level);
 
@@ -321,7 +321,7 @@ static bool opt_debug(const struct opt_state *state, int level, const char *form
 }
 
 /** Warn about an expression. */
-attr_format(3, 4)
+attr(format(3, 4))
 static void opt_warning(const struct opt_state *state, const struct bfs_expr *expr, const char *format, ...) {
 	if (bfs_expr_warning(state->ctx, expr)) {
 		va_list args;

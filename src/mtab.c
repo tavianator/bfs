@@ -61,7 +61,7 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-attr_maybe_unused
+attr(maybe_unused)
 static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
 	struct bfs_mount *mount = RESERVE(struct bfs_mount, &mtab->mounts, &mtab->nmounts);
 	if (!mount) {

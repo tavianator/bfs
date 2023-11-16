@@ -114,8 +114,7 @@ static inline size_t flex_size(size_t align, size_t min, size_t offset, size_t s
  * @return
  *         The allocated memory, or NULL on failure.
  */
-attr_malloc(free, 1)
-attr_aligned_alloc(1, 2)
+attr(malloc(free, 1), aligned_alloc(1, 2))
 void *alloc(size_t align, size_t size);
 
 /**
@@ -128,8 +127,7 @@ void *alloc(size_t align, size_t size);
  * @return
  *         The allocated memory, or NULL on failure.
  */
-attr_malloc(free, 1)
-attr_aligned_alloc(1, 2)
+attr(malloc(free, 1), aligned_alloc(1, 2))
 void *zalloc(size_t align, size_t size);
 
 /** Allocate memory for the given type. */
@@ -252,7 +250,7 @@ void arena_free(struct arena *arena, void *ptr);
 /**
  * Allocate an object out of the arena.
  */
-attr_malloc(arena_free, 2)
+attr(malloc(arena_free, 2))
 void *arena_alloc(struct arena *arena);
 
 /**
@@ -334,7 +332,7 @@ void varena_free(struct varena *varena, void *ptr, size_t count);
  * @return
  *         The allocated struct, or NULL on failure.
  */
-attr_malloc(varena_free, 2)
+attr(malloc(varena_free, 2))
 void *varena_alloc(struct varena *varena, size_t count);
 
 /**
