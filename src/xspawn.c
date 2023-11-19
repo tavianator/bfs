@@ -8,7 +8,6 @@
 #include "list.h"
 #include <errno.h>
 #include <fcntl.h>
-#include <spawn.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
@@ -18,6 +17,10 @@
 
 #if BFS_USE_PATHS_H
 #  include <paths.h>
+#endif
+
+#if _POSIX_SPAWN > 0
+#  include <spawn.h>
 #endif
 
 /**
@@ -44,8 +47,11 @@ struct bfs_spawn_action {
 };
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
-	ctx->flags = BFS_SPAWN_USE_POSIX;
+	ctx->flags = 0;
 	SLIST_INIT(ctx);
+
+#if _POSIX_SPAWN > 0
+	ctx->flags |= BFS_SPAWN_USE_POSIX;
 
 	errno = posix_spawn_file_actions_init(&ctx->actions);
 	if (errno != 0) {
@@ -57,13 +63,16 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 		posix_spawn_file_actions_destroy(&ctx->actions);
 		return -1;
 	}
+#endif
 
 	return 0;
 }
 
 int bfs_spawn_destroy(struct bfs_spawn *ctx) {
+#if _POSIX_SPAWN > 0
 	posix_spawnattr_destroy(&ctx->attr);
 	posix_spawn_file_actions_destroy(&ctx->actions);
+#endif
 
 	for_slist (struct bfs_spawn_action, action, ctx) {
 		free(action);
@@ -72,6 +81,7 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 	return 0;
 }
 
+#if _POSIX_SPAWN > 0
 /** Set some posix_spawnattr flags. */
 attr_maybe_unused
 static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
@@ -91,6 +101,7 @@ static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 
 	return 0;
 }
+#endif // _POSIX_SPAWN > 0
 
 /** Allocate a spawn action. */
 static struct bfs_spawn_action *bfs_spawn_action(enum bfs_spawn_op op) {
@@ -112,6 +123,7 @@ int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
 		return -1;
 	}
 
+#if _POSIX_SPAWN > 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_addclose(&ctx->actions, fd);
 		if (errno != 0) {
@@ -119,6 +131,7 @@ int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
 			return -1;
 		}
 	}
+#endif
 
 	action->out_fd = fd;
 	SLIST_APPEND(ctx, action);
@@ -131,6 +144,7 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
 		return -1;
 	}
 
+#if _POSIX_SPAWN > 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_adddup2(&ctx->actions, oldfd, newfd);
 		if (errno != 0) {
@@ -138,6 +152,7 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
 			return -1;
 		}
 	}
+#endif
 
 	action->in_fd = oldfd;
 	action->out_fd = newfd;
@@ -217,6 +232,7 @@ fail:
 	return -1;
 }
 
+#if _POSIX_SPAWN > 0
 /** bfs_spawn() implementation using posix_spawn(). */
 static pid_t bfs_posix_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	pid_t ret;
@@ -227,6 +243,7 @@ static pid_t bfs_posix_spawn(const char *exe, const struct bfs_spawn *ctx, char 
 
 	return ret;
 }
+#endif
 
 /** Actually exec() the new process. */
 static noreturn void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
@@ -321,6 +338,17 @@ static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char *
 	return pid;
 }
 
+/** Call the right bfs_spawn() implementation. */
+static pid_t bfs_spawn_impl(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+#if _POSIX_SPAWN > 0
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		return bfs_posix_spawn(exe, ctx, argv, envp);
+	}
+#endif
+
+	return bfs_fork_spawn(exe, ctx, argv, envp);
+}
+
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	// execvp()/posix_spawnp() are typically implemented with repeated
 	// execv() calls for each $PATH component until one succeeds.  It's
@@ -338,13 +366,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 		envp = environ;
 	}
 
-	pid_t ret;
-	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
-		ret = bfs_posix_spawn(exe, ctx, argv, envp);
-	} else {
-		ret = bfs_fork_spawn(exe, ctx, argv, envp);
-	}
-
+	pid_t ret = bfs_spawn_impl(exe, ctx, argv, envp);
 	free(resolved);
 	return ret;
 }

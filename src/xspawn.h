@@ -9,9 +9,13 @@
 #define BFS_XSPAWN_H
 
 #include "config.h"
-#include <spawn.h>
 #include <sys/resource.h>
 #include <sys/types.h>
+#include <unistd.h>
+
+#if _POSIX_SPAWN > 0
+#  include <spawn.h>
+#endif
 
 /**
  * bfs_spawn() flags.
@@ -34,9 +38,11 @@ struct bfs_spawn {
 	struct bfs_spawn_action *head;
 	struct bfs_spawn_action **tail;
 
+#if _POSIX_SPAWN > 0
 	/** posix_spawn() context, for when we can use it. */
 	posix_spawn_file_actions_t actions;
 	posix_spawnattr_t attr;
+#endif
 };
 
 /**
