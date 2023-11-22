@@ -14,7 +14,7 @@
 static void *xmemalign(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert(align >= sizeof(void *));
-	bfs_assert((size & (align - 1)) == 0);
+	bfs_assert(is_aligned(align, size));
 
 #if __APPLE__
 	void *ptr = NULL;
@@ -27,7 +27,7 @@ static void *xmemalign(size_t align, size_t size) {
 
 void *alloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert((size & (align - 1)) == 0);
+	bfs_assert(is_aligned(align, size));
 
 	if (size >> (SIZE_WIDTH - 1)) {
 		errno = EOVERFLOW;
@@ -43,7 +43,7 @@ void *alloc(size_t align, size_t size) {
 
 void *zalloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert((size & (align - 1)) == 0);
+	bfs_assert(is_aligned(align, size));
 
 	if (size >> (SIZE_WIDTH - 1)) {
 		errno = EOVERFLOW;
@@ -90,7 +90,7 @@ static void chunk_set_next(const struct arena *arena, union chunk *chunk, union 
 
 void arena_init(struct arena *arena, size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert((size & (align - 1)) == 0);
+	bfs_assert(is_aligned(align, size));
 
 	if (align < alignof(union chunk)) {
 		align = alignof(union chunk);
@@ -98,7 +98,7 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 	if (size < sizeof(union chunk)) {
 		size = sizeof(union chunk);
 	}
-	bfs_assert((size & (align - 1)) == 0);
+	bfs_assert(is_aligned(align, size));
 
 	arena->chunks = NULL;
 	arena->nslabs = 0;

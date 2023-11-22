@@ -11,6 +11,11 @@
 #include "config.h"
 #include <stdlib.h>
 
+/** Check if a size is properly aligned. */
+static inline bool is_aligned(size_t align, size_t size) {
+	return (size & (align - 1)) == 0;
+}
+
 /** Round down to a multiple of an alignment. */
 static inline size_t align_floor(size_t align, size_t size) {
 	return size & ~(align - 1);
