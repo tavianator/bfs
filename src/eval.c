@@ -57,7 +57,7 @@ struct bfs_eval {
 /**
  * Print an error message.
  */
-attr(format(2, 3))
+attr(printf(2, 3))
 static void eval_error(struct bfs_eval *state, const char *format, ...) {
 	// By POSIX, any errors should be accompanied by a non-zero exit status
 	*state->ret = EXIT_FAILURE;

@@ -240,9 +240,9 @@ typedef long double max_align_t;
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
 #if __has_attribute(format)
-#  define attr_format(fmt, args) __attribute__((format(printf, fmt, args)))
+#  define attr_printf(fmt, args) __attribute__((format(printf, fmt, args)))
 #else
-#  define attr_format(fmt, args)
+#  define attr_printf(fmt, args)
 #endif
 
 /**

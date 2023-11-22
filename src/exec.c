@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 /** Print some debugging info. */
-attr(format(2, 3))
+attr(printf(2, 3))
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
 	const struct bfs_ctx *ctx = execbuf->ctx;
 
