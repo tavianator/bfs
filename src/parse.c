@@ -15,7 +15,6 @@
 #include "color.h"
 #include "config.h"
 #include "ctx.h"
-#include "darray.h"
 #include "diag.h"
 #include "dir.h"
 #include "eval.h"
@@ -481,16 +480,17 @@ static char **parser_advance(struct parser_state *state, enum token_type type, s
  * Parse a root path.
  */
 static int parse_root(struct parser_state *state, const char *path) {
-	char *copy = strdup(path);
-	if (!copy) {
-		parse_perror(state, "strdup()");
+	struct bfs_ctx *ctx = state->ctx;
+	const char **root = RESERVE(const char *, &ctx->paths, &ctx->npaths);
+	if (!root) {
+		parse_perror(state, "RESERVE()");
 		return -1;
 	}
 
-	struct bfs_ctx *ctx = state->ctx;
-	if (DARRAY_PUSH(&ctx->paths, &copy) != 0) {
-		parse_perror(state, "DARRAY_PUSH()");
-		free(copy);
+	*root = strdup(path);
+	if (!*root) {
+		--ctx->npaths;
+		parse_perror(state, "strdup()");
 		return -1;
 	}
 
@@ -3617,7 +3617,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 		}
 	}
 
-	for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+	for (size_t i = 0; i < ctx->npaths; ++i) {
 		const char *path = ctx->paths[i];
 		char c = path[0];
 		if (c == '-' || c == '(' || c == ')' || c == '!' || c == ',') {
@@ -3778,7 +3778,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
-	if (darray_length(ctx->paths) == 0 && state.implicit_root) {
+	if (ctx->npaths == 0 && state.implicit_root) {
 		if (parse_root(&state, ".") != 0) {
 			goto fail;
 		}

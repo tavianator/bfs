@@ -12,7 +12,6 @@
 #include "color.h"
 #include "config.h"
 #include "ctx.h"
-#include "darray.h"
 #include "diag.h"
 #include "dir.h"
 #include "dstring.h"
@@ -1622,7 +1621,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 
 	struct bftw_args bftw_args = {
 		.paths = ctx->paths,
-		.npaths = darray_length(ctx->paths),
+		.npaths = ctx->npaths,
 		.callback = eval_callback,
 		.ptr = &args,
 		.nopenfd = fdlimit,

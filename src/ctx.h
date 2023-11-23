@@ -27,6 +27,9 @@ struct bfs_ctx {
 
 	/** The root paths. */
 	const char **paths;
+	/** The number of root paths. */
+	size_t npaths;
+
 	/** The main command line expression. */
 	struct bfs_expr *expr;
 	/** An expression for files to filter out. */

@@ -4,7 +4,6 @@
 #include "ctx.h"
 #include "alloc.h"
 #include "color.h"
-#include "darray.h"
 #include "diag.h"
 #include "expr.h"
 #include "mtab.h"
@@ -242,10 +241,10 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		free_colors(ctx->colors);
 
-		for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+		for (size_t i = 0; i < ctx->npaths; ++i) {
 			free((char *)ctx->paths[i]);
 		}
-		darray_free(ctx->paths);
+		free(ctx->paths);
 
 		free(ctx->argv);
 		free(ctx);
