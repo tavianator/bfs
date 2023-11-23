@@ -5,7 +5,6 @@
 #include "alloc.h"
 #include "bfstd.h"
 #include "config.h"
-#include "darray.h"
 #include "stat.h"
 #include "trie.h"
 #include <errno.h>
@@ -37,7 +36,7 @@
 /**
  * A mount point in the table.
  */
-struct bfs_mtab_entry {
+struct bfs_mount {
 	/** The path to the mount point. */
 	char *path;
 	/** The filesystem type. */
@@ -46,7 +45,10 @@ struct bfs_mtab_entry {
 
 struct bfs_mtab {
 	/** The array of mount points. */
-	struct bfs_mtab_entry *entries;
+	struct bfs_mount *mounts;
+	/** The number of mount points. */
+	size_t nmounts;
+
 	/** The basenames of every mount point. */
 	struct trie names;
 
@@ -61,17 +63,15 @@ struct bfs_mtab {
  */
 attr_maybe_unused
 static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
-	struct bfs_mtab_entry entry = {
-		.path = strdup(path),
-		.type = strdup(type),
-	};
-
-	if (!entry.path || !entry.type) {
-		goto fail_entry;
+	struct bfs_mount *mount = RESERVE(struct bfs_mount, &mtab->mounts, &mtab->nmounts);
+	if (!mount) {
+		return -1;
 	}
 
-	if (DARRAY_PUSH(&mtab->entries, &entry) != 0) {
-		goto fail_entry;
+	mount->path = strdup(path);
+	mount->type = strdup(type);
+	if (!mount->path || !mount->type) {
+		goto fail;
 	}
 
 	const char *name = path + xbaseoff(path);
@@ -81,10 +81,10 @@ static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *typ
 
 	return 0;
 
-fail_entry:
-	free(entry.type);
-	free(entry.path);
 fail:
+	free(mount->type);
+	free(mount->path);
+	--mtab->nmounts;
 	return -1;
 }
 
@@ -194,9 +194,9 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 	int parent_ret = -1;
 	struct bfs_stat parent_stat;
 
-	for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
-		struct bfs_mtab_entry *entry = &mtab->entries[i];
-		const char *path = entry->path;
+	for (size_t i = 0; i < mtab->nmounts; ++i) {
+		struct bfs_mount *mount = &mtab->mounts[i];
+		const char *path = mount->path;
 		int fd = AT_FDCWD;
 
 		char *dir = xdirname(path);
@@ -239,7 +239,7 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 
 		struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
 		if (leaf) {
-			leaf->value = entry->type;
+			leaf->value = mount->type;
 		} else {
 			goto fail;
 		}
@@ -281,11 +281,11 @@ void bfs_mtab_free(struct bfs_mtab *mtab) {
 		trie_destroy(&mtab->types);
 		trie_destroy(&mtab->names);
 
-		for (size_t i = 0; i < darray_length(mtab->entries); ++i) {
-			free(mtab->entries[i].type);
-			free(mtab->entries[i].path);
+		for (size_t i = 0; i < mtab->nmounts; ++i) {
+			free(mtab->mounts[i].type);
+			free(mtab->mounts[i].path);
 		}
-		darray_free(mtab->entries);
+		free(mtab->mounts);
 
 		free(mtab);
 	}
