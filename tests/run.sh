@@ -80,12 +80,15 @@ wait_test() {
     case $ret in
         0)
             ((++passed))
+            return 0
             ;;
         $EX_SKIP)
             ((++skipped))
+            return 0
             ;;
         *)
             ((++failed))
+            return $ret
             ;;
     esac
 }
@@ -126,6 +129,9 @@ run_tests() {
     for TEST in "${TEST_CASES[@]}"; do
         if ((BG >= JOBS)); then
             wait_test
+            if (($? && STOP)); then
+                break
+            fi
         fi
 
         printf "$TEST_FMT" "$TEST"
