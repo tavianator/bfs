@@ -182,18 +182,22 @@ struct bftw_args {
 	const char **paths;
 	/** The number of starting paths. */
 	size_t npaths;
+
 	/** The callback to invoke. */
 	bftw_callback *callback;
 	/** A pointer which is passed to the callback. */
 	void *ptr;
+
 	/** The maximum number of file descriptors to keep open. */
 	int nopenfd;
 	/** The maximum number of threads to use. */
 	int nthreads;
+
 	/** Flags that control bftw() behaviour. */
 	enum bftw_flags flags;
 	/** The search strategy to use. */
 	enum bftw_strategy strategy;
+
 	/** The parsed mount table, if available. */
 	const struct bfs_mtab *mtab;
 };
