@@ -12,46 +12,60 @@
 #include <string.h>
 
 /**
- * The memory representation of a dynamic string.  Users get a pointer to data.
+ * The memory representation of a dynamic string.  Users get a pointer to str.
  */
 struct dstring {
-	size_t capacity;
-	size_t length;
-	alignas(dchar) char data[];
+	/** Capacity of the string, *including* the terminating NUL. */
+	size_t cap;
+	/** Length of the string, *excluding* the terminating NUL. */
+	size_t len;
+	/** The string itself. */
+	alignas(dchar) char str[];
 };
 
-/** Get the string header from the string data pointer. */
+#define DSTR_OFFSET offsetof(struct dstring, str)
+
+/** Back up to the header from a pointer to dstring::str. */
 static struct dstring *dstrheader(const dchar *dstr) {
-	return (struct dstring *)(dstr - offsetof(struct dstring, data));
+	return (struct dstring *)(dstr - DSTR_OFFSET);
 }
 
-/** Get the correct size for a dstring with the given capacity. */
-static size_t dstrsize(size_t capacity) {
-	return sizeof_flex(struct dstring, data, capacity + 1);
+/**
+ * In some provenance models, the expression `header->str` has its provenance
+ * restricted to just the `str` field itself, making a future dstrheader()
+ * illegal.  This alternative is guaranteed to preserve provenance for the entire
+ * allocation.
+ *
+ * - https://stackoverflow.com/q/25296019
+ * - https://mastodon.social/@void_friend@tech.lgbt/111144859908104311
+ */
+static dchar *dstrdata(struct dstring *header) {
+	return (char *)header + DSTR_OFFSET;
 }
 
 /** Allocate a dstring with the given contents. */
-static dchar *dstralloc_impl(size_t capacity, size_t length, const char *data) {
+static dchar *dstralloc_impl(size_t cap, size_t len, const char *str) {
 	// Avoid reallocations for small strings
-	if (capacity < 7) {
-		capacity = 7;
+	if (cap < DSTR_OFFSET) {
+		cap = DSTR_OFFSET;
 	}
 
-	struct dstring *header = malloc(dstrsize(capacity));
+	struct dstring *header = ALLOC_FLEX(struct dstring, str, cap);
 	if (!header) {
 		return NULL;
 	}
 
-	header->capacity = capacity;
-	header->length = length;
+	header->cap = cap;
+	header->len = len;
 
-	memcpy(header->data, data, length);
-	header->data[length] = '\0';
-	return header->data;
+	char *ret = dstrdata(header);
+	memcpy(ret, str, len);
+	ret[len] = '\0';
+	return ret;
 }
 
-dchar *dstralloc(size_t capacity) {
-	return dstralloc_impl(capacity, 0, "");
+dchar *dstralloc(size_t cap) {
+	return dstralloc_impl(cap + 1, 0, "");
 }
 
 dchar *dstrdup(const char *str) {
@@ -67,44 +81,45 @@ dchar *dstrddup(const dchar *dstr) {
 }
 
 dchar *dstrxdup(const char *str, size_t len) {
-	return dstralloc_impl(len, len, str);
+	return dstralloc_impl(len + 1, len, str);
 }
 
 size_t dstrlen(const dchar *dstr) {
-	return dstrheader(dstr)->length;
+	return dstrheader(dstr)->len;
 }
 
-int dstreserve(dchar **dstr, size_t capacity) {
+int dstreserve(dchar **dstr, size_t cap) {
 	if (!*dstr) {
-		*dstr = dstralloc(capacity);
+		*dstr = dstralloc(cap);
 		return *dstr ? 0 : -1;
 	}
 
 	struct dstring *header = dstrheader(*dstr);
-
-	if (capacity > header->capacity) {
-		capacity = bit_ceil(capacity + 1) - 1;
-
-		header = realloc(header, dstrsize(capacity));
-		if (!header) {
-			return -1;
-		}
-		header->capacity = capacity;
-
-		*dstr = header->data;
+	size_t old_cap = header->cap;
+	size_t new_cap = cap + 1; // Terminating NUL
+	if (old_cap >= new_cap) {
+		return 0;
 	}
 
+	new_cap = bit_ceil(new_cap);
+	header = REALLOC_FLEX(struct dstring, str, header, old_cap, new_cap);
+	if (!header) {
+		return -1;
+	}
+
+	header->cap = new_cap;
+	*dstr = dstrdata(header);
 	return 0;
 }
 
-int dstresize(dchar **dstr, size_t length) {
-	if (dstreserve(dstr, length) != 0) {
+int dstresize(dchar **dstr, size_t len) {
+	if (dstreserve(dstr, len) != 0) {
 		return -1;
 	}
 
 	struct dstring *header = dstrheader(*dstr);
-	header->length = length;
-	header->data[length] = '\0';
+	header->len = len;
+	header->str[len] = '\0';
 	return 0;
 }
 
@@ -196,21 +211,21 @@ int dstrvcatf(dchar **str, const char *format, va_list args) {
 	// Guess a capacity to try to avoid calling vsnprintf() twice
 	size_t len = dstrlen(*str);
 	dstreserve(str, len + 2 * strlen(format));
-	size_t cap = dstrheader(*str)->capacity;
+	size_t cap = dstrheader(*str)->cap;
 
 	va_list copy;
 	va_copy(copy, args);
 
 	char *tail = *str + len;
-	int ret = vsnprintf(tail, cap - len + 1, format, args);
+	size_t tail_cap = cap - len;
+	int ret = vsnprintf(tail, tail_cap, format, args);
 	if (ret < 0) {
 		goto fail;
 	}
 
 	size_t tail_len = ret;
-	if (tail_len > cap - len) {
-		cap = len + tail_len;
-		if (dstreserve(str, cap) != 0) {
+	if (tail_len >= tail_cap) {
+		if (dstreserve(str, len + tail_len) != 0) {
 			goto fail;
 		}
 
@@ -224,8 +239,7 @@ int dstrvcatf(dchar **str, const char *format, va_list args) {
 
 	va_end(copy);
 
-	struct dstring *header = dstrheader(*str);
-	header->length += tail_len;
+	dstrheader(*str)->len += tail_len;
 	return 0;
 
 fail:

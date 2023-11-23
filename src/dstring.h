@@ -38,11 +38,11 @@ void dstrfree(dchar *dstr);
 /**
  * Allocate a dynamic string.
  *
- * @param capacity
+ * @param cap
  *         The initial capacity of the string.
  */
 attr_malloc(dstrfree, 1)
-dchar *dstralloc(size_t capacity);
+dchar *dstralloc(size_t cap);
 
 /**
  * Create a dynamic copy of a string.
@@ -99,24 +99,24 @@ size_t dstrlen(const dchar *dstr);
  *
  * @param dstr
  *         The dynamic string to preallocate.
- * @param capacity
+ * @param cap
  *         The new capacity for the string.
  * @return
  *         0 on success, -1 on failure.
  */
-int dstreserve(dchar **dstr, size_t capacity);
+int dstreserve(dchar **dstr, size_t cap);
 
 /**
  * Resize a dynamic string.
  *
  * @param dstr
  *         The dynamic string to resize.
- * @param length
+ * @param len
  *         The new length for the dynamic string.
  * @return
  *         0 on success, -1 on failure.
  */
-int dstresize(dchar **dstr, size_t length);
+int dstresize(dchar **dstr, size_t len);
 
 /**
  * Append to a dynamic string.
