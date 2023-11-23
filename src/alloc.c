@@ -69,6 +69,38 @@ void *zalloc(size_t align, size_t size) {
 	return ret;
 }
 
+void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size) {
+	bfs_assert(has_single_bit(align));
+	bfs_assert(is_aligned(align, old_size));
+	bfs_assert(is_aligned(align, new_size));
+
+	if (new_size == 0) {
+		free(ptr);
+		return NULL;
+	} else if (new_size > ALLOC_MAX) {
+		errno = EOVERFLOW;
+		return NULL;
+	}
+
+	if (align <= alignof(max_align_t)) {
+		return realloc(ptr, new_size);
+	}
+
+	// There is no aligned_realloc(), so reallocate and copy manually
+	void *ret = xmemalign(align, new_size);
+	if (!ret) {
+		return NULL;
+	}
+
+	size_t min_size = old_size < new_size ? old_size : new_size;
+	if (min_size) {
+		memcpy(ret, ptr, min_size);
+	}
+
+	free(ptr);
+	return ret;
+}
+
 /**
  * An arena allocator chunk.
  */
@@ -118,7 +150,8 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 /** Allocate a new slab. */
 attr_cold
 static int slab_alloc(struct arena *arena) {
-	void **slabs = realloc(arena->slabs, sizeof_array(void *, arena->nslabs + 1));
+	size_t nslabs = arena->nslabs;
+	void **slabs = REALLOC_ARRAY(void *, arena->slabs, nslabs, nslabs + 1);
 	if (!slabs) {
 		return -1;
 	}
@@ -132,7 +165,7 @@ static int slab_alloc(struct arena *arena) {
 	// Trim off the excess
 	size -= size % arena->size;
 	// Double the size for every slab
-	size <<= arena->nslabs;
+	size <<= nslabs;
 
 	// Allocate the slab
 	void *slab = zalloc(arena->align, size);
@@ -147,7 +180,8 @@ static int slab_alloc(struct arena *arena) {
 	// We can rely on zero-initialized slabs, but others shouldn't
 	sanitize_uninit(slab, size);
 
-	arena->chunks = arena->slabs[arena->nslabs++] = slab;
+	arena->chunks = arena->slabs[nslabs] = slab;
+	++arena->nslabs;
 	return 0;
 }
 
@@ -220,7 +254,7 @@ static struct arena *varena_get(struct varena *varena, size_t count) {
 
 	if (i >= varena->narenas) {
 		size_t narenas = i + 1;
-		struct arena *arenas = realloc(varena->arenas, sizeof_array(struct arena, narenas));
+		struct arena *arenas = REALLOC_ARRAY(struct arena, varena->arenas, varena->narenas, narenas);
 		if (!arenas) {
 			return NULL;
 		}

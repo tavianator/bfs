@@ -156,6 +156,30 @@ void *zalloc(size_t align, size_t size);
 	(type *)zalloc(alignof(type), sizeof_flex(type, member, count))
 
 /**
+ * Alignment-aware realloc().
+ *
+ * @param ptr
+ *         The pointer to reallocate.
+ * @param align
+ *         The required alignment.
+ * @param old_size
+ *         The previous allocation size.
+ * @param new_size
+ *         The new allocation size.
+ * @return
+ *         The reallocated memory, or NULL on failure.
+ */
+void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
+
+/** Reallocate memory for an array. */
+#define REALLOC_ARRAY(type, ptr, old_count, new_count) \
+	(type *)xrealloc((ptr), alignof(type), sizeof_array(type, old_count), sizeof_array(type, new_count))
+
+/** Reallocate memory for a flexible struct. */
+#define REALLOC_FLEX(type, member, ptr, old_count, new_count) \
+	(type *)xrealloc((ptr), alignof(type), sizeof_flex(type, member, old_count), sizeof_flex(type, member, new_count))
+
+/**
  * An arena allocator for fixed-size types.
  *
  * Arena allocators are intentionally not thread safe.
