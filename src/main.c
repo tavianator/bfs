@@ -27,7 +27,6 @@
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
  *     - config.h      (configuration and feature/platform detection)
- *     - darray.[ch]   (a dynamic array library)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)

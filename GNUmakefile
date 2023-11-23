@@ -236,7 +236,6 @@ LIBBFS := \
     $(OBJ)/src/bftw.o \
     $(OBJ)/src/color.o \
     $(OBJ)/src/ctx.o \
-    $(OBJ)/src/darray.o \
     $(OBJ)/src/diag.o \
     $(OBJ)/src/dir.o \
     $(OBJ)/src/dstring.o \
