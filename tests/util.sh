@@ -27,7 +27,7 @@ stdenv() {
     export LC_ALL=C
     export TZ=UTC0
 
-    local SAN_OPTIONS="halt_on_error=1:log_to_syslog=0"
+    local SAN_OPTIONS="abort_on_error=1:halt_on_error=1:log_to_syslog=0"
     export ASAN_OPTIONS="$SAN_OPTIONS"
     export LSAN_OPTIONS="$SAN_OPTIONS"
     export MSAN_OPTIONS="$SAN_OPTIONS"
