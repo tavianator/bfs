@@ -284,8 +284,12 @@ const char *xstrerror(int errnum) {
 	const char *ret = NULL;
 	static thread_local char buf[256];
 
-#if __APPLE__ || __COSMOPOLITAN__
-	// No strerror_l() on macOS
+	// - __APPLE__
+	// - __COSMOPOLITAN__
+	//     - No strerror_l()
+	// - __FreeBSD__ && SANITIZE_MEMORY
+	//     - duplocale() triggers https://github.com/llvm/llvm-project/issues/65532
+#if __APPLE__ || __COSMOPOLITAN__ || (__FreeBSD__ && SANITIZE_MEMORY)
 	if (strerror_r(errnum, buf, sizeof(buf)) == 0) {
 		ret = buf;
 	}
@@ -643,6 +647,16 @@ wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb) {
 	}
 }
 
+/**
+ * Work around https://github.com/llvm/llvm-project/issues/65532 by forcing a
+ * function, not a macro, to be called.
+ */
+#if __FreeBSD__ && SANITIZE_MEMORY
+#  define BFS_INTERCEPT(fn) (fn)
+#else
+#  define BFS_INTERCEPT(fn) fn
+#endif
+
 size_t xstrwidth(const char *str) {
 	size_t len = strlen(str);
 	size_t ret = 0;
@@ -654,7 +668,7 @@ size_t xstrwidth(const char *str) {
 			// Assume a single-width '?'
 			++ret;
 		} else {
-			ret += wcwidth(wc);
+			ret += BFS_INTERCEPT(wcwidth)(wc);
 		}
 	}
 
@@ -674,20 +688,11 @@ static unsigned char ctype_cache[UCHAR_MAX + 1];
 
 /** Initialize the ctype cache. */
 static void char_cache_init(void) {
-#if __FreeBSD__ && SANITIZE_MEMORY
-// Work around https://github.com/llvm/llvm-project/issues/65532
-#  define bfs_isprint (isprint)
-#  define bfs_isspace (isspace)
-#else
-#  define bfs_isprint isprint
-#  define bfs_isspace isspace
-#endif
-
 	for (size_t c = 0; c <= UCHAR_MAX; ++c) {
-		if (bfs_isprint(c)) {
+		if (BFS_INTERCEPT(isprint)(c)) {
 			ctype_cache[c] |= IS_PRINT;
 		}
-		if (bfs_isspace(c)) {
+		if (BFS_INTERCEPT(isspace)(c)) {
 			ctype_cache[c] |= IS_SPACE;
 		}
 	}
