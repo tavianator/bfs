@@ -601,7 +601,7 @@ static int bfs_exec_push(struct bfs_exec *execbuf, char *arg) {
 
 	if (execbuf->argc + 1 >= execbuf->argv_cap) {
 		size_t cap = 2 * execbuf->argv_cap;
-		char **argv = realloc(execbuf->argv, sizeof_array(char *, cap));
+		char **argv = REALLOC_ARRAY(char *, execbuf->argv, execbuf->argv_cap, cap);
 		if (!argv) {
 			return -1;
 		}
