@@ -101,6 +101,34 @@ void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size) {
 	return ret;
 }
 
+void *reserve(void *ptr, size_t align, size_t size, size_t count) {
+	// No need to overflow-check the current size
+	size_t old_size = size * count;
+
+	// Capacity is doubled every power of two, from 0→1, 1→2, 2→4, etc.
+	// If we stayed within the same size class, re-use ptr.
+	if (count & (count - 1)) {
+		// Tell sanitizers about the new array element
+		sanitize_alloc((char *)ptr + old_size, size);
+		errno = 0;
+		return ptr;
+	}
+
+	// No need to overflow-check; xrealloc() will fail before we overflow
+	size_t new_size = count ? 2 * old_size : size;
+	void *ret = xrealloc(ptr, align, old_size, new_size);
+	if (!ret) {
+		// errno is used to communicate success/failure to the RESERVE() macro
+		bfs_assert(errno != 0);
+		return ptr;
+	}
+
+	// Pretend we only allocated one more element
+	sanitize_free((char *)ret + old_size + size, new_size - old_size - size);
+	errno = 0;
+	return ret;
+}
+
 /**
  * An arena allocator chunk.
  */
@@ -150,13 +178,6 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 /** Allocate a new slab. */
 attr_cold
 static int slab_alloc(struct arena *arena) {
-	size_t nslabs = arena->nslabs;
-	void **slabs = REALLOC_ARRAY(void *, arena->slabs, nslabs, nslabs + 1);
-	if (!slabs) {
-		return -1;
-	}
-	arena->slabs = slabs;
-
 	// Make the initial allocation size ~4K
 	size_t size = 4096;
 	if (size < arena->size) {
@@ -165,11 +186,18 @@ static int slab_alloc(struct arena *arena) {
 	// Trim off the excess
 	size -= size % arena->size;
 	// Double the size for every slab
-	size <<= nslabs;
+	size <<= arena->nslabs;
 
 	// Allocate the slab
 	void *slab = zalloc(arena->align, size);
 	if (!slab) {
+		return -1;
+	}
+
+	// Grow the slab array
+	void **pslab = RESERVE(void *, &arena->slabs, &arena->nslabs);
+	if (!pslab) {
+		free(slab);
 		return -1;
 	}
 
@@ -180,8 +208,7 @@ static int slab_alloc(struct arena *arena) {
 	// We can rely on zero-initialized slabs, but others shouldn't
 	sanitize_uninit(slab, size);
 
-	arena->chunks = arena->slabs[nslabs] = slab;
-	++arena->nslabs;
+	arena->chunks = *pslab = slab;
 	return 0;
 }
 
@@ -252,21 +279,16 @@ static size_t varena_exact_size(const struct varena *varena, size_t count) {
 static struct arena *varena_get(struct varena *varena, size_t count) {
 	size_t i = varena_size_class(varena, count);
 
-	if (i >= varena->narenas) {
-		size_t narenas = i + 1;
-		struct arena *arenas = REALLOC_ARRAY(struct arena, varena->arenas, varena->narenas, narenas);
-		if (!arenas) {
+	while (i >= varena->narenas) {
+		size_t j = varena->narenas;
+		struct arena *arena = RESERVE(struct arena, &varena->arenas, &varena->narenas);
+		if (!arena) {
 			return NULL;
 		}
 
-		for (size_t j = varena->narenas; j < narenas; ++j) {
-			size_t shift = j + varena->shift;
-			size_t size = varena_exact_size(varena, (size_t)1 << shift);
-			arena_init(&arenas[j], varena->align, size);
-		}
-
-		varena->narenas = narenas;
-		varena->arenas = arenas;
+		size_t shift = j + varena->shift;
+		size_t size = varena_exact_size(varena, (size_t)1 << shift);
+		arena_init(arena, varena->align, size);
 	}
 
 	return &varena->arenas[i];

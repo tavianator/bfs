@@ -9,6 +9,7 @@
 #define BFS_ALLOC_H
 
 #include "config.h"
+#include <errno.h>
 #include <stdlib.h>
 
 /** Check if a size is properly aligned. */
@@ -178,6 +179,41 @@ void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
 /** Reallocate memory for a flexible struct. */
 #define REALLOC_FLEX(type, member, ptr, old_count, new_count) \
 	(type *)xrealloc((ptr), alignof(type), sizeof_flex(type, member, old_count), sizeof_flex(type, member, new_count))
+
+/**
+ * Reserve space for one more element in a dynamic array.
+ *
+ * @param ptr
+ *         The pointer to reallocate.
+ * @param align
+ *         The required alignment.
+ * @param count
+ *         The current size of the array.
+ * @return
+ *         The reallocated memory, on both success *and* failure.  On success,
+ *         errno will be set to zero, and the returned pointer will have room
+ *         for (count + 1) elements.  On failure, errno will be non-zero, and
+ *         ptr will returned unchanged.
+ */
+void *reserve(void *ptr, size_t align, size_t size, size_t count);
+
+/**
+ * Convenience macro to grow a dynamic array.
+ *
+ * @param type
+ *         The array element type.
+ * @param type **ptr
+ *         A pointer to the array.
+ * @param size_t *count
+ *         A pointer to the array's size.
+ * @return
+ *         On success, a pointer to the newly reserved array element, i.e.
+ *         `*ptr + *count++`.  On failure, NULL is returned, and both *ptr and
+ *         *count remain unchanged.
+ */
+#define RESERVE(type, ptr, count) \
+	((*ptr) = reserve((*ptr), alignof(type), sizeof(type), (*count)), \
+	 errno ? NULL : (*ptr) + (*count)++)
 
 /**
  * An arena allocator for fixed-size types.
