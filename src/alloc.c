@@ -8,7 +8,15 @@
 #include "sanity.h"
 #include <errno.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+
+/** The largest possible allocation size. */
+#if PTRDIFF_MAX < SIZE_MAX / 2
+#  define ALLOC_MAX ((size_t)PTRDIFF_MAX)
+#else
+#  define ALLOC_MAX (SIZE_MAX / 2)
+#endif
 
 /** Portable aligned_alloc()/posix_memalign(). */
 static void *xmemalign(size_t align, size_t size) {
@@ -29,7 +37,7 @@ void *alloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert(is_aligned(align, size));
 
-	if (size >> (SIZE_WIDTH - 1)) {
+	if (size > ALLOC_MAX) {
 		errno = EOVERFLOW;
 		return NULL;
 	}
@@ -45,7 +53,7 @@ void *zalloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert(is_aligned(align, size));
 
-	if (size >> (SIZE_WIDTH - 1)) {
+	if (size > ALLOC_MAX) {
 		errno = EOVERFLOW;
 		return NULL;
 	}
