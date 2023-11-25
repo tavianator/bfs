@@ -142,12 +142,12 @@ static int init_esc(struct colors *colors, const char *name, const char *value, 
 	*field = esc;
 
 	struct trie_leaf *leaf = trie_insert_str(&colors->names, name);
-	if (leaf) {
-		leaf->value = field;
-		return 0;
-	} else {
+	if (!leaf) {
 		return -1;
 	}
+
+	leaf->value = field;
+	return 0;
 }
 
 /** Check if an escape sequence is equal to a string. */
@@ -623,58 +623,58 @@ struct colors *parse_colors(void) {
 	trie_init(&colors->ext_trie);
 	trie_init(&colors->iext_trie);
 
-	int ret = 0;
+	bool fail = false;
 
 	// From man console_codes
 
-	ret |= init_esc(colors, "rs", "0",      &colors->reset);
-	ret |= init_esc(colors, "lc", "\033[",  &colors->leftcode);
-	ret |= init_esc(colors, "rc", "m",      &colors->rightcode);
-	ret |= init_esc(colors, "ec", NULL,     &colors->endcode);
-	ret |= init_esc(colors, "cl", "\033[K", &colors->clear_to_eol);
+	fail = fail || init_esc(colors, "rs", "0",      &colors->reset);
+	fail = fail || init_esc(colors, "lc", "\033[",  &colors->leftcode);
+	fail = fail || init_esc(colors, "rc", "m",      &colors->rightcode);
+	fail = fail || init_esc(colors, "ec", NULL,     &colors->endcode);
+	fail = fail || init_esc(colors, "cl", "\033[K", &colors->clear_to_eol);
 
-	ret |= init_esc(colors, "bld", "01;39", &colors->bold);
-	ret |= init_esc(colors, "gry", "01;30", &colors->gray);
-	ret |= init_esc(colors, "red", "01;31", &colors->red);
-	ret |= init_esc(colors, "grn", "01;32", &colors->green);
-	ret |= init_esc(colors, "ylw", "01;33", &colors->yellow);
-	ret |= init_esc(colors, "blu", "01;34", &colors->blue);
-	ret |= init_esc(colors, "mag", "01;35", &colors->magenta);
-	ret |= init_esc(colors, "cyn", "01;36", &colors->cyan);
-	ret |= init_esc(colors, "wht", "01;37", &colors->white);
+	fail = fail || init_esc(colors, "bld", "01;39", &colors->bold);
+	fail = fail || init_esc(colors, "gry", "01;30", &colors->gray);
+	fail = fail || init_esc(colors, "red", "01;31", &colors->red);
+	fail = fail || init_esc(colors, "grn", "01;32", &colors->green);
+	fail = fail || init_esc(colors, "ylw", "01;33", &colors->yellow);
+	fail = fail || init_esc(colors, "blu", "01;34", &colors->blue);
+	fail = fail || init_esc(colors, "mag", "01;35", &colors->magenta);
+	fail = fail || init_esc(colors, "cyn", "01;36", &colors->cyan);
+	fail = fail || init_esc(colors, "wht", "01;37", &colors->white);
 
-	ret |= init_esc(colors, "wrn", "01;33", &colors->warning);
-	ret |= init_esc(colors, "err", "01;31", &colors->error);
+	fail = fail || init_esc(colors, "wrn", "01;33", &colors->warning);
+	fail = fail || init_esc(colors, "err", "01;31", &colors->error);
 
 	// Defaults from man dir_colors
 	// "" means fall back to ->normal
 
-	ret |= init_esc(colors, "no", NULL,    &colors->normal);
+	fail = fail || init_esc(colors, "no", NULL,    &colors->normal);
 
-	ret |= init_esc(colors, "fi", "",      &colors->file);
-	ret |= init_esc(colors, "mh", NULL,    &colors->multi_hard);
-	ret |= init_esc(colors, "ex", "01;32", &colors->executable);
-	ret |= init_esc(colors, "ca", NULL,    &colors->capable);
-	ret |= init_esc(colors, "sg", "30;43", &colors->setgid);
-	ret |= init_esc(colors, "su", "37;41", &colors->setuid);
+	fail = fail || init_esc(colors, "fi", "",      &colors->file);
+	fail = fail || init_esc(colors, "mh", NULL,    &colors->multi_hard);
+	fail = fail || init_esc(colors, "ex", "01;32", &colors->executable);
+	fail = fail || init_esc(colors, "ca", NULL,    &colors->capable);
+	fail = fail || init_esc(colors, "sg", "30;43", &colors->setgid);
+	fail = fail || init_esc(colors, "su", "37;41", &colors->setuid);
 
-	ret |= init_esc(colors, "di", "01;34", &colors->directory);
-	ret |= init_esc(colors, "st", "37;44", &colors->sticky);
-	ret |= init_esc(colors, "ow", "34;42", &colors->other_writable);
-	ret |= init_esc(colors, "tw", "30;42", &colors->sticky_other_writable);
+	fail = fail || init_esc(colors, "di", "01;34", &colors->directory);
+	fail = fail || init_esc(colors, "st", "37;44", &colors->sticky);
+	fail = fail || init_esc(colors, "ow", "34;42", &colors->other_writable);
+	fail = fail || init_esc(colors, "tw", "30;42", &colors->sticky_other_writable);
 
-	ret |= init_esc(colors, "ln", "01;36", &colors->link);
-	ret |= init_esc(colors, "or", NULL,    &colors->orphan);
-	ret |= init_esc(colors, "mi", NULL,    &colors->missing);
+	fail = fail || init_esc(colors, "ln", "01;36", &colors->link);
+	fail = fail || init_esc(colors, "or", NULL,    &colors->orphan);
+	fail = fail || init_esc(colors, "mi", NULL,    &colors->missing);
 	colors->link_as_target = false;
 
-	ret |= init_esc(colors, "bd", "01;33", &colors->blockdev);
-	ret |= init_esc(colors, "cd", "01;33", &colors->chardev);
-	ret |= init_esc(colors, "do", "01;35", &colors->door);
-	ret |= init_esc(colors, "pi", "33",    &colors->pipe);
-	ret |= init_esc(colors, "so", "01;35", &colors->socket);
+	fail = fail || init_esc(colors, "bd", "01;33", &colors->blockdev);
+	fail = fail || init_esc(colors, "cd", "01;33", &colors->chardev);
+	fail = fail || init_esc(colors, "do", "01;35", &colors->door);
+	fail = fail || init_esc(colors, "pi", "33",    &colors->pipe);
+	fail = fail || init_esc(colors, "so", "01;35", &colors->socket);
 
-	if (ret != 0) {
+	if (fail) {
 		goto fail;
 	}
 
