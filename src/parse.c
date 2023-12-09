@@ -565,13 +565,17 @@ enum int_flags {
  * Parse an integer.
  */
 static const char *parse_int(const struct parser_state *state, char **arg, const char *str, void *result, enum int_flags flags) {
-	char *endptr;
+	// strtoll() skips leading spaces, but we want to reject them
+	if (xisspace(str[0])) {
+		goto bad;
+	}
 
 	int base = flags & IF_BASE_MASK;
 	if (base == 0) {
 		base = 10;
 	}
 
+	char *endptr;
 	errno = 0;
 	long long value = strtoll(str, &endptr, base);
 	if (errno != 0) {
