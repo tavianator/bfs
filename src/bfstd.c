@@ -647,16 +647,6 @@ wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb) {
 	}
 }
 
-/**
- * Work around https://github.com/llvm/llvm-project/issues/65532 by forcing a
- * function, not a macro, to be called.
- */
-#if __FreeBSD__ && SANITIZE_MEMORY
-#  define BFS_INTERCEPT(fn) (fn)
-#else
-#  define BFS_INTERCEPT(fn) fn
-#endif
-
 size_t xstrwidth(const char *str) {
 	size_t len = strlen(str);
 	size_t ret = 0;
@@ -689,17 +679,17 @@ static unsigned char ctype_cache[UCHAR_MAX + 1];
 /** Initialize the ctype cache. */
 static void char_cache_init(void) {
 	for (size_t c = 0; c <= UCHAR_MAX; ++c) {
-		if (BFS_INTERCEPT(isprint)(c)) {
+		if (xisprint(c)) {
 			ctype_cache[c] |= IS_PRINT;
 		}
-		if (BFS_INTERCEPT(isspace)(c)) {
+		if (xisspace(c)) {
 			ctype_cache[c] |= IS_SPACE;
 		}
 	}
 }
 
 /** Check if a character is printable. */
-static bool xisprint(unsigned char c, enum wesc_flags flags) {
+static bool wesc_isprint(unsigned char c, enum wesc_flags flags) {
 	if (ctype_cache[c] & IS_PRINT) {
 		return true;
 	}
@@ -715,21 +705,12 @@ static bool xisprint(unsigned char c, enum wesc_flags flags) {
 }
 
 /** Check if a wide character is printable. */
-static bool xiswprint(wchar_t c, enum wesc_flags flags) {
-#if __FreeBSD__ && SANITIZE_MEMORY
-// Work around https://github.com/llvm/llvm-project/issues/65532
-#  define bfs_iswprint (iswprint)
-#  define bfs_iswspace (iswspace)
-#else
-#  define bfs_iswprint iswprint
-#  define bfs_iswspace iswspace
-#endif
-
-	if (bfs_iswprint(c)) {
+static bool wesc_iswprint(wchar_t c, enum wesc_flags flags) {
+	if (xiswprint(c)) {
 		return true;
 	}
 
-	if (!(flags & WESC_SHELL) && bfs_iswspace(c)) {
+	if (!(flags & WESC_SHELL) && xiswspace(c)) {
 		return true;
 	}
 
@@ -753,18 +734,18 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 		}
 
 		for (size_t j = 0; j < sizeof(word); ++i, ++j) {
-			if (!xisprint(str[i], flags)) {
+			if (!wesc_isprint(str[i], flags)) {
 				return i;
 			}
 		}
 	}
 
 	for (; i < len; ++i) {
-		unsigned char c = str[i];
-		if (!isascii(c)) {
+		char c = str[i];
+		if (!xisascii(c)) {
 			goto multibyte;
 		}
-		if (!xisprint(c, flags)) {
+		if (!wesc_isprint(c, flags)) {
 			return i;
 		}
 	}
@@ -777,7 +758,7 @@ multibyte:;
 		if (wc == WEOF) {
 			break;
 		}
-		if (!xiswprint(wc, flags)) {
+		if (!wesc_iswprint(wc, flags)) {
 			break;
 		}
 	}
@@ -825,7 +806,7 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len, en
 
 		wint_t wc = xmbrtowc(str, &i, len, &mb);
 		if (wc != WEOF) {
-			safe = xiswprint(wc, flags);
+			safe = wesc_iswprint(wc, flags);
 		}
 
 		for (size_t j = start; safe && j < i; ++j) {

@@ -9,7 +9,38 @@
 #define BFS_BFSTD_H
 
 #include "config.h"
+#include "sanity.h"
 #include <stddef.h>
+
+#include <ctype.h>
+
+/**
+ * Work around https://github.com/llvm/llvm-project/issues/65532 by forcing a
+ * function, not a macro, to be called.
+ */
+#if __FreeBSD__ && SANITIZE_MEMORY
+#  define BFS_INTERCEPT(fn) (fn)
+#else
+#  define BFS_INTERCEPT(fn) fn
+#endif
+
+/**
+ * Wrap isalpha()/isdigit()/etc.
+ */
+#define BFS_ISCTYPE(fn, c) BFS_INTERCEPT(fn)((unsigned char)(c))
+
+#define xisalnum(c) BFS_ISCTYPE(isalnum, c)
+#define xisalpha(c) BFS_ISCTYPE(isalpha, c)
+#define xisascii(c) BFS_ISCTYPE(isascii, c)
+#define xiscntrl(c) BFS_ISCTYPE(iscntrl, c)
+#define xisdigit(c) BFS_ISCTYPE(isdigit, c)
+#define xislower(c) BFS_ISCTYPE(islower, c)
+#define xisgraph(c) BFS_ISCTYPE(isgraph, c)
+#define xisprint(c) BFS_ISCTYPE(isprint, c)
+#define xispunct(c) BFS_ISCTYPE(ispunct, c)
+#define xisspace(c) BFS_ISCTYPE(isspace, c)
+#define xisupper(c) BFS_ISCTYPE(isupper, c)
+#define xisxdigit(c) BFS_ISCTYPE(isxdigit, c)
 
 // #include <errno.h>
 
@@ -358,6 +389,25 @@ wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb);
  *         The likely width of that string in a terminal.
  */
 size_t xstrwidth(const char *str);
+
+#include <wctype.h>
+
+/**
+ * Wrap iswalpha()/iswdigit()/etc.
+ */
+#define BFS_ISWCTYPE(fn, c) BFS_INTERCEPT(fn)(c)
+
+#define xiswalnum(c) BFS_ISWCTYPE(iswalnum, c)
+#define xiswalpha(c) BFS_ISWCTYPE(iswalpha, c)
+#define xiswcntrl(c) BFS_ISWCTYPE(iswcntrl, c)
+#define xiswdigit(c) BFS_ISWCTYPE(iswdigit, c)
+#define xiswlower(c) BFS_ISWCTYPE(iswlower, c)
+#define xiswgraph(c) BFS_ISWCTYPE(iswgraph, c)
+#define xiswprint(c) BFS_ISWCTYPE(iswprint, c)
+#define xiswpunct(c) BFS_ISWCTYPE(iswpunct, c)
+#define xiswspace(c) BFS_ISWCTYPE(iswspace, c)
+#define xiswupper(c) BFS_ISWCTYPE(iswupper, c)
+#define xiswxdigit(c) BFS_ISWCTYPE(iswxdigit, c)
 
 // #include <wordexp.h>
 
