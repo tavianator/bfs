@@ -9,13 +9,13 @@
 <a href="https://codecov.io/gh/tavianator/bfs"><img src="https://img.shields.io/codecov/c/github/tavianator/bfs?token=PpBVuozOVC" alt="Code coverage" align="right"/></a>
 </h1>
 
-**[Features]   •   [Installation]   •   [Usage]   •   [Building]   •   [Hacking]   •   [Changelog]**
+**[Features]   •   [Installation]   •   [Usage]   •   [Building]   •   [Contributing]   •   [Changelog]**
 
 [Features]: #features
 [Installation]: #installation
 [Usage]: /docs/USAGE.md
 [Building]: /docs/BUILDING.md
-[Hacking]: /docs/HACKING.md
+[Contributing]: /docs/CONTRIBUTING.md
 [Changelog]: /docs/CHANGELOG.md
 
 <picture>

@@ -18,7 +18,7 @@ $ bfs
 ./completions/bfs.zsh
 ./docs/BUILDING.md
 ./docs/CHANGELOG.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ./docs/USAGE.md
 ./docs/bfs.1
 ...
@@ -53,7 +53,7 @@ $ bfs -name '*.md'
 ./README.md
 ./docs/BUILDING.md
 ./docs/CHANGELOG.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ./docs/USAGE.md
 ```
 
@@ -64,7 +64,7 @@ When you put multiple expressions next to each other, both of them must match:
 ```console
 $ bfs -name '*.md' -name '*ING*'
 ./docs/BUILDING.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ```
 
 This works because the expressions are implicitly combined with *logical and*.
@@ -84,7 +84,7 @@ $ bfs -name '*.md' -or -name 'bfs.*'
 ./completions/bfs.zsh
 ./docs/BUILDING.md
 ./docs/CHANGELOG.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ./docs/USAGE.md
 ./docs/bfs.1
 ```

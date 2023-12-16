@@ -1,5 +1,5 @@
-Hacking on `bfs`
-================
+Contributing to `bfs`
+=====================
 
 License
 -------
