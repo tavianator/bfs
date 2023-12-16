@@ -116,15 +116,26 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Use the system locale instead of "C"
-	setlocale(LC_ALL, "");
+	int locale_err = 0;
+	if (!setlocale(LC_ALL, "")) {
+		locale_err = errno;
+	}
 
+	// Parse the command line
 	struct bfs_ctx *ctx = bfs_parse_cmdline(argc, argv);
 	if (!ctx) {
 		return EXIT_FAILURE;
 	}
 
+	// Warn if setlocale() failed, unless there's no expression to evaluate
+	if (locale_err && ctx->warn && ctx->expr) {
+		bfs_warning(ctx, "Failed to set locale: %s\n\n", xstrerror(locale_err));
+	}
+
+	// Walk the file system tree, evaluating the expression on each file
 	int ret = bfs_eval(ctx);
 
+	// Free the parsed command line, and detect any last-minute errors
 	if (bfs_ctx_free(ctx) != 0 && ret == EXIT_SUCCESS) {
 		ret = EXIT_FAILURE;
 	}
