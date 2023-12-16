@@ -390,6 +390,11 @@ wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb);
  */
 size_t xstrwidth(const char *str);
 
+/**
+ * wcwidth() wrapper that works around LLVM bug #65532.
+ */
+#define xwcwidth BFS_INTERCEPT(wcwidth)
+
 #include <wctype.h>
 
 /**

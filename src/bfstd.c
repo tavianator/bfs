@@ -658,7 +658,7 @@ size_t xstrwidth(const char *str) {
 			// Assume a single-width '?'
 			++ret;
 		} else {
-			ret += BFS_INTERCEPT(wcwidth)(wc);
+			ret += xwcwidth(wc);
 		}
 	}
 

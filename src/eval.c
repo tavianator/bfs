@@ -1154,7 +1154,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 			// Invalid byte sequence, assume a single-width '?'
 			cwidth = 1;
 		} else {
-			cwidth = wcwidth(wc);
+			cwidth = xwcwidth(wc);
 			if (cwidth < 0) {
 				cwidth = 0;
 			}
