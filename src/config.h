@@ -212,8 +212,8 @@ typedef long double max_align_t;
  */
 #if __has_c_attribute(nodiscard)
 #  define attr_nodiscard [[nodiscard]]
-#elif __has_attribute(nodiscard)
-#  define attr_nodiscard __attribute__((nodiscard))
+#elif __has_attribute(warn_unused_result)
+#  define attr_nodiscard __attribute__((warn_unused_result))
 #else
 #  define attr_nodiscard
 #endif
