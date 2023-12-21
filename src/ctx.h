@@ -8,9 +8,11 @@
 #ifndef BFS_CTX_H
 #define BFS_CTX_H
 
+#include "alloc.h"
 #include "bftw.h"
 #include "config.h"
 #include "diag.h"
+#include "expr.h"
 #include "trie.h"
 #include <stddef.h>
 #include <sys/resource.h>
@@ -34,6 +36,10 @@ struct bfs_ctx {
 	struct bfs_expr *expr;
 	/** An expression for files to filter out. */
 	struct bfs_expr *exclude;
+	/** A list of allocated expressions. */
+	struct bfs_exprs expr_list;
+	/** bfs_expr arena. */
+	struct arena expr_arena;
 
 	/** -mindepth option. */
 	int mindepth;

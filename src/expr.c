@@ -3,24 +3,27 @@
 
 #include "expr.h"
 #include "alloc.h"
+#include "ctx.h"
 #include "eval.h"
 #include "exec.h"
 #include "printf.h"
 #include "xregex.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval_fn, size_t argc, char **argv) {
-	struct bfs_expr *expr = ZALLOC(struct bfs_expr);
+struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t argc, char **argv) {
+	struct bfs_expr *expr = arena_alloc(&ctx->expr_arena);
 	if (!expr) {
-		perror("zalloc()");
 		return NULL;
 	}
 
+	memset(expr, 0, sizeof(*expr));
 	expr->eval_fn = eval_fn;
 	expr->argc = argc;
 	expr->argv = argv;
 	expr->probability = 0.5;
+	SLIST_PREPEND(&ctx->expr_list, expr);
 	return expr;
 }
 
@@ -36,21 +39,12 @@ bool bfs_expr_never_returns(const struct bfs_expr *expr) {
 	return expr->always_true && expr->always_false;
 }
 
-void bfs_expr_free(struct bfs_expr *expr) {
-	if (!expr) {
-		return;
-	}
-
-	if (bfs_expr_is_parent(expr)) {
-		bfs_expr_free(expr->rhs);
-		bfs_expr_free(expr->lhs);
-	} else if (expr->eval_fn == eval_exec) {
+void bfs_expr_clear(struct bfs_expr *expr) {
+	if (expr->eval_fn == eval_exec) {
 		bfs_exec_free(expr->exec);
 	} else if (expr->eval_fn == eval_fprintf) {
 		bfs_printf_free(expr->printf);
 	} else if (expr->eval_fn == eval_regex) {
 		bfs_regfree(expr->regex);
 	}
-
-	free(expr);
 }

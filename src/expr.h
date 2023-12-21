@@ -75,9 +75,20 @@ enum bfs_size_unit {
 };
 
 /**
+ * A linked list of expressions.
+ */
+struct bfs_exprs {
+	struct bfs_expr *head;
+	struct bfs_expr **tail;
+};
+
+/**
  * A command line expression.
  */
 struct bfs_expr {
+	/** The next allocated expression. */
+	struct bfs_expr *next;
+
 	/** The function that evaluates this expression. */
 	bfs_eval_fn *eval_fn;
 
@@ -199,10 +210,12 @@ struct bfs_expr {
 	};
 };
 
+struct bfs_ctx;
+
 /**
  * Create a new expression.
  */
-struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval, size_t argc, char **argv);
+struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv);
 
 /**
  * @return Whether the expression has child expressions.
@@ -220,8 +233,8 @@ bool bfs_expr_never_returns(const struct bfs_expr *expr);
 bool bfs_expr_cmp(const struct bfs_expr *expr, long long n);
 
 /**
- * Free an expression tree.
+ * Free any resources owned by an expression.
  */
-void bfs_expr_free(struct bfs_expr *expr);
+void bfs_expr_clear(struct bfs_expr *expr);
 
 #endif // BFS_EXPR_H
