@@ -62,25 +62,30 @@ jobs:
   freebsd:
     name: FreeBSD
 
-    if: ${{ github.repository_owner == 'tavianator' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-
     runs-on: ubuntu-22.04
-
-    concurrency: spurion
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: tailscale/github-action@v2
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
       - name: Run tests
-        run: |
-          spurion=$(tailscale ip -6 spurion)
-          mkdir ~/.ssh
-          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n' "$spurion" >~/.ssh/config
-          rsync -rl --delete . "[$spurion]:bfs"
-          ssh "$spurion" '. ~/.ssh/rc; gmake -C bfs -j$(nproc) distcheck CC=clang16 JOBS=-j$(nproc)'
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14.0"
+          usesh: true
+          copyback: false
+
+          prepare: |
+            pkg install -y \
+                bash \
+                expect \
+                gmake \
+                llvm16 \
+                oniguruma \
+                sudo \
+                tcl-wrapper
+            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
+            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
+
+          run: |
+            chown -R action:action .
+            su action -c 'gmake -j$(nproc) distcheck CC=clang16 JOBS=-j$(nproc)'
