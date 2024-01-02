@@ -6,10 +6,10 @@ jobs:
   linux:
     name: Linux
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -48,7 +48,7 @@ jobs:
     runs-on: macos-13
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -64,14 +64,14 @@ jobs:
 
     if: ${{ github.repository_owner == 'tavianator' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     concurrency: spurion
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - uses: tailscale/github-action@main
+      - uses: tailscale/github-action@v2
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
