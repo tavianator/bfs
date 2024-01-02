@@ -90,7 +90,7 @@ struct bfs_users *bfs_users_new(void) {
 static void *bfs_getpwnam_impl(const void *key, void *ptr, size_t bufsize) {
 	struct bfs_passwd *storage = ptr;
 
-	struct passwd *ret;
+	struct passwd *ret = NULL;
 	errno = getpwnam_r(key, &storage->pwd, storage->buf, bufsize, &ret);
 	return ret;
 }
@@ -109,7 +109,7 @@ static void *bfs_getpwuid_impl(const void *key, void *ptr, size_t bufsize) {
 	const uid_t *uid = key;
 	struct bfs_passwd *storage = ptr;
 
-	struct passwd *ret;
+	struct passwd *ret = NULL;
 	errno = getpwuid_r(*uid, &storage->pwd, storage->buf, bufsize, &ret);
 	return ret;
 }
@@ -171,7 +171,7 @@ struct bfs_groups *bfs_groups_new(void) {
 static void *bfs_getgrnam_impl(const void *key, void *ptr, size_t bufsize) {
 	struct bfs_group *storage = ptr;
 
-	struct group *ret;
+	struct group *ret = NULL;
 	errno = getgrnam_r(key, &storage->grp, storage->buf, bufsize, &ret);
 	return ret;
 }
@@ -190,7 +190,7 @@ static void *bfs_getgrgid_impl(const void *key, void *ptr, size_t bufsize) {
 	const gid_t *gid = key;
 	struct bfs_group *storage = ptr;
 
-	struct group *ret;
+	struct group *ret = NULL;
 	errno = getgrgid_r(*gid, &storage->grp, storage->buf, bufsize, &ret);
 	return ret;
 }
