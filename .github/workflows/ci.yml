@@ -88,7 +88,7 @@ jobs:
 
           run: |
             chown -R action:action .
-            su action -c 'gmake -j$(nproc) distcheck CC=clang16 JOBS=-j$(nproc)'
+            sudo -u action gmake -j$(nproc) distcheck CC=clang16 JOBS=-j$(nproc)
 
   openbsd:
     name: OpenBSD
@@ -119,3 +119,36 @@ jobs:
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
             doas -u action gmake -j$jobs check JOBS=-j$jobs TEST_FLAGS="--sudo=doas --verbose=skipped"
+
+  netbsd:
+    name: NetBSD
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: vmactions/netbsd-vm@v1
+        with:
+          release: "9.3"
+          usesh: true
+          copyback: false
+
+          prepare: |
+            PATH="/sbin:/usr/sbin:$PATH"
+            pkg_add \
+                bash \
+                clang \
+                gmake \
+                oniguruma \
+                sudo \
+                tcl-expect
+            useradd -m -G wheel -g =uid action
+            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/pkg/etc/sudoers
+
+          run: |
+            PATH="/sbin:/usr/sbin:$PATH"
+            chown -R action:action .
+            jobs=$(sysctl -n hw.ncpu)
+            sudo -u action gmake -j$jobs check CC=clang LDFLAGS="-rpath /usr/pkg/lib" JOBS=-j$jobs TEST_FLAGS="--sudo --verbose=skipped"
