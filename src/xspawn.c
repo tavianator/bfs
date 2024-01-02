@@ -167,7 +167,7 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	}
 
 #ifndef BFS_HAS_POSIX_SPAWN_FCHDIR
-#  define BFS_HAS_POSIX_SPAWN_FCHDIR __NetBSD__
+#  define BFS_HAS_POSIX_SPAWN_FCHDIR __NetBSD_Prereq__(10, 0, 0)
 #endif
 
 #ifndef BFS_HAS_POSIX_SPAWN_FCHDIR_NP
