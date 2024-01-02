@@ -609,8 +609,14 @@ error:
 int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear) {
 #if BSD && !__GNU__
 	char *str_arg = (char *)*str;
-	unsigned long set_arg = 0;
-	unsigned long clear_arg = 0;
+
+#if __OpenBSD__
+	typedef uint32_t fflags_t;
+#else
+	typedef unsigned long fflags_t;
+#endif
+	fflags_t set_arg = 0;
+	fflags_t clear_arg = 0;
 
 #if __NetBSD__
 	int ret = string_to_flags(&str_arg, &set_arg, &clear_arg);
