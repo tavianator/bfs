@@ -89,3 +89,33 @@ jobs:
           run: |
             chown -R action:action .
             su action -c 'gmake -j$(nproc) distcheck CC=clang16 JOBS=-j$(nproc)'
+
+  openbsd:
+    name: OpenBSD
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: vmactions/openbsd-vm@v1
+        with:
+          release: "7.4"
+          usesh: true
+          copyback: false
+
+          prepare: |
+            pkg_add \
+                bash \
+                expect \
+                gmake \
+                oniguruma
+            adduser -group USER -batch action wheel </dev/null
+            cp /etc/examples/doas.conf /etc/doas.conf
+            echo "permit nopass keepenv :wheel" >>/etc/doas.conf
+
+          run: |
+            chown -R action:action .
+            jobs=$(sysctl -n hw.ncpu)
+            doas -u action gmake -j$jobs check JOBS=-j$jobs TEST_FLAGS="--sudo=doas --verbose=skipped"
