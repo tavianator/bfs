@@ -149,6 +149,10 @@
 #  define __GLIBC_PREREQ(maj, min) false
 #endif
 
+#ifndef __NetBSD_Prereq__
+#  define __NetBSD_Prereq__(maj, min, patch) false
+#endif
+
 // Fundamental utilities
 
 /**
