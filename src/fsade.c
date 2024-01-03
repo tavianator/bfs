@@ -117,24 +117,60 @@ static bool is_absence_error(int error) {
 
 #if BFS_CAN_CHECK_ACL
 
+/** Unified interface for incompatible acl_get_entry() implementations. */
+static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
+#if __DragonFly__ && !defined(ACL_FIRST_ENTRY) && !defined(ACL_NEXT_ENTRY)
+#  define ACL_FIRST_ENTRY 0
+#  define ACL_NEXT_ENTRY  1
+
+	switch (which) {
+	case ACL_FIRST_ENTRY:
+		*entry = &acl->acl_entry[0];
+		break;
+	case ACL_NEXT_ENTRY:
+		++*entry;
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	acl_entry_t last = &acl->acl_entry[acl->acl_cnt];
+	return *entry == last;
+#else
+	int ret = acl_get_entry(acl, which, entry);
+#  if __APPLE__
+	// POSIX.1e specifies a return value of 1 for success, but macOS returns 0 instead
+	return !ret;
+#  else
+	return ret;
+#  endif
+#endif
+}
+
+/** Unified interface for acl_get_tag_type(). */
+static int bfs_acl_tag_type(acl_entry_t entry, acl_tag_t *tag) {
+#if __DragonFly__
+	*tag = entry->ae_tag;
+	return 0;
+#else
+	return acl_get_tag_type(entry, tag);
+#endif
+}
+
 /** Check if a POSIX.1e ACL is non-trivial. */
 static int bfs_check_posix1e_acl(acl_t acl, bool ignore_required) {
 	int ret = 0;
 
 	acl_entry_t entry;
-	for (int status = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
-#if __APPLE__
-	     // POSIX.1e specifies a return value of 1 for success, but macOS
-	     // returns 0 instead
-	     status == 0;
-#else
+	for (int status = bfs_acl_entry(acl, ACL_FIRST_ENTRY, &entry);
 	     status > 0;
-#endif
-	     status = acl_get_entry(acl, ACL_NEXT_ENTRY, &entry)) {
+	     status = bfs_acl_entry(acl, ACL_NEXT_ENTRY, &entry))
+	{
 #if defined(ACL_USER_OBJ) && defined(ACL_GROUP_OBJ) && defined(ACL_OTHER)
 		if (ignore_required) {
 			acl_tag_t tag;
-			if (acl_get_tag_type(entry, &tag) != 0) {
+			if (bfs_acl_tag_type(entry, &tag) != 0) {
 				ret = -1;
 				continue;
 			}

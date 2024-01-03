@@ -160,6 +160,10 @@ ifeq ($(OS),NetBSD)
 LOCAL_LDLIBS += -lutil
 endif
 
+ifeq ($(OS),DragonFly)
+LOCAL_LDLIBS += -lposix1e
+endif
+
 ifneq ($(filter gcov,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += --coverage
 # gcov only intercepts fork()/exec() with -std=gnu*
