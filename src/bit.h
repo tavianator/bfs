@@ -174,30 +174,30 @@
 #endif
 
 #if __STDC_VERSION__ >= C23
-#  define bswap16 stdc_memreverse8u16
-#  define bswap32 stdc_memreverse8u32
-#  define bswap64 stdc_memreverse8u64
+#  define bswap_u16 stdc_memreverse8u16
+#  define bswap_u32 stdc_memreverse8u32
+#  define bswap_u64 stdc_memreverse8u64
 #elif __GNUC__
-#  define bswap16 __builtin_bswap16
-#  define bswap32 __builtin_bswap32
-#  define bswap64 __builtin_bswap64
+#  define bswap_u16 __builtin_bswap16
+#  define bswap_u32 __builtin_bswap32
+#  define bswap_u64 __builtin_bswap64
 #else
 
-static inline uint16_t bswap16(uint16_t n) {
+static inline uint16_t bswap_u16(uint16_t n) {
 	return (n << 8) | (n >> 8);
 }
 
-static inline uint32_t bswap32(uint32_t n) {
-	return ((uint32_t)bswap16(n) << 16) | bswap16(n >> 16);
+static inline uint32_t bswap_u32(uint32_t n) {
+	return ((uint32_t)bswap_u16(n) << 16) | bswap_u16(n >> 16);
 }
 
-static inline uint64_t bswap64(uint64_t n) {
-	return ((uint64_t)bswap32(n) << 32) | bswap32(n >> 32);
+static inline uint64_t bswap_u64(uint64_t n) {
+	return ((uint64_t)bswap_u32(n) << 32) | bswap_u32(n >> 32);
 }
 
 #endif
 
-static inline uint8_t bswap8(uint8_t n) {
+static inline uint8_t bswap_u8(uint8_t n) {
 	return n;
 }
 
@@ -206,10 +206,10 @@ static inline uint8_t bswap8(uint8_t n) {
  */
 #define bswap(n) \
 	_Generic((n), \
-		uint8_t: bswap8, \
-		uint16_t: bswap16, \
-		uint32_t: bswap32, \
-		uint64_t: bswap64)(n)
+		uint8_t: bswap_u8, \
+		uint16_t: bswap_u16, \
+		uint32_t: bswap_u32, \
+		uint64_t: bswap_u64)(n)
 
 // Define an overload for each unsigned type
 #define UINT_OVERLOADS(macro) \
