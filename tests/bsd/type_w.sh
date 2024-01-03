@@ -5,7 +5,11 @@ command -v newfs &>/dev/null || skip
 cd "$TEST"
 
 # Create a ramdisk
-truncate -s1M img
+if command -v truncate &>/dev/null; then
+    truncate -s1M img
+else
+    dd if=/dev/zero of=img bs=1k count=1k
+fi
 md=$(bfs_sudo mdconfig img) || skip
 defer bfs_sudo mdconfig -du "$md"
 
