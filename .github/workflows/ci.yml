@@ -152,3 +152,34 @@ jobs:
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
             sudo -u action gmake -j$jobs check CC=clang LDFLAGS="-rpath /usr/pkg/lib" JOBS=-j$jobs TEST_FLAGS="--sudo --verbose=skipped"
+
+  dragonflybsd:
+    name: DragonFly BSD
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: vmactions/dragonflybsd-vm@v1
+        with:
+          release: "6.4.0"
+          usesh: true
+          copyback: false
+
+          prepare: |
+            pkg install -y \
+                bash \
+                expect \
+                gmake \
+                oniguruma \
+                sudo \
+                tcl-wrapper
+            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
+            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
+
+          run: |
+            chown -R action:action .
+            jobs=$(sysctl -n hw.ncpu)
+            sudo -u action gmake -j$jobs check JOBS=-j$jobs TEST_FLAGS="--sudo --verbose=skipped"
