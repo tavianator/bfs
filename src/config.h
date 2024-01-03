@@ -253,10 +253,10 @@ typedef long double max_align_t;
  * Annotates allocator-like functions.
  */
 #if __has_attribute(malloc)
-#  if __clang__
-#    define attr_malloc(...) attr_nodiscard __attribute__((malloc))
-#  else
+#  if __GNUC__ >= 11
 #    define attr_malloc(...) attr_nodiscard __attribute__((malloc(__VA_ARGS__)))
+#  else
+#    define attr_malloc(...) attr_nodiscard __attribute__((malloc))
 #  endif
 #else
 #  define attr_malloc(...) attr_nodiscard
