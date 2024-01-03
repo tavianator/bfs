@@ -739,8 +739,20 @@ static int bftw_file_open(struct bftw_state *state, struct bftw_file *file, cons
 	}
 
 	int fd = bftw_file_openat(state, file, base, at_path);
-	if (fd >= 0 || errno != ENAMETOOLONG) {
+	if (fd >= 0) {
 		return fd;
+	}
+
+	switch (errno) {
+	case ENAMETOOLONG:
+#if __DragonFly__
+	// https://twitter.com/tavianator/status/1742991411203485713
+	case EFAULT:
+#endif
+		break;
+
+	default:
+		return -1;
 	}
 
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component
