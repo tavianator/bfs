@@ -287,7 +287,7 @@ typedef long double max_align_t;
  * Check if function multiversioning via GNU indirect functions (ifunc) is supported.
  */
 #ifndef BFS_USE_TARGET_CLONES
-#  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__ || __NetBSD__)
+#  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__)
 #    define BFS_USE_TARGET_CLONES true
 #  endif
 #endif
