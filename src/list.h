@@ -198,13 +198,50 @@
 	(void)sizeof(list->tail - &list->head)
 
 /**
+ * Get the head of a singly-linked list.
+ *
+ * @param list
+ *         The list in question.
+ * @return
+ *         The first item in the list.
+ */
+#define SLIST_HEAD(list) \
+	SLIST_HEAD_((list))
+
+#define SLIST_HEAD_(list) \
+	(SLIST_CHECK_(list), list->head)
+
+/**
  * Check if a singly-linked list is empty.
  */
 #define SLIST_EMPTY(list) \
-	SLIST_EMPTY_((list))
+	(!SLIST_HEAD(list))
 
-#define SLIST_EMPTY_(list) \
-	(SLIST_CHECK_(list), !list->head)
+/**
+ * Like container_of(), but using the head pointer instead of offsetof() since
+ * we don't have the type around.
+ */
+#define SLIST_CONTAINER_(tail, head, next) \
+	(void *)((char *)tail - ((char *)&head->next - (char *)head))
+
+/**
+ * Get the tail of a singly-linked list.
+ *
+ * @param list
+ *         The list in question.
+ * @param node (optional)
+ *         If specified, use item->node.next rather than item->next.
+ * @return
+ *         The last item in the list.
+ */
+#define SLIST_TAIL(...) \
+	SLIST_TAIL_(__VA_ARGS__, )
+
+#define SLIST_TAIL_(list, ...) \
+	SLIST_TAIL__((list), LIST_NEXT_(__VA_ARGS__))
+
+#define SLIST_TAIL__(list, next) \
+	(list->head ? SLIST_CONTAINER_(list->tail, list->head, next) : NULL)
 
 /**
  * Check if an item is attached to a singly-linked list.
