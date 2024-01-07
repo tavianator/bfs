@@ -591,6 +591,7 @@ done:
  * -i?name test.
  */
 bool eval_name(const struct bfs_expr *expr, struct bfs_eval *state) {
+	bool ret = false;
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
@@ -599,9 +600,15 @@ bool eval_name(const struct bfs_expr *expr, struct bfs_eval *state) {
 		// Any trailing slashes are not part of the name.  This can only
 		// happen for the root path.
 		name = copy = xbasename(name);
+		if (!name) {
+			eval_report_error(state);
+			goto done;
+		}
 	}
 
-	bool ret = eval_fnmatch(expr, name);
+	ret = eval_fnmatch(expr, name);
+
+done:
 	free(copy);
 	return ret;
 }
