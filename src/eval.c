@@ -372,11 +372,10 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 			}
 			ret = -1;
 		}
-	} else if (bfs_expr_is_parent(expr)) {
-		if (expr->lhs && eval_exec_finish(expr->lhs, ctx) != 0) {
-			ret = -1;
-		}
-		if (expr->rhs && eval_exec_finish(expr->rhs, ctx) != 0) {
+	}
+
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		if (eval_exec_finish(child, ctx) != 0) {
 			ret = -1;
 		}
 	}
@@ -1045,50 +1044,48 @@ static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate a negation.
  */
 bool eval_not(const struct bfs_expr *expr, struct bfs_eval *state) {
-	return !eval_expr(expr->rhs, state);
+	return !eval_expr(bfs_expr_children(expr), state);
 }
 
 /**
  * Evaluate a conjunction.
  */
 bool eval_and(const struct bfs_expr *expr, struct bfs_eval *state) {
-	if (!eval_expr(expr->lhs, state)) {
-		return false;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		if (!eval_expr(child, state) || state->quit) {
+			return false;
+		}
 	}
 
-	if (state->quit) {
-		return false;
-	}
-
-	return eval_expr(expr->rhs, state);
+	return true;
 }
 
 /**
  * Evaluate a disjunction.
  */
 bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
-	if (eval_expr(expr->lhs, state)) {
-		return true;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		if (eval_expr(child, state) || state->quit) {
+			return true;
+		}
 	}
 
-	if (state->quit) {
-		return false;
-	}
-
-	return eval_expr(expr->rhs, state);
+	return false;
 }
 
 /**
  * Evaluate the comma operator.
  */
 bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
-	eval_expr(expr->lhs, state);
-
-	if (state->quit) {
-		return false;
+	bool ret;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		ret = eval_expr(child, state);
+		if (state->quit) {
+			break;
+		}
 	}
 
-	return eval_expr(expr->rhs, state);
+	return ret;
 }
 
 /** Update the status bar. */
@@ -1571,12 +1568,8 @@ static bool eval_must_buffer(const struct bfs_expr *expr) {
 		return true;
 	}
 
-	if (bfs_expr_is_parent(expr)) {
-		if (expr->lhs && eval_must_buffer(expr->lhs)) {
-			return true;
-		}
-
-		if (expr->rhs && eval_must_buffer(expr->rhs)) {
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		if (eval_must_buffer(child)) {
 			return true;
 		}
 	}

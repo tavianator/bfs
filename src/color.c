@@ -1109,7 +1109,11 @@ attr(printf(2, 3))
 static int cbuff(CFILE *cfile, const char *format, ...);
 
 /** Dump a parsed expression tree, for debugging. */
-static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
+static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, int depth) {
+	if (depth >= 2) {
+		return dstrcat(&cfile->buffer, "(...)");
+	}
+
 	if (!expr) {
 		return dstrcat(&cfile->buffer, "(null)");
 	}
@@ -1118,13 +1122,7 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 		return -1;
 	}
 
-	const struct bfs_expr *lhs = NULL;
-	const struct bfs_expr *rhs = NULL;
-
 	if (bfs_expr_is_parent(expr)) {
-		lhs = expr->lhs;
-		rhs = expr->rhs;
-
 		if (cbuff(cfile, "${red}%pq${rs}", expr->argv[0]) < 0) {
 			return -1;
 		}
@@ -1152,21 +1150,20 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose) {
 		}
 	}
 
-	if (lhs) {
+	int count = 0;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
 		if (dstrcat(&cfile->buffer, " ") != 0) {
 			return -1;
 		}
-		if (print_expr(cfile, lhs, verbose) != 0) {
-			return -1;
-		}
-	}
-
-	if (rhs) {
-		if (dstrcat(&cfile->buffer, " ") != 0) {
-			return -1;
-		}
-		if (print_expr(cfile, rhs, verbose) != 0) {
-			return -1;
+		if (++count >= 3) {
+			if (dstrcat(&cfile->buffer, "...") != 0) {
+				return -1;
+			}
+			break;
+		} else {
+			if (print_expr(cfile, child, verbose, depth + 1) != 0) {
+				return -1;
+			}
 		}
 	}
 
@@ -1276,12 +1273,12 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 					break;
 
 				case 'e':
-					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), false) != 0) {
+					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), false, 0) != 0) {
 						return -1;
 					}
 					break;
 				case 'E':
-					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), true) != 0) {
+					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), true, 0) != 0) {
 						return -1;
 					}
 					break;

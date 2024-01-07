@@ -21,6 +21,7 @@
 #include "exec.h"
 #include "expr.h"
 #include "fsade.h"
+#include "list.h"
 #include "opt.h"
 #include "printf.h"
 #include "pwcache.h"
@@ -47,10 +48,9 @@
 #include <unistd.h>
 
 // Strings printed by -D tree for "fake" expressions
-static char *fake_and_arg = "-a";
-static char *fake_false_arg = "-false";
+static char *fake_and_arg = "-and";
 static char *fake_hidden_arg = "-hidden";
-static char *fake_or_arg = "-o";
+static char *fake_or_arg = "-or";
 static char *fake_print_arg = "-print";
 static char *fake_true_arg = "-true";
 
@@ -319,12 +319,8 @@ static struct bfs_expr *new_unary_expr(const struct bfs_parser *parser, bfs_eval
 		return NULL;
 	}
 
-	expr->lhs = NULL;
-	expr->rhs = rhs;
 	bfs_assert(bfs_expr_is_parent(expr));
-
-	expr->persistent_fds = rhs->persistent_fds;
-	expr->ephemeral_fds = rhs->ephemeral_fds;
+	bfs_expr_append(expr, rhs);
 	return expr;
 }
 
@@ -337,17 +333,9 @@ static struct bfs_expr *new_binary_expr(const struct bfs_parser *parser, bfs_eva
 		return NULL;
 	}
 
-	expr->lhs = lhs;
-	expr->rhs = rhs;
 	bfs_assert(bfs_expr_is_parent(expr));
-
-	expr->persistent_fds = lhs->persistent_fds + rhs->persistent_fds;
-	if (lhs->ephemeral_fds > rhs->ephemeral_fds) {
-		expr->ephemeral_fds = lhs->ephemeral_fds;
-	} else {
-		expr->ephemeral_fds = rhs->ephemeral_fds;
-	}
-
+	bfs_expr_append(expr, lhs);
+	bfs_expr_append(expr, rhs);
 	return expr;
 }
 
@@ -772,19 +760,6 @@ static struct bfs_expr *parse_unary_action(struct bfs_parser *parser, bfs_eval_f
 	}
 
 	return parse_action(parser, eval_fn, 2);
-}
-
-/**
- * Add an expression to the exclusions.
- */
-static int parse_exclude(struct bfs_parser *parser, struct bfs_expr *expr) {
-	struct bfs_ctx *ctx = parser->ctx;
-	ctx->exclude = new_binary_expr(parser, eval_or, ctx->exclude, expr, &fake_or_arg);
-	if (ctx->exclude) {
-		return 0;
-	} else {
-		return -1;
-	}
 }
 
 /**
@@ -1839,10 +1814,7 @@ static struct bfs_expr *parse_nohidden(struct bfs_parser *parser, int arg1, int 
 		return NULL;
 	}
 
-	if (parse_exclude(parser, hidden) != 0) {
-		return NULL;
-	}
-
+	bfs_expr_append(parser->ctx->exclude, hidden);
 	return parse_nullary_option(parser);
 }
 
@@ -3206,10 +3178,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 
 		parser->excluding = false;
 
-		if (parse_exclude(parser, factor) != 0) {
-			return NULL;
-		}
-
+		bfs_expr_append(parser->ctx->exclude, factor);
 		return parse_new_expr(parser, eval_true, parser->argv - argv, argv);
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
 		char **argv = parser_advance(parser, T_OPERATOR, 1);
@@ -3428,19 +3397,29 @@ static void dump_expr_multiline(const struct bfs_ctx *ctx, enum debug_flags flag
 		cfprintf(ctx->cerr, "  ");
 	}
 
+	bool close = true;
+
 	if (bfs_expr_is_parent(expr)) {
-		cfprintf(ctx->cerr, "(${red}%s${rs}\n", expr->argv[0]);
-		if (expr->lhs) {
-			dump_expr_multiline(ctx, flag, expr->lhs, indent + 1, 0);
+		if (SLIST_EMPTY(&expr->children)) {
+			cfprintf(ctx->cerr, "(${red}%s${rs}", expr->argv[0]);
+			++rparens;
+		} else {
+			cfprintf(ctx->cerr, "(${red}%s${rs}\n", expr->argv[0]);
+			for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+				int parens = child->next ? 0 : rparens + 1;
+				dump_expr_multiline(ctx, flag, child, indent + 1, parens);
+			}
+			close = false;
 		}
-		dump_expr_multiline(ctx, flag, expr->rhs, indent + 1, rparens + 1);
 	} else {
 		if (flag == DEBUG_RATES) {
 			cfprintf(ctx->cerr, "%pE", expr);
 		} else {
 			cfprintf(ctx->cerr, "%pe", expr);
 		}
+	}
 
+	if (close) {
 		for (int i = 0; i < rparens; ++i) {
 			cfprintf(ctx->cerr, ")");
 		}
@@ -3540,10 +3519,8 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 
 	fputs("\n", stderr);
 
-	if (ctx->exclude->eval_fn != eval_false) {
-		bfs_debug(ctx, flag, "(${red}-exclude${rs}\n");
-		dump_expr_multiline(ctx, flag, ctx->exclude, 1, 1);
-	}
+	bfs_debug(ctx, flag, "(${red}-exclude${rs}\n");
+	dump_expr_multiline(ctx, flag, ctx->exclude, 1, 1);
 
 	dump_expr_multiline(ctx, flag, ctx->expr, 0, 0);
 }
@@ -3638,7 +3615,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.now = ctx->now,
 	};
 
-	ctx->exclude = parse_new_expr(&parser, eval_false, 1, &fake_false_arg);
+	ctx->exclude = parse_new_expr(&parser, eval_or, 1, &fake_or_arg);
 	if (!ctx->exclude) {
 		goto fail;
 	}

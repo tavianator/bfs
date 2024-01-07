@@ -158,9 +158,8 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 		}
 	}
 
-	if (bfs_expr_is_parent(expr)) {
-		ret |= highlight_expr_recursive(ctx, expr->lhs, args);
-		ret |= highlight_expr_recursive(ctx, expr->rhs, args);
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		ret |= highlight_expr_recursive(ctx, child, args);
 	}
 
 	return ret;

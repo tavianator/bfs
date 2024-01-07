@@ -23,7 +23,12 @@ struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t 
 	expr->argc = argc;
 	expr->argv = argv;
 	expr->probability = 0.5;
-	SLIST_PREPEND(&ctx->expr_list, expr);
+	SLIST_PREPEND(&ctx->expr_list, expr, freelist);
+
+	if (bfs_expr_is_parent(expr)) {
+		SLIST_INIT(&expr->children);
+	}
+
 	return expr;
 }
 
@@ -32,6 +37,36 @@ bool bfs_expr_is_parent(const struct bfs_expr *expr) {
 		|| expr->eval_fn == eval_or
 		|| expr->eval_fn == eval_not
 		|| expr->eval_fn == eval_comma;
+}
+
+struct bfs_expr *bfs_expr_children(const struct bfs_expr *expr) {
+	if (bfs_expr_is_parent(expr)) {
+		return expr->children.head;
+	} else {
+		return NULL;
+	}
+}
+
+void bfs_expr_append(struct bfs_expr *expr, struct bfs_expr *child) {
+	bfs_assert(bfs_expr_is_parent(expr));
+
+	SLIST_APPEND(&expr->children, child);
+
+	if (!child->pure) {
+		expr->pure = false;
+	}
+
+	expr->persistent_fds += child->persistent_fds;
+	if (expr->ephemeral_fds < child->ephemeral_fds) {
+		expr->ephemeral_fds = child->ephemeral_fds;
+	}
+}
+
+void bfs_expr_extend(struct bfs_expr *expr, struct bfs_exprs *children) {
+	while (!SLIST_EMPTY(children)) {
+		struct bfs_expr *child = SLIST_POP(children);
+		bfs_expr_append(expr, child);
+	}
 }
 
 bool bfs_expr_never_returns(const struct bfs_expr *expr) {

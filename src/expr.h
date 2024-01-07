@@ -86,8 +86,10 @@ struct bfs_exprs {
  * A command line expression.
  */
 struct bfs_expr {
-	/** The next allocated expression. */
+	/** This expression's next sibling, if any. */
 	struct bfs_expr *next;
+	/** The next allocated expression. */
+	struct { struct bfs_expr *next; } freelist;
 
 	/** The function that evaluates this expression. */
 	bfs_eval_fn *eval_fn;
@@ -123,12 +125,7 @@ struct bfs_expr {
 	/** Auxilliary data for the evaluation function. */
 	union {
 		/** Child expressions. */
-		struct {
-			/** The left hand side of the expression. */
-			struct bfs_expr *lhs;
-			/** The right hand side of the expression. */
-			struct bfs_expr *rhs;
-		};
+		struct bfs_exprs children;
 
 		/** Integer comparisons. */
 		struct {
@@ -218,9 +215,24 @@ struct bfs_ctx;
 struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv);
 
 /**
- * @return Whether the expression has child expressions.
+ * @return Whether this type of expression has children.
  */
 bool bfs_expr_is_parent(const struct bfs_expr *expr);
+
+/**
+ * @return The first child of this expression, or NULL if it has none.
+ */
+struct bfs_expr *bfs_expr_children(const struct bfs_expr *expr);
+
+/**
+ * Add a child to an expression.
+ */
+void bfs_expr_append(struct bfs_expr *expr, struct bfs_expr *child);
+
+/**
+ * Add a list of children to an expression.
+ */
+void bfs_expr_extend(struct bfs_expr *expr, struct bfs_exprs *children);
 
 /**
  * @return Whether expr is known to always quit.

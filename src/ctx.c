@@ -241,7 +241,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		free_colors(ctx->colors);
 
-		for_slist (struct bfs_expr, expr, &ctx->expr_list) {
+		for_slist (struct bfs_expr, expr, &ctx->expr_list, freelist) {
 			bfs_expr_clear(expr);
 		}
 		arena_destroy(&ctx->expr_arena);
