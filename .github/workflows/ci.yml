@@ -183,3 +183,35 @@ jobs:
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
             sudo -u action gmake -j$jobs check JOBS=-j$jobs TEST_FLAGS="--sudo --verbose=skipped"
+
+  omnios:
+    name: OmniOS
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: vmactions/omnios-vm@v1
+        with:
+          release: "r151048"
+          usesh: true
+          copyback: false
+
+          prepare: |
+            pkg install \
+                bash \
+                build-essential \
+                expect \
+                gnu-make \
+                onig \
+                sudo
+            useradd -m -g staff action
+            echo "%staff ALL=(ALL) NOPASSWD: ALL" >>/etc/sudoers
+
+          run: |
+            PATH="/usr/xpg4/bin:$PATH"
+            chown -R action:staff .
+            jobs=$(getconf NPROCESSORS_ONLN)
+            sudo -u action gmake -j$jobs check LDFLAGS="-Wl,-rpath,/opt/ooce/lib/amd64" JOBS=-j$jobs TEST_FLAGS="--sudo --verbose=skipped"
