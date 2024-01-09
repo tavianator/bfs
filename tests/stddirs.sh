@@ -106,8 +106,9 @@ make_rainbow() {
     ln -s nowhere "$1/broken"
     "$MKSOCK" "$1/socket"
     "$XTOUCH" -p "$1"/s{u,g,ug}id
-    chmod u+s "$1"/su{,g}id
-    chmod g+s "$1"/s{u,}gid
+    chmod 06644 "$1"/sugid
+    chmod 04644 "$1"/suid
+    chmod 02644 "$1"/sgid
     mkdir "$1/ow" "$1"/sticky{,_ow}
     chmod o+w "$1"/*ow
     chmod +t "$1"/sticky*
