@@ -97,7 +97,7 @@
 #  define BFS_USE_PATHS_H BFS_HAS_PATHS_H
 #endif
 #ifndef BFS_USE_SYS_ACL_H
-#  define BFS_USE_SYS_ACL_H BFS_HAS_SYS_ACL_H
+#  define BFS_USE_SYS_ACL_H (BFS_HAS_SYS_ACL_H && !__illumos__)
 #endif
 #ifndef BFS_USE_SYS_CAPABILITY_H
 #  define BFS_USE_SYS_CAPABILITY_H (BFS_HAS_SYS_CAPABILITY_H && !__FreeBSD__)
