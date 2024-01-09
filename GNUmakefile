@@ -165,6 +165,10 @@ ifeq ($(OS),DragonFly)
 LOCAL_LDLIBS += -lposix1e
 endif
 
+ifeq ($(OS),SunOS)
+LOCAL_LDLIBS += -lsocket -lnsl
+endif
+
 ifneq ($(filter gcov,$(MAKECMDGOALS)),)
 LOCAL_CFLAGS += --coverage
 # gcov only intercepts fork()/exec() with -std=gnu*
