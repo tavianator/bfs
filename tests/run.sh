@@ -51,10 +51,24 @@ bg_test() {
     fi
     ret=$?
 
-    if ((ret != 0 && ret != EX_SKIP)); then
-        ((VERBOSE_ERRORS)) || cat "$TMP/$TEST.err" >&2
-        color printf "${BOL}${RED}%s failed!${RST}\n" "$TEST"
-    fi
+    case $ret in
+        0)
+            if ((VERBOSE_TESTS)); then
+                color printf "${BOL}${GRN}[PASS]${RST} ${BLD}%s${RST}\n" "$TEST"
+            fi
+            ;;
+        $EX_SKIP)
+            if ((VERBOSE_SKIPPED || VERBOSE_TESTS)); then
+                color printf "${BOL}${CYN}[SKIP]${RST} ${BLD}%s${RST}\n" "$TEST"
+            fi
+            ;;
+        *)
+            if ((!VERBOSE_ERRORS)); then
+                cat "$TMP/$TEST.err" >&2
+            fi
+            color printf "${BOL}${RED}[FAIL]${RST} ${BLD}%s${RST}\n" "$TEST"
+            ;;
+    esac
 
     return $ret
 }
@@ -114,9 +128,11 @@ run_tests() {
     passed=0
     failed=0
     skipped=0
+    ran=0
+    total=${#TEST_CASES[@]}
 
     if ((COLOR_STDOUT || VERBOSE_TESTS)); then
-        TEST_FMT="${BOL}${YLW}%s${RST}${EOL}"
+        TEST_FMT="${BOL}${YLW}[%3d%%]${RST} ${BLD}%s${RST}${EOL}"
     else
         TEST_FMT="."
     fi
@@ -134,13 +150,14 @@ run_tests() {
             fi
         fi
 
-        printf "$TEST_FMT" "$TEST"
+        percent=$((100 * ran / total))
+        printf "$TEST_FMT" $percent "$TEST"
 
         mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
 
         bg_test "$TESTS/$TEST.sh" &
-        ((++BG))
+        ((++BG, ++ran))
     done
 
     while ((BG > 0)); do
@@ -150,13 +167,13 @@ run_tests() {
     printf "${BOL}"
 
     if ((passed > 0)); then
-        color printf "${GRN}tests passed: %d${RST}\n" "$passed"
+        color printf "${GRN}[PASS]${RST} ${BLD}%3d${RST} / ${BLD}%d${RST}\n" $passed $total
     fi
     if ((skipped > 0)); then
-        color printf "${CYN}tests skipped: %s${RST}\n" "$skipped"
+        color printf "${CYN}[SKIP]${RST} ${BLD}%3d${RST} / ${BLD}%d${RST}\n" $skipped $total
     fi
     if ((failed > 0)); then
-        color printf "${RED}tests failed: %s${RST}\n" "$failed"
+        color printf "${RED}[FAIL]${RST} ${BLD}%3d${RST} / ${BLD}%d${RST}\n" $failed $total
         exit 1
     fi
 }
@@ -180,10 +197,8 @@ skip() {
         caller | {
             read -r line file
             printf "${BOL}"
-            debug "$file" $line "${CYN}$TEST skipped!${RST}" "$(awk "NR == $line" "$file")" >&3
+            debug "$file" $line "" "$(awk "NR == $line" "$file")" >&3
         }
-    elif ((VERBOSE_TESTS)); then
-        color printf "${BOL}${CYN}%s skipped!${RST}\n" "$TEST"
     fi
 
     exit $EX_SKIP
