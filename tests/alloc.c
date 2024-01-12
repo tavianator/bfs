@@ -1,13 +1,14 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "tests.h"
 #include "../src/alloc.h"
 #include "../src/diag.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
 
-int main(void) {
+bool check_alloc(void) {
 	// Check sizeof_flex()
 	struct flexible {
 		alignas(64) int foo[8];
@@ -44,6 +45,5 @@ int main(void) {
 	}
 
 	varena_destroy(&varena);
-
-	return EXIT_SUCCESS;
+	return true;
 }

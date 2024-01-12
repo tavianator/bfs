@@ -1,6 +1,7 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "tests.h"
 #include "../src/bfstd.h"
 #include "../src/config.h"
 #include "../src/diag.h"
@@ -34,7 +35,7 @@ static void check_wordesc(const char *str, const char *exp, enum wesc_flags flag
 	bfs_verify(strcmp(buf, exp) == 0, "wordesc(%s) == %s (!= %s)", str, buf, exp);
 }
 
-int main(void) {
+bool check_bfstd(void) {
 	// Try to set a UTF-8 locale
 	if (!setlocale(LC_ALL, "C.UTF-8")) {
 		setlocale(LC_ALL, "");
@@ -69,5 +70,5 @@ int main(void) {
 		check_wordesc("\xF0\x9F\x98\x80", "\xF0\x9F\x98\x80", WESC_SHELL | WESC_TTY);
 	}
 
-	return EXIT_SUCCESS;
+	return true;
 }

@@ -269,32 +269,39 @@ LIBBFS := \
 # The main executable
 $(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
 
-# Standalone unit tests
-UNITS := alloc bfstd bit trie xtimegm
-UNIT_TESTS := $(UNITS:%=$(BIN)/tests/%)
-UNIT_CHECKS := $(UNITS:%=check-%)
-
 # Testing utilities
 TEST_UTILS := $(BIN)/tests/mksock $(BIN)/tests/xtouch
 
-TESTS := $(UNIT_TESTS) $(TEST_UTILS)
+$(BIN)/tests/mksock: $(OBJ)/tests/mksock.o $(LIBBFS)
+
+$(BIN)/tests/xtouch: $(OBJ)/tests/xtouch.o $(LIBBFS)
+
+# All test binaries
+TESTS := $(BIN)/tests/units $(TEST_UTILS)
+
+$(BIN)/tests/units: \
+    $(OBJ)/tests/alloc.o \
+    $(OBJ)/tests/bfstd.o \
+    $(OBJ)/tests/bit.o \
+    $(OBJ)/tests/main.o \
+    $(OBJ)/tests/trie.o \
+    $(OBJ)/tests/xtime.o \
+    $(LIBBFS)
 
 tests: $(TESTS)
 .PHONY: tests
-
-$(TESTS): $(BIN)/tests/%: $(OBJ)/tests/%.o $(LIBBFS)
 
 # The different search strategies that we test
 STRATEGIES := bfs dfs ids eds
 STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
 
 # All the different checks we run
-CHECKS := $(UNIT_CHECKS) $(STRATEGY_CHECKS)
+CHECKS := check-units $(STRATEGY_CHECKS)
 
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
 
-$(UNIT_CHECKS): check-%: $(BIN)/tests/%
+check-units: $(BIN)/tests/units
 	$<
 
 JOBS := $(filter -j%,$(MAKEFLAGS))

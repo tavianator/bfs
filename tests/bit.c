@@ -1,6 +1,7 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "tests.h"
 #include "../src/bit.h"
 #include "../src/diag.h"
 #include <limits.h>
@@ -54,7 +55,7 @@ bfs_static_assert(INTMAX_MAX == IWIDTH_MAX(INTMAX_WIDTH));
 #define verify_eq(a, b) \
 	bfs_verify((a) == (b), "(0x%jX) %s != %s (0x%jX)", (uintmax_t)(a), #a, #b, (uintmax_t)(b))
 
-int main(void) {
+bool check_bit(void) {
 	verify_eq(bswap((uint8_t)0x12), 0x12);
 	verify_eq(bswap((uint16_t)0x1234), 0x3412);
 	verify_eq(bswap((uint32_t)0x12345678), 0x78563412);
@@ -121,5 +122,5 @@ int main(void) {
 	bfs_verify(!has_single_bit(UINT32_MAX));
 	bfs_verify(has_single_bit((uint32_t)1 << (UINT_WIDTH - 1)));
 
-	return EXIT_SUCCESS;
+	return true;
 }

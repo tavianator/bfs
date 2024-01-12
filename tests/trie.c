@@ -1,6 +1,7 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "tests.h"
 #include "../src/trie.h"
 #include "../src/config.h"
 #include "../src/diag.h"
@@ -38,7 +39,7 @@ const char *keys[] = {
 
 const size_t nkeys = countof(keys);
 
-int main(void) {
+bool check_trie(void) {
 	struct trie trie;
 	trie_init(&trie);
 
@@ -130,5 +131,5 @@ int main(void) {
 
 	free(longstr);
 	trie_destroy(&trie);
-	return EXIT_SUCCESS;
+	return true;
 }

@@ -1,6 +1,7 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "tests.h"
 #include "../src/xtime.h"
 #include "../src/config.h"
 #include <stdint.h>
@@ -48,10 +49,10 @@ static void tm_print(FILE *file, const struct tm *tm) {
 		tm->tm_isdst ? (tm->tm_isdst < 0 ? " (DST?)" : " (DST)") : "");
 }
 
-int main(void) {
+bool check_xtime(void) {
 	if (setenv("TZ", "UTC0", true) != 0) {
 		perror("setenv()");
-		return EXIT_FAILURE;
+		return false;
 	}
 
 	struct tm tm = {
@@ -86,9 +87,9 @@ int main(void) {
 		if (fail) {
 			printf("Input:     ");
 			tm_print(stdout, &tm);
-			return EXIT_FAILURE;
+			return false;
 		}
 	}
 
-	return EXIT_SUCCESS;
+	return true;
 }
