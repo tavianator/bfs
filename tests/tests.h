@@ -5,6 +5,9 @@
  * Unit tests.
  */
 
+#ifndef BFS_TESTS_H
+#define BFS_TESTS_H
+
 #include "../src/config.h"
 
 /** Unit test function type. */
@@ -24,3 +27,5 @@ bool check_trie(void);
 
 /** Time tests. */
 bool check_xtime(void);
+
+#endif // BFS_TESTS_H
