@@ -45,9 +45,23 @@
 // #include <errno.h>
 
 /**
- * Return whether an error code is due to a path not existing.
+ * Check if an error code is "like" another one.  For example, ENOTDIR is
+ * like ENOENT because they can both be triggered by non-existent paths.
+ *
+ * @param error
+ *         The error code to check.
+ * @param category
+ *         The category to test for.  Known categories include ENOENT and
+ *         ENAMETOOLONG.
+ * @return
+ *         Whether the error belongs to the given category.
  */
-bool is_nonexistence_error(int error);
+bool error_is_like(int error, int category);
+
+/**
+ * Equivalent to error_is_like(errno, category).
+ */
+bool errno_is_like(int category);
 
 #include <fcntl.h>
 

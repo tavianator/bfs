@@ -68,7 +68,7 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags 
 		}
 	} else {
 		ret = bftw_stat_impl(mutbuf, &mutbuf->stat_cache, BFS_STAT_FOLLOW);
-		if (!ret && (flags & BFS_STAT_TRYFOLLOW) && is_nonexistence_error(errno)) {
+		if (!ret && (flags & BFS_STAT_TRYFOLLOW) && errno_is_like(ENOENT)) {
 			ret = bftw_stat_impl(mutbuf, &mutbuf->lstat_cache, BFS_STAT_NOFOLLOW);
 		}
 	}
@@ -81,7 +81,7 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
 		return ftwbuf->lstat_cache.buf;
 	} else if (ftwbuf->stat_cache.buf) {
 		return ftwbuf->stat_cache.buf;
-	} else if ((flags & BFS_STAT_TRYFOLLOW) && is_nonexistence_error(ftwbuf->stat_cache.error)) {
+	} else if ((flags & BFS_STAT_TRYFOLLOW) && error_is_like(ftwbuf->stat_cache.error, ENOENT)) {
 		return ftwbuf->lstat_cache.buf;
 	} else {
 		return NULL;
@@ -739,20 +739,8 @@ static int bftw_file_open(struct bftw_state *state, struct bftw_file *file, cons
 	}
 
 	int fd = bftw_file_openat(state, file, base, at_path);
-	if (fd >= 0) {
+	if (fd >= 0 || !errno_is_like(ENAMETOOLONG)) {
 		return fd;
-	}
-
-	switch (errno) {
-	case ENAMETOOLONG:
-#if __DragonFly__
-	// https://twitter.com/tavianator/status/1742991411203485713
-	case EFAULT:
-#endif
-		break;
-
-	default:
-		return -1;
 	}
 
 	// Handle ENAMETOOLONG by manually traversing the path component-by-component

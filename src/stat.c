@@ -260,7 +260,7 @@ static int bfs_stat_tryfollow(int at_fd, const char *at_path, int at_flags, int 
 
 	if (ret != 0
 	    && (bfs_flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW
-	    && is_nonexistence_error(errno))
+	    && errno_is_like(ENOENT))
 	{
 		at_flags |= AT_SYMLINK_NOFOLLOW;
 		ret = bfs_stat_explicit(at_fd, at_path, at_flags, x_flags, buf);

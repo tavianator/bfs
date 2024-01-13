@@ -68,22 +68,11 @@ static int open_parent(const struct args *args, const char **path) {
 		goto done;
 	}
 
-	switch (errno) {
-	case ENAMETOOLONG:
-#if __DragonFly__
-	// https://twitter.com/tavianator/status/1742991411203485713
-	case EFAULT:
-#endif
-		break;
-
-	case ENOENT:
-		if (args->flags & CREATE_PARENTS) {
-			break;
-		} else {
+	if (errno == ENOENT) {
+		if (!(args->flags & CREATE_PARENTS)) {
 			goto err;
 		}
-
-	default:
+	} else if (!errno_is_like(ENAMETOOLONG)) {
 		goto err;
 	}
 

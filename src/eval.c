@@ -80,7 +80,7 @@ static void eval_error(struct bfs_eval *state, const char *format, ...) {
  */
 static bool eval_should_ignore(const struct bfs_eval *state, int error) {
 	return state->ctx->ignore_races
-		&& is_nonexistence_error(error)
+		&& error_is_like(error, ENOENT)
 		&& state->ftwbuf->depth > 0;
 }
 

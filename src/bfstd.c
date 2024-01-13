@@ -36,8 +36,27 @@
 #  include <util.h>
 #endif
 
-bool is_nonexistence_error(int error) {
-	return error == ENOENT || errno == ENOTDIR;
+bool error_is_like(int error, int category) {
+	if (error == category) {
+		return true;
+	}
+
+	switch (category) {
+	case ENOENT:
+		return error == ENOTDIR;
+
+#if __DragonFly__
+	// https://twitter.com/tavianator/status/1742991411203485713
+	case ENAMETOOLONG:
+		return error == EFAULT;
+#endif
+	}
+
+	return false;
+}
+
+bool errno_is_like(int category) {
+	return error_is_like(errno, category);
 }
 
 char *xdirname(const char *path) {
