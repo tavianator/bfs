@@ -59,6 +59,15 @@ bool errno_is_like(int category) {
 	return error_is_like(errno, category);
 }
 
+int try(int ret) {
+	if (ret >= 0) {
+		return ret;
+	} else {
+		bfs_assert(errno > 0, "errno should be positive, was %d\n", errno);
+		return -errno;
+	}
+}
+
 char *xdirname(const char *path) {
 	size_t i = xbaseoff(path);
 

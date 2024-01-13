@@ -36,10 +36,8 @@ struct ioq_ent {
 	/** The I/O operation. */
 	enum ioq_op op;
 
-	/** The return value of the operation. */
-	int ret;
-	/** The error code, if the operation failed. */
-	int error;
+	/** The return value (on success) or negative error code (on failure). */
+	int result;
 
 	/** Arbitrary user data. */
 	void *ptr;

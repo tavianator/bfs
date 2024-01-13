@@ -621,7 +621,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		}
 
 		dir = ent->opendir.dir;
-		if (ent->ret == 0) {
+		if (ent->result >= 0) {
 			bftw_file_set_dir(cache, file, dir);
 		} else {
 			bftw_freedir(cache, dir);

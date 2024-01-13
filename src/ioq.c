@@ -455,41 +455,34 @@ static bool ioq_check_cancel(struct ioq *ioq, struct ioq_ent *ent) {
 		return false;
 	}
 
-	ent->ret = -1;
-	ent->error = EINTR;
+	ent->result = -EINTR;
 	ioqq_push(ioq->ready, ent);
 	return true;
 }
 
 /** Handle a single request synchronously. */
 static void ioq_handle(struct ioq *ioq, struct ioq_ent *ent) {
-	int ret;
-
 	switch (ent->op) {
 	case IOQ_CLOSE:
-		ret = xclose(ent->close.fd);
+		ent->result = try(xclose(ent->close.fd));
 		break;
 
 	case IOQ_OPENDIR:
-		ret = bfs_opendir(ent->opendir.dir, ent->opendir.dfd, ent->opendir.path, ent->opendir.flags);
-		if (ret == 0) {
+		ent->result = try(bfs_opendir(ent->opendir.dir, ent->opendir.dfd, ent->opendir.path, ent->opendir.flags));
+		if (ent->result >= 0) {
 			bfs_polldir(ent->opendir.dir);
 		}
 		break;
 
 	case IOQ_CLOSEDIR:
-		ret = bfs_closedir(ent->closedir.dir);
+		ent->result = try(bfs_closedir(ent->closedir.dir));
 		break;
 
 	default:
 		bfs_bug("Unknown ioq_op %d", (int)ent->op);
-		ret = -1;
-		errno = ENOSYS;
+		ent->result = -ENOSYS;
 		break;
 	}
-
-	ent->ret = ret;
-	ent->error = ret == 0 ? 0 : errno;
 
 	ioqq_push(ioq->ready, ent);
 }
@@ -603,24 +596,21 @@ static void ioq_ring_reap(struct ioq_ring_state *state) {
 		}
 
 		struct ioq_ent *ent = io_uring_cqe_get_data(cqe);
-		ent->ret = cqe->res >= 0 ? cqe->res : -1;
-		ent->error = cqe->res < 0 ? -cqe->res : 0;
+		ent->result = cqe->res;
 		io_uring_cqe_seen(ring, cqe);
 		--state->submitted;
 
-		if (ent->op == IOQ_OPENDIR && ent->ret >= 0) {
-			int fd = ent->ret;
+		if (ent->op == IOQ_OPENDIR && ent->result >= 0) {
+			int fd = ent->result;
 			if (ioq_check_cancel(ioq, ent)) {
 				xclose(fd);
 				continue;
 			}
 
-			ent->ret = bfs_opendir(ent->opendir.dir, fd, NULL, ent->opendir.flags);
-			if (ent->ret == 0) {
+			ent->result = try(bfs_opendir(ent->opendir.dir, fd, NULL, ent->opendir.flags));
+			if (ent->result >= 0) {
 				// TODO: io_uring_prep_getdents()
 				bfs_polldir(ent->opendir.dir);
-			} else {
-				ent->error = errno;
 			}
 		}
 

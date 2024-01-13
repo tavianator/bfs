@@ -63,6 +63,16 @@ bool error_is_like(int error, int category);
  */
 bool errno_is_like(int category);
 
+/**
+ * Apply the "negative errno" convention.
+ *
+ * @param ret
+ *         The return value of the attempted operation.
+ * @return
+ *         ret, if non-negative, otherwise -errno.
+ */
+int try(int ret);
+
 #include <fcntl.h>
 
 #ifndef O_EXEC
