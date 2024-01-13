@@ -151,7 +151,7 @@ run_tests() {
         fi
 
         percent=$((100 * ran / total))
-        printf "$TEST_FMT" $percent "$TEST"
+        color printf "$TEST_FMT" $percent "$TEST"
 
         mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
