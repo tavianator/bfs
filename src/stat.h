@@ -138,11 +138,21 @@ struct bfs_stat {
 int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct bfs_stat *buf);
 
 /**
+ * Convert bfs_stat_flags to fstatat() flags.
+ */
+int bfs_fstatat_flags(enum bfs_stat_flags flags);
+
+/**
  * Convert struct stat to struct bfs_stat.
  */
 void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src);
 
 #if BFS_USE_STATX
+/**
+ * Convert bfs_stat_flags to statx() flags.
+ */
+int bfs_statx_flags(enum bfs_stat_flags flags);
+
 /**
  * Convert struct statx to struct bfs_stat.
  */

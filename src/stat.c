@@ -57,6 +57,20 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 	return "???";
 }
 
+int bfs_fstatat_flags(enum bfs_stat_flags flags) {
+	int ret = 0;
+
+	if (flags & BFS_STAT_NOFOLLOW) {
+		ret |= AT_SYMLINK_NOFOLLOW;
+	}
+
+#if defined(AT_NO_AUTOMOUNT) && (!__GNU__ || __GLIBC_PREREQ(2, 35))
+	ret |= AT_NO_AUTOMOUNT;
+#endif
+
+	return ret;
+}
+
 void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 	dest->mask = 0;
 
@@ -134,6 +148,16 @@ static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int 
 	if (ret == 0) {
 		// -fsanitize=memory doesn't know about statx()
 		sanitize_init(buf);
+	}
+
+	return ret;
+}
+
+int bfs_statx_flags(enum bfs_stat_flags flags) {
+	int ret = bfs_fstatat_flags(flags);
+
+	if (flags & BFS_STAT_NOSYNC) {
+		ret |= AT_STATX_DONT_SYNC;
 	}
 
 	return ret;
@@ -226,12 +250,12 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 /**
  * Calls the stat() implementation with explicit flags.
  */
-static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, int x_flags, struct bfs_stat *buf) {
+static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, struct bfs_stat *buf) {
 #if BFS_USE_STATX
 	static atomic bool has_statx = true;
 
 	if (load(&has_statx, relaxed)) {
-		int ret = bfs_statx_impl(at_fd, at_path, at_flags | x_flags, buf);
+		int ret = bfs_statx_impl(at_fd, at_path, at_flags, buf);
 		// EPERM is commonly returned in a seccomp() sandbox that does
 		// not allow statx()
 		if (ret != 0 && (errno == ENOSYS || errno == EPERM)) {
@@ -240,6 +264,8 @@ static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, int x
 			return ret;
 		}
 	}
+
+	at_flags &= ~AT_STATX_DONT_SYNC;
 #endif
 
 	return bfs_stat_impl(at_fd, at_path, at_flags, buf);
@@ -248,39 +274,29 @@ static int bfs_stat_explicit(int at_fd, const char *at_path, int at_flags, int x
 /**
  * Implements the BFS_STAT_TRYFOLLOW retry logic.
  */
-static int bfs_stat_tryfollow(int at_fd, const char *at_path, int at_flags, int x_flags, enum bfs_stat_flags bfs_flags, struct bfs_stat *buf) {
-	int ret = bfs_stat_explicit(at_fd, at_path, at_flags, x_flags, buf);
+static int bfs_stat_tryfollow(int at_fd, const char *at_path, int at_flags, enum bfs_stat_flags bfs_flags, struct bfs_stat *buf) {
+	int ret = bfs_stat_explicit(at_fd, at_path, at_flags, buf);
 
 	if (ret != 0
 	    && (bfs_flags & (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW)) == BFS_STAT_TRYFOLLOW
 	    && errno_is_like(ENOENT))
 	{
 		at_flags |= AT_SYMLINK_NOFOLLOW;
-		ret = bfs_stat_explicit(at_fd, at_path, at_flags, x_flags, buf);
+		ret = bfs_stat_explicit(at_fd, at_path, at_flags, buf);
 	}
 
 	return ret;
 }
 
 int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct bfs_stat *buf) {
-	int at_flags = 0;
-	if (flags & BFS_STAT_NOFOLLOW) {
-		at_flags |= AT_SYMLINK_NOFOLLOW;
-	}
-
-#if defined(AT_NO_AUTOMOUNT) && (!__GNU__ || __GLIBC_PREREQ(2, 35))
-	at_flags |= AT_NO_AUTOMOUNT;
-#endif
-
-	int x_flags = 0;
-#ifdef AT_STATX_DONT_SYNC
-	if (flags & BFS_STAT_NOSYNC) {
-		x_flags |= AT_STATX_DONT_SYNC;
-	}
+#if BFS_USE_STATX
+	int at_flags = bfs_statx_flags(flags);
+#else
+	int at_flags = bfs_fstatat_flags(flags);
 #endif
 
 	if (at_path) {
-		return bfs_stat_tryfollow(at_fd, at_path, at_flags, x_flags, flags, buf);
+		return bfs_stat_tryfollow(at_fd, at_path, at_flags, flags, buf);
 	}
 
 	// Check __GNU__ to work around https://lists.gnu.org/archive/html/bug-hurd/2021-12/msg00001.html
@@ -288,7 +304,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 	static atomic bool has_at_ep = true;
 	if (load(&has_at_ep, relaxed)) {
 		at_flags |= AT_EMPTY_PATH;
-		int ret = bfs_stat_explicit(at_fd, "", at_flags, x_flags, buf);
+		int ret = bfs_stat_explicit(at_fd, "", at_flags, buf);
 		if (ret != 0 && errno == EINVAL) {
 			store(&has_at_ep, false, relaxed);
 		} else {
