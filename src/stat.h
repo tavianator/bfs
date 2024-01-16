@@ -13,11 +13,32 @@
 #define BFS_STAT_H
 
 #include "config.h"
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
 
+#if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
+#  define BFS_HAS_LIBC_STATX true
+#elif __linux__
+#  include <linux/stat.h>
+#endif
+
+#ifndef BFS_USE_STATX
+#  ifdef STATX_BASIC_STATS
+#    define BFS_USE_STATX true
+#  endif
+#endif
+
 #if BFS_USE_SYS_PARAM_H
 #  include <sys/param.h>
+#endif
+
+#ifdef DEV_BSIZE
+#  define BFS_STAT_BLKSIZE DEV_BSIZE
+#elif defined(S_BLKSIZE)
+#  define BFS_STAT_BLKSIZE S_BLKSIZE
+#else
+#  define BFS_STAT_BLKSIZE 512
 #endif
 
 /**
@@ -59,14 +80,6 @@ enum bfs_stat_flags {
 	/** Try to use cached values without synchronizing remote filesystems. */
 	BFS_STAT_NOSYNC = 1 << 2,
 };
-
-#ifdef DEV_BSIZE
-#  define BFS_STAT_BLKSIZE DEV_BSIZE
-#elif defined(S_BLKSIZE)
-#  define BFS_STAT_BLKSIZE S_BLKSIZE
-#else
-#  define BFS_STAT_BLKSIZE 512
-#endif
 
 /**
  * Facade over struct stat.
@@ -123,6 +136,18 @@ struct bfs_stat {
  *         0 on success, -1 on error.
  */
 int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct bfs_stat *buf);
+
+/**
+ * Convert struct stat to struct bfs_stat.
+ */
+void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src);
+
+#if BFS_USE_STATX
+/**
+ * Convert struct statx to struct bfs_stat.
+ */
+int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src);
+#endif
 
 /**
  * Get a particular time field from a bfs_stat() buffer.

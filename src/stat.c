@@ -13,18 +13,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
-#  define BFS_HAS_LIBC_STATX true
-#elif __linux__
+#if BFS_USE_STATX && !BFS_HAS_LIBC_STATX
 #  include <linux/stat.h>
 #  include <sys/syscall.h>
 #  include <unistd.h>
-#endif
-
-#ifndef BFS_USE_STATX
-#  if BFS_HAS_LIBC_STATX || defined(SYS_statx)
-#    define BFS_USE_STATX true
-#  endif
 #endif
 
 const char *bfs_stat_field_name(enum bfs_stat_field field) {
@@ -65,56 +57,53 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 	return "???";
 }
 
-/**
- * Convert a struct stat to a struct bfs_stat.
- */
-static void bfs_stat_convert(const struct stat *statbuf, struct bfs_stat *buf) {
-	buf->mask = 0;
+void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
+	dest->mask = 0;
 
-	buf->dev = statbuf->st_dev;
-	buf->mask |= BFS_STAT_DEV;
+	dest->dev = src->st_dev;
+	dest->mask |= BFS_STAT_DEV;
 
-	buf->ino = statbuf->st_ino;
-	buf->mask |= BFS_STAT_INO;
+	dest->ino = src->st_ino;
+	dest->mask |= BFS_STAT_INO;
 
-	buf->mode = statbuf->st_mode;
-	buf->mask |= BFS_STAT_TYPE | BFS_STAT_MODE;
+	dest->mode = src->st_mode;
+	dest->mask |= BFS_STAT_TYPE | BFS_STAT_MODE;
 
-	buf->nlink = statbuf->st_nlink;
-	buf->mask |= BFS_STAT_NLINK;
+	dest->nlink = src->st_nlink;
+	dest->mask |= BFS_STAT_NLINK;
 
-	buf->gid = statbuf->st_gid;
-	buf->mask |= BFS_STAT_GID;
+	dest->gid = src->st_gid;
+	dest->mask |= BFS_STAT_GID;
 
-	buf->uid = statbuf->st_uid;
-	buf->mask |= BFS_STAT_UID;
+	dest->uid = src->st_uid;
+	dest->mask |= BFS_STAT_UID;
 
-	buf->size = statbuf->st_size;
-	buf->mask |= BFS_STAT_SIZE;
+	dest->size = src->st_size;
+	dest->mask |= BFS_STAT_SIZE;
 
-	buf->blocks = statbuf->st_blocks;
-	buf->mask |= BFS_STAT_BLOCKS;
+	dest->blocks = src->st_blocks;
+	dest->mask |= BFS_STAT_BLOCKS;
 
-	buf->rdev = statbuf->st_rdev;
-	buf->mask |= BFS_STAT_RDEV;
+	dest->rdev = src->st_rdev;
+	dest->mask |= BFS_STAT_RDEV;
 
 #if BSD
-	buf->attrs = statbuf->st_flags;
-	buf->mask |= BFS_STAT_ATTRS;
+	dest->attrs = src->st_flags;
+	dest->mask |= BFS_STAT_ATTRS;
 #endif
 
-	buf->atime = statbuf->st_atim;
-	buf->mask |= BFS_STAT_ATIME;
+	dest->atime = src->st_atim;
+	dest->mask |= BFS_STAT_ATIME;
 
-	buf->ctime = statbuf->st_ctim;
-	buf->mask |= BFS_STAT_CTIME;
+	dest->ctime = src->st_ctim;
+	dest->mask |= BFS_STAT_CTIME;
 
-	buf->mtime = statbuf->st_mtim;
-	buf->mask |= BFS_STAT_MTIME;
+	dest->mtime = src->st_mtim;
+	dest->mask |= BFS_STAT_MTIME;
 
 #if __APPLE__ || __FreeBSD__ || __NetBSD__
-	buf->btime = statbuf->st_birthtim;
-	buf->mask |= BFS_STAT_BTIME;
+	dest->btime = src->st_birthtim;
+	dest->mask |= BFS_STAT_BTIME;
 #endif
 }
 
@@ -125,7 +114,7 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, struct bf
 	struct stat statbuf;
 	int ret = fstatat(at_fd, at_path, &statbuf, at_flags);
 	if (ret == 0) {
-		bfs_stat_convert(&statbuf, buf);
+		bfs_stat_convert(buf, &statbuf);
 	}
 	return ret;
 }
@@ -150,6 +139,74 @@ static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int 
 	return ret;
 }
 
+int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src) {
+	// Callers shouldn't have to check anything except the times
+	const unsigned int guaranteed = STATX_BASIC_STATS & ~(STATX_ATIME | STATX_CTIME | STATX_MTIME);
+	if ((src->stx_mask & guaranteed) != guaranteed) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	dest->mask = 0;
+
+	dest->dev = xmakedev(src->stx_dev_major, src->stx_dev_minor);
+	dest->mask |= BFS_STAT_DEV;
+
+	dest->ino = src->stx_ino;
+	dest->mask |= BFS_STAT_INO;
+
+	dest->mode = src->stx_mode;
+	dest->mask |= BFS_STAT_TYPE;
+	dest->mask |= BFS_STAT_MODE;
+
+	dest->nlink = src->stx_nlink;
+	dest->mask |= BFS_STAT_NLINK;
+
+	dest->gid = src->stx_gid;
+	dest->mask |= BFS_STAT_GID;
+
+	dest->uid = src->stx_uid;
+	dest->mask |= BFS_STAT_UID;
+
+	dest->size = src->stx_size;
+	dest->mask |= BFS_STAT_SIZE;
+
+	dest->blocks = src->stx_blocks;
+	dest->mask |= BFS_STAT_BLOCKS;
+
+	dest->rdev = xmakedev(src->stx_rdev_major, src->stx_rdev_minor);
+	dest->mask |= BFS_STAT_RDEV;
+
+	dest->attrs = src->stx_attributes;
+	dest->mask |= BFS_STAT_ATTRS;
+
+	if (src->stx_mask & STATX_ATIME) {
+		dest->atime.tv_sec = src->stx_atime.tv_sec;
+		dest->atime.tv_nsec = src->stx_atime.tv_nsec;
+		dest->mask |= BFS_STAT_ATIME;
+	}
+
+	if (src->stx_mask & STATX_BTIME) {
+		dest->btime.tv_sec = src->stx_btime.tv_sec;
+		dest->btime.tv_nsec = src->stx_btime.tv_nsec;
+		dest->mask |= BFS_STAT_BTIME;
+	}
+
+	if (src->stx_mask & STATX_CTIME) {
+		dest->ctime.tv_sec = src->stx_ctime.tv_sec;
+		dest->ctime.tv_nsec = src->stx_ctime.tv_nsec;
+		dest->mask |= BFS_STAT_CTIME;
+	}
+
+	if (src->stx_mask & STATX_MTIME) {
+		dest->mtime.tv_sec = src->stx_mtime.tv_sec;
+		dest->mtime.tv_nsec = src->stx_mtime.tv_nsec;
+		dest->mask |= BFS_STAT_MTIME;
+	}
+
+	return 0;
+}
+
 /**
  * bfs_stat() implementation backed by statx().
  */
@@ -161,71 +218,7 @@ static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct b
 		return ret;
 	}
 
-	// Callers shouldn't have to check anything except the times
-	const unsigned int guaranteed = STATX_BASIC_STATS & ~(STATX_ATIME | STATX_CTIME | STATX_MTIME);
-	if ((xbuf.stx_mask & guaranteed) != guaranteed) {
-		errno = ENOTSUP;
-		return -1;
-	}
-
-	buf->mask = 0;
-
-	buf->dev = xmakedev(xbuf.stx_dev_major, xbuf.stx_dev_minor);
-	buf->mask |= BFS_STAT_DEV;
-
-	buf->ino = xbuf.stx_ino;
-	buf->mask |= BFS_STAT_INO;
-
-	buf->mode = xbuf.stx_mode;
-	buf->mask |= BFS_STAT_TYPE;
-	buf->mask |= BFS_STAT_MODE;
-
-	buf->nlink = xbuf.stx_nlink;
-	buf->mask |= BFS_STAT_NLINK;
-
-	buf->gid = xbuf.stx_gid;
-	buf->mask |= BFS_STAT_GID;
-
-	buf->uid = xbuf.stx_uid;
-	buf->mask |= BFS_STAT_UID;
-
-	buf->size = xbuf.stx_size;
-	buf->mask |= BFS_STAT_SIZE;
-
-	buf->blocks = xbuf.stx_blocks;
-	buf->mask |= BFS_STAT_BLOCKS;
-
-	buf->rdev = xmakedev(xbuf.stx_rdev_major, xbuf.stx_rdev_minor);
-	buf->mask |= BFS_STAT_RDEV;
-
-	buf->attrs = xbuf.stx_attributes;
-	buf->mask |= BFS_STAT_ATTRS;
-
-	if (xbuf.stx_mask & STATX_ATIME) {
-		buf->atime.tv_sec = xbuf.stx_atime.tv_sec;
-		buf->atime.tv_nsec = xbuf.stx_atime.tv_nsec;
-		buf->mask |= BFS_STAT_ATIME;
-	}
-
-	if (xbuf.stx_mask & STATX_BTIME) {
-		buf->btime.tv_sec = xbuf.stx_btime.tv_sec;
-		buf->btime.tv_nsec = xbuf.stx_btime.tv_nsec;
-		buf->mask |= BFS_STAT_BTIME;
-	}
-
-	if (xbuf.stx_mask & STATX_CTIME) {
-		buf->ctime.tv_sec = xbuf.stx_ctime.tv_sec;
-		buf->ctime.tv_nsec = xbuf.stx_ctime.tv_nsec;
-		buf->mask |= BFS_STAT_CTIME;
-	}
-
-	if (xbuf.stx_mask & STATX_MTIME) {
-		buf->mtime.tv_sec = xbuf.stx_mtime.tv_sec;
-		buf->mtime.tv_nsec = xbuf.stx_mtime.tv_nsec;
-		buf->mask |= BFS_STAT_MTIME;
-	}
-
-	return ret;
+	return bfs_statx_convert(buf, &xbuf);
 }
 
 #endif // BFS_USE_STATX
@@ -306,7 +299,7 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 
 	struct stat statbuf;
 	if (fstat(at_fd, &statbuf) == 0) {
-		bfs_stat_convert(&statbuf, buf);
+		bfs_stat_convert(buf, &statbuf);
 		return 0;
 	} else {
 		return -1;
