@@ -460,34 +460,39 @@ static bool ioq_check_cancel(struct ioq *ioq, struct ioq_ent *ent) {
 	return true;
 }
 
-/** Handle a single request synchronously. */
-static void ioq_handle(struct ioq *ioq, struct ioq_ent *ent) {
+/** Dispatch a single request synchronously. */
+static void ioq_dispatch_sync(struct ioq *ioq, struct ioq_ent *ent) {
 	switch (ent->op) {
-	case IOQ_CLOSE:
-		ent->result = try(xclose(ent->close.fd));
-		break;
+		case IOQ_CLOSE:
+			ent->result = try(xclose(ent->close.fd));
+			return;
 
-	case IOQ_OPENDIR:
-		ent->result = try(bfs_opendir(ent->opendir.dir, ent->opendir.dfd, ent->opendir.path, ent->opendir.flags));
-		if (ent->result >= 0) {
-			bfs_polldir(ent->opendir.dir);
+		case IOQ_OPENDIR: {
+			struct ioq_opendir *args = &ent->opendir;
+			ent->result = try(bfs_opendir(args->dir, args->dfd, args->path, args->flags));
+			if (ent->result >= 0) {
+				bfs_polldir(args->dir);
+			}
+			return;
 		}
-		break;
 
-	case IOQ_CLOSEDIR:
-		ent->result = try(bfs_closedir(ent->closedir.dir));
-		break;
-
-	default:
-		bfs_bug("Unknown ioq_op %d", (int)ent->op);
-		ent->result = -ENOSYS;
-		break;
+		case IOQ_CLOSEDIR:
+			ent->result = try(bfs_closedir(ent->closedir.dir));
+			return;
 	}
 
+	bfs_bug("Unknown ioq_op %d", (int)ent->op);
+	ent->result = -ENOSYS;
+}
+
+/** Complete a single request synchronously. */
+static void ioq_complete(struct ioq *ioq, struct ioq_ent *ent) {
+	ioq_dispatch_sync(ioq, ent);
 	ioqq_push(ioq->ready, ent);
 }
 
 #if BFS_USE_LIBURING
+
 /** io_uring worker state. */
 struct ioq_ring_state {
 	/** The I/O queue. */
@@ -520,35 +525,54 @@ static struct ioq_ent *ioq_ring_pop(struct ioq_ring_state *state) {
 	return ret;
 }
 
-/** Prep a single SQE. */
-static void ioq_prep_sqe(struct io_uring_sqe *sqe, struct ioq_ent *ent) {
+/** Dispatch a single request asynchronously. */
+static struct io_uring_sqe *ioq_dispatch_async(struct io_uring *ring, struct ioq_ent *ent) {
+	struct io_uring_sqe *sqe = NULL;
+
 	switch (ent->op) {
-	case IOQ_CLOSE:
-		io_uring_prep_close(sqe, ent->close.fd);
-		break;
+		case IOQ_CLOSE:
+			sqe = io_uring_get_sqe(ring);
+			io_uring_prep_close(sqe, ent->close.fd);
+			return sqe;
 
-	case IOQ_OPENDIR:
-		io_uring_prep_openat(sqe, ent->opendir.dfd, ent->opendir.path, O_RDONLY | O_CLOEXEC | O_DIRECTORY, 0);
-		break;
+		case IOQ_OPENDIR: {
+			sqe = io_uring_get_sqe(ring);
+			struct ioq_opendir *args = &ent->opendir;
+			int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
+			io_uring_prep_openat(sqe, args->dfd, args->path, flags, 0);
+			return sqe;
+		}
 
+		case IOQ_CLOSEDIR:
 #if BFS_USE_UNWRAPDIR
-	case IOQ_CLOSEDIR:
-		io_uring_prep_close(sqe, bfs_unwrapdir(ent->closedir.dir));
-		break;
+			sqe = io_uring_get_sqe(ring);
+			io_uring_prep_close(sqe, bfs_unwrapdir(ent->closedir.dir));
 #endif
-
-	default:
-		bfs_bug("Unknown ioq_op %d", (int)ent->op);
-		io_uring_prep_nop(sqe);
-		break;
+			return sqe;
 	}
 
-	io_uring_sqe_set_data(sqe, ent);
+	bfs_bug("Unknown ioq_op %d", (int)ent->op);
+	return NULL;
+}
+
+/** Prep a single SQE. */
+static void ioq_prep_sqe(struct ioq_ring_state *state, struct ioq_ent *ent) {
+	struct ioq *ioq = state->ioq;
+	if (ioq_check_cancel(ioq, ent)) {
+		return;
+	}
+
+	struct io_uring_sqe *sqe = ioq_dispatch_async(state->ring, ent);
+	if (sqe) {
+		io_uring_sqe_set_data(sqe, ent);
+		++state->prepped;
+	} else {
+		ioq_complete(ioq, ent);
+	}
 }
 
 /** Prep a batch of SQEs. */
 static bool ioq_ring_prep(struct ioq_ring_state *state) {
-	struct ioq *ioq = state->ioq;
 	struct io_uring *ring = state->ring;
 
 	while (io_uring_sq_space_left(ring)) {
@@ -557,28 +581,42 @@ static bool ioq_ring_prep(struct ioq_ring_state *state) {
 			break;
 		}
 
-		if (ioq_check_cancel(ioq, ent)) {
-			continue;
-		}
-
-#if !BFS_USE_UNWRAPDIR
-		if (ent->op == IOQ_CLOSEDIR) {
-			ioq_handle(ioq, ent);
-			continue;
-		}
-#endif
-
-		struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
-		ioq_prep_sqe(sqe, ent);
-		++state->prepped;
+		ioq_prep_sqe(state, ent);
 	}
 
 	return state->prepped || state->submitted;
 }
 
-/** Reap a batch of SQEs. */
-static void ioq_ring_reap(struct ioq_ring_state *state) {
+/** Reap a single CQE. */
+static void ioq_reap_cqe(struct ioq_ring_state *state, struct io_uring_cqe *cqe) {
 	struct ioq *ioq = state->ioq;
+	struct io_uring *ring = state->ring;
+
+	struct ioq_ent *ent = io_uring_cqe_get_data(cqe);
+	ent->result = cqe->res;
+	io_uring_cqe_seen(ring, cqe);
+	--state->submitted;
+
+	if (ent->op == IOQ_OPENDIR && ent->result >= 0) {
+		int fd = ent->result;
+		if (ioq_check_cancel(ioq, ent)) {
+			xclose(fd);
+			return;
+		}
+
+		struct ioq_opendir *args = &ent->opendir;
+		ent->result = try(bfs_opendir(args->dir, fd, NULL, args->flags));
+		if (ent->result >= 0) {
+			// TODO: io_uring_prep_getdents()
+			bfs_polldir(args->dir);
+		}
+	}
+
+	ioqq_push(ioq->ready, ent);
+}
+
+/** Reap a batch of CQEs. */
+static void ioq_ring_reap(struct ioq_ring_state *state) {
 	struct io_uring *ring = state->ring;
 
 	while (state->prepped) {
@@ -595,26 +633,7 @@ static void ioq_ring_reap(struct ioq_ring_state *state) {
 			continue;
 		}
 
-		struct ioq_ent *ent = io_uring_cqe_get_data(cqe);
-		ent->result = cqe->res;
-		io_uring_cqe_seen(ring, cqe);
-		--state->submitted;
-
-		if (ent->op == IOQ_OPENDIR && ent->result >= 0) {
-			int fd = ent->result;
-			if (ioq_check_cancel(ioq, ent)) {
-				xclose(fd);
-				continue;
-			}
-
-			ent->result = try(bfs_opendir(ent->opendir.dir, fd, NULL, ent->opendir.flags));
-			if (ent->result >= 0) {
-				// TODO: io_uring_prep_getdents()
-				bfs_polldir(ent->opendir.dir);
-			}
-		}
-
-		ioqq_push(ioq->ready, ent);
+		ioq_reap_cqe(state, cqe);
 	}
 }
 
@@ -629,7 +648,8 @@ static void ioq_ring_work(struct ioq_thread *thread) {
 		ioq_ring_reap(&state);
 	}
 }
-#endif
+
+#endif // BFS_USE_LIBURING
 
 /** Synchronous syscall loop. */
 static void ioq_sync_work(struct ioq_thread *thread) {
@@ -642,7 +662,7 @@ static void ioq_sync_work(struct ioq_thread *thread) {
 		}
 
 		if (!ioq_check_cancel(ioq, ent)) {
-			ioq_handle(ioq, ent);
+			ioq_complete(ioq, ent);
 		}
 	}
 }
