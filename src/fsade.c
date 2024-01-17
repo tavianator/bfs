@@ -149,6 +149,7 @@ static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
 }
 
 /** Unified interface for acl_get_tag_type(). */
+attr(maybe_unused)
 static int bfs_acl_tag_type(acl_entry_t entry, acl_tag_t *tag) {
 #if __DragonFly__
 	*tag = entry->ae_tag;
