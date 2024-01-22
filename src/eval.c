@@ -21,6 +21,7 @@
 #include "mtab.h"
 #include "printf.h"
 #include "pwcache.h"
+#include "sanity.h"
 #include "stat.h"
 #include "trie.h"
 #include "xregex.h"
@@ -1084,7 +1085,8 @@ bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate the comma operator.
  */
 bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
-	bool ret;
+	bool ret = uninit(ret, false);
+
 	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
 		ret = eval_expr(child, state);
 		if (state->quit) {
