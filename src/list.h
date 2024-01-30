@@ -275,6 +275,8 @@
  *         The item to insert.
  * @param node (optional)
  *         If specified, use item->node.next rather than item->next.
+ * @return
+ *         A cursor for the next item.
  */
 #define SLIST_INSERT(list, cursor, ...) \
 	SLIST_INSERT_(list, cursor, __VA_ARGS__, )
@@ -282,11 +284,12 @@
 #define SLIST_INSERT_(list, cursor, item, ...) \
 	SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_INSERT__(list, cursor, item, next) LIST_VOID_( \
-	bfs_assert(!SLIST_ATTACHED__(list, item, next)), \
-	item->next = *cursor, \
-	*cursor = item, \
-	list->tail = item->next ? list->tail : &item->next)
+#define SLIST_INSERT__(list, cursor, item, next) \
+	(bfs_assert(!SLIST_ATTACHED__(list, item, next)), \
+	 item->next = *cursor, \
+	 *cursor = item, \
+	 list->tail = item->next ? list->tail : &item->next, \
+	 &item->next)
 
 /**
  * Add an item to the tail of a singly-linked list.
@@ -302,7 +305,7 @@
 	SLIST_APPEND_(list, __VA_ARGS__, )
 
 #define SLIST_APPEND_(list, item, ...) \
-	SLIST_INSERT_(list, (list)->tail, item, __VA_ARGS__)
+	LIST_VOID_(SLIST_INSERT_(list, (list)->tail, item, __VA_ARGS__))
 
 /**
  * Add an item to the head of a singly-linked list.
@@ -318,7 +321,7 @@
 	SLIST_PREPEND_(list, __VA_ARGS__, )
 
 #define SLIST_PREPEND_(list, item, ...) \
-	SLIST_INSERT_(list, &(list)->head, item, __VA_ARGS__)
+	LIST_VOID_(SLIST_INSERT_(list, &(list)->head, item, __VA_ARGS__))
 
 /**
  * Add an entire singly-linked list to the tail of another.
