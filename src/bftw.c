@@ -400,6 +400,13 @@ static struct bftw_file *bftw_queue_ready(const struct bftw_queue *queue) {
 	return SLIST_HEAD(&queue->ready);
 }
 
+/** Check if a queue is empty. */
+static bool bftw_queue_empty(const struct bftw_queue *queue) {
+	return SLIST_EMPTY(&queue->buffer)
+		&& SLIST_EMPTY(&queue->waiting)
+		&& SLIST_EMPTY(&queue->ready);
+}
+
 /** Pop a file from the queue. */
 static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 	// Don't pop until we've had a chance to sort the buffer
@@ -683,13 +690,10 @@ struct bftw_state {
 
 	/** The queue of unpinned directories to unwrap. */
 	struct bftw_list to_close;
+	/** The queue of files to visit. */
+	struct bftw_queue fileq;
 	/** The queue of directories to open/read. */
 	struct bftw_queue dirq;
-
-	/** A batch of files to enqueue. */
-	struct bftw_list file_batch;
-	/** The queue of files to visit. */
-	struct bftw_list to_visit;
 
 	/** The current path. */
 	dchar *path;
@@ -790,10 +794,11 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	SLIST_INIT(&state->to_close);
 
 	enum bftw_qflags qflags = 0;
-	if (state->strategy != BFTW_BFS && !(state->flags & BFTW_BUFFER)) {
-		// For a depth-first, unbuffered search, queue directories in
-		// LIFO order
+	if (state->strategy != BFTW_BFS) {
 		qflags |= BFTW_QBUFFER | BFTW_QLIFO;
+	}
+	if (state->flags & BFTW_BUFFER) {
+		qflags |= BFTW_QBUFFER;
 	}
 	if (state->flags & BFTW_SORT) {
 		qflags |= BFTW_QORDER;
@@ -801,10 +806,14 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	if (nthreads == 1) {
 		qflags |= BFTW_QBALANCE;
 	}
-	bftw_queue_init(&state->dirq, qflags);
+	bftw_queue_init(&state->fileq, qflags);
 
-	SLIST_INIT(&state->file_batch);
-	SLIST_INIT(&state->to_visit);
+	if (state->strategy == BFTW_BFS || (state->flags & BFTW_BUFFER)) {
+		// In breadth-first mode, or if we're already buffering files,
+		// directories can be queued in FIFO order
+		qflags &= ~(BFTW_QBUFFER | BFTW_QLIFO);
+	}
+	bftw_queue_init(&state->dirq, qflags);
 
 	state->path = NULL;
 	state->file = NULL;
@@ -1172,10 +1181,10 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
 	struct bftw_cache *cache = &state->cache;
-	bool have_files = !SLIST_EMPTY(&state->to_visit);
 
 	if (state->flags & BFTW_SORT) {
 		// Keep strict breadth-first order when sorting
+		bool have_files = bftw_queue_ready(&state->fileq);
 		if (state->strategy == BFTW_BFS && have_files) {
 			return false;
 		}
@@ -1183,6 +1192,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 		while (!bftw_queue_ready(&state->dirq)) {
 			// Block if we have no other files/dirs to visit, or no room in the cache
 			bool have_dirs = bftw_queue_waiting(&state->dirq);
+			bool have_files = !bftw_queue_empty(&state->fileq);
 			bool have_room = cache->capacity > 0 && cache->dirlimit > 0;
 			bool block = !(have_dirs || have_files) || !have_room;
 
@@ -1208,7 +1218,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 /** Pop a file to visit from the queue. */
 static bool bftw_pop_file(struct bftw_state *state) {
 	bfs_assert(!state->file);
-	state->file = SLIST_POP(&state->to_visit);
+	state->file = bftw_queue_pop(&state->fileq);
 	return state->file;
 }
 
@@ -1640,17 +1650,12 @@ static void bftw_list_sort(struct bftw_list *list) {
 	SLIST_EXTEND(list, &right);
 }
 
-/** Finish adding a batch of files. */
-static void bftw_batch_finish(struct bftw_state *state) {
+/** Flush all the queue buffers. */
+static void bftw_flush(struct bftw_state *state) {
 	if (state->flags & BFTW_SORT) {
-		bftw_list_sort(&state->file_batch);
+		bftw_list_sort(&state->fileq.buffer);
 	}
-
-	if (state->strategy != BFTW_BFS) {
-		SLIST_EXTEND(&state->file_batch, &state->to_visit);
-	}
-
-	SLIST_EXTEND(&state->to_visit, &state->file_batch);
+	bftw_queue_flush(&state->fileq);
 
 	bftw_queue_flush(&state->dirq);
 	bftw_ioq_opendirs(state);
@@ -1662,7 +1667,7 @@ static int bftw_closedir(struct bftw_state *state) {
 		return -1;
 	}
 
-	bftw_batch_finish(state);
+	bftw_flush(state);
 	return 0;
 }
 
@@ -1695,7 +1700,7 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 			file->type = state->de->type;
 		}
 
-		SLIST_APPEND(&state->file_batch, file);
+		bftw_queue_push(&state->fileq, file);
 		return 0;
 	}
 
@@ -1744,7 +1749,7 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	}
 
 	bftw_queue_flush(&state->dirq);
-	SLIST_EXTEND(&state->to_visit, &state->file_batch);
+	bftw_queue_flush(&state->fileq);
 	do {
 		bftw_gc(state, BFTW_VISIT_NONE);
 	} while (bftw_pop_dir(state) || bftw_pop_file(state));
@@ -1766,7 +1771,7 @@ static int bftw_impl(struct bftw_state *state) {
 			return -1;
 		}
 	}
-	bftw_batch_finish(state);
+	bftw_flush(state);
 
 	while (true) {
 		while (bftw_pop_dir(state)) {
