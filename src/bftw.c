@@ -802,8 +802,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	}
 	if (state->flags & BFTW_SORT) {
 		qflags |= BFTW_QORDER;
-	}
-	if (nthreads == 1) {
+	} else if (nthreads == 1) {
 		qflags |= BFTW_QBALANCE;
 	}
 	bftw_queue_init(&state->fileq, qflags);
