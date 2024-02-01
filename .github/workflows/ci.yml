@@ -86,6 +86,7 @@ jobs:
                 tcl-wrapper
             pw useradd -n action -m -G wheel -s /usr/local/bin/bash
             echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
+            mount -t fdescfs none /dev/fd
 
           run: |
             chown -R action:action .

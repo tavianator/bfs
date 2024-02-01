@@ -48,23 +48,16 @@ stdenv() {
         export MallocNanoZone=0
     fi
 
-    # Close non-standard inherited fds
+    # Count the inherited FDs
     if [ -d /proc/self/fd ]; then
         local fds=/proc/self/fd
     else
         local fds=/dev/fd
     fi
-
-    for fd in "$fds"/*; do
-        if [ ! -e "$fd" ]; then
-            continue
-        fi
-
-        local fd="${fd##*/}"
-        if ((fd > 2)); then
-            eval "exec ${fd}<&-"
-        fi
-    done
+    # We use ls $fds on purpose, rather than e.g. ($fds/*), to avoid counting
+    # internal bash fds that are not exposed to spawned processes
+    NOPENFD=$(ls -1q "$fds/" 2>/dev/null | wc -l)
+    NOPENFD=$((NOPENFD > 3 ? NOPENFD - 1 : 3))
 
     # Close stdin so bfs doesn't think we're interactive
     # dup() the standard fds for logging even when redirected
