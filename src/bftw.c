@@ -330,11 +330,6 @@ static void bftw_queue_flush(struct bftw_queue *queue) {
 	SLIST_EXTEND(&queue->waiting, &queue->buffer);
 }
 
-/** Update the queue imbalance. */
-static void bftw_queue_balance(struct bftw_queue *queue, long delta) {
-	queue->imbalance += delta;
-}
-
 /** Check if the queue is properly balanced for async work. */
 static bool bftw_queue_balanced(const struct bftw_queue *queue) {
 	if (queue->flags & BFTW_QBALANCE) {
@@ -358,7 +353,7 @@ static void bftw_queue_detach(struct bftw_queue *queue, struct bftw_file *file) 
 	}
 
 	file->ioqueued = true;
-	bftw_queue_balance(queue, -1);
+	--queue->imbalance;
 }
 
 /** Reattach a serviced file to the queue. */
@@ -420,7 +415,7 @@ static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 		file = SLIST_POP(&queue->waiting);
 		if (file) {
 			// This file will be serviced synchronously
-			bftw_queue_balance(queue, +1);
+			++queue->imbalance;
 		}
 	}
 
