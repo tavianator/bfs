@@ -437,10 +437,13 @@ struct bftw_cache {
 
 	/** bftw_file arena. */
 	struct varena files;
+
 	/** bfs_dir arena. */
 	struct arena dirs;
 	/** Remaining bfs_dir capacity. */
-	size_t dirlimit;
+	size_t dir_limit;
+	/** Excess force-allocated bfs_dirs. */
+	size_t dir_excess;
 };
 
 /** Initialize a cache. */
@@ -450,28 +453,48 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	cache->capacity = capacity;
 
 	VARENA_INIT(&cache->files, struct bftw_file, name);
+
 	bfs_dir_arena(&cache->dirs);
 
-	cache->dirlimit = capacity - 1;
-	if (cache->dirlimit > 1024) {
-		cache->dirlimit = 1024;
+	cache->dir_limit = capacity - 1;
+	if (cache->dir_limit > 1024) {
+		cache->dir_limit = 1024;
 	}
+
+	cache->dir_excess = 0;
 }
 
 /** Allocate a directory. */
-static struct bfs_dir *bftw_allocdir(struct bftw_cache *cache) {
-	if (cache->dirlimit == 0) {
+static struct bfs_dir *bftw_allocdir(struct bftw_cache *cache, bool force) {
+	size_t limit = cache->dir_limit;
+	size_t excess = cache->dir_excess;
+
+	if (cache->dir_limit > 0) {
+		--cache->dir_limit;
+	} else if (force) {
+		++cache->dir_excess;
+	} else {
 		errno = ENOMEM;
 		return NULL;
 	}
-	--cache->dirlimit;
 
-	return arena_alloc(&cache->dirs);
+	struct bfs_dir *dir = arena_alloc(&cache->dirs);
+	if (!dir) {
+		cache->dir_limit = limit;
+		cache->dir_excess = excess;
+	}
+
+	return dir;
 }
 
 /** Free a directory. */
 static void bftw_freedir(struct bftw_cache *cache, struct bfs_dir *dir) {
-	++cache->dirlimit;
+	if (cache->dir_excess > 0) {
+		--cache->dir_excess;
+	} else {
+		++cache->dir_limit;
+	}
+
 	arena_free(&cache->dirs, dir);
 }
 
@@ -1125,7 +1148,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 		goto unpin;
 	}
 
-	struct bfs_dir *dir = bftw_allocdir(cache);
+	struct bfs_dir *dir = bftw_allocdir(cache, false);
 	if (!dir) {
 		goto unpin;
 	}
@@ -1187,7 +1210,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 			// Block if we have no other files/dirs to visit, or no room in the cache
 			bool have_dirs = bftw_queue_waiting(&state->dirq);
 			bool have_files = !bftw_queue_empty(&state->fileq);
-			bool have_room = cache->capacity > 0 && cache->dirlimit > 0;
+			bool have_room = cache->capacity > 0;
 			bool block = !(have_dirs || have_files) || !have_room;
 
 			if (bftw_ioq_pop(state, block) < 0) {
@@ -1271,7 +1294,7 @@ static struct bfs_dir *bftw_file_opendir(struct bftw_state *state, struct bftw_f
 	}
 
 	struct bftw_cache *cache = &state->cache;
-	struct bfs_dir *dir = bftw_allocdir(cache);
+	struct bfs_dir *dir = bftw_allocdir(cache, true);
 	if (!dir) {
 		return NULL;
 	}
