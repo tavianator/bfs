@@ -10,6 +10,7 @@ if command -v nproc &>/dev/null; then
 else
     JOBS=1
 fi
+MAKE=
 PATTERNS=()
 SUDO=()
 STOP=0
@@ -24,15 +25,19 @@ VERBOSE_TESTS=0
 usage() {
     local pad=$(printf "%*s" ${#0} "")
     color cat <<EOF
-Usage: ${GRN}$0${RST} [${BLU}-j${RST}${BLD}N${RST}] [${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]] [${BLU}--stop${RST}]
-       $pad [${BLU}--no-clean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
-       $pad [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
+Usage: ${GRN}$0${RST}
+           [${BLU}-j${RST}${BLD}N${RST}] [${BLU}--make${RST}=${BLD}MAKE${RST}] [${BLU}--bfs${RST}=${BLD}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]]
+           [${BLU}--stop${RST}] [${BLU}--no-clean${RST}] [${BLU}--update${RST}] [${BLU}--verbose${RST}[=${BLD}LEVEL${RST}]] [${BLU}--help${RST}]
+           [${BLU}--posix${RST}] [${BLU}--bsd${RST}] [${BLU}--gnu${RST}] [${BLU}--all${RST}] [${BLD}TEST${RST} [${BLD}TEST${RST} ...]]
 
-  [${BLU}-j${RST}${BLD}N${RST}]
+  ${BLU}-j${RST}${BLD}N${RST}
       Run ${BLD}N${RST} tests in parallel (default: ${BLD}$JOBS${RST})
 
-  ${BLU}--bfs${RST}=${MAG}path/to/bfs${RST}
-      Set the path to the bfs executable to test (default: ${MAG}./bin/bfs${RST})
+  ${BLU}--make${RST}=${BLD}MAKE${RST}
+      Use the jobserver from ${BLD}MAKE${RST}, e.g. ${BLU}--make${RST}=${BLD}"make -j$JOBS"${RST}
+
+  ${BLU}--bfs${RST}=${BLD}path/to/bfs${RST}
+      Set the path to the bfs executable to test (default: ${BLD}./bin/bfs${RST})
 
   ${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]
       Run tests that require root using ${GRN}sudo${RST} or the given ${BLD}COMMAND${RST}
@@ -74,6 +79,9 @@ parse_args() {
         case "$arg" in
             -j?*)
                 JOBS="${arg#-j}"
+                ;;
+            --make=*)
+                MAKE="${arg#*=}"
                 ;;
             --bfs=*)
                 BFS="${arg#*=}"
@@ -137,6 +145,8 @@ parse_args() {
                 ;;
         esac
     done
+
+    read -a MAKE <<<"$MAKE"
 
     # Try to resolve the path to $BFS before we cd, while also supporting
     # --bfs="./bin/bfs -S ids"

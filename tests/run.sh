@@ -27,29 +27,39 @@ debug_err() {
     local ret=$? line func file
     callers | while read -r line func file; do
         if [ "$func" = source ]; then
-            local cmd="$(awk "NR == $line" "$file" 2>/dev/null)" || :
-            debug "$file" $line "${RED}error $ret${RST}" "$cmd" >&$DUPERR
+            debug "$file" $line "${RED}error $ret${RST}" >&$DUPERR
             break
         fi
     done
 }
 
-# Run a single test
-run_test() (
+# Source a test
+source_test() (
     set -eE
     trap debug_err ERR
+
+    if ((${#MAKE[@]})); then
+        # Close the jobserver pipes
+        exec {READY_PIPE}<&- {DONE_PIPE}>&-
+    fi
+
     cd "$TMP"
     source "$@"
 )
 
-# Run a test in the background
-bg_test() {
+# Run a test
+run_test() {
     if ((VERBOSE_ERRORS)); then
-        run_test "$1"
+        source_test "$1"
     else
-        run_test "$1" 2>"$TMP/$TEST.err"
+        source_test "$1" 2>"$TMP/$TEST.err"
     fi
     ret=$?
+
+    if ((${#MAKE[@]})); then
+        # Write one byte to the done pipe
+        printf . >&$DONE_PIPE
+    fi
 
     case $ret in
         0)
@@ -73,26 +83,85 @@ bg_test() {
     return $ret
 }
 
-# Wait for a background test to finish
-wait_test() {
-    wait -n
-    ret=$?
+# Count the tests running in the background
+BG=0
+
+# Run a test in the background
+bg_test() {
+    run_test "$1" &
+    ((++BG))
+}
+
+# Reap a finished background test
+reap_test() {
     ((BG--))
 
-    case $ret in
+    case "$1" in
         0)
             ((++passed))
-            return 0
             ;;
         $EX_SKIP)
             ((++skipped))
-            return 0
             ;;
         *)
             ((++failed))
-            return $ret
             ;;
     esac
+}
+
+# Wait for a background test to finish
+wait_test() {
+    local pid
+    wait -n -ppid
+    ret=$?
+    if [ -z "${pid:-}" ]; then
+        debug "${BASH_SOURCE[0]}" $((LINENO - 3)) "${RED}error $ret${RST}" >&$DUPERR
+        exit 1
+    fi
+
+    reap_test $ret
+}
+
+# Wait until we're ready to run another test
+wait_ready() {
+    if ((${#MAKE[@]})); then
+        # We'd like to parse the output of jobs -n, but we can't run it in a
+        # subshell or we won't get the right output
+        jobs -n >"$TMP/jobs"
+        while read -r job status ret foo; do
+            case "$status" in
+                Done)
+                    reap_test 0
+                    ;;
+                Exit)
+                    reap_test $ret
+                    ;;
+            esac
+        done <"$TMP/jobs"
+
+        # Read one byte from the ready pipe
+        read -r -N1 -u$READY_PIPE
+    elif ((BG >= JOBS)); then
+        wait_test
+    fi
+}
+
+# Run make as a co-process to use its job control
+comake() {
+    coproc {
+        # We can't just use std{in,out}, due to
+        # https://www.gnu.org/software/make/manual/html_node/Parallel-Input.html
+        exec {DONE_PIPE}<&0 {READY_PIPE}>&1
+        exec "${MAKE[@]}" -s \
+             -f "$TESTS/tests.mk" \
+             DONE=$DONE_PIPE \
+             READY=$READY_PIPE \
+             "${TEST_CASES[@]/#/tests/}" \
+             </dev/null >/dev/null
+    }
+
+    # coproc pipes aren't inherited by subshells, so dup them
+    exec {READY_PIPE}<&${COPROC[0]} {DONE_PIPE}>&${COPROC[1]}
 }
 
 # Run all the tests
@@ -125,17 +194,17 @@ run_tests() {
         TEST_FMT="."
     fi
 
-    BG=0
+    if ((${#MAKE[@]})); then
+        comake
+    fi
 
     # Turn off set -e (but turn it back on in run_test)
     set +e
 
     for TEST in "${TEST_CASES[@]}"; do
-        if ((BG >= JOBS)); then
-            wait_test
-            if (($? && STOP)); then
-                break
-            fi
+        wait_ready
+        if (($? && STOP)); then
+            break
         fi
 
         percent=$((100 * ran / total))
@@ -144,8 +213,8 @@ run_tests() {
         mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
 
-        bg_test "$TESTS/$TEST.sh" &
-        ((++BG, ++ran))
+        bg_test "$TESTS/$TEST.sh"
+        ((++ran))
     done
 
     while ((BG > 0)); do
@@ -185,7 +254,7 @@ skip() {
         caller | {
             read -r line file
             printf "${BOL}"
-            debug "$file" $line "" "$(awk "NR == $line" "$file")" >&$DUPOUT
+            debug "$file" $line "" >&$DUPOUT
         }
     fi
 

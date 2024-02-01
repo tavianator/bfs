@@ -113,9 +113,13 @@ callers() {
 
 # Print a message including path, line number, and command
 debug() {
-    local file="${1/#*\/tests\//tests/}"
-    set -- "$file" "${@:2}"
-    color printf "${BLD}%s:%d:${RST} %s\n    %s\n" "$@"
+    local file="$1"
+    local line="$2"
+    local msg="$3"
+    local cmd="$(awk "NR == $line" "$file" 2>/dev/null)" || :
+    file="${file/#*\/tests\//tests/}"
+
+    color printf "${BLD}%s:%d:${RST} %s\n    %s\n" "$file" "$line" "$msg" "$cmd"
 }
 
 ## Deferred cleanup
@@ -163,7 +167,7 @@ pop_defer() {
     eval "$cmd" || ret=$?
 
     if ((ret != 0)); then
-        debug "$file" $line "${RED}error $ret${RST}" "defer $cmd" >&$DUPERR
+        debug "$file" $line "${RED}error $ret${RST}" >&$DUPERR
     fi
 
     return $ret

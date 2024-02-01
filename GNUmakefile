@@ -304,13 +304,8 @@ check: $(CHECKS)
 check-units: $(BIN)/tests/units
 	$<
 
-JOBS := $(filter -j%,$(MAKEFLAGS))
-ifndef JOBS
-	JOBS := -j1
-endif
-
 $(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(TEST_UTILS)
-	./tests/tests.sh $(JOBS) --bfs="$(BIN)/bfs -S $*" $(TEST_FLAGS)
+	+./tests/tests.sh --make="$(MAKE)" --bfs="$(BIN)/bfs -S $*" $(TEST_FLAGS)
 
 # Custom test flags for distcheck
 DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
