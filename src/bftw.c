@@ -1191,27 +1191,38 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 	bftw_ioq_opendirs(state);
 }
 
+/** Check if we should block on the ioq when popping a directory. */
+static bool bftw_block_for_dir(const struct bftw_state *state) {
+	// Always block with more than one background thread
+	if (state->nthreads > 1) {
+		return true;
+	}
+
+	// Block if the cache is full
+	if (state->cache.capacity == 0) {
+		return true;
+	}
+
+	// Block if we have no other files/dirs to visit
+	if (!bftw_queue_waiting(&state->dirq) && bftw_queue_empty(&state->fileq)) {
+		return true;
+	}
+
+	return false;
+}
+
 /** Pop a directory to read from the queue. */
 static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
-	struct bftw_cache *cache = &state->cache;
-
 	if (state->flags & BFTW_SORT) {
 		// Keep strict breadth-first order when sorting
-		bool have_files = bftw_queue_ready(&state->fileq);
-		if (state->strategy == BFTW_BFS && have_files) {
+		if (state->strategy == BFTW_BFS && bftw_queue_ready(&state->fileq)) {
 			return false;
 		}
 	} else {
 		while (!bftw_queue_ready(&state->dirq)) {
-			// Block if we have no other files/dirs to visit, or no room in the cache
-			bool have_dirs = bftw_queue_waiting(&state->dirq);
-			bool have_files = !bftw_queue_empty(&state->fileq);
-			bool have_room = cache->capacity > 0;
-			bool block = !(have_dirs || have_files) || !have_room;
-
-			if (bftw_ioq_pop(state, block) < 0) {
+			if (bftw_ioq_pop(state, bftw_block_for_dir(state)) < 0) {
 				break;
 			}
 		}
