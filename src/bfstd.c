@@ -639,12 +639,12 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 	char *str_arg = (char *)*str;
 
 #if __OpenBSD__
-	typedef uint32_t fflags_t;
+	typedef uint32_t bfs_fflags_t;
 #else
-	typedef unsigned long fflags_t;
+	typedef unsigned long bfs_fflags_t;
 #endif
-	fflags_t set_arg = 0;
-	fflags_t clear_arg = 0;
+	bfs_fflags_t set_arg = 0;
+	bfs_fflags_t clear_arg = 0;
 
 #if __NetBSD__
 	int ret = string_to_flags(&str_arg, &set_arg, &clear_arg);
