@@ -659,8 +659,6 @@ static void bftw_file_set_dir(struct bftw_cache *cache, struct bftw_file *file, 
 		file->fd = bfs_dirfd(dir);
 		bftw_cache_add(cache, file);
 	}
-
-	bftw_cache_pin(cache, file);
 }
 
 /** Free a bftw_file. */
@@ -1318,7 +1316,7 @@ static int bftw_opendir(struct bftw_state *state) {
 	struct bftw_file *file = state->file;
 	state->dir = file->dir;
 	if (state->dir) {
-		return 0;
+		goto pin;
 	}
 
 	if (bftw_build_path(state, NULL) != 0) {
@@ -1328,8 +1326,11 @@ static int bftw_opendir(struct bftw_state *state) {
 	state->dir = bftw_file_opendir(state, file, state->path);
 	if (!state->dir) {
 		state->direrror = errno;
+		return 0;
 	}
 
+pin:
+	bftw_cache_pin(&state->cache, file);
 	return 0;
 }
 
@@ -1577,7 +1578,7 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	int ret = 0;
 
 	struct bftw_file *file = state->file;
-	if (file && file->dir) {
+	if (file && state->dir) {
 		bftw_unpin_dir(state, file, true);
 	}
 	state->dir = NULL;
