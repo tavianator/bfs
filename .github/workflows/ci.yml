@@ -52,7 +52,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install expect
+          brew install \
+              bash \
+              expect
 
       - name: Run tests
         run: |

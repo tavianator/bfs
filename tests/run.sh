@@ -28,7 +28,7 @@ debug_err() {
     callers | while read -r line func file; do
         if [ "$func" = source ]; then
             local cmd="$(awk "NR == $line" "$file" 2>/dev/null)" || :
-            debug "$file" $line "${RED}error $ret${RST}" "$cmd" >&4
+            debug "$file" $line "${RED}error $ret${RST}" "$cmd" >&$DUPERR
             break
         fi
     done
@@ -73,21 +73,9 @@ bg_test() {
     return $ret
 }
 
-# Wait for any background job to complete
-if ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3))); then
-    wait_any() {
-        wait -n
-    }
-else
-    wait_any() {
-        read -ra jobs < <(jobs -p)
-        wait ${jobs[0]}
-    }
-fi
-
 # Wait for a background test to finish
 wait_test() {
-    wait_any
+    wait -n
     ret=$?
     ((BG--))
 
@@ -197,7 +185,7 @@ skip() {
         caller | {
             read -r line file
             printf "${BOL}"
-            debug "$file" $line "" "$(awk "NR == $line" "$file")" >&3
+            debug "$file" $line "" "$(awk "NR == $line" "$file")" >&$DUPOUT
         }
     fi
 
@@ -252,8 +240,8 @@ bfs_verbose() {
         (
             # Close some fds to make room for the pipe,
             # even with extremely low ulimit -n
-            exec >&- 4>&-
-            exec >&3 3>&-
+            exec >&- {DUPERR}>&-
+            exec >&$DUPOUT {DUPOUT}>&-
             color bfs_verbose_impl "$@"
         )
     fi
@@ -306,7 +294,7 @@ invoke_bfs() {
 
     local ret=0
     # Close the logging fds
-    "${BFS[@]}" "$@" 3>&- 4>&- || ret=$?
+    "${BFS[@]}" "$@" {DUPOUT}>&- {DUPERR}>&- || ret=$?
 
     # Allow bfs to fail, but not crash
     if ((ret > 125)); then
@@ -391,7 +379,7 @@ diff_output() {
     if ((UPDATE)); then
         cp "$OUT" "$GOLD"
     else
-        $DIFF -u "$GOLD" "$OUT" >&4
+        $DIFF -u "$GOLD" "$OUT" >&$DUPERR
     fi
 }
 

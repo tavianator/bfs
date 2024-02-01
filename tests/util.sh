@@ -68,7 +68,7 @@ stdenv() {
 
     # Close stdin so bfs doesn't think we're interactive
     # dup() the standard fds for logging even when redirected
-    exec </dev/null 3>&1 4>&2
+    exec </dev/null {DUPOUT}>&1 {DUPERR}>&2
 }
 
 # Drop root priviliges or bail
@@ -159,19 +159,18 @@ defer() {
 
 # Pop a single command from the defer stack and run it
 pop_defer() {
-    local i=$((${#DEFER_CMDS[@]} - 1))
-    local cmd="${DEFER_CMDS[$i]}"
-    local file="${DEFER_FILES[$i]}"
-    local line="${DEFER_LINES[$i]}"
-    unset "DEFER_CMDS[$i]"
-    unset "DEFER_FILES[$i]"
-    unset "DEFER_LINES[$i]"
+    local cmd="${DEFER_CMDS[-1]}"
+    local file="${DEFER_FILES[-1]}"
+    local line="${DEFER_LINES[-1]}"
+    unset "DEFER_CMDS[-1]"
+    unset "DEFER_FILES[-1]"
+    unset "DEFER_LINES[-1]"
 
     local ret=0
     eval "$cmd" || ret=$?
 
     if ((ret != 0)); then
-        debug "$file" $line "${RED}error $ret${RST}" "defer $cmd" >&4
+        debug "$file" $line "${RED}error $ret${RST}" "defer $cmd" >&$DUPERR
     fi
 
     return $ret
