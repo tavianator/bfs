@@ -291,12 +291,12 @@ $(BIN)/tests/units: \
 tests: $(TESTS)
 .PHONY: tests
 
-# The different search strategies that we test
-STRATEGIES := bfs dfs ids eds
-STRATEGY_CHECKS := $(STRATEGIES:%=check-%)
+# The different flag combinations we check
+INTEGRATIONS := default dfs ids eds j1 j2 j3 s
+INTEGRATION_CHECKS := $(INTEGRATIONS:%=check-%)
 
 # All the different checks we run
-CHECKS := check-units $(STRATEGY_CHECKS)
+CHECKS := check-units $(INTEGRATION_CHECKS)
 
 check: $(CHECKS)
 .PHONY: check $(CHECKS)
@@ -304,8 +304,14 @@ check: $(CHECKS)
 check-units: $(BIN)/tests/units
 	$<
 
-$(STRATEGY_CHECKS): check-%: $(BIN)/bfs $(TEST_UTILS)
-	+./tests/tests.sh --make="$(MAKE)" --bfs="$(BIN)/bfs -S $*" $(TEST_FLAGS)
+check-default: $(BIN)/bfs $(TEST_UTILS)
+	+./tests/tests.sh --make="$(MAKE)" --bfs="$<" $(TEST_FLAGS)
+
+check-dfs check-ids check-eds: check-%: $(BIN)/bfs $(TEST_UTILS)
+	+./tests/tests.sh --make="$(MAKE)" --bfs="$< -S $*" $(TEST_FLAGS)
+
+check-j1 check-j2 check-j3 check-s: check-%: $(BIN)/bfs $(TEST_UTILS)
+	+./tests/tests.sh --make="$(MAKE)" --bfs="$< -$*" $(TEST_FLAGS)
 
 # Custom test flags for distcheck
 DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
