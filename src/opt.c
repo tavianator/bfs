@@ -1218,6 +1218,7 @@ static struct bfs_expr *annotate_visit(struct bfs_opt *opt, struct bfs_expr *exp
 		{eval_acl,       STAT_COST},
 		{eval_capable,   STAT_COST},
 		{eval_empty, 2 * STAT_COST}, // readdir() is worse than stat()
+		{eval_flags,     STAT_COST},
 		{eval_fls,      PRINT_COST},
 		{eval_fprint,   PRINT_COST},
 		{eval_fprint0,  PRINT_COST},
