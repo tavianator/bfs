@@ -79,7 +79,6 @@ jobs:
                 bash \
                 expect \
                 gmake \
-                llvm16 \
                 oniguruma \
                 sudo \
                 tcl-wrapper
@@ -88,7 +87,7 @@ jobs:
 
           run: |
             chown -R action:action .
-            sudo -u action gmake -j$(nproc) distcheck CC=clang16 JOBS=-j$(nproc)
+            sudo -u action gmake -j$(nproc) distcheck JOBS=-j$(nproc)
 
   openbsd:
     name: OpenBSD
