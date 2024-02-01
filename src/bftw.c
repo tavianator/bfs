@@ -1791,7 +1791,7 @@ static int bftw_impl(struct bftw_state *state) {
 			break;
 		}
 		if (bftw_visit(state, NULL) != 0) {
-			break;
+			return -1;
 		}
 	}
 
