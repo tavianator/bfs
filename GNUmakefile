@@ -288,21 +288,18 @@ $(BIN)/tests/units: \
     $(OBJ)/tests/xtime.o \
     $(LIBBFS)
 
+# Build all the test binaries
 tests: $(TESTS)
 .PHONY: tests
 
+# Run the unit tests
+unit-tests: $(BIN)/tests/units
+	$<
+.PHONY: unit-tests
+
 # The different flag combinations we check
 INTEGRATIONS := default dfs ids eds j1 j2 j3 s
-INTEGRATION_CHECKS := $(INTEGRATIONS:%=check-%)
-
-# All the different checks we run
-CHECKS := check-units $(INTEGRATION_CHECKS)
-
-check: $(CHECKS)
-.PHONY: check $(CHECKS)
-
-check-units: $(BIN)/tests/units
-	$<
+INTEGRATION_TESTS := $(INTEGRATIONS:%=check-%)
 
 check-default: $(BIN)/bfs $(TEST_UTILS)
 	+./tests/tests.sh --make="$(MAKE)" --bfs="$<" $(TEST_FLAGS)
@@ -312,6 +309,14 @@ check-dfs check-ids check-eds: check-%: $(BIN)/bfs $(TEST_UTILS)
 
 check-j1 check-j2 check-j3 check-s: check-%: $(BIN)/bfs $(TEST_UTILS)
 	+./tests/tests.sh --make="$(MAKE)" --bfs="$< -$*" $(TEST_FLAGS)
+
+# Run the integration tests
+integration-tests: $(INTEGRATION_TESTS)
+.PHONY: integration-tests
+
+# Run all the tests
+check: unit-tests integration-tests
+.PHONY: check
 
 # Custom test flags for distcheck
 DISTCHECK_FLAGS := -s TEST_FLAGS="--sudo --verbose=skipped"
