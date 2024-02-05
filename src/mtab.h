@@ -43,12 +43,12 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
  *
  * @param mtab
  *         The current mount table.
- * @param path
- *         The path to check.
+ * @param name
+ *         The name of the file to check.
  * @return
  *         Whether the named file could be a mount point.
  */
-bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path);
+bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *name);
 
 /**
  * Free a mount table.

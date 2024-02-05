@@ -271,8 +271,7 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 	}
 }
 
-bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path) {
-	const char *name = path + xbaseoff(path);
+bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *name) {
 	return trie_find_str(&mtab->names, name);
 }
 

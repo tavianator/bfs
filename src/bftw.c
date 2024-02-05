@@ -1390,7 +1390,7 @@ static bool bftw_need_stat(const struct bftw_state *state) {
 		// need to stat() to get the correct type.  We don't need to
 		// check for directories because they can only be mounted over
 		// by other directories.
-		if (bfs_might_be_mount(state->mtab, ftwbuf->path)) {
+		if (bfs_might_be_mount(state->mtab, ftwbuf->path + ftwbuf->nameoff)) {
 			return true;
 		}
 #endif
