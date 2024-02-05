@@ -203,7 +203,7 @@ run_tests() {
 
     for TEST in "${TEST_CASES[@]}"; do
         wait_ready
-        if (($? && STOP)); then
+        if ((STOP && failed > 0)); then
             break
         fi
 
