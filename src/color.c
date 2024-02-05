@@ -764,6 +764,11 @@ static bool is_link_broken(const struct BFTW *ftwbuf) {
 	}
 }
 
+bool colors_need_stat(const struct colors *colors) {
+	return colors->setuid || colors->setgid || colors->executable || colors->multi_hard
+		|| colors->sticky_other_writable || colors->other_writable || colors->sticky;
+}
+
 /** Get the color for a file. */
 static const struct esc_seq *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	enum bfs_type type = bftw_type(ftwbuf, flags);

@@ -19,17 +19,17 @@
 struct colors;
 
 /**
- * Parse a color table.
- *
- * @return The parsed color table.
+ * Parse the color table from the environment.
  */
 struct colors *parse_colors(void);
 
 /**
+ * Check if stat() info is required to color a file correctly.
+ */
+bool colors_need_stat(const struct colors *colors);
+
+/**
  * Free a color table.
- *
- * @param colors
- *         The color table to free.
  */
 void free_colors(struct colors *colors);
 
