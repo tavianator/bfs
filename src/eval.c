@@ -1515,19 +1515,6 @@ done:
 	return ret;
 }
 
-static int infer_nproc(void) {
-	long nproc = sysconf(_SC_NPROCESSORS_ONLN);
-
-	if (nproc < 1) {
-		nproc = 1;
-	} else if (nproc > 8) {
-		// Not much speedup after 8 threads
-		nproc = 8;
-	}
-
-	return nproc;
-}
-
 /**
  * Dump the bftw() flags for -D search.
  */
@@ -1614,12 +1601,8 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	reserve_fds(fdlimit);
 	fdlimit = infer_fdlimit(ctx, fdlimit);
 
-	int nthreads;
-	if (ctx->threads > 0) {
-		nthreads = ctx->threads - 1;
-	} else {
-		nthreads = infer_nproc() - 1;
-	}
+	// -1 for the main thread
+	int nthreads = ctx->threads - 1;
 
 	struct bftw_args bftw_args = {
 		.paths = ctx->paths,

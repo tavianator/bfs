@@ -15,6 +15,21 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+/** Get the initial value for ctx->threads (-j). */
+static int bfs_nproc(void) {
+	long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+
+	if (nproc < 1) {
+		nproc = 1;
+	} else if (nproc > 8) {
+		// Not much speedup after 8 threads
+		nproc = 8;
+	}
+
+	return nproc;
+}
 
 struct bfs_ctx *bfs_ctx_new(void) {
 	struct bfs_ctx *ctx = ZALLOC(struct bfs_ctx);
@@ -28,6 +43,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	ctx->maxdepth = INT_MAX;
 	ctx->flags = BFTW_RECOVER;
 	ctx->strategy = BFTW_BFS;
+	ctx->threads = bfs_nproc();
 	ctx->optlevel = 3;
 
 	trie_init(&ctx->files);

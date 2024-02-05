@@ -3452,12 +3452,10 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 		cfprintf(cerr, " ${cyn}-s${rs}");
 	}
 
+	cfprintf(cerr, " ${cyn}-j${bld}%d${rs}", ctx->threads);
+
 	if (ctx->optlevel != 3) {
 		cfprintf(cerr, " ${cyn}-O${bld}%d${rs}", ctx->optlevel);
-	}
-
-	if (ctx->threads > 0) {
-		cfprintf(cerr, " ${cyn}-j${bld}%d${rs}", ctx->threads);
 	}
 
 	cfprintf(cerr, " ${cyn}-S${rs} ${bld}%s${rs}", bftw_strategy_name(ctx->strategy));
