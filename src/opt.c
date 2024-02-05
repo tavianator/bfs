@@ -1004,6 +1004,13 @@ static struct bfs_expr *annotate_fnmatch(struct bfs_opt *opt, struct bfs_expr *e
 	return expr;
 }
 
+/** Annotate -f?print. */
+static struct bfs_expr *annotate_fprint(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	const struct colors *colors = expr->cfile->colors;
+	expr->calls_stat = colors && colors_need_stat(colors);
+	return expr;
+}
+
 /** Estimate probability for -x?type. */
 static void estimate_type_probability(struct bfs_expr *expr) {
 	unsigned int types = expr->num;
@@ -1204,6 +1211,38 @@ static struct bfs_expr *annotate_visit(struct bfs_opt *opt, struct bfs_expr *exp
 		}
 	}
 
+	/** Table of stat-calling primaries. */
+	static bfs_eval_fn *const calls_stat[] = {
+		eval_empty,
+		eval_flags,
+		eval_fls,
+		eval_fprintf,
+		eval_fstype,
+		eval_gid,
+		eval_inum,
+		eval_links,
+		eval_newer,
+		eval_nogroup,
+		eval_nouser,
+		eval_perm,
+		eval_samefile,
+		eval_size,
+		eval_sparse,
+		eval_time,
+		eval_uid,
+		eval_used,
+		eval_xattr,
+		eval_xattrname,
+	};
+
+	expr->calls_stat = false;
+	for (size_t i = 0; i < countof(calls_stat); ++i) {
+		if (expr->eval_fn == calls_stat[i]) {
+			expr->calls_stat = true;
+			break;
+		}
+	}
+
 #define FAST_COST       40.0
 #define FNMATCH_COST   400.0
 #define STAT_COST     1000.0
@@ -1294,6 +1333,7 @@ static const struct visitor annotate = {
 		{eval_access, annotate_access},
 		{eval_empty, annotate_empty},
 		{eval_exec, annotate_exec},
+		{eval_fprint, annotate_fprint},
 		{eval_lname, annotate_fnmatch},
 		{eval_name, annotate_fnmatch},
 		{eval_path, annotate_fnmatch},
@@ -2130,6 +2170,43 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 	return expr;
 }
 
+/** Estimate the odds of an expression calling stat(). */
+static float expr_stat_odds(struct bfs_expr *expr) {
+	if (expr->calls_stat) {
+		return 1.0;
+	}
+
+	float nostat_odds = 1.0;
+	float reached_odds = 1.0;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		float child_odds = expr_stat_odds(child);
+		nostat_odds *= 1.0 - reached_odds * child_odds;
+
+		if (expr->eval_fn == eval_and) {
+			reached_odds *= child->probability;
+		} else if (expr->eval_fn == eval_or) {
+			reached_odds *= 1.0 - child->probability;
+		}
+	}
+
+	return 1.0 - nostat_odds;
+}
+
+/** Estimate the odds of calling stat(). */
+static float estimate_stat_odds(struct bfs_ctx *ctx) {
+	if (ctx->unique) {
+		return 1.0;
+	}
+
+	float nostat_odds = 1.0 - expr_stat_odds(ctx->exclude);
+
+	float reached_odds = 1.0 - ctx->exclude->probability;
+	float expr_odds = expr_stat_odds(ctx->expr);
+	nostat_odds *= 1.0 - reached_odds * expr_odds;
+
+	return 1.0 - nostat_odds;
+}
+
 int bfs_optimize(struct bfs_ctx *ctx) {
 	bfs_ctx_dump(ctx, DEBUG_OPT);
 
@@ -2194,6 +2271,20 @@ int bfs_optimize(struct bfs_ctx *ctx) {
 		opt_enter(&opt, "${blu}-maxdepth${rs} ${bld}%d${rs}\n", ctx->maxdepth);
 		ctx->maxdepth = maxdepth;
 		opt_leave(&opt, "${blu}-maxdepth${rs} ${bld}%d${rs}\n", ctx->maxdepth);
+	}
+
+	if (opt.level >= 3) {
+		// bfs_eval() can do lazy stat() calls, but only on one thread.
+		float lazy_cost = estimate_stat_odds(ctx);
+		// bftw() can do eager stat() calls in parallel
+		float eager_cost = 1.0 / ctx->threads;
+
+		if (eager_cost <= lazy_cost) {
+			opt_enter(&opt, "lazy stat cost: ${ylw}%g${rs}\n", lazy_cost);
+			ctx->flags |= BFTW_STAT;
+			opt_leave(&opt, "eager stat cost: ${ylw}%g${rs}\n", eager_cost);
+		}
+
 	}
 
 	opt_leave(&opt, NULL);

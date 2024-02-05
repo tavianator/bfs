@@ -110,6 +110,8 @@ struct bfs_expr {
 	bool always_true;
 	/** Whether this expression always evaluates to false. */
 	bool always_false;
+	/** Whether this expression uses stat(). */
+	bool calls_stat;
 
 	/** Estimated cost. */
 	float cost;
