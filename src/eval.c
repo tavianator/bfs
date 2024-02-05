@@ -1234,7 +1234,7 @@ static bool eval_file_unique(struct bfs_eval *state, struct trie *seen) {
 /**
  * Log a stat() call.
  */
-static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, const struct bftw_stat *cache, enum bfs_stat_flags flags) {
+static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, int err) {
 	bfs_debug_prefix(ctx, DEBUG_STAT);
 
 	fprintf(stderr, "bfs_stat(");
@@ -1254,10 +1254,10 @@ static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, con
 	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
 	DEBUG_FLAG(flags, BFS_STAT_NOSYNC);
 
-	fprintf(stderr, ") == %d", cache->buf ? 0 : -1);
+	fprintf(stderr, ") == %d", err ? 0 : -1);
 
-	if (cache->error) {
-		fprintf(stderr, " [%d]", cache->error);
+	if (err) {
+		fprintf(stderr, " [%d]", err);
 	}
 
 	fprintf(stderr, "\n");
@@ -1271,14 +1271,14 @@ static void debug_stats(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf) {
 		return;
 	}
 
-	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
-	if (statbuf || ftwbuf->stat_cache.error) {
-		debug_stat(ctx, ftwbuf, &ftwbuf->stat_cache, BFS_STAT_FOLLOW);
+	const struct bftw_stat *bufs = &ftwbuf->stat_bufs;
+
+	if (bufs->stat_err >= 0) {
+		debug_stat(ctx, ftwbuf, BFS_STAT_FOLLOW, bufs->stat_err);
 	}
 
-	const struct bfs_stat *lstatbuf = ftwbuf->lstat_cache.buf;
-	if ((lstatbuf && lstatbuf != statbuf) || ftwbuf->lstat_cache.error) {
-		debug_stat(ctx, ftwbuf, &ftwbuf->lstat_cache, BFS_STAT_NOFOLLOW);
+	if (bufs->lstat_err >= 0) {
+		debug_stat(ctx, ftwbuf, BFS_STAT_NOFOLLOW, bufs->lstat_err);
 	}
 }
 

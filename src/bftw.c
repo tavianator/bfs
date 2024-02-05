@@ -36,58 +36,130 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/** Caching bfs_stat(). */
-static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, struct bftw_stat *cache, enum bfs_stat_flags flags) {
-	if (!cache->buf) {
-		if (cache->error) {
-			errno = cache->error;
-		} else if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, flags, &cache->storage) == 0) {
-			cache->buf = &cache->storage;
-#ifdef S_IFWHT
-		} else if (errno == ENOENT && ftwbuf->type == BFS_WHT) {
-			// This matches the behavior of FTS_WHITEOUT on BSD
-			memset(&cache->storage, 0, sizeof(cache->storage));
-			cache->storage.mode = S_IFWHT;
-			cache->buf = &cache->storage;
-#endif
+/** Initialize a bftw_stat cache. */
+static void bftw_stat_init(struct bftw_stat *bufs, struct bfs_stat *stat_buf, struct bfs_stat *lstat_buf) {
+	bufs->stat_buf = stat_buf;
+	bufs->lstat_buf = lstat_buf;
+	bufs->stat_err = -1;
+	bufs->lstat_err = -1;
+}
+
+/** Fill a bftw_stat cache from another one. */
+static void bftw_stat_fill(struct bftw_stat *dest, const struct bftw_stat *src) {
+	if (dest->stat_err < 0 && src->stat_err >= 0) {
+		dest->stat_buf = src->stat_buf;
+		dest->stat_err = src->stat_err;
+	}
+
+	if (dest->lstat_err < 0 && src->lstat_err >= 0) {
+		dest->lstat_buf = src->lstat_buf;
+		dest->lstat_err = src->lstat_err;
+	}
+}
+
+/** Cache a bfs_stat() result. */
+static void bftw_stat_cache(struct bftw_stat *bufs, enum bfs_stat_flags flags, const struct bfs_stat *buf, int err) {
+	if (flags & BFS_STAT_NOFOLLOW) {
+		bufs->lstat_buf = buf;
+		bufs->lstat_err = err;
+		if (err || !S_ISLNK(buf->mode)) {
+			// Non-link, so share stat info
+			bufs->stat_buf = buf;
+			bufs->stat_err = err;
+		}
+	} else if (flags & BFS_STAT_TRYFOLLOW) {
+		if (err) {
+			bufs->stat_err = err;
+		} else if (S_ISLNK(buf->mode)) {
+			bufs->lstat_buf = buf;
+			bufs->lstat_err = err;
+			bufs->stat_err = ENOENT;
 		} else {
-			cache->error = errno;
+			bufs->stat_buf = buf;
+			bufs->stat_err = err;
+		}
+	} else {
+		bufs->stat_buf = buf;
+		bufs->stat_err = err;
+	}
+}
+
+/** Caching bfs_stat(). */
+static const struct bfs_stat *bftw_stat_impl(struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+	struct bftw_stat *bufs = &ftwbuf->stat_bufs;
+	struct bfs_stat *buf;
+
+	if (flags & BFS_STAT_NOFOLLOW) {
+		buf = (struct bfs_stat *)bufs->lstat_buf;
+		if (bufs->lstat_err == 0) {
+			return buf;
+		} else if (bufs->lstat_err > 0) {
+			errno = bufs->lstat_err;
+			return NULL;
+		}
+	} else {
+		buf = (struct bfs_stat *)bufs->stat_buf;
+		if (bufs->stat_err == 0) {
+			return buf;
+		} else if (bufs->stat_err > 0) {
+			errno = bufs->stat_err;
+			return NULL;
 		}
 	}
 
-	return cache->buf;
+	struct bfs_stat *ret;
+	int err;
+	if (bfs_stat(ftwbuf->at_fd, ftwbuf->at_path, flags, buf) == 0) {
+		ret = buf;
+		err = 0;
+#ifdef S_IFWHT
+	} else if (errno == ENOENT && ftwbuf->type == BFS_WHT) {
+		// This matches the behavior of FTS_WHITEOUT on BSD
+		ret = memset(buf, 0, sizeof(*buf));
+		ret->mode = S_IFWHT;
+		err = 0;
+#endif
+	} else {
+		ret = NULL;
+		err = errno;
+	}
+
+	bftw_stat_cache(bufs, flags, ret, err);
+	return ret;
 }
 
 const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
 	struct BFTW *mutbuf = (struct BFTW *)ftwbuf;
 	const struct bfs_stat *ret;
 
-	if (flags & BFS_STAT_NOFOLLOW) {
-		ret = bftw_stat_impl(mutbuf, &mutbuf->lstat_cache, BFS_STAT_NOFOLLOW);
-		if (ret && !S_ISLNK(ret->mode) && !mutbuf->stat_cache.buf) {
-			// Non-link, so share stat info
-			mutbuf->stat_cache.buf = ret;
+	if (flags & BFS_STAT_TRYFOLLOW) {
+		ret = bftw_stat_impl(mutbuf, BFS_STAT_FOLLOW);
+		if (!ret && errno_is_like(ENOENT)) {
+			ret = bftw_stat_impl(mutbuf, BFS_STAT_NOFOLLOW);
 		}
 	} else {
-		ret = bftw_stat_impl(mutbuf, &mutbuf->stat_cache, BFS_STAT_FOLLOW);
-		if (!ret && (flags & BFS_STAT_TRYFOLLOW) && errno_is_like(ENOENT)) {
-			ret = bftw_stat_impl(mutbuf, &mutbuf->lstat_cache, BFS_STAT_NOFOLLOW);
-		}
+		ret = bftw_stat_impl(mutbuf, flags);
 	}
 
 	return ret;
 }
 
 const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+	const struct bftw_stat *bufs = &ftwbuf->stat_bufs;
+
 	if (flags & BFS_STAT_NOFOLLOW) {
-		return ftwbuf->lstat_cache.buf;
-	} else if (ftwbuf->stat_cache.buf) {
-		return ftwbuf->stat_cache.buf;
-	} else if ((flags & BFS_STAT_TRYFOLLOW) && error_is_like(ftwbuf->stat_cache.error, ENOENT)) {
-		return ftwbuf->lstat_cache.buf;
-	} else {
-		return NULL;
+		if (bufs->lstat_err == 0) {
+			return bufs->lstat_buf;
+		}
+	} else if (bufs->stat_err == 0) {
+		return bufs->stat_buf;
+	} else if ((flags & BFS_STAT_TRYFOLLOW) && error_is_like(bufs->stat_err, ENOENT)) {
+		if (bufs->lstat_err == 0) {
+			return bufs->lstat_buf;
+		}
 	}
+
+	return NULL;
 }
 
 enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
@@ -155,6 +227,9 @@ struct bftw_file {
 	dev_t dev;
 	/** The inode number, for cycle detection. */
 	ino_t ino;
+
+	/** Cached bfs_stat() info. */
+	struct bftw_stat stat_bufs;
 
 	/** The offset of this file in the full path. */
 	size_t nameoff;
@@ -276,6 +351,10 @@ struct bftw_queue {
 	struct bftw_list waiting;
 	/** A list of already-serviced files. */
 	struct bftw_list ready;
+	/** The current size of the queue. */
+	size_t size;
+	/** The number of files currently in-service. */
+	size_t ioqueued;
 	/** Tracks the imbalance between synchronous and async service. */
 	unsigned long imbalance;
 };
@@ -286,6 +365,8 @@ static void bftw_queue_init(struct bftw_queue *queue, enum bftw_qflags flags) {
 	SLIST_INIT(&queue->buffer);
 	SLIST_INIT(&queue->waiting);
 	SLIST_INIT(&queue->ready);
+	queue->size = 0;
+	queue->ioqueued = 0;
 	queue->imbalance = 0;
 }
 
@@ -304,6 +385,8 @@ static void bftw_queue_push(struct bftw_queue *queue, struct bftw_file *file) {
 			SLIST_APPEND(&queue->ready, file, ready);
 		}
 	}
+
+	++queue->size;
 }
 
 /** Add any buffered files to the queue. */
@@ -339,8 +422,19 @@ static bool bftw_queue_balanced(const struct bftw_queue *queue) {
 	}
 }
 
-/** Detatch the next waiting file to service it asynchronously. */
-static void bftw_queue_detach(struct bftw_queue *queue, struct bftw_file *file) {
+/** Update the queue balance for (a)sync service. */
+static void bftw_queue_rebalance(struct bftw_queue *queue, bool async) {
+	if (async) {
+		--queue->imbalance;
+	} else {
+		++queue->imbalance;
+	}
+}
+
+/** Detatch the next waiting file. */
+static void bftw_queue_detach(struct bftw_queue *queue, struct bftw_file *file, bool async) {
+	bfs_assert(!file->ioqueued);
+
 	if (file == SLIST_HEAD(&queue->buffer)) {
 		// To maintain order, we can't detach any files until they're
 		// added to the waiting/ready lists
@@ -352,17 +446,32 @@ static void bftw_queue_detach(struct bftw_queue *queue, struct bftw_file *file) 
 		bfs_bug("Detached file was not buffered or waiting");
 	}
 
-	file->ioqueued = true;
-	--queue->imbalance;
+	if (async) {
+		file->ioqueued = true;
+		++queue->ioqueued;
+		bftw_queue_rebalance(queue, true);
+	}
 }
 
 /** Reattach a serviced file to the queue. */
-static void bftw_queue_attach(struct bftw_queue *queue, struct bftw_file *file) {
-	file->ioqueued = false;
+static void bftw_queue_attach(struct bftw_queue *queue, struct bftw_file *file, bool async) {
+	if (async) {
+		bfs_assert(file->ioqueued);
+		file->ioqueued = false;
+		--queue->ioqueued;
+	} else {
+		bfs_assert(!file->ioqueued);
+	}
 
 	if (!(queue->flags & BFTW_QORDER)) {
 		SLIST_APPEND(&queue->ready, file, ready);
 	}
+}
+
+/** Make a file ready immediately. */
+static void bftw_queue_skip(struct bftw_queue *queue, struct bftw_file *file) {
+	bftw_queue_detach(queue, file, false);
+	bftw_queue_attach(queue, file, false);
 }
 
 /** Get the next waiting file. */
@@ -395,13 +504,6 @@ static struct bftw_file *bftw_queue_ready(const struct bftw_queue *queue) {
 	return SLIST_HEAD(&queue->ready);
 }
 
-/** Check if a queue is empty. */
-static bool bftw_queue_empty(const struct bftw_queue *queue) {
-	return SLIST_EMPTY(&queue->buffer)
-		&& SLIST_EMPTY(&queue->waiting)
-		&& SLIST_EMPTY(&queue->ready);
-}
-
 /** Pop a file from the queue. */
 static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 	// Don't pop until we've had a chance to sort the buffer
@@ -413,10 +515,10 @@ static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 		// If no files are ready, try the waiting list.  Or, if
 		// BFTW_QORDER is set, we may need to pop from both lists.
 		file = SLIST_POP(&queue->waiting);
-		if (file) {
-			// This file will be serviced synchronously
-			++queue->imbalance;
-		}
+	}
+
+	if (file) {
+		--queue->size;
 	}
 
 	return file;
@@ -444,6 +546,9 @@ struct bftw_cache {
 	size_t dir_limit;
 	/** Excess force-allocated bfs_dirs. */
 	size_t dir_excess;
+
+	/** bfs_stat arena. */
+	struct arena stat_bufs;
 };
 
 /** Initialize a cache. */
@@ -462,6 +567,8 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 	}
 
 	cache->dir_excess = 0;
+
+	ARENA_INIT(&cache->stat_bufs, struct bfs_stat);
 }
 
 /** Allocate a directory. */
@@ -603,8 +710,9 @@ static void bftw_cache_destroy(struct bftw_cache *cache) {
 	bfs_assert(LIST_EMPTY(cache));
 	bfs_assert(!cache->target);
 
-	varena_destroy(&cache->files);
+	arena_destroy(&cache->stat_bufs);
 	arena_destroy(&cache->dirs);
+	varena_destroy(&cache->files);
 }
 
 /** Create a new bftw_file. */
@@ -642,6 +750,8 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 	file->dev = -1;
 	file->ino = -1;
 
+	bftw_stat_init(&file->stat_bufs, NULL, NULL);
+
 	file->namelen = namelen;
 	memcpy(file->name, name, namelen + 1);
 
@@ -661,6 +771,21 @@ static void bftw_file_set_dir(struct bftw_cache *cache, struct bftw_file *file, 
 	}
 }
 
+/** Free a file's cached stat() buffers. */
+static void bftw_stat_recycle(struct bftw_cache *cache, struct bftw_file *file) {
+	struct bftw_stat *bufs = &file->stat_bufs;
+
+	struct bfs_stat *stat_buf = (struct bfs_stat *)bufs->stat_buf;
+	struct bfs_stat *lstat_buf = (struct bfs_stat *)bufs->lstat_buf;
+	if (stat_buf) {
+		arena_free(&cache->stat_bufs, stat_buf);
+	} else if (lstat_buf) {
+		arena_free(&cache->stat_bufs, lstat_buf);
+	}
+
+	bftw_stat_init(bufs, NULL, NULL);
+}
+
 /** Free a bftw_file. */
 static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 	bfs_assert(file->refcount == 0);
@@ -668,6 +793,8 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 	if (file->fd >= 0) {
 		bftw_file_close(cache, file);
 	}
+
+	bftw_stat_recycle(cache, file);
 
 	varena_free(&cache->files, file, file->namelen + 1);
 }
@@ -729,6 +856,10 @@ struct bftw_state {
 
 	/** Extra data about the current file. */
 	struct BFTW ftwbuf;
+	/** stat() buffer storage. */
+	struct bfs_stat stat_buf;
+	/** lstat() buffer storage. */
+	struct bfs_stat lstat_buf;
 };
 
 /** Check if we have to buffer files before visiting them. */
@@ -752,6 +883,11 @@ static bool bftw_must_buffer(const struct bftw_state *state) {
 		// This is okay for iterative deepening, since the caller only
 		// sees files at the target depth.  We also deem it okay for
 		// parallel searches, since the order is unpredictable anyway.
+		return true;
+	}
+
+	if ((state->flags & BFTW_STAT) && state->nthreads > 1) {
+		// We will be buffering every file anyway for ioq_stat()
 		return true;
 	}
 
@@ -841,19 +977,32 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	return 0;
 }
 
-/** Unpin a directory, and possibly queue it for unwrapping. */
-static void bftw_unpin_dir(struct bftw_state *state, struct bftw_file *file, bool force) {
-	bftw_cache_unpin(&state->cache, file);
+/** Queue a directory for unwrapping. */
+static void bftw_delayed_unwrap(struct bftw_state *state, struct bftw_file *file) {
+	bfs_assert(file->dir);
 
-	if (file->dir && (force || file->pincount == 0)) {
-		if (!SLIST_ATTACHED(&state->to_close, file)) {
-			SLIST_APPEND(&state->to_close, file);
-		}
+	if (!SLIST_ATTACHED(&state->to_close, file, ready)) {
+		SLIST_APPEND(&state->to_close, file, ready);
+	}
+}
+
+/** Unpin a file's parent. */
+static void bftw_unpin_parent(struct bftw_state *state, struct bftw_file *file, bool unwrap) {
+	struct bftw_file *parent = file->parent;
+	if (!parent) {
+		return;
+	}
+
+	bftw_cache_unpin(&state->cache, parent);
+
+	if (unwrap && parent->dir && parent->pincount == 0) {
+		bftw_delayed_unwrap(state, parent);
 	}
 }
 
 /** Pop a response from the I/O queue. */
 static int bftw_ioq_pop(struct bftw_state *state, bool block) {
+	struct bftw_cache *cache = &state->cache;
 	struct ioq *ioq = state->ioq;
 	if (!ioq) {
 		return -1;
@@ -864,10 +1013,10 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		return -1;
 	}
 
-	struct bftw_cache *cache = &state->cache;
-	struct bftw_file *file;
-	struct bftw_file *parent;
-	struct bfs_dir *dir;
+	struct bftw_file *file = ent->ptr;
+	if (file) {
+		bftw_unpin_parent(state, file, true);
+	}
 
 	enum ioq_op op = ent->op;
 	switch (op) {
@@ -877,30 +1026,30 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 
 	case IOQ_CLOSEDIR:
 		++cache->capacity;
-		dir = ent->closedir.dir;
-		bftw_freedir(cache, dir);
+		bftw_freedir(cache, ent->closedir.dir);
 		break;
 
 	case IOQ_OPENDIR:
-		file = ent->ptr;
-
 		++cache->capacity;
-		parent = file->parent;
-		if (parent) {
-			bftw_unpin_dir(state, parent, false);
-		}
 
-		dir = ent->opendir.dir;
 		if (ent->result >= 0) {
-			bftw_file_set_dir(cache, file, dir);
+			bftw_file_set_dir(cache, file, ent->opendir.dir);
 		} else {
-			bftw_freedir(cache, dir);
+			bftw_freedir(cache, ent->opendir.dir);
 		}
 
-		bftw_queue_attach(&state->dirq, file);
+		bftw_queue_attach(&state->dirq, file, true);
 		break;
 
 	case IOQ_STAT:
+		if (ent->result >= 0) {
+			bftw_stat_cache(&file->stat_bufs, ent->stat.flags, ent->stat.buf, 0);
+		} else {
+			arena_free(&cache->stat_bufs, ent->stat.buf);
+			bftw_stat_cache(&file->stat_bufs, ent->stat.flags, NULL, -ent->result);
+		}
+
+		bftw_queue_attach(&state->fileq, file, true);
 		break;
 	}
 
@@ -1125,21 +1274,34 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 	return bftw_ioq_closedir(state, dir);
 }
 
+/** Try to pin a file's parent. */
+static int bftw_pin_parent(struct bftw_state *state, struct bftw_file *file) {
+	struct bftw_file *parent = file->parent;
+	if (!parent) {
+		return AT_FDCWD;
+	}
+
+	int fd = parent->fd;
+	if (fd < 0) {
+		bfs_static_assert(AT_FDCWD != -1);
+		return -1;
+	}
+
+	bftw_cache_pin(&state->cache, parent);
+	return fd;
+}
+
 /** Open a directory asynchronously. */
 static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
+	struct bftw_cache *cache = &state->cache;
+
 	if (bftw_ioq_reserve(state) != 0) {
 		goto fail;
 	}
 
-	int dfd = AT_FDCWD;
-	struct bftw_cache *cache = &state->cache;
-	struct bftw_file *parent = file->parent;
-	if (parent) {
-		dfd = parent->fd;
-		if (dfd < 0) {
-			goto fail;
-		}
-		bftw_cache_pin(cache, parent);
+	int dfd = bftw_pin_parent(state, file);
+	if (dfd < 0 && dfd != AT_FDCWD) {
+		goto fail;
 	}
 
 	if (bftw_cache_reserve(state) != 0) {
@@ -1161,9 +1323,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 free:
 	bftw_freedir(cache, dir);
 unpin:
-	if (parent) {
-		bftw_cache_unpin(cache, parent);
-	}
+	bftw_unpin_parent(state, file, false);
 fail:
 	return -1;
 }
@@ -1177,7 +1337,7 @@ static void bftw_ioq_opendirs(struct bftw_state *state) {
 		}
 
 		if (bftw_ioq_opendir(state, dir) == 0) {
-			bftw_queue_detach(&state->dirq, dir);
+			bftw_queue_detach(&state->dirq, dir, true);
 		} else {
 			break;
 		}
@@ -1191,44 +1351,26 @@ static void bftw_push_dir(struct bftw_state *state, struct bftw_file *file) {
 	bftw_ioq_opendirs(state);
 }
 
-/** Check if we should block on the ioq when popping a directory. */
-static bool bftw_block_for_dir(const struct bftw_state *state) {
-	// Always block with more than one background thread
-	if (state->nthreads > 1) {
-		return true;
+/** Pop a file from a queue, then activate it. */
+static bool bftw_pop(struct bftw_state *state, struct bftw_queue *queue) {
+	if (queue->size == 0) {
+		return false;
 	}
 
-	// Block if the cache is full
-	if (state->cache.capacity == 0) {
-		return true;
-	}
-
-	// Block if we have no other files/dirs to visit
-	if (!bftw_queue_waiting(&state->dirq) && bftw_queue_empty(&state->fileq)) {
-		return true;
-	}
-
-	return false;
-}
-
-/** Pop a directory to read from the queue. */
-static bool bftw_pop_dir(struct bftw_state *state) {
-	bfs_assert(!state->file);
-
-	if (state->flags & BFTW_SORT) {
-		// Keep strict breadth-first order when sorting
-		if (state->strategy == BFTW_BFS && bftw_queue_ready(&state->fileq)) {
-			return false;
+	while (!bftw_queue_ready(queue) && queue->ioqueued > 0) {
+		bool block = true;
+		if (bftw_queue_waiting(queue) && state->nthreads == 1) {
+			// With only one background thread, balance the work
+			// between it and the main thread
+			block = false;
 		}
-	} else {
-		while (!bftw_queue_ready(&state->dirq)) {
-			if (bftw_ioq_pop(state, bftw_block_for_dir(state)) < 0) {
-				break;
-			}
+
+		if (bftw_ioq_pop(state, block) < 0) {
+			break;
 		}
 	}
 
-	struct bftw_file *file = bftw_queue_pop(&state->dirq);
+	struct bftw_file *file = bftw_queue_pop(queue);
 	if (!file) {
 		return false;
 	}
@@ -1241,11 +1383,152 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 	return true;
 }
 
+/** Pop a directory to read from the queue. */
+static bool bftw_pop_dir(struct bftw_state *state) {
+	bfs_assert(!state->file);
+
+	if (state->flags & BFTW_SORT) {
+		// Keep strict breadth-first order when sorting
+		if (state->strategy == BFTW_BFS && bftw_queue_ready(&state->fileq)) {
+			return false;
+		}
+	} else if (!bftw_queue_ready(&state->dirq)) {
+		// Don't block if we have files ready to visit
+		if (bftw_queue_ready(&state->fileq)) {
+			return false;
+		}
+	}
+
+	return bftw_pop(state, &state->dirq);
+}
+
+/** Figure out bfs_stat() flags. */
+static enum bfs_stat_flags bftw_stat_flags(const struct bftw_state *state, size_t depth) {
+	enum bftw_flags mask = BFTW_FOLLOW_ALL;
+	if (depth == 0) {
+		mask |= BFTW_FOLLOW_ROOTS;
+	}
+
+	if (state->flags & mask) {
+		return BFS_STAT_TRYFOLLOW;
+	} else {
+		return BFS_STAT_NOFOLLOW;
+	}
+}
+
+/** Check if a stat() call is necessary. */
+static bool bftw_must_stat(const struct bftw_state *state, size_t depth, enum bfs_type type, const char *name) {
+	if (state->flags & BFTW_STAT) {
+		return true;
+	}
+
+	switch (type) {
+	case BFS_UNKNOWN:
+		return true;
+
+	case BFS_DIR:
+		return state->flags & (BFTW_DETECT_CYCLES | BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS);
+
+	case BFS_LNK:
+		if (!(bftw_stat_flags(state, depth) & BFS_STAT_NOFOLLOW)) {
+			return true;
+		}
+		fallthru;
+
+	default:
+#if __linux__
+		if (state->mtab && bfs_might_be_mount(state->mtab, name)) {
+			return true;
+		}
+#endif
+		return false;
+	}
+}
+
+/** stat() a file asynchronously. */
+static int bftw_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
+	if (bftw_ioq_reserve(state) != 0) {
+		goto fail;
+	}
+
+	int dfd = bftw_pin_parent(state, file);
+	if (dfd < 0 && dfd != AT_FDCWD) {
+		goto fail;
+	}
+
+	struct bftw_cache *cache = &state->cache;
+	struct bfs_stat *buf = arena_alloc(&cache->stat_bufs);
+	if (!buf) {
+		goto unpin;
+	}
+
+	enum bfs_stat_flags flags = bftw_stat_flags(state, file->depth);
+	if (ioq_stat(state->ioq, dfd, file->name, flags, buf, file) != 0) {
+		goto free;
+	}
+
+	return 0;
+
+free:
+	arena_free(&cache->stat_bufs, buf);
+unpin:
+	bftw_unpin_parent(state, file, false);
+fail:
+	return -1;
+}
+
+/** Check if we should stat() a file asynchronously. */
+static bool bftw_should_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
+	// To avoid surprising users too much, process the roots in order
+	if (file->depth == 0) {
+		return false;
+	}
+
+#ifdef S_IFWHT
+	// ioq_stat() does not do whiteout emulation like bftw_stat_impl()
+	if (file->type == BFS_WHT) {
+		return false;
+	}
+#endif
+
+	return bftw_must_stat(state, file->depth, file->type, file->name);
+}
+
+/** Call stat() on files that need it. */
+static void bftw_stat_files(struct bftw_state *state) {
+	while (true) {
+		struct bftw_file *file = bftw_queue_waiting(&state->fileq);
+		if (!file) {
+			break;
+		}
+
+		if (!bftw_should_ioq_stat(state, file)) {
+			bftw_queue_skip(&state->fileq, file);
+			continue;
+		}
+
+		if (!bftw_queue_balanced(&state->fileq)) {
+			break;
+		}
+
+		if (bftw_ioq_stat(state, file) == 0) {
+			bftw_queue_detach(&state->fileq, file, true);
+		} else {
+			break;
+		}
+	}
+}
+
+/** Push a file onto the queue. */
+static void bftw_push_file(struct bftw_state *state, struct bftw_file *file) {
+	bftw_queue_push(&state->fileq, file);
+	bftw_stat_files(state);
+}
+
 /** Pop a file to visit from the queue. */
 static bool bftw_pop_file(struct bftw_state *state) {
 	bfs_assert(!state->file);
-	state->file = bftw_queue_pop(&state->fileq);
-	return state->file;
+	return bftw_pop(state, &state->fileq);
 }
 
 /** Build the path to the current file. */
@@ -1334,6 +1617,8 @@ static int bftw_opendir(struct bftw_state *state) {
 		return -1;
 	}
 
+	bftw_queue_rebalance(&state->dirq, false);
+
 	state->dir = bftw_file_opendir(state, file, state->path);
 	if (!state->dir) {
 		state->direrror = errno;
@@ -1362,47 +1647,6 @@ static int bftw_readdir(struct bftw_state *state) {
 	}
 
 	return ret;
-}
-
-/** Check if a stat() call is needed for this visit. */
-static bool bftw_need_stat(const struct bftw_state *state) {
-	if (state->flags & BFTW_STAT) {
-		return true;
-	}
-
-	const struct BFTW *ftwbuf = &state->ftwbuf;
-	if (ftwbuf->type == BFS_UNKNOWN) {
-		return true;
-	}
-
-	if (ftwbuf->type == BFS_LNK && !(ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
-		return true;
-	}
-
-	if (ftwbuf->type == BFS_DIR) {
-		if (state->flags & (BFTW_DETECT_CYCLES | BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) {
-			return true;
-		}
-#if __linux__
-	} else if (state->mtab) {
-		// Linux fills in d_type from the underlying inode, even when
-		// the directory entry is a bind mount point.  In that case, we
-		// need to stat() to get the correct type.  We don't need to
-		// check for directories because they can only be mounted over
-		// by other directories.
-		if (bfs_might_be_mount(state->mtab, ftwbuf->path + ftwbuf->nameoff)) {
-			return true;
-		}
-#endif
-	}
-
-	return false;
-}
-
-/** Initialize bftw_stat cache. */
-static void bftw_stat_init(struct bftw_stat *cache) {
-	cache->buf = NULL;
-	cache->error = 0;
 }
 
 /** Open a file if necessary. */
@@ -1436,9 +1680,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	ftwbuf->error = state->direrror;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
-	ftwbuf->stat_flags = BFS_STAT_NOFOLLOW;
-	bftw_stat_init(&ftwbuf->lstat_cache);
-	bftw_stat_init(&ftwbuf->stat_cache);
+	bftw_stat_init(&ftwbuf->stat_bufs, &state->stat_buf, &state->lstat_buf);
 
 	struct bftw_file *parent = NULL;
 	if (de) {
@@ -1451,6 +1693,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 		ftwbuf->depth = file->depth;
 		ftwbuf->type = file->type;
 		ftwbuf->nameoff = file->nameoff;
+		bftw_stat_fill(&ftwbuf->stat_bufs, &file->stat_bufs);
 	}
 
 	if (parent) {
@@ -1468,22 +1711,15 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 		ftwbuf->nameoff = xbaseoff(ftwbuf->path);
 	}
 
+	ftwbuf->stat_flags = bftw_stat_flags(state, ftwbuf->depth);
+
 	if (ftwbuf->error != 0) {
 		ftwbuf->type = BFS_ERROR;
 		return;
 	}
 
-	int follow_flags = BFTW_FOLLOW_ALL;
-	if (ftwbuf->depth == 0) {
-		follow_flags |= BFTW_FOLLOW_ROOTS;
-	}
-	bool follow = state->flags & follow_flags;
-	if (follow) {
-		ftwbuf->stat_flags = BFS_STAT_TRYFOLLOW;
-	}
-
 	const struct bfs_stat *statbuf = NULL;
-	if (bftw_need_stat(state)) {
+	if (bftw_must_stat(state, ftwbuf->depth, ftwbuf->type, ftwbuf->path + ftwbuf->nameoff)) {
 		statbuf = bftw_stat(ftwbuf, ftwbuf->stat_flags);
 		if (statbuf) {
 			ftwbuf->type = bfs_mode_to_type(statbuf->mode);
@@ -1522,6 +1758,11 @@ static bool bftw_is_mount(struct bftw_state *state, const char *name) {
 	return statbuf && statbuf->dev != parent->dev;
 }
 
+/** Check if bfs_stat() was called from the main thread. */
+static bool bftw_stat_was_sync(const struct bftw_state *state, const struct bfs_stat *buf) {
+	return buf == &state->stat_buf || buf == &state->lstat_buf;
+}
+
 /** Invoke the callback. */
 static enum bftw_action bftw_call_back(struct bftw_state *state, const char *name, enum bftw_visit visit) {
 	if (visit == BFTW_POST && !(state->flags & BFTW_POST_ORDER)) {
@@ -1541,31 +1782,43 @@ static enum bftw_action bftw_call_back(struct bftw_state *state, const char *nam
 		return BFTW_STOP;
 	}
 
+	enum bftw_action ret = BFTW_PRUNE;
 	if ((state->flags & BFTW_SKIP_MOUNTS) && bftw_is_mount(state, name)) {
-		return BFTW_PRUNE;
+		goto done;
 	}
 
-	enum bftw_action ret = state->callback(ftwbuf, state->ptr);
+	ret = state->callback(ftwbuf, state->ptr);
 	switch (ret) {
 	case BFTW_CONTINUE:
-		if (visit != BFTW_PRE) {
-			return BFTW_PRUNE;
+		if (visit != BFTW_PRE || ftwbuf->type != BFS_DIR) {
+			ret = BFTW_PRUNE;
+		} else if (state->flags & BFTW_PRUNE_MOUNTS) {
+			if (bftw_is_mount(state, name)) {
+				ret = BFTW_PRUNE;
+			}
 		}
-		if (ftwbuf->type != BFS_DIR) {
-			return BFTW_PRUNE;
-		}
-		if ((state->flags & BFTW_PRUNE_MOUNTS) && bftw_is_mount(state, name)) {
-			return BFTW_PRUNE;
-		}
-		fallthru;
+		break;
+
 	case BFTW_PRUNE:
 	case BFTW_STOP:
-		return ret;
+		break;
 
 	default:
 		state->error = EINVAL;
 		return BFTW_STOP;
 	}
+
+done:
+	if (state->fileq.flags & BFTW_QBALANCE) {
+		// Detect any main-thread stat() calls to rebalance the queue
+		const struct bfs_stat *buf = bftw_cached_stat(ftwbuf, BFS_STAT_FOLLOW);
+		const struct bfs_stat *lbuf = bftw_cached_stat(ftwbuf, BFS_STAT_NOFOLLOW);
+		if (bftw_stat_was_sync(state, buf) || bftw_stat_was_sync(state, lbuf)) {
+			bftw_queue_rebalance(&state->fileq, false);
+		}
+	}
+
+	return ret;
 }
 
 /**
@@ -1589,8 +1842,13 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	int ret = 0;
 
 	struct bftw_file *file = state->file;
-	if (file && state->dir) {
-		bftw_unpin_dir(state, file, true);
+	if (file) {
+		if (state->dir) {
+			bftw_cache_unpin(&state->cache, file);
+		}
+		if (file->dir) {
+			bftw_delayed_unwrap(state, file);
+		}
 	}
 	state->dir = NULL;
 	state->de = NULL;
@@ -1607,7 +1865,7 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	}
 	state->direrror = 0;
 
-	while ((file = SLIST_POP(&state->to_close))) {
+	while ((file = SLIST_POP(&state->to_close, ready))) {
 		bftw_unwrapdir(state, file);
 	}
 
@@ -1685,6 +1943,7 @@ static void bftw_flush(struct bftw_state *state) {
 		bftw_list_sort(&state->fileq.buffer);
 	}
 	bftw_queue_flush(&state->fileq);
+	bftw_stat_files(state);
 
 	bftw_queue_flush(&state->dirq);
 	bftw_ioq_opendirs(state);
@@ -1704,22 +1963,46 @@ static int bftw_closedir(struct bftw_state *state) {
 static void bftw_save_ftwbuf(struct bftw_file *file, const struct BFTW *ftwbuf) {
 	file->type = ftwbuf->type;
 
-	const struct bfs_stat *statbuf = ftwbuf->stat_cache.buf;
-	if (!statbuf || (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW)) {
-		statbuf = ftwbuf->lstat_cache.buf;
-	}
+	const struct bfs_stat *statbuf = bftw_cached_stat(ftwbuf, ftwbuf->stat_flags);
 	if (statbuf) {
 		file->dev = statbuf->dev;
 		file->ino = statbuf->ino;
 	}
 }
 
+/** Check if we should buffer a file instead of visiting it. */
+static bool bftw_buffer_file(const struct bftw_state *state, const struct bftw_file *file, const char *name) {
+	if (!name) {
+		// Already buffered
+		return false;
+	}
+
+	if (state->flags & BFTW_BUFFER) {
+		return true;
+	}
+
+	// If we need to call stat(), and can do it async, buffer this file
+	if (!state->ioq) {
+		return false;
+	}
+
+	if (!bftw_queue_balanced(&state->fileq)) {
+		// stat() would run synchronously anyway
+		return false;
+	}
+
+	size_t depth = file ? file->depth + 1 : 1;
+	enum bfs_type type = state->de ? state->de->type : BFS_UNKNOWN;
+	return bftw_must_stat(state, depth, type, name);
+}
+
 /** Visit and/or enqueue the current file. */
 static int bftw_visit(struct bftw_state *state, const char *name) {
+	struct bftw_cache *cache = &state->cache;
 	struct bftw_file *file = state->file;
 
-	if (name && (state->flags & BFTW_BUFFER)) {
-		file = bftw_file_new(&state->cache, file, name);
+	if (bftw_buffer_file(state, file, name)) {
+		file = bftw_file_new(cache, file, name);
 		if (!file) {
 			state->error = errno;
 			return -1;
@@ -1729,14 +2012,14 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 			file->type = state->de->type;
 		}
 
-		bftw_queue_push(&state->fileq, file);
+		bftw_push_file(state, file);
 		return 0;
 	}
 
 	switch (bftw_call_back(state, name, BFTW_PRE)) {
 	case BFTW_CONTINUE:
 		if (name) {
-			file = bftw_file_new(&state->cache, state->file, name);
+			file = bftw_file_new(cache, state->file, name);
 		} else {
 			state->file = NULL;
 		}
@@ -1746,6 +2029,7 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 		}
 
 		bftw_save_ftwbuf(file, &state->ftwbuf);
+		bftw_stat_recycle(cache, file);
 		bftw_push_dir(state, file);
 		return 0;
 
@@ -1757,7 +2041,19 @@ static int bftw_visit(struct bftw_state *state, const char *name) {
 		}
 
 	default:
+		if (file && !name) {
+			bftw_gc(state, BFTW_VISIT_NONE);
+		}
 		return -1;
+	}
+}
+
+/** Drain a bftw_queue. */
+static void bftw_drain(struct bftw_state *state, struct bftw_queue *queue) {
+	bftw_queue_flush(queue);
+
+	while (bftw_pop(state, queue)) {
+		bftw_gc(state, BFTW_VISIT_NONE);
 	}
 }
 
@@ -1777,11 +2073,9 @@ static int bftw_state_destroy(struct bftw_state *state) {
 		state->ioq = NULL;
 	}
 
-	bftw_queue_flush(&state->dirq);
-	bftw_queue_flush(&state->fileq);
-	do {
-		bftw_gc(state, BFTW_VISIT_NONE);
-	} while (bftw_pop_dir(state) || bftw_pop_file(state));
+	bftw_gc(state, BFTW_VISIT_NONE);
+	bftw_drain(state, &state->dirq);
+	bftw_drain(state, &state->fileq);
 
 	ioq_destroy(ioq);
 
@@ -1823,6 +2117,7 @@ static int bftw_impl(struct bftw_state *state) {
 		if (bftw_visit(state, NULL) != 0) {
 			return -1;
 		}
+		bftw_flush(state);
 	}
 
 	return 0;

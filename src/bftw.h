@@ -26,12 +26,14 @@ enum bftw_visit {
  * Cached bfs_stat() info for a file.
  */
 struct bftw_stat {
-	/** A pointer to the bfs_stat() buffer, if available. */
-	const struct bfs_stat *buf;
-	/** Storage for the bfs_stat() buffer, if needed. */
-	struct bfs_stat storage;
-	/** The cached error code, if any. */
-	int error;
+	/** The bfs_stat(BFS_STAT_FOLLOW) buffer. */
+	const struct bfs_stat *stat_buf;
+	/** The bfs_stat(BFS_STAT_NOFOLLOW) buffer. */
+	const struct bfs_stat *lstat_buf;
+	/** The cached bfs_stat(BFS_STAT_FOLLOW) error. */
+	int stat_err;
+	/** The cached bfs_stat(BFS_STAT_NOFOLLOW) error. */
+	int lstat_err;
 };
 
 /**
@@ -62,10 +64,8 @@ struct BFTW {
 
 	/** Flags for bfs_stat(). */
 	enum bfs_stat_flags stat_flags;
-	/** Cached bfs_stat() info for BFS_STAT_NOFOLLOW. */
-	struct bftw_stat lstat_cache;
-	/** Cached bfs_stat() info for BFS_STAT_FOLLOW. */
-	struct bftw_stat stat_cache;
+	/** Cached bfs_stat() info. */
+	struct bftw_stat stat_bufs;
 };
 
 /**
