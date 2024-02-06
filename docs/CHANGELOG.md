@@ -1,6 +1,50 @@
 3.*
 ===
 
+3.1
+---
+
+**February 6, 2024**
+
+### New features
+
+- On Linux, `bfs` now uses [io_uring](https://en.wikipedia.org/wiki/Io_uring) for async I/O
+
+- On all platforms, `bfs` can now perform `stat()` calls in parallel, accelerating queries like `-links`, `-newer`, and `-size`, as well as colorized output
+
+- On FreeBSD, `-type w` now works to find whiteouts like the system `find`
+
+### Changes
+
+- Improved `bfs -j2` performance ([`b2ab7a1`](https://github.com/tavianator/bfs/commit/b2ab7a151fca517f4879e76e626ec85ad3de97c7))
+
+- Optimized `-exec` by using `posix_spawn()` when possible, which can avoid the overhead of `fork()` ([`95fbde1`](https://github.com/tavianator/bfs/commit/95fbde17a66377b6fbe7ff1f014301dbbf09270d))
+
+- `-execdir` and `-okdir` are now rejected if `$PATH` contains a relative path, matching the behaviour of GNU find ([`163baf1`](https://github.com/tavianator/bfs/commit/163baf1c9af13be0ce705b133e41e0c3d6427398))
+
+- Leading whitespace is no longer accepted in integer command line arguments like `-links ' 1'` ([`e0d7dc5`](https://github.com/tavianator/bfs/commit/e0d7dc5dfd7bdaa62b6bc18e9c1cce00bbe08577))
+
+### Bug Fixes
+
+- `-quit` and `-exit` could be ignored in the iterative deepening modes (`-S {ids,eds}`).
+  This is now fixed ([`670ebd9`](https://github.com/tavianator/bfs/commit/670ebd97fb431e830b1500b2e7e8013b121fb2c5)).
+  The bug was introduced in version 3.0.3 (commit [`5f16169`]).
+
+- Fixed two possible errors in sort mode (`-s`):
+  - Too many open files ([`710c083`](https://github.com/tavianator/bfs/commit/710c083ff02eb1cc5b8daa6778784f3d1cd3c08d))
+  - Out of memory ([`76ffc8d`](https://github.com/tavianator/bfs/commit/76ffc8d30cb1160d55d855d8ac630a2b9075fbcf))
+
+- Fixed handling of FreeBSD union mounts ([`3ac3bee`](https://github.com/tavianator/bfs/commit/3ac3bee7b0d9c9be693415206efa664bf4a7d4a7))
+
+- Fixed `NO_COLOR` handling when it's set to the empty string ([`79aee58`](https://github.com/tavianator/bfs/commit/79aee58a4621d01c4b1e98c332775f3b87213ddb))
+
+- Fixed some portability issues:
+  - [OpenBSD](https://github.com/tavianator/bfs/compare/ee200c07643801c8b53e5b80df704ecbf77a884e...79f1521b0e628be72bed3a648f0ae90b62fc69b8)
+  - [NetBSD](https://github.com/tavianator/bfs/compare/683f2c41c72efcb82ce866e3dcc311ac9bd8b66d...6435684a7d515e18247ae1b3dd9ec8681fee22d0)
+  - [DragonFly BSD](https://github.com/tavianator/bfs/compare/08867473e75e8e20ca76c7fb181204839e28b271...45fb1d952c3b262278a3b22e9c7d60cca19a5407)
+  - [Illumos](https://github.com/tavianator/bfs/compare/4010140cb748cc4f7f57b0a3d514485796c665ce...ae94cdc00136685abe61d55e1e357caaa636d785)
+
+
 3.0.4
 -----
 
