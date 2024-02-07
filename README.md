@@ -234,6 +234,9 @@ Installation
 <strong><a href="https://src.fedoraproject.org/rpms/bfs">Fedora Linux</a></strong>
 # dnf install bfs
 
+<strong><a href="https://packages.gentoo.org/packages/sys-apps/bfs">Gentoo</a></strong>
+# emerge sys-apps/bfs
+
 <strong><a href="https://packages.guix.gnu.org/packages/bfs/">GNU Guix</a></strong>
 # guix install bfs
 
