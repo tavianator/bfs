@@ -764,10 +764,8 @@ struct ioq *ioq_create(size_t depth, size_t nthreads) {
 				params.wq_fd = prev->ring.ring_fd;
 			}
 
-			size_t entries = depth / nthreads;
-			if (entries < 16) {
-				entries = 16;
-			}
+			// Use a page for each SQE ring
+			size_t entries = 4096 / sizeof(struct io_uring_sqe);
 			thread->ring_err = -io_uring_queue_init_params(entries, &thread->ring, &params);
 		}
 #endif
