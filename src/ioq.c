@@ -26,15 +26,11 @@
  *
  * Pushes are implemented with an unconditional
  *
- *     fetch_add(&ioqq->head, IOQ_STRIDE)
+ *     fetch_add(&ioqq->head, 1)
  *
  * which scales better on many architectures than compare-and-swap (see [1] for
- * details).  Pops are implemented similarly.  We add IOQ_STRIDE rather than 1
- * so that successive queue elements are on different cache lines, but the
- * exposition below uses 1 for simplicity.
- *
- * Since the fetch-and-adds are unconditional, non-blocking readers can get
- * ahead of writers:
+ * details).  Pops are implemented similarly.  Since the fetch-and-adds are
+ * unconditional, non-blocking readers can get ahead of writers:
  *
  *     Reader              Writer
  *     ────────────────    ──────────────────────
@@ -204,17 +200,6 @@ struct ioqq {
 	cache_align ioq_slot slots[];
 };
 
-// If we assign slots sequentially, threads will likely be operating on
-// consecutive slots.  If these slots are in the same cache line, that will
-// result in false sharing.  We can mitigate this by assigning slots with a
-// stride larger than a cache line e.g. 0, 9, 18, ..., 1, 10, 19, ...
-// As long as the stride is relatively prime to circular buffer length, we'll
-// still use every available slot.  Since the length is a power of two, that
-// means the stride must be odd.
-
-#define IOQ_STRIDE ((FALSE_SHARING_SIZE / sizeof(ioq_slot)) | 1)
-bfs_static_assert(IOQ_STRIDE % 2 == 1);
-
 /** Destroy an I/O command queue. */
 static void ioqq_destroy(struct ioqq *ioqq) {
 	if (!ioqq) {
@@ -357,7 +342,7 @@ static bool ioq_slot_push(struct ioqq *ioqq, ioq_slot *slot, struct ioq_ent *ent
 /** Push an entry onto the queue. */
 static void ioqq_push(struct ioqq *ioqq, struct ioq_ent *ent) {
 	while (true) {
-		size_t i = fetch_add(&ioqq->head, IOQ_STRIDE, relaxed);
+		size_t i = fetch_add(&ioqq->head, 1, relaxed);
 		ioq_slot *slot = &ioqq->slots[i & ioqq->slot_mask];
 		if (ioq_slot_push(ioqq, slot, ent)) {
 			break;
@@ -400,7 +385,7 @@ static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool bloc
 
 /** Pop an entry from the queue. */
 static struct ioq_ent *ioqq_pop(struct ioqq *ioqq, bool block) {
-	size_t i = fetch_add(&ioqq->tail, IOQ_STRIDE, relaxed);
+	size_t i = fetch_add(&ioqq->tail, 1, relaxed);
 	ioq_slot *slot = &ioqq->slots[i & ioqq->slot_mask];
 	return ioq_slot_pop(ioqq, slot, block);
 }
