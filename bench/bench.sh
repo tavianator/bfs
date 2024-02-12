@@ -17,6 +17,7 @@ declare -gA TAGS=(
 
 COMPLETE_DEFAULT=(linux rust chromium)
 EARLY_QUIT_DEFAULT=(chromium)
+STAT_DEFAULT=(rust)
 PRINT_DEFAULT=(linux)
 STRATEGIES_DEFAULT=(rust)
 JOBS_DEFAULT=(rust)
@@ -32,15 +33,19 @@ usage() {
     printf '      Run the default set of benchmarks\n\n'
 
     printf '  --complete[=CORPUS]\n'
-    printf '      Complete traversal benchmark.  \n'
+    printf '      Complete traversal benchmark.\n'
     printf '      Default corpus is --complete="%s"\n\n' "${COMPLETE_DEFAULT[*]}"
 
     printf '  --early-quit[=CORPUS]\n'
-    printf '      Early quitting benchmark.  \n'
+    printf '      Early quitting benchmark.\n'
     printf '      Default corpus is --early-quit=%s\n\n' "${EARLY_QUIT_DEFAULT[*]}"
 
+    printf '  --stat[=CORPUS]\n'
+    printf '      Traversal with stat().\n'
+    printf '      Default corpus is --stat=%s\n\n' "${STAT_DEFAULT[*]}"
+
     printf '  --print[=CORPUS]\n'
-    printf '      Path printing benchmark.  \n'
+    printf '      Path printing benchmark.\n'
     printf '      Default corpus is --print=%s\n\n' "${PRINT_DEFAULT[*]}"
 
     printf '  --strategies[=CORPUS]\n'
@@ -111,6 +116,7 @@ setup() {
 
     COMPLETE=()
     EARLY_QUIT=()
+    STAT=()
     PRINT=()
     STRATEGIES=()
     JOBS=()
@@ -159,6 +165,12 @@ setup() {
             --early-quit=*)
                 read -ra EARLY_QUIT <<<"${arg#*=}"
                 ;;
+            --stat)
+                STAT=("${STAT_DEFAULT[@]}")
+                ;;
+            --stat=*)
+                read -ra STAT <<<"${arg#*=}"
+                ;;
             --print)
                 PRINT=("${PRINT_DEFAULT[@]}")
                 ;;
@@ -186,6 +198,7 @@ setup() {
             --default)
                 COMPLETE=("${COMPLETE_DEFAULT[@]}")
                 EARLY_QUIT=("${EARLY_QUIT_DEFAULT[@]}")
+                STAT=("${STAT_DEFAULT[@]}")
                 PRINT=("${PRINT_DEFAULT[@]}")
                 STRATEGIES=("${STRATEGIES_DEFAULT[@]}")
                 JOBS=("${JOBS_DEFAULT[@]}")
@@ -213,7 +226,7 @@ setup() {
     as-user mkdir -p bench/corpus
 
     declare -A cloned=()
-    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}" "${EXEC[@]}"; do
+    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${STAT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}" "${EXEC[@]}"; do
         if ((cloned["$corpus"])); then
             continue
         fi
@@ -264,6 +277,7 @@ setup() {
 
     export_array COMPLETE
     export_array EARLY_QUIT
+    export_array STAT
     export_array PRINT
     export_array STRATEGIES
     export_array JOBS
@@ -390,6 +404,39 @@ bench-early-quit() {
 
         for corpus; do
             bench-early-quit-corpus "$corpus ${TAGS[$corpus]}" "bench/corpus/$corpus"
+        done
+    fi
+}
+
+# Benchmark traversal with stat()
+bench-stat-corpus() {
+    total=$(./bin/bfs "$2" -printf '.' | wc -c)
+
+    subgroup "%s (%'d files)" "$1" "$total"
+
+    cmds=()
+    for bfs in "${BFS[@]}"; do
+        cmds+=("$bfs $2 -size 1024G")
+    done
+
+    for find in "${FIND[@]}"; do
+        cmds+=("$find $2 -size 1024G")
+    done
+
+    for fd in "${FD[@]}"; do
+        cmds+=("$fd -u --search-path $2 --size 1024Gi")
+    done
+
+    do-hyperfine "${cmds[@]}"
+}
+
+# stat() benchmarks
+bench-stat() {
+    if (($#)); then
+        group "Traversal with stat()"
+
+        for corpus; do
+            bench-stat-corpus "$corpus ${TAGS[$corpus]}" "bench/corpus/$corpus"
         done
     fi
 }
@@ -645,6 +692,7 @@ bench() {
 
     import_array COMPLETE
     import_array EARLY_QUIT
+    import_array STAT
     import_array PRINT
     import_array STRATEGIES
     import_array JOBS
@@ -652,6 +700,7 @@ bench() {
 
     bench-complete "${COMPLETE[@]}"
     bench-early-quit "${EARLY_QUIT[@]}"
+    bench-stat "${STAT[@]}"
     bench-print "${PRINT[@]}"
     bench-strategies "${STRATEGIES[@]}"
     bench-jobs "${JOBS[@]}"
