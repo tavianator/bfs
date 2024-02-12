@@ -1120,12 +1120,12 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 	const struct BFTW *ftwbuf = state->ftwbuf;
 
 	dchar *status = NULL;
-	dchar *rhs = dstrprintf(" (visited: %zu, depth: %2zu)", count, ftwbuf->depth);
+	dchar *rhs = dstrprintf(" (visited: %'zu, depth: %2zu)", count, ftwbuf->depth);
 	if (!rhs) {
 		return;
 	}
 
-	size_t rhslen = dstrlen(rhs);
+	size_t rhslen = xstrwidth(rhs);
 	if (3 + rhslen > width) {
 		dstresize(&rhs, 0);
 		rhslen = 0;
