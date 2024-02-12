@@ -1891,11 +1891,11 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		MODE_PLUS,
 		MODE_MINUS,
 		MODE_EQUALS,
-	} op = uninit(op, MODE_EQUALS);
+	} op uninit(MODE_EQUALS);
 
-	mode_t who = uninit(who, 0);
-	mode_t file_change = uninit(file_change, 0);
-	mode_t dir_change = uninit(dir_change, 0);
+	mode_t who uninit(0);
+	mode_t file_change uninit(0);
+	mode_t dir_change uninit(0);
 
 	const char *i = mode;
 	while (true) {

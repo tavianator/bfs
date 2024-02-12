@@ -1085,7 +1085,7 @@ bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate the comma operator.
  */
 bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
-	bool ret = uninit(ret, false);
+	bool ret uninit(false);
 
 	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
 		ret = eval_expr(child, state);

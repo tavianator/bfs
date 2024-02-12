@@ -86,9 +86,9 @@
  * Initialize a variable, unless sanitizers would detect uninitialized uses.
  */
 #if SANITIZE_MEMORY
-#  define uninit(var, value) var
+#  define uninit(value)
 #else
-#  define uninit(var, value) value
+#  define uninit(value) = value
 #endif
 
 #endif // BFS_SANITY_H
