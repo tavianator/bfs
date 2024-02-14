@@ -511,9 +511,11 @@ static struct ioq_ent *ioq_ring_pop(struct ioq_ring_state *state) {
 
 	// Block if we have nothing else to do
 	bool block = !state->prepped && !state->submitted;
-	struct ioq_ent *ret = ioqq_pop(state->ioq->pending, block);
+	struct ioqq *pending = state->ioq->pending;
+	struct ioq_ent *ret = ioqq_pop(pending, block);
 
 	if (ret == &IOQ_STOP) {
+		ioqq_push(pending, &IOQ_STOP);
 		state->stop = true;
 		ret = NULL;
 	}
@@ -685,6 +687,7 @@ static void ioq_sync_work(struct ioq_thread *thread) {
 	while (true) {
 		struct ioq_ent *ent = ioqq_pop(ioq->pending, true);
 		if (ent == &IOQ_STOP) {
+			ioqq_push(ioq->pending, &IOQ_STOP);
 			break;
 		}
 
@@ -884,9 +887,7 @@ void ioq_free(struct ioq *ioq, struct ioq_ent *ent) {
 
 void ioq_cancel(struct ioq *ioq) {
 	if (!exchange(&ioq->cancel, true, relaxed)) {
-		for (size_t i = 0; i < ioq->nthreads; ++i) {
-			ioqq_push(ioq->pending, &IOQ_STOP);
-		}
+		ioqq_push(ioq->pending, &IOQ_STOP);
 	}
 }
 
