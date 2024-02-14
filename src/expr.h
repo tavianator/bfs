@@ -136,21 +136,15 @@ struct bfs_expr {
 			/** The comparison mode. */
 			enum bfs_int_cmp int_cmp;
 
-			/** Optional extra data. */
-			union {
-				/** -size data. */
-				enum bfs_size_unit size_unit;
+			/** -size data. */
+			enum bfs_size_unit size_unit;
 
-				/** Timestamp comparison data. */
-				struct {
-					/** The stat field to look at. */
-					enum bfs_stat_field stat_field;
-					/** The reference time. */
-					struct timespec reftime;
-					/** The time unit. */
-					enum bfs_time_unit time_unit;
-				};
-			};
+			/** The stat field to look at. */
+			enum bfs_stat_field stat_field;
+			/** The time unit. */
+			enum bfs_time_unit time_unit;
+			/** The reference time. */
+			struct timespec reftime;
 		};
 
 		/** String comparisons. */
