@@ -54,8 +54,8 @@ struct ioq_ent {
 		/** ioq_opendir() args. */
 		struct ioq_opendir {
 			struct bfs_dir *dir;
-			int dfd;
 			const char *path;
+			int dfd;
 			enum bfs_dir_flags flags;
 		} opendir;
 		/** ioq_closedir() args. */
@@ -64,11 +64,11 @@ struct ioq_ent {
 		} closedir;
 		/** ioq_stat() args. */
 		struct ioq_stat {
-			int dfd;
 			const char *path;
-			enum bfs_stat_flags flags;
 			struct bfs_stat *buf;
 			void *xbuf;
+			int dfd;
+			enum bfs_stat_flags flags;
 		} stat;
 	};
 };
