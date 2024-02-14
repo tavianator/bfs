@@ -755,6 +755,15 @@ struct ioq *ioq_create(size_t depth, size_t nthreads) {
 			// Use a page for each SQE ring
 			size_t entries = 4096 / sizeof(struct io_uring_sqe);
 			thread->ring_err = -io_uring_queue_init_params(entries, &thread->ring, &params);
+
+			if (!prev && thread->ring_err == 0) {
+				// Limit the number of io_uring workers
+				unsigned int values[] = {
+					[IO_WQ_BOUND] = nthreads,
+					[IO_WQ_UNBOUND] = 0,
+				};
+				io_uring_register_iowq_max_workers(&thread->ring, values);
+			}
 		}
 #endif
 
