@@ -196,12 +196,26 @@ struct bftw_file {
 	/** The root under which this file was found. */
 	struct bftw_file *root;
 
-	/** The next file to open/close/visit. */
+	/**
+	 * List node for:
+	 *
+	 *     bftw_queue::buffer
+	 *     bftw_queue::waiting
+	 *     bftw_file_open()::parents
+	 */
 	struct bftw_file *next;
-	/** The next directory to read. */
+
+	/**
+	 * List node for:
+	 *
+	 *     bftw_queue::ready
+	 *     bftw_state::to_close
+	 */
 	struct { struct bftw_file *next; } ready;
 
-	/** LRU list node. */
+	/**
+	 * List node for bftw_cache.
+	 */
 	struct {
 		struct bftw_file *prev;
 		struct bftw_file *next;
