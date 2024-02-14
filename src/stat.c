@@ -21,14 +21,12 @@
 
 const char *bfs_stat_field_name(enum bfs_stat_field field) {
 	switch (field) {
+	case BFS_STAT_MODE:
+		return "mode";
 	case BFS_STAT_DEV:
 		return "device number";
 	case BFS_STAT_INO:
 		return "inode nunmber";
-	case BFS_STAT_TYPE:
-		return "type";
-	case BFS_STAT_MODE:
-		return "mode";
 	case BFS_STAT_NLINK:
 		return "link count";
 	case BFS_STAT_GID:
@@ -74,14 +72,14 @@ int bfs_fstatat_flags(enum bfs_stat_flags flags) {
 void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 	dest->mask = 0;
 
+	dest->mode = src->st_mode;
+	dest->mask |= BFS_STAT_MODE;
+
 	dest->dev = src->st_dev;
 	dest->mask |= BFS_STAT_DEV;
 
 	dest->ino = src->st_ino;
 	dest->mask |= BFS_STAT_INO;
-
-	dest->mode = src->st_mode;
-	dest->mask |= BFS_STAT_TYPE | BFS_STAT_MODE;
 
 	dest->nlink = src->st_nlink;
 	dest->mask |= BFS_STAT_NLINK;
@@ -173,15 +171,14 @@ int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src) {
 
 	dest->mask = 0;
 
+	dest->mode = src->stx_mode;
+	dest->mask |= BFS_STAT_MODE;
+
 	dest->dev = xmakedev(src->stx_dev_major, src->stx_dev_minor);
 	dest->mask |= BFS_STAT_DEV;
 
 	dest->ino = src->stx_ino;
 	dest->mask |= BFS_STAT_INO;
-
-	dest->mode = src->stx_mode;
-	dest->mask |= BFS_STAT_TYPE;
-	dest->mask |= BFS_STAT_MODE;
 
 	dest->nlink = src->stx_nlink;
 	dest->mask |= BFS_STAT_NLINK;

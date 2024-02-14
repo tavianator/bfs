@@ -45,21 +45,20 @@
  * bfs_stat field bitmask.
  */
 enum bfs_stat_field {
-	BFS_STAT_DEV    = 1 << 0,
-	BFS_STAT_INO    = 1 << 1,
-	BFS_STAT_TYPE   = 1 << 2,
-	BFS_STAT_MODE   = 1 << 3,
-	BFS_STAT_NLINK  = 1 << 4,
-	BFS_STAT_GID    = 1 << 5,
-	BFS_STAT_UID    = 1 << 6,
-	BFS_STAT_SIZE   = 1 << 7,
-	BFS_STAT_BLOCKS = 1 << 8,
-	BFS_STAT_RDEV   = 1 << 9,
-	BFS_STAT_ATTRS  = 1 << 10,
-	BFS_STAT_ATIME  = 1 << 11,
-	BFS_STAT_BTIME  = 1 << 12,
-	BFS_STAT_CTIME  = 1 << 13,
-	BFS_STAT_MTIME  = 1 << 14,
+	BFS_STAT_MODE   = 1 << 0,
+	BFS_STAT_DEV    = 1 << 1,
+	BFS_STAT_INO    = 1 << 2,
+	BFS_STAT_NLINK  = 1 << 3,
+	BFS_STAT_GID    = 1 << 4,
+	BFS_STAT_UID    = 1 << 5,
+	BFS_STAT_SIZE   = 1 << 6,
+	BFS_STAT_BLOCKS = 1 << 7,
+	BFS_STAT_RDEV   = 1 << 8,
+	BFS_STAT_ATTRS  = 1 << 9,
+	BFS_STAT_ATIME  = 1 << 10,
+	BFS_STAT_BTIME  = 1 << 11,
+	BFS_STAT_CTIME  = 1 << 12,
+	BFS_STAT_MTIME  = 1 << 13,
 };
 
 /**
@@ -88,12 +87,12 @@ struct bfs_stat {
 	/** Bitmask indicating filled fields. */
 	enum bfs_stat_field mask;
 
+	/** File type and access mode. */
+	mode_t mode;
 	/** Device ID containing the file. */
 	dev_t dev;
 	/** Inode number. */
 	ino_t ino;
-	/** File type and access mode. */
-	mode_t mode;
 	/** Number of hard links. */
 	nlink_t nlink;
 	/** Owner group ID. */
