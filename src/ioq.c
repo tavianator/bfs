@@ -742,8 +742,8 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 	if (!prev) {
 		// Limit the number of io_uring workers
 		unsigned int values[] = {
-			[IO_WQ_BOUND] = ioq->nthreads,
-			[IO_WQ_UNBOUND] = 0,
+			ioq->nthreads, // [IO_WQ_BOUND]
+			0,             // [IO_WQ_UNBOUND]
 		};
 		io_uring_register_iowq_max_workers(&thread->ring, values);
 	}
