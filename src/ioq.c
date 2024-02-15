@@ -623,6 +623,8 @@ static void ioq_reap_cqe(struct ioq_ring_state *state, struct io_uring_cqe *cqe)
 			if (ent->result >= 0) {
 				// TODO: io_uring_prep_getdents()
 				bfs_polldir(args->dir);
+			} else {
+				xclose(fd);
 			}
 
 			break;
