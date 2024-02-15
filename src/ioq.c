@@ -446,7 +446,6 @@ static bool ioq_check_cancel(struct ioq *ioq, struct ioq_ent *ent) {
 	}
 
 	ent->result = -EINTR;
-	ioqq_push(ioq->ready, ent);
 	return true;
 }
 
@@ -479,12 +478,6 @@ static void ioq_dispatch_sync(struct ioq *ioq, struct ioq_ent *ent) {
 
 	bfs_bug("Unknown ioq_op %d", (int)ent->op);
 	ent->result = -ENOSYS;
-}
-
-/** Complete a single request synchronously. */
-static void ioq_complete(struct ioq *ioq, struct ioq_ent *ent) {
-	ioq_dispatch_sync(ioq, ent);
-	ioqq_push(ioq->ready, ent);
 }
 
 #if BFS_USE_LIBURING
@@ -568,6 +561,7 @@ static struct io_uring_sqe *ioq_dispatch_async(struct io_uring *ring, struct ioq
 static void ioq_prep_sqe(struct ioq_ring_state *state, struct ioq_ent *ent) {
 	struct ioq *ioq = state->ioq;
 	if (ioq_check_cancel(ioq, ent)) {
+		ioqq_push(ioq->ready, ent);
 		return;
 	}
 
@@ -576,7 +570,8 @@ static void ioq_prep_sqe(struct ioq_ring_state *state, struct ioq_ent *ent) {
 		io_uring_sqe_set_data(sqe, ent);
 		++state->prepped;
 	} else {
-		ioq_complete(ioq, ent);
+		ioq_dispatch_sync(ioq, ent);
+		ioqq_push(ioq->ready, ent);
 	}
 }
 
@@ -615,7 +610,7 @@ static void ioq_reap_cqe(struct ioq_ring_state *state, struct io_uring_cqe *cqe)
 			int fd = ent->result;
 			if (ioq_check_cancel(ioq, ent)) {
 				xclose(fd);
-				return;
+				goto push;
 			}
 
 			struct ioq_opendir *args = &ent->opendir;
@@ -694,8 +689,9 @@ static void ioq_sync_work(struct ioq_thread *thread) {
 		}
 
 		if (!ioq_check_cancel(ioq, ent)) {
-			ioq_complete(ioq, ent);
+			ioq_dispatch_sync(ioq, ent);
 		}
+		ioqq_push(ioq->ready, ent);
 	}
 }
 
