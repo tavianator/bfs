@@ -1,6 +1,18 @@
 3.*
 ===
 
+3.1.1
+-----
+
+**February 16, 2024**
+
+### Changes
+
+- Performance and scalability improvements
+
+- The file count in `bfs -status` now has a thousands separator
+
+
 3.1
 ---
 
