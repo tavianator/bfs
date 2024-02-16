@@ -33,11 +33,18 @@ enum ioq_op {
 };
 
 /**
+ * The I/O queue implementation needs two tag bits in each pointer to a struct
+ * ioq_ent, so we need to ensure at least 4-byte alignment.  The natural
+ * alignment is enough on most architectures, but not m68k, so over-align it.
+ */
+#define IOQ_ENT_ALIGN alignas(4)
+
+/**
  * An I/O queue entry.
  */
 struct ioq_ent {
 	/** The I/O operation. */
-	enum ioq_op op;
+	IOQ_ENT_ALIGN enum ioq_op op;
 
 	/** The return value (on success) or negative error code (on failure). */
 	int result;
