@@ -386,7 +386,7 @@ bfs_pty() {
     bfs_verbose "$@"
 
     local ret=0
-    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@"' bash "${BFS[@]}" "$@" || ret=$?
+    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@" </dev/null' bash "${BFS[@]}" "$@" || ret=$?
 
     if ((ret > 125)); then
         exit $ret
