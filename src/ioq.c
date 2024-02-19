@@ -171,8 +171,11 @@ typedef atomic uintptr_t ioq_slot;
 
 /** Someone might be waiting on this slot. */
 #define IOQ_BLOCKED ((uintptr_t)1)
+
+/** Bit for IOQ_SKIP. */
+#define IOQ_SKIP_BIT (UINTPTR_WIDTH - 1)
 /** The next push(es) should skip this slot. */
-#define IOQ_SKIP ((uintptr_t)1 << (UINTPTR_WIDTH - 1))
+#define IOQ_SKIP ((uintptr_t)1 << IOQ_SKIP_BIT)
 /** Amount to add for an additional skip. */
 #define IOQ_SKIP_ONE (~IOQ_BLOCKED)
 
@@ -309,23 +312,29 @@ static void ioq_slot_wake(struct ioqq *ioqq, ioq_slot *slot) {
 	cond_broadcast(&monitor->cond);
 }
 
+/** Branch-free (slot & IOQ_SKIP) ? ~IOQ_BLOCKED : 0 */
+static uintptr_t ioq_skip_mask(uintptr_t slot) {
+	return -(slot >> IOQ_SKIP_BIT) << 1;
+}
+
 /** Push an entry into a slot. */
 static bool ioq_slot_push(struct ioqq *ioqq, ioq_slot *slot, struct ioq_ent *ent) {
 	uintptr_t prev = load(slot, relaxed);
+
 	while (true) {
-		uintptr_t next;
-		if (prev & IOQ_SKIP) {
-			// skip(1) → empty
-			// skip(n) → skip(n - 1)
-			next = (prev - IOQ_SKIP_ONE) & ~IOQ_BLOCKED;
-		} else if (prev > IOQ_BLOCKED) {
+		size_t skip_mask = ioq_skip_mask(prev);
+		size_t full_mask = ~skip_mask & ~IOQ_BLOCKED;
+		if (prev & full_mask) {
 			// full(ptr) → wait
 			prev = ioq_slot_wait(ioqq, slot, prev);
 			continue;
-		} else {
-			// empty → full(ptr)
-			next = (uintptr_t)ent >> 1;
 		}
+
+		// empty   → full(ptr)
+		uintptr_t next = ((uintptr_t)ent >> 1) & full_mask;
+		// skip(1) → empty
+		// skip(n) → skip(n - 1)
+		next |= (prev - IOQ_SKIP_ONE) & skip_mask;
 
 		if (compare_exchange_weak(slot, &prev, next, release, relaxed)) {
 			break;
@@ -349,7 +358,7 @@ static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool bloc
 		uintptr_t next = prev + IOQ_SKIP_ONE;
 		// skip(n)   → ~IOQ_BLOCKED
 		// full(ptr) → 0
-		next &= (next & IOQ_SKIP) ? ~IOQ_BLOCKED : 0;
+		next &= ioq_skip_mask(next);
 
 		if (block && next) {
 			prev = ioq_slot_wait(ioqq, slot, prev);
@@ -368,7 +377,7 @@ static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool bloc
 	// empty     → 0
 	// skip(n)   → 0
 	// full(ptr) → ptr
-	prev &= (prev & IOQ_SKIP) ? 0 : ~IOQ_BLOCKED;
+	prev &= ioq_skip_mask(~prev);
 	return (struct ioq_ent *)(prev << 1);
 }
 
