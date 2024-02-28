@@ -45,6 +45,10 @@ bool error_is_like(int error, int category) {
 	case ENOENT:
 		return error == ENOTDIR;
 
+	case ENOSYS:
+		// https://github.com/opencontainers/runc/issues/2151
+		return errno == EPERM;
+
 #if __DragonFly__
 	// https://twitter.com/tavianator/status/1742991411203485713
 	case ENAMETOOLONG:
