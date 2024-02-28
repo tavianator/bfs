@@ -22,6 +22,9 @@ bool check_bfstd(void);
 /** Bit manipulation tests. */
 bool check_bit(void);
 
+/** I/O queue tests. */
+bool check_ioq(void);
+
 /** Trie tests. */
 bool check_trie(void);
 

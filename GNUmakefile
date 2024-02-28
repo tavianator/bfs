@@ -283,6 +283,7 @@ $(BIN)/tests/units: \
     $(OBJ)/tests/alloc.o \
     $(OBJ)/tests/bfstd.o \
     $(OBJ)/tests/bit.o \
+    $(OBJ)/tests/ioq.o \
     $(OBJ)/tests/main.o \
     $(OBJ)/tests/trie.o \
     $(OBJ)/tests/xtime.o \
