@@ -174,19 +174,29 @@ overflow:
 	return -1;
 }
 
+/** Parse a decimal digit. */
+static int xgetdigit(char c) {
+	int ret = c - '0';
+	if (ret < 0 || ret > 9) {
+		return -1;
+	} else {
+		return ret;
+	}
+}
+
 /** Parse some digits from a timestamp. */
 static int xgetpart(const char **str, size_t n, int *result) {
-	char buf[n + 1];
+	*result = 0;
+
 	for (size_t i = 0; i < n; ++i, ++*str) {
-		char c = **str;
-		if (c < '0' || c > '9') {
+		int dig = xgetdigit(**str);
+		if (dig < 0) {
 			return -1;
 		}
-		buf[i] = c;
+		*result *= 10;
+		*result += dig;
 	}
-	buf[n] = '\0';
 
-	*result = atoi(buf);
 	return 0;
 }
 
@@ -239,6 +249,8 @@ int xgetdate(const char *str, struct timespec *result) {
 		goto end;
 	} else if (*str == ':') {
 		++str;
+	} else if (xgetdigit(*str) < 0) {
+		goto zone;
 	}
 	if (xgetpart(&str, 2, &tm.tm_min) != 0) {
 		goto invalid;
@@ -249,11 +261,14 @@ int xgetdate(const char *str, struct timespec *result) {
 		goto end;
 	} else if (*str == ':') {
 		++str;
+	} else if (xgetdigit(*str) < 0) {
+		goto zone;
 	}
 	if (xgetpart(&str, 2, &tm.tm_sec) != 0) {
 		goto invalid;
 	}
 
+zone:
 	if (!*str) {
 		goto end;
 	} else if (*str == 'Z') {
@@ -296,11 +311,11 @@ end:
 			goto error;
 		}
 
-		int offset = 60 * tz_hour + tz_min;
+		int offset = (tz_hour * 60 + tz_min) * 60;
 		if (tz_negative) {
-			result->tv_sec -= offset;
-		} else {
 			result->tv_sec += offset;
+		} else {
+			result->tv_sec -= offset;
 		}
 	}
 
