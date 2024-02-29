@@ -12,121 +12,122 @@
 #include <time.h>
 
 static bool tm_equal(const struct tm *tma, const struct tm *tmb) {
-	if (tma->tm_year != tmb->tm_year) {
-		return false;
-	}
-	if (tma->tm_mon != tmb->tm_mon) {
-		return false;
-	}
-	if (tma->tm_mday != tmb->tm_mday) {
-		return false;
-	}
-	if (tma->tm_hour != tmb->tm_hour) {
-		return false;
-	}
-	if (tma->tm_min != tmb->tm_min) {
-		return false;
-	}
-	if (tma->tm_sec != tmb->tm_sec) {
-		return false;
-	}
-	if (tma->tm_wday != tmb->tm_wday) {
-		return false;
-	}
-	if (tma->tm_yday != tmb->tm_yday) {
-		return false;
-	}
-	if (tma->tm_isdst != tmb->tm_isdst) {
-		return false;
-	}
-
-	return true;
-}
-
-static void tm_print(FILE *file, const struct tm *tm) {
-	fprintf(file, "Y%d M%d D%d  h%d m%d s%d  wd%d yd%d%s\n",
-		tm->tm_year, tm->tm_mon, tm->tm_mday,
-		tm->tm_hour, tm->tm_min, tm->tm_sec,
-		tm->tm_wday, tm->tm_yday,
-		tm->tm_isdst ? (tm->tm_isdst < 0 ? " (DST?)" : " (DST)") : "");
+	return tma->tm_year == tmb->tm_year
+		&& tma->tm_mon == tmb->tm_mon
+		&& tma->tm_mday == tmb->tm_mday
+		&& tma->tm_hour == tmb->tm_hour
+		&& tma->tm_min == tmb->tm_min
+		&& tma->tm_sec == tmb->tm_sec
+		&& tma->tm_wday == tmb->tm_wday
+		&& tma->tm_yday == tmb->tm_yday
+		&& tma->tm_isdst == tmb->tm_isdst;
 }
 
 /** Check one xgetdate() result. */
-static bool compare_xgetdate(const char *str, int error, time_t expected) {
+static bool check_one_xgetdate(const char *str, int error, time_t expected) {
 	struct timespec ts;
 	int ret = xgetdate(str, &ts);
 
 	if (error) {
-		if (ret != -1 || errno != error) {
-			fprintf(stderr, "xgetdate('%s'): %s\n", str, xstrerror(errno));
-			return false;
-		}
-	} else if (ret != 0) {
-		fprintf(stderr, "xgetdate('%s'): %s\n", str, xstrerror(errno));
-		return false;
-	} else if (ts.tv_sec != expected || ts.tv_nsec != 0) {
-		fprintf(stderr, "xgetdate('%s'): %jd.%09jd != %jd\n", str, (intmax_t)ts.tv_sec, (intmax_t)ts.tv_nsec, (intmax_t)expected);
-		return false;
+		return bfs_check(ret == -1 && errno == error, "xgetdate('%s'): %s", str, xstrerror(errno));
+	} else {
+		return bfs_check(ret == 0, "xgetdate('%s'): %s", str, xstrerror(errno))
+			&& bfs_check(ts.tv_sec == expected && ts.tv_nsec == 0,
+				"xgetdate('%s'): %jd.%09jd != %jd",
+				str, (intmax_t)ts.tv_sec, (intmax_t)ts.tv_nsec, (intmax_t)expected);
 	}
-
-	return true;
 }
 
 /** xgetdate() tests. */
 static bool check_xgetdate(void) {
-	return compare_xgetdate("", EINVAL, 0)
-		& compare_xgetdate("????", EINVAL, 0)
-		& compare_xgetdate("1991", EINVAL, 0)
-		& compare_xgetdate("1991-??", EINVAL, 0)
-		& compare_xgetdate("1991-12", EINVAL, 0)
-		& compare_xgetdate("1991-12-", EINVAL, 0)
-		& compare_xgetdate("1991-12-??", EINVAL, 0)
-		& compare_xgetdate("1991-12-14", 0, 692668800)
-		& compare_xgetdate("1991-12-14-", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T??", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T10", 0, 692704800)
-		& compare_xgetdate("1991-12-14T10:??", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T10:11", 0, 692705460)
-		& compare_xgetdate("1991-12-14T10:11:??", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T10:11:12", 0, 692705472)
-		& compare_xgetdate("1991-12-14T10Z", 0, 692704800)
-		& compare_xgetdate("1991-12-14T10:11Z", 0, 692705460)
-		& compare_xgetdate("1991-12-14T10:11:12Z", 0, 692705472)
-		& compare_xgetdate("1991-12-14T10:11:12?", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T03-07", 0, 692704800)
-		& compare_xgetdate("1991-12-14T06:41-03:30", 0, 692705460)
-		& compare_xgetdate("1991-12-14T03:11:12-07:00", 0, 692705472)
-		& compare_xgetdate("19911214 031112-0700", 0, 692705472);
+	bool ret = true;
+
+	ret &= check_one_xgetdate("", EINVAL, 0);
+	ret &= check_one_xgetdate("????", EINVAL, 0);
+	ret &= check_one_xgetdate("1991", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-??", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-??", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14", 0, 692668800);
+	ret &= check_one_xgetdate("1991-12-14-", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14T", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14T??", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14T10", 0, 692704800);
+	ret &= check_one_xgetdate("1991-12-14T10:??", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14T10:11", 0, 692705460);
+	ret &= check_one_xgetdate("1991-12-14T10:11:??", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14T10:11:12", 0, 692705472);
+	ret &= check_one_xgetdate("1991-12-14T10Z", 0, 692704800);
+	ret &= check_one_xgetdate("1991-12-14T10:11Z", 0, 692705460);
+	ret &= check_one_xgetdate("1991-12-14T10:11:12Z", 0, 692705472);
+	ret &= check_one_xgetdate("1991-12-14T10:11:12?", EINVAL, 0);
+	ret &= check_one_xgetdate("1991-12-14T03-07", 0, 692704800);
+	ret &= check_one_xgetdate("1991-12-14T06:41-03:30", 0, 692705460);
+	ret &= check_one_xgetdate("1991-12-14T03:11:12-07:00", 0, 692705472);
+	ret &= check_one_xgetdate("19911214 031112-0700", 0, 692705472);;
+
+	return ret;
+}
+
+#define TM_FORMAT "%04d-%02d-%02d %02d:%02d:%02d (%d/7, %d/365%s)"
+
+#define TM_PRINTF(tm) \
+	(1900 + (tm).tm_year), (tm).tm_mon, (tm).tm_mday, \
+	(tm).tm_hour, (tm).tm_min, (tm).tm_sec, \
+	((tm).tm_wday + 1), ((tm).tm_yday + 1), \
+	((tm).tm_isdst ? ((tm).tm_isdst < 0 ? ", DST?" : ", DST") : "")
+
+/** Check one xmktime() result. */
+static bool check_one_xmktime(time_t expected) {
+	struct tm tm;
+	if (xlocaltime(&expected, &tm) != 0) {
+		bfs_diag("xlocaltime(%jd): %s", (intmax_t)expected, xstrerror(errno));
+		return false;
+	}
+
+	time_t actual;
+	return bfs_check(xmktime(&tm, &actual) == 0, "xmktime(" TM_FORMAT "): %s", TM_PRINTF(tm), xstrerror(errno))
+		&& bfs_check(actual == expected, "xmktime(" TM_FORMAT "): %jd != %jd", TM_PRINTF(tm), (intmax_t)actual, (intmax_t)expected);
 }
 
 /** xmktime() tests. */
 static bool check_xmktime(void) {
+	bool ret = true;
+
 	for (time_t time = -10; time <= 10; ++time) {
-		struct tm tm;
-		if (xlocaltime(&time, &tm) != 0) {
-			perror("xlocaltime()");
-			return false;
-		}
-
-		time_t made;
-		if (xmktime(&tm, &made) != 0) {
-			perror("xmktime()");
-			return false;
-		}
-
-		if (time != made) {
-			fprintf(stderr, "Mismatch: %jd != %jd\n", (intmax_t)time, (intmax_t)made);
-			tm_print(stderr, &tm);
-			return false;
-		}
+		ret &= check_one_xmktime(time);
 	}
 
-	return true;
+	return ret;
+}
+
+/** Check one xtimegm() result. */
+static bool check_one_xtimegm(const struct tm *tm) {
+	struct tm tma = *tm, tmb = *tm;
+	time_t ta, tb;
+	ta = mktime(&tma);
+	if (xtimegm(&tmb, &tb) != 0) {
+		tb = -1;
+	}
+
+	bool ret = true;
+	ret &= bfs_check(ta == tb, "%jd != %jd", (intmax_t)ta, (intmax_t)tb);
+	ret &= bfs_check(ta == -1 || tm_equal(&tma, &tmb));
+
+	if (!ret) {
+		bfs_diag("mktime():  " TM_FORMAT, TM_PRINTF(tma));
+		bfs_diag("xtimegm(): " TM_FORMAT, TM_PRINTF(tmb));
+		bfs_diag("(input):   " TM_FORMAT, TM_PRINTF(*tm));
+	}
+
+	return ret;
 }
 
 /** xtimegm() tests. */
 static bool check_xtimegm(void) {
+	bool ret = true;
+
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
@@ -137,33 +138,10 @@ static bool check_xtimegm(void) {
 	for (tm.tm_hour =  -1; tm.tm_hour <=  24; tm.tm_hour +=  5)
 	for (tm.tm_min  =  -1; tm.tm_min  <=  60; tm.tm_min  += 31)
 	for (tm.tm_sec  = -60; tm.tm_sec  <= 120; tm.tm_sec  +=  5) {
-		struct tm tma = tm, tmb = tm;
-		time_t ta, tb;
-		ta = mktime(&tma);
-		if (xtimegm(&tmb, &tb) != 0) {
-			tb = -1;
-		}
-
-		bool fail = false;
-		if (ta != tb) {
-			printf("Mismatch:  %jd != %jd\n", (intmax_t)ta, (intmax_t)tb);
-			fail = true;
-		}
-		if (ta != -1 && !tm_equal(&tma, &tmb)) {
-			printf("mktime():  ");
-			tm_print(stdout, &tma);
-			printf("xtimegm(): ");
-			tm_print(stdout, &tmb);
-			fail = true;
-		}
-		if (fail) {
-			printf("Input:     ");
-			tm_print(stdout, &tm);
-			return false;
-		}
+		ret &= check_one_xtimegm(&tm);
 	}
 
-	return true;
+	return ret;
 }
 
 bool check_xtime(void) {
@@ -173,7 +151,9 @@ bool check_xtime(void) {
 	}
 	tzset();
 
-	return check_xgetdate()
-		& check_xmktime()
-		& check_xtimegm();
+	bool ret = true;
+	ret &= check_xgetdate();
+	ret &= check_xmktime();
+	ret &= check_xtimegm();
+	return ret;
 }

@@ -9,6 +9,7 @@
 #define BFS_TESTS_H
 
 #include "../src/config.h"
+#include "../src/diag.h"
 
 /** Unit test function type. */
 typedef bool test_fn(void);
@@ -30,5 +31,24 @@ bool check_trie(void);
 
 /** Time tests. */
 bool check_xtime(void);
+
+/** Don't ignore the bfs_check() return value. */
+attr(nodiscard)
+static inline bool bfs_check(bool ret) {
+	return ret;
+}
+
+/**
+ * Check a condition, logging a message on failure but continuing.
+ */
+#define bfs_check(...) \
+	bfs_check(bfs_check_(#__VA_ARGS__, __VA_ARGS__, "", ""))
+
+#define bfs_check_(str, cond, format, ...) \
+	((cond) ? true : (bfs_diag( \
+		sizeof(format) > 1 \
+			? "%.0s" format "%s%s" \
+			: "Check failed: `%s`%s", \
+		str, __VA_ARGS__), false))
 
 #endif // BFS_TESTS_H

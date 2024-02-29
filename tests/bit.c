@@ -52,75 +52,77 @@ bfs_static_assert(UINTMAX_MAX == UWIDTH_MAX(UINTMAX_WIDTH));
 bfs_static_assert(INTMAX_MIN == IWIDTH_MIN(INTMAX_WIDTH));
 bfs_static_assert(INTMAX_MAX == IWIDTH_MAX(INTMAX_WIDTH));
 
-#define verify_eq(a, b) \
-	bfs_verify((a) == (b), "(0x%jX) %s != %s (0x%jX)", (uintmax_t)(a), #a, #b, (uintmax_t)(b))
+#define check_eq(a, b) \
+	bfs_check((a) == (b), "(0x%jX) %s != %s (0x%jX)", (uintmax_t)(a), #a, #b, (uintmax_t)(b))
 
 bool check_bit(void) {
-	verify_eq(bswap((uint8_t)0x12), 0x12);
-	verify_eq(bswap((uint16_t)0x1234), 0x3412);
-	verify_eq(bswap((uint32_t)0x12345678), 0x78563412);
-	verify_eq(bswap((uint64_t)0x1234567812345678), 0x7856341278563412);
+	bool ret = true;
 
-	verify_eq(count_ones(0x0), 0);
-	verify_eq(count_ones(0x1), 1);
-	verify_eq(count_ones(0x2), 1);
-	verify_eq(count_ones(0x3), 2);
-	verify_eq(count_ones(0x137F), 10);
+	ret &= check_eq(bswap((uint8_t)0x12), 0x12);
+	ret &= check_eq(bswap((uint16_t)0x1234), 0x3412);
+	ret &= check_eq(bswap((uint32_t)0x12345678), 0x78563412);
+	ret &= check_eq(bswap((uint64_t)0x1234567812345678), 0x7856341278563412);
 
-	verify_eq(count_zeros(0), INT_WIDTH);
-	verify_eq(count_zeros(0L), LONG_WIDTH);
-	verify_eq(count_zeros(0LL), LLONG_WIDTH);
-	verify_eq(count_zeros((uint8_t)0), 8);
-	verify_eq(count_zeros((uint16_t)0), 16);
-	verify_eq(count_zeros((uint32_t)0), 32);
-	verify_eq(count_zeros((uint64_t)0), 64);
+	ret &= check_eq(count_ones(0x0), 0);
+	ret &= check_eq(count_ones(0x1), 1);
+	ret &= check_eq(count_ones(0x2), 1);
+	ret &= check_eq(count_ones(0x3), 2);
+	ret &= check_eq(count_ones(0x137F), 10);
 
-	verify_eq(rotate_left((uint8_t)0xA1, 4), 0x1A);
-	verify_eq(rotate_left((uint16_t)0x1234, 12), 0x4123);
-	verify_eq(rotate_left((uint32_t)0x12345678, 20), 0x67812345);
-	verify_eq(rotate_left((uint32_t)0x12345678, 0), 0x12345678);
+	ret &= check_eq(count_zeros(0), INT_WIDTH);
+	ret &= check_eq(count_zeros(0L), LONG_WIDTH);
+	ret &= check_eq(count_zeros(0LL), LLONG_WIDTH);
+	ret &= check_eq(count_zeros((uint8_t)0), 8);
+	ret &= check_eq(count_zeros((uint16_t)0), 16);
+	ret &= check_eq(count_zeros((uint32_t)0), 32);
+	ret &= check_eq(count_zeros((uint64_t)0), 64);
 
-	verify_eq(rotate_right((uint8_t)0xA1, 4), 0x1A);
-	verify_eq(rotate_right((uint16_t)0x1234, 12), 0x2341);
-	verify_eq(rotate_right((uint32_t)0x12345678, 20), 0x45678123);
-	verify_eq(rotate_right((uint32_t)0x12345678, 0), 0x12345678);
+	ret &= check_eq(rotate_left((uint8_t)0xA1, 4), 0x1A);
+	ret &= check_eq(rotate_left((uint16_t)0x1234, 12), 0x4123);
+	ret &= check_eq(rotate_left((uint32_t)0x12345678, 20), 0x67812345);
+	ret &= check_eq(rotate_left((uint32_t)0x12345678, 0), 0x12345678);
+
+	ret &= check_eq(rotate_right((uint8_t)0xA1, 4), 0x1A);
+	ret &= check_eq(rotate_right((uint16_t)0x1234, 12), 0x2341);
+	ret &= check_eq(rotate_right((uint32_t)0x12345678, 20), 0x45678123);
+	ret &= check_eq(rotate_right((uint32_t)0x12345678, 0), 0x12345678);
 
 	for (int i = 0; i < 16; ++i) {
 		uint16_t n = (uint16_t)1 << i;
 		for (int j = i; j < 16; ++j) {
 			uint16_t m = (uint16_t)1 << j;
 			uint16_t nm = n | m;
-			verify_eq(count_ones(nm), 1 + (n != m));
-			verify_eq(count_zeros(nm), 15 - (n != m));
-			verify_eq(leading_zeros(nm), 15 - j);
-			verify_eq(trailing_zeros(nm), i);
-			verify_eq(first_leading_one(nm), j + 1);
-			verify_eq(first_trailing_one(nm), i + 1);
-			verify_eq(bit_width(nm), j + 1);
-			verify_eq(bit_floor(nm), m);
+			ret &= check_eq(count_ones(nm), 1 + (n != m));
+			ret &= check_eq(count_zeros(nm), 15 - (n != m));
+			ret &= check_eq(leading_zeros(nm), 15 - j);
+			ret &= check_eq(trailing_zeros(nm), i);
+			ret &= check_eq(first_leading_one(nm), j + 1);
+			ret &= check_eq(first_trailing_one(nm), i + 1);
+			ret &= check_eq(bit_width(nm), j + 1);
+			ret &= check_eq(bit_floor(nm), m);
 			if (n == m) {
-				verify_eq(bit_ceil(nm), m);
-				bfs_verify(has_single_bit(nm));
+				ret &= check_eq(bit_ceil(nm), m);
+				ret &= bfs_check(has_single_bit(nm));
 			} else {
 				if (j < 15) {
-					verify_eq(bit_ceil(nm), (m << 1));
+					ret &= check_eq(bit_ceil(nm), (m << 1));
 				}
-				bfs_verify(!has_single_bit(nm));
+				ret &= bfs_check(!has_single_bit(nm));
 			}
 		}
 	}
 
-	verify_eq(leading_zeros((uint16_t)0), 16);
-	verify_eq(trailing_zeros((uint16_t)0), 16);
-	verify_eq(first_leading_one(0), 0);
-	verify_eq(first_trailing_one(0), 0);
-	verify_eq(bit_width(0), 0);
-	verify_eq(bit_floor(0), 0);
-	verify_eq(bit_ceil(0), 1);
+	ret &= check_eq(leading_zeros((uint16_t)0), 16);
+	ret &= check_eq(trailing_zeros((uint16_t)0), 16);
+	ret &= check_eq(first_leading_one(0), 0);
+	ret &= check_eq(first_trailing_one(0), 0);
+	ret &= check_eq(bit_width(0), 0);
+	ret &= check_eq(bit_floor(0), 0);
+	ret &= check_eq(bit_ceil(0), 1);
 
-	bfs_verify(!has_single_bit(0));
-	bfs_verify(!has_single_bit(UINT32_MAX));
-	bfs_verify(has_single_bit((uint32_t)1 << (UINT_WIDTH - 1)));
+	ret &= bfs_check(!has_single_bit(0));
+	ret &= bfs_check(!has_single_bit(UINT32_MAX));
+	ret &= bfs_check(has_single_bit((uint32_t)1 << (UINT_WIDTH - 1)));
 
-	return true;
+	return ret;
 }
