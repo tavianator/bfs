@@ -94,10 +94,10 @@ static bool check_xgetdate(void) {
 		& compare_xgetdate("1991-12-14T10:11Z", 0, 692705460)
 		& compare_xgetdate("1991-12-14T10:11:12Z", 0, 692705472)
 		& compare_xgetdate("1991-12-14T10:11:12?", EINVAL, 0)
-		& compare_xgetdate("1991-12-14T02-08", 0, 692704800)
+		& compare_xgetdate("1991-12-14T03-07", 0, 692704800)
 		& compare_xgetdate("1991-12-14T06:41-03:30", 0, 692705460)
-		& compare_xgetdate("1991-12-14T02:11:12-08:00", 0, 692705472)
-		& compare_xgetdate("19911214 021112-0800", 0, 692705472);
+		& compare_xgetdate("1991-12-14T03:11:12-07:00", 0, 692705472)
+		& compare_xgetdate("19911214 031112-0700", 0, 692705472);
 }
 
 /** xmktime() tests. */
