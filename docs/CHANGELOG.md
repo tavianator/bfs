@@ -1,6 +1,22 @@
 3.*
 ===
 
+3.1.2
+-----
+
+**February 29, 2024**
+
+### Bug fixes
+
+- On Linux, we now check for supported `io_uring` operations before using them, which should fix `bfs` on 5.X series kernels that support `io_uring` but not all of `openat()`/`close()`/`statx()` ([`8bc72d6`](https://github.com/tavianator/bfs/commit/8bc72d6c20c5e38783c4956c4d9fde9b3ee9140c))
+
+- Fixed a test failure triggered by certain filesystem types for `/tmp` ([#131](https://github.com/tavianator/bfs/issues/131))
+
+- Fixed parsing and interpretation of timezone offsets for explicit reference times used in `-*since` and `-newerXt` ([`a9f3cde`](https://github.com/tavianator/bfs/commit/a9f3cde30426b546ba6e3172e1a7951213a72049))
+
+- Fixed the build on m68k ([`c749c11`](https://github.com/tavianator/bfs/commit/c749c11b04444ca40941dd2ddc5802faed148f6a))
+
+
 3.1.1
 -----
 
@@ -36,7 +52,7 @@
 
 - Leading whitespace is no longer accepted in integer command line arguments like `-links ' 1'` ([`e0d7dc5`](https://github.com/tavianator/bfs/commit/e0d7dc5dfd7bdaa62b6bc18e9c1cce00bbe08577))
 
-### Bug Fixes
+### Bug fixes
 
 - `-quit` and `-exit` could be ignored in the iterative deepening modes (`-S {ids,eds}`).
   This is now fixed ([`670ebd9`](https://github.com/tavianator/bfs/commit/670ebd97fb431e830b1500b2e7e8013b121fb2c5)).
@@ -62,7 +78,7 @@
 
 **October 12, 2023**
 
-### Bug Fixes
+### Bug fixes
 
 - Fixed a segfault when reporting errors under musl ([`d40eb87`])
 
@@ -80,7 +96,7 @@
 
 - Parallel depth-first search (`-S dfs`) was optimized to avoid enqueueing every file separately ([`2572273`])
 
-### Bug Fixes
+### Bug fixes
 
 - Iterative deepening modes (`-S {ids,eds}`) were performing iterative *breadth*-first searches since `bfs` 3.0, negating any advantages they may have had over normal breadth-first search.
   They now do iterative *depth*-first searches as expected.
