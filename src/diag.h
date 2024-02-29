@@ -42,6 +42,19 @@ struct bfs_loc {
 #endif
 
 /**
+ * Print a low-level diagnostic message to standard error, formatted like
+ *
+ *     bfs: func@src/file.c:0: Message
+ */
+attr(printf(2, 3))
+void bfs_diagf(const struct bfs_loc *loc, const char *format, ...);
+
+/**
+ * Unconditional diagnostic message.
+ */
+#define bfs_diag(...) bfs_diagf(bfs_location(), __VA_ARGS__)
+
+/**
  * Print a message to standard error and abort.
  */
 attr(cold, printf(2, 3))

@@ -14,15 +14,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
+/** bfs_diagf() implementation. */
+attr(printf(2, 0))
+static void bfs_vdiagf(const struct bfs_loc *loc, const char *format, va_list args) {
 	fprintf(stderr, "%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
+	vfprintf(stderr, format, args);
+	fprintf(stderr, "\n");
+}
 
+void bfs_diagf(const struct bfs_loc *loc, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	vfprintf(stderr, format, args);
+	bfs_vdiagf(loc, format, args);
 	va_end(args);
+}
 
-	fprintf(stderr, "\n");
+noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	bfs_vdiagf(loc, format, args);
+	va_end(args);
 
 	abort();
 }
