@@ -54,15 +54,17 @@ static void check_ioq_push_block(void) {
 	ioq_cancel(ioq);
 
 	// Drain the queue
-	struct ioq_ent *ent;
-	while ((ent = ioq_pop(ioq, true))) {
-		bfs_verify(ent->op == IOQ_OPENDIR);
+	for (size_t i = 0; i < depth; ++i) {
+		struct ioq_ent *ent = ioq_pop(ioq, true);
+		bfs_verify(ent && ent->op == IOQ_OPENDIR);
+
 		if (ent->result >= 0) {
 			bfs_closedir(ent->opendir.dir);
 		}
 		free(ent->opendir.dir);
 		ioq_free(ioq, ent);
 	}
+	bfs_verify(!ioq_pop(ioq, true));
 
 	ioq_destroy(ioq);
 }
