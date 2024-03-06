@@ -1,6 +1,18 @@
 3.*
 ===
 
+3.1.3
+-----
+
+**March 6, 2024**
+
+### Bug fixes
+
+- On Linux, the `io_uring` feature probing introduced in `bfs` 3.1.2 only applied to one thread, causing all other threads to avoid using io_uring entirely.
+  The probe results are now copied to all threads correctly.
+  ([`f64f76b`](https://github.com/tavianator/bfs/commit/f64f76b55400b71e8576ed7e4a377eb5ef9576aa))
+
+
 3.1.2
 -----
 
