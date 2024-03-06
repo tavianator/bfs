@@ -850,6 +850,7 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 
 	if (prev) {
 		// Initial setup already complete
+		thread->ring_ops = prev->ring_ops;
 		return 0;
 	}
 
@@ -916,12 +917,14 @@ static void ioq_thread_join(struct ioq_thread *thread) {
 }
 
 struct ioq *ioq_create(size_t depth, size_t nthreads) {
-	struct ioq *ioq = ZALLOC_FLEX(struct ioq, threads, nthreads);
+	struct ioq *ioq = ALLOC_FLEX(struct ioq, threads, nthreads);
 	if (!ioq) {
 		goto fail;
 	}
 
 	ioq->depth = depth;
+	ioq->size = 0;
+	ioq->cancel = false;
 
 	ARENA_INIT(&ioq->ents, struct ioq_ent);
 
