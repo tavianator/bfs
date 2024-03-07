@@ -1086,8 +1086,8 @@ static struct bfs_expr *parse_const(struct bfs_parser *parser, int value, int ar
  */
 static struct bfs_expr *parse_daystart(struct bfs_parser *parser, int arg1, int arg2) {
 	struct tm tm;
-	if (xlocaltime(&parser->now.tv_sec, &tm) != 0) {
-		parse_perror(parser, "xlocaltime()");
+	if (!localtime_r(&parser->now.tv_sec, &tm)) {
+		parse_perror(parser, "localtime_r()");
 		return NULL;
 	}
 
@@ -1708,8 +1708,8 @@ static int parse_reftime(const struct bfs_parser *parser, struct bfs_expr *expr)
 	fprintf(stderr, "Supported timestamp formats are ISO 8601-like, e.g.\n\n");
 
 	struct tm tm;
-	if (xlocaltime(&parser->now.tv_sec, &tm) != 0) {
-		parse_perror(parser, "xlocaltime()");
+	if (!localtime_r(&parser->now.tv_sec, &tm)) {
+		parse_perror(parser, "localtime_r()");
 		return -1;
 	}
 
@@ -1728,8 +1728,8 @@ static int parse_reftime(const struct bfs_parser *parser, struct bfs_expr *expr)
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d%+03d:%02d\n",
 		year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tz_hour, tz_min);
 
-	if (xgmtime(&parser->now.tv_sec, &tm) != 0) {
-		parse_perror(parser, "xgmtime()");
+	if (!gmtime_r(&parser->now.tv_sec, &tm)) {
+		parse_perror(parser, "gmtime_r()");
 		return -1;
 	}
 

@@ -11,30 +11,6 @@
 #include <time.h>
 
 /**
- * localtime_r() wrapper that calls tzset() first.
- *
- * @param[in] timep
- *         The time_t to convert.
- * @param[out] result
- *         Buffer to hold the result.
- * @return
- *         0 on success, -1 on failure.
- */
-int xlocaltime(const time_t *timep, struct tm *result);
-
-/**
- * gmtime_r() wrapper that calls tzset() first.
- *
- * @param[in] timep
- *         The time_t to convert.
- * @param[out] result
- *         Buffer to hold the result.
- * @return
- *         0 on success, -1 on failure.
- */
-int xgmtime(const time_t *timep, struct tm *result);
-
-/**
  * mktime() wrapper that reports errors more reliably.
  *
  * @param[in,out] tm

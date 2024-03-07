@@ -730,7 +730,7 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 	time_t six_months_ago = now - 6 * 30 * 24 * 60 * 60;
 	time_t tomorrow = now + 24 * 60 * 60;
 	struct tm tm;
-	if (xlocaltime(&time, &tm) != 0) {
+	if (!localtime_r(&time, &tm)) {
 		goto error;
 	}
 	char time_str[256];

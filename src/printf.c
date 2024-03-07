@@ -123,7 +123,7 @@ static int bfs_printf_ctime(CFILE *cfile, const struct bfs_fmt *fmt, const struc
 	}
 
 	struct tm tm;
-	if (xlocaltime(&ts->tv_sec, &tm) != 0) {
+	if (!localtime_r(&ts->tv_sec, &tm)) {
 		return -1;
 	}
 
@@ -153,7 +153,7 @@ static int bfs_printf_strftime(CFILE *cfile, const struct bfs_fmt *fmt, const st
 	}
 
 	struct tm tm;
-	if (xlocaltime(&ts->tv_sec, &tm) != 0) {
+	if (!localtime_r(&ts->tv_sec, &tm)) {
 		return -1;
 	}
 

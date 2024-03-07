@@ -55,6 +55,7 @@
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 /**
@@ -120,6 +121,9 @@ int main(int argc, char *argv[]) {
 	if (!setlocale(LC_ALL, "")) {
 		locale_err = errno;
 	}
+
+	// Apply the environment's timezone
+	tzset();
 
 	// Parse the command line
 	struct bfs_ctx *ctx = bfs_parse_cmdline(argc, argv);

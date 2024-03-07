@@ -157,6 +157,8 @@ done:
 }
 
 int main(int argc, char *argv[]) {
+	tzset();
+
 	mode_t mask = umask(0);
 
 	struct args args = {

@@ -11,9 +11,11 @@
 #include "../src/config.h"
 #include "../src/diag.h"
 #include <errno.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /**
  * Test context.
@@ -90,6 +92,18 @@ static void run_test(struct test_ctx *ctx, const char *test, test_fn *fn) {
 }
 
 int main(int argc, char *argv[]) {
+	// Try to set a UTF-8 locale
+	if (!setlocale(LC_ALL, "C.UTF-8")) {
+		setlocale(LC_ALL, "");
+	}
+
+	// Run tests in UTC
+	if (setenv("TZ", "UTC0", true) != 0) {
+		perror("setenv()");
+		return EXIT_FAILURE;
+	}
+	tzset();
+
 	struct test_ctx ctx;
 	if (test_init(&ctx, argc, argv) != 0) {
 		goto done;

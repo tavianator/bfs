@@ -43,11 +43,6 @@ static bool check_wordesc(const char *str, const char *exp, enum wesc_flags flag
 bool check_bfstd(void) {
 	bool ret = true;
 
-	// Try to set a UTF-8 locale
-	if (!setlocale(LC_ALL, "C.UTF-8")) {
-		setlocale(LC_ALL, "");
-	}
-
 	// From man 3p basename
 	ret &= check_base_dir("usr", ".", "usr");
 	ret &= check_base_dir("usr/", ".", "usr");

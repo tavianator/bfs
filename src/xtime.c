@@ -11,38 +11,6 @@
 #include <time.h>
 #include <unistd.h>
 
-/** Call tzset() if necessary. */
-static void xtzset(void) {
-	static atomic bool is_set = false;
-
-	if (!load(&is_set, relaxed)) {
-		tzset();
-		store(&is_set, true, relaxed);
-	}
-}
-
-int xlocaltime(const time_t *timep, struct tm *result) {
-	// Should be called before localtime_r() according to POSIX.1-2004
-	xtzset();
-
-	if (localtime_r(timep, result)) {
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-int xgmtime(const time_t *timep, struct tm *result) {
-	// Should be called before gmtime_r() according to POSIX.1-2004
-	xtzset();
-
-	if (gmtime_r(timep, result)) {
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
 int xmktime(struct tm *tm, time_t *timep) {
 	*timep = mktime(tm);
 
@@ -50,7 +18,7 @@ int xmktime(struct tm *tm, time_t *timep) {
 		int error = errno;
 
 		struct tm tmp;
-		if (xlocaltime(timep, &tmp) != 0) {
+		if (!localtime_r(timep, &tmp)) {
 			return -1;
 		}
 

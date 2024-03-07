@@ -81,8 +81,8 @@ static bool check_xgetdate(void) {
 /** Check one xmktime() result. */
 static bool check_one_xmktime(time_t expected) {
 	struct tm tm;
-	if (xlocaltime(&expected, &tm) != 0) {
-		bfs_diag("xlocaltime(%jd): %s", (intmax_t)expected, xstrerror(errno));
+	if (!localtime_r(&expected, &tm)) {
+		bfs_diag("localtime_r(%jd): %s", (intmax_t)expected, xstrerror(errno));
 		return false;
 	}
 
@@ -145,12 +145,6 @@ static bool check_xtimegm(void) {
 }
 
 bool check_xtime(void) {
-	if (setenv("TZ", "UTC0", true) != 0) {
-		perror("setenv()");
-		return false;
-	}
-	tzset();
-
 	bool ret = true;
 	ret &= check_xgetdate();
 	ret &= check_xmktime();
