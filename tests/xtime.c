@@ -99,6 +99,19 @@ static bool check_xmktime(void) {
 		ret &= check_one_xmktime(time);
 	}
 
+	// Attempt to trigger overflow (but don't test for it, since it's not mandatory)
+	struct tm tm = {
+		.tm_year = INT_MAX,
+		.tm_mon = INT_MAX,
+		.tm_mday = INT_MAX,
+		.tm_hour = INT_MAX,
+		.tm_min = INT_MAX,
+		.tm_sec = INT_MAX,
+		.tm_isdst = -1,
+	};
+	time_t time;
+	xmktime(&tm, &time);
+
 	return ret;
 }
 
@@ -131,7 +144,9 @@ static bool check_xtimegm(void) {
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
+	time_t time;
 
+	// Check equivalence with mktime()
 	for (tm.tm_year =  10; tm.tm_year <= 200; tm.tm_year += 10)
 	for (tm.tm_mon  =  -3; tm.tm_mon  <=  15; tm.tm_mon  +=  3)
 	for (tm.tm_mday = -31; tm.tm_mday <=  61; tm.tm_mday +=  4)
@@ -140,6 +155,19 @@ static bool check_xtimegm(void) {
 	for (tm.tm_sec  = -60; tm.tm_sec  <= 120; tm.tm_sec  +=  5) {
 		ret &= check_one_xtimegm(&tm);
 	}
+
+	// Check integer overflow cases
+	tm = (struct tm){ .tm_sec = INT_MAX, .tm_min = INT_MAX };
+	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
+
+	tm = (struct tm){ .tm_min = INT_MAX, .tm_hour = INT_MAX };
+	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
+
+	tm = (struct tm){ .tm_hour = INT_MAX, .tm_mday = INT_MAX };
+	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
+
+	tm = (struct tm){ .tm_mon = INT_MAX, .tm_year = INT_MAX };
+	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
 
 	return ret;
 }

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "xtime.h"
-#include "atomic.h"
+#include "bfstd.h"
 #include "config.h"
+#include "diag.h"
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -19,6 +20,7 @@ int xmktime(struct tm *tm, time_t *timep) {
 
 		struct tm tmp;
 		if (!localtime_r(timep, &tmp)) {
+			bfs_bug("localtime_r(-1): %s", xstrerror(errno));
 			return -1;
 		}
 
