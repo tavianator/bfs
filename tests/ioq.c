@@ -4,10 +4,12 @@
 #include "tests.h"
 #include "../src/ioq.h"
 #include "../src/bfstd.h"
+#include "../src/config.h"
 #include "../src/diag.h"
 #include "../src/dir.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 
 /**
  * Test for blocking within ioq_slot_push().

@@ -5,10 +5,10 @@
 #include "../src/xtime.h"
 #include "../src/bfstd.h"
 #include "../src/config.h"
+#include "../src/diag.h"
 #include <errno.h>
+#include <limits.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 static bool tm_equal(const struct tm *tma, const struct tm *tmb) {

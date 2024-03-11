@@ -18,6 +18,8 @@
 #include <sys/resource.h>
 #include <time.h>
 
+struct CFILE;
+
 /**
  * The execution context for bfs.
  */

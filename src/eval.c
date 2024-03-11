@@ -25,7 +25,6 @@
 #include "stat.h"
 #include "trie.h"
 #include "xregex.h"
-#include "xtime.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -36,8 +35,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/resource.h>
-#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>

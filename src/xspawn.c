@@ -12,7 +12,6 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 #if BFS_USE_PATHS_H

@@ -10,6 +10,7 @@
 
 #include "config.h"
 #include <errno.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 /** Check if a size is properly aligned. */

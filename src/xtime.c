@@ -7,7 +7,6 @@
 #include "diag.h"
 #include <errno.h>
 #include <limits.h>
-#include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>

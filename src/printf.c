@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "printf.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -14,10 +15,10 @@
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
-#include "xtime.h"
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

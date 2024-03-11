@@ -5,7 +5,6 @@
 #define BFS_TRIE_H
 
 #include "alloc.h"
-#include "config.h"
 #include "list.h"
 #include <stddef.h>
 #include <stdint.h>

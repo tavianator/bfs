@@ -3,6 +3,7 @@
 
 #include "tests.h"
 #include "../src/alloc.h"
+#include "../src/config.h"
 #include "../src/diag.h"
 #include <errno.h>
 #include <stdlib.h>

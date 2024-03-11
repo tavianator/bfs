@@ -26,11 +26,13 @@
  */
 
 #include "opt.h"
+#include "bftw.h"
 #include "bit.h"
 #include "color.h"
 #include "config.h"
 #include "ctx.h"
 #include "diag.h"
+#include "dir.h"
 #include "eval.h"
 #include "exec.h"
 #include "expr.h"
@@ -40,7 +42,6 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 
 static char *fake_and_arg = "-and";

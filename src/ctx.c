@@ -6,6 +6,7 @@
 #include "color.h"
 #include "diag.h"
 #include "expr.h"
+#include "list.h"
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"

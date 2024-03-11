@@ -3,10 +3,10 @@
 
 #include "tests.h"
 #include "../src/bit.h"
+#include "../src/config.h"
 #include "../src/diag.h"
 #include <limits.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 bfs_static_assert(UMAX_WIDTH(0x1) == 1);
 bfs_static_assert(UMAX_WIDTH(0x3) == 2);

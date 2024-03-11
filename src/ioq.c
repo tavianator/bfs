@@ -126,13 +126,14 @@
 #include "config.h"
 #include "diag.h"
 #include "dir.h"
-#include "sanity.h"
 #include "stat.h"
 #include "thread.h"
-#include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #if BFS_USE_LIBURING
 #  include <liburing.h>

@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 /** Initialize a bftw_stat cache. */
 static void bftw_stat_init(struct bftw_stat *bufs, struct bfs_stat *stat_buf, struct bfs_stat *lstat_buf) {

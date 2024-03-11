@@ -2,18 +2,19 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "bfstd.h"
-#include "bit.h"
 #include "config.h"
 #include "diag.h"
 #include "sanity.h"
 #include "thread.h"
 #include "xregex.h"
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
+#include <limits.h>
 #include <locale.h>
 #include <nl_types.h>
+#include <pthread.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +25,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <wchar.h>
-#include <wctype.h>
 
 #if BFS_USE_SYS_SYSMACROS_H
 #  include <sys/sysmacros.h>

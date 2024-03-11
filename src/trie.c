@@ -87,9 +87,7 @@
 #include "config.h"
 #include "diag.h"
 #include "list.h"
-#include <limits.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 bfs_static_assert(CHAR_WIDTH == 8);

@@ -6,11 +6,8 @@
  */
 
 #include "tests.h"
-#include "../src/bfstd.h"
 #include "../src/color.h"
 #include "../src/config.h"
-#include "../src/diag.h"
-#include <errno.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>

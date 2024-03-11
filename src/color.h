@@ -10,7 +10,6 @@
 
 #include "config.h"
 #include "dstring.h"
-#include <stdarg.h>
 #include <stdio.h>
 
 /**

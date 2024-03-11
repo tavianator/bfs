@@ -12,7 +12,6 @@
 #include "config.h"
 #include "eval.h"
 #include "stat.h"
-#include <stddef.h>
 #include <sys/types.h>
 #include <time.h>
 

@@ -48,6 +48,7 @@
 #include "bfstd.h"
 #include "config.h"
 #include "ctx.h"
+#include "diag.h"
 #include "eval.h"
 #include "parse.h"
 #include <errno.h>

@@ -8,8 +8,6 @@
 #ifndef BFS_DIR_H
 #define BFS_DIR_H
 
-#include "alloc.h"
-#include "config.h"
 #include <sys/types.h>
 
 /**
@@ -77,6 +75,8 @@ struct bfs_dirent {
  *         An allocated, unopen directory, or NULL on failure.
  */
 struct bfs_dir *bfs_allocdir(void);
+
+struct arena;
 
 /**
  * Initialize an arena for directories.

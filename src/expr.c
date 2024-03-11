@@ -4,12 +4,12 @@
 #include "expr.h"
 #include "alloc.h"
 #include "ctx.h"
+#include "diag.h"
 #include "eval.h"
 #include "exec.h"
+#include "list.h"
 #include "printf.h"
 #include "xregex.h"
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t argc, char **argv) {
