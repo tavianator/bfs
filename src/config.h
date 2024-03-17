@@ -203,9 +203,7 @@ typedef long double max_align_t;
 /**
  * Silence warnings about unused declarations.
  */
-#if __has_c_attribute(maybe_unused)
-#  define attr_maybe_unused [[maybe_unused]]
-#elif __has_attribute(unused)
+#if __has_attribute(unused)
 #  define attr_maybe_unused __attribute__((unused))
 #else
 #  define attr_maybe_unused
@@ -214,9 +212,7 @@ typedef long double max_align_t;
 /**
  * Warn if a value is unused.
  */
-#if __has_c_attribute(nodiscard)
-#  define attr_nodiscard [[nodiscard]]
-#elif __has_attribute(warn_unused_result)
+#if __has_attribute(warn_unused_result)
 #  define attr_nodiscard __attribute__((warn_unused_result))
 #else
 #  define attr_nodiscard
