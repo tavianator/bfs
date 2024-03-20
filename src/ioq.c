@@ -1064,7 +1064,7 @@ void ioq_free(struct ioq *ioq, struct ioq_ent *ent) {
 	--ioq->size;
 
 #if BFS_USE_LIBURING && BFS_USE_STATX
-	if (ent->op == IOQ_STAT) {
+	if (ent->op == IOQ_STAT && ent->stat.xbuf) {
 		arena_free(&ioq->xbufs, ent->stat.xbuf);
 	}
 #endif
@@ -1083,7 +1083,9 @@ void ioq_destroy(struct ioq *ioq) {
 		return;
 	}
 
-	ioq_cancel(ioq);
+	if (ioq->nthreads > 0) {
+		ioq_cancel(ioq);
+	}
 
 	for (size_t i = 0; i < ioq->nthreads; ++i) {
 		ioq_thread_join(&ioq->threads[i]);
