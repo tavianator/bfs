@@ -1181,6 +1181,7 @@ static struct bfs_expr *annotate_visit(struct bfs_opt *opt, struct bfs_expr *exp
 		eval_fprint0,
 		eval_fprintf,
 		eval_fprintx,
+		eval_limit,
 		eval_prune,
 		eval_true,
 		// Non-returning

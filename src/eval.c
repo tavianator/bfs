@@ -841,6 +841,19 @@ error:
 }
 
 /**
+ * -limit action.
+ */
+bool eval_limit(const struct bfs_expr *expr, struct bfs_eval *state) {
+	long long evals = expr->evaluations + 1;
+	if (evals >= expr->num) {
+		state->action = BFTW_STOP;
+		state->quit = true;
+	}
+
+	return true;
+}
+
+/**
  * -prune action.
  */
 bool eval_prune(const struct bfs_expr *expr, struct bfs_eval *state) {

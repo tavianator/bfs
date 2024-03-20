@@ -133,6 +133,7 @@ complete -c bfs -o fls -d "Like -ls, but write to specified file" -F
 complete -c bfs -o fprint -d "Like -print, but write to specified file" -F
 complete -c bfs -o fprint0 -d "Like -print0, but write to specified file" -F
 complete -c bfs -o fprintf -d "Like -printf, but write to specified file" -F
+complete -c bfs -o limit -d "Limit the number of results" -x
 complete -c bfs -o ls -d "List files like ls -dils"
 complete -c bfs -o print -d "Print the path to the found file"
 complete -c bfs -o print0 -d "Like -print, but use the null character as a separator rather than newlines"

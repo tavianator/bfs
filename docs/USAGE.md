@@ -130,6 +130,40 @@ Unlike `-prune`, `-exclude` even works in combination with `-depth`/`-delete`.
 
 ---
 
+### `-limit`
+
+The `-limit N` action makes `bfs` quit once it gets evaluated `N` times.
+Placing it after an action like `-print` limits the number of results that get printed, for example:
+
+```console
+$ bfs -s -type f -name '*.txt'
+./1.txt
+./2.txt
+./3.txt
+./4.txt
+$ bfs -s -type f -name '*.txt' -print -limit 2
+./1.txt
+./2.txt
+```
+
+This is similar to
+
+```console
+$ bfs -s -type f -name '*.txt' | head -n2
+```
+
+but more powerful because you can apply separate limits to different expressions:
+
+```console
+$ bfs \( -name '*.txt' -print -limit 3 -o -name '*.log' -print -limit 4 \) -limit 5
+[At most 3 .txt files, at most 4 .log files, and at most 5 in total]
+```
+
+and more efficient because it will quit immediately.
+When piping to `head`, `bfs` will only quit *after* it tries to output too many results.
+
+---
+
 ### `-hidden`/`-nohidden`
 
 `-hidden` matches "hidden" files (dotfiles).

@@ -37,6 +37,7 @@ _bfs() {
         -ipath
         -iregex
         -iwholename
+        -limit
         -links
         -lname
         -maxdepth
@@ -94,8 +95,6 @@ _bfs() {
         -depth
         -follow
         -ignore_readdir_race
-        -maxdepth
-        -mindepth
         -mount
         -nocolor
         -noignore_readdir_race

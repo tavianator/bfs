@@ -88,6 +88,7 @@ bool eval_fprint(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_fprint0(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_fprintf(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_fprintx(const struct bfs_expr *expr, struct bfs_eval *state);
+bool eval_limit(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_prune(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_quit(const struct bfs_expr *expr, struct bfs_eval *state);
 

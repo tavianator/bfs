@@ -133,6 +133,7 @@ args=(
     '*-fprint0[print the path to the found file using null character as separator, but write to FILE instead of standard output]:output file:_files'
     '*-fprintf[print according to format string, but write to FILE instead of standard output]:output file:_files:output format'
 
+    '*-limit[quit after N results]:maximum result count'
     '*-ls[list files like ls -dils]'
     '*-print[print the path to the found file]'
     '*-print0[print the path to the found file using null character as separator]'

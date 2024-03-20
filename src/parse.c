@@ -97,6 +97,8 @@ struct bfs_parser {
 	char **last_arg;
 	/** A "-depth"-type argument, if any. */
 	char **depth_arg;
+	/** A "-limit" argument, if any. */
+	char **limit_arg;
 	/** A "-prune" argument, if any. */
 	char **prune_arg;
 	/** A "-mount" argument, if any. */
@@ -733,7 +735,7 @@ static struct bfs_expr *parse_action(struct bfs_parser *parser, bfs_eval_fn *eva
 		return NULL;
 	}
 
-	if (eval_fn != eval_prune && eval_fn != eval_quit) {
+	if (eval_fn != eval_limit && eval_fn != eval_prune && eval_fn != eval_quit) {
 		parser->implicit_print = false;
 	}
 
@@ -1566,6 +1568,29 @@ static struct bfs_expr *parse_jobs(struct bfs_parser *parser, int arg1, int arg2
 	}
 
 	parser->ctx->threads = n;
+	return expr;
+}
+
+/**
+ * Parse -limit N.
+ */
+static struct bfs_expr *parse_limit(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_unary_action(parser, eval_limit);
+	if (!expr) {
+		return NULL;
+	}
+
+	char **arg = &expr->argv[1];
+	if (!parse_int(parser, arg, *arg, &expr->num, IF_LONG_LONG)) {
+		return NULL;
+	}
+
+	if (expr->num <= 0) {
+		parse_expr_error(parser, expr, "The ${blu}%s${rs} must be at least ${bld}1${rs}.\n", expr->argv[0]);
+		return NULL;
+	}
+
+	parser->limit_arg = expr->argv;
 	return expr;
 }
 
@@ -2845,6 +2870,8 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "  ${blu}-fprintf${rs} ${bld}FILE${rs} ${bld}FORMAT${rs}\n");
 	cfprintf(cout, "      Like ${blu}-ls${rs}/${blu}-print${rs}/${blu}-print0${rs}/${blu}-printf${rs}, but write to ${bld}FILE${rs} instead of standard\n"
 	               "      output\n");
+	cfprintf(cout, "  ${blu}-limit${rs} ${bld}N${rs}\n");
+	cfprintf(cout, "      Quit after this action is evaluated ${bld}N${rs} times\n");
 	cfprintf(cout, "  ${blu}-ls${rs}\n");
 	cfprintf(cout, "      List files like ${ex}ls${rs} ${bld}-dils${rs}\n");
 	cfprintf(cout, "  ${blu}-print${rs}\n");
@@ -2968,6 +2995,7 @@ static const struct table_entry parse_table[] = {
 	{"-iregex", T_TEST, parse_regex, BFS_REGEX_ICASE},
 	{"-iwholename", T_TEST, parse_path, true},
 	{"-j", T_FLAG, parse_jobs, 0, 0, true},
+	{"-limit", T_ACTION, parse_limit},
 	{"-links", T_TEST, parse_links},
 	{"-lname", T_TEST, parse_lname, false},
 	{"-ls", T_ACTION, parse_ls},
@@ -3330,6 +3358,14 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 	}
 
 	if (parser->implicit_print) {
+		char **limit = parser->limit_arg;
+		if (limit) {
+			parse_argv_error(parser, parser->limit_arg, 2,
+				"With ${blu}%s${rs}, you must specify an action explicitly; for example, ${blu}-print${rs} ${blu}%s${rs} ${bld}%s${rs}.\n",
+				limit[0], limit[0], limit[1]);
+			return NULL;
+		}
+
 		struct bfs_expr *print = parse_new_expr(parser, eval_fprint, 1, &fake_print_arg);
 		if (!print) {
 			return NULL;
