@@ -69,5 +69,8 @@ bool check_bfstd(void) {
 		ret &= check_wordesc("\xF0\x9F\x98\x80", "\xF0\x9F\x98\x80", WESC_SHELL | WESC_TTY);
 	}
 
+	ret &= bfs_check(xstrwidth("Hello world") == 11);
+	ret &= bfs_check(xstrwidth("Hello\1world") == 10);
+
 	return ret;
 }

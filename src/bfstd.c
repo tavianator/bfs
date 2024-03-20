@@ -695,8 +695,12 @@ size_t xstrwidth(const char *str) {
 		if (wc == WEOF) {
 			// Assume a single-width '?'
 			++ret;
-		} else {
-			ret += xwcwidth(wc);
+			continue;
+		}
+
+		int width = xwcwidth(wc);
+		if (width > 0) {
+			ret += width;
 		}
 	}
 
