@@ -728,8 +728,17 @@ size_t xstrwidth(const char *str) {
 	size_t len = strlen(str);
 	size_t ret = 0;
 
+	size_t asclen = asciinlen(str, len);
+	size_t i;
+	for (i = 0; i < asclen; ++i) {
+		// Assume all ASCII printables have width 1
+		if (xisprint(str[i])) {
+			++ret;
+		}
+	}
+
 	mbstate_t mb = {0};
-	for (size_t i = 0; i < len;) {
+	while (i < len) {
 		wint_t wc = xmbrtowc(str, &i, len, &mb);
 		if (wc == WEOF) {
 			// Assume a single-width '?'
