@@ -178,6 +178,21 @@ int ynprompt(void);
 // #include <string.h>
 
 /**
+ * Get the length of the pure-ASCII prefix of a string.
+ */
+size_t asciilen(const char *str);
+
+/**
+ * Get the length of the pure-ASCII prefix of a string.
+ *
+ * @param str
+ *         The string to check.
+ * @param n
+ *         The maximum prefix length.
+ */
+size_t asciinlen(const char *str, size_t n);
+
+/**
  * Allocate a copy of a region of memory.
  *
  * @param src

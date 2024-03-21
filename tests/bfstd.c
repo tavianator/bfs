@@ -40,6 +40,21 @@ static bool check_wordesc(const char *str, const char *exp, enum wesc_flags flag
 bool check_bfstd(void) {
 	bool ret = true;
 
+	ret &= bfs_check(asciilen("") == 0);
+	ret &= bfs_check(asciilen("@") == 1);
+	ret &= bfs_check(asciilen("@@") == 2);
+	ret &= bfs_check(asciilen("\xFF@") == 0);
+	ret &= bfs_check(asciilen("@\xFF") == 1);
+	ret &= bfs_check(asciilen("@@@@@@@@") == 8);
+	ret &= bfs_check(asciilen("@@@@@@@@@@@@@@@@") == 16);
+	ret &= bfs_check(asciilen("@@@@@@@@@@@@@@@@@@@@@@@@") == 24);
+	ret &= bfs_check(asciilen("@@@@@@@@@@@@@@a\xFF@@@@@@@") == 15);
+	ret &= bfs_check(asciilen("@@@@@@@@@@@@@@@@\xFF@@@@@@@") == 16);
+	ret &= bfs_check(asciilen("@@@@@@@@@@@@@@@@a\xFF@@@@@@") == 17);
+	ret &= bfs_check(asciilen("@@@@@@@\xFF@@@@@@a\xFF@@@@@@@") == 7);
+	ret &= bfs_check(asciilen("@@@@@@@@\xFF@@@@@a\xFF@@@@@@@") == 8);
+	ret &= bfs_check(asciilen("@@@@@@@@@\xFF@@@@a\xFF@@@@@@@") == 9);
+
 	// From man 3p basename
 	ret &= check_base_dir("usr", ".", "usr");
 	ret &= check_base_dir("usr/", ".", "usr");

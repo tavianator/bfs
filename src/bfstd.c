@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "bfstd.h"
+#include "bit.h"
 #include "config.h"
 #include "diag.h"
 #include "sanity.h"
@@ -670,6 +671,44 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 #endif
 }
 
+size_t asciilen(const char *str) {
+	return asciinlen(str, strlen(str));
+}
+
+size_t asciinlen(const char *str, size_t n) {
+	size_t i = 0;
+
+#if SIZE_WIDTH % 8 == 0
+	// Word-at-a-time isascii()
+	for (size_t word; i + sizeof(word) <= n; i += sizeof(word)) {
+		memcpy(&word, str + i, sizeof(word));
+
+		const size_t mask = (SIZE_MAX / 0xFF) << 7; // 0x808080...
+		word &= mask;
+		if (!word) {
+			continue;
+		}
+
+#if ENDIAN_NATIVE == ENDIAN_BIG
+		word = bswap(word);
+#elif ENDIAN_NATIVE != ENDIAN_LITTLE
+		break;
+#endif
+
+		size_t first = trailing_zeros(word) / 8;
+		return i + first;
+	}
+#endif
+
+	for (; i < n; ++i) {
+		if (!xisascii(str[i])) {
+			break;
+		}
+	}
+
+	return i;
+}
+
 wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb) {
 	wchar_t wc;
 	size_t mblen = mbrtowc(&wc, str + *i, len - *i, mb);
@@ -765,36 +804,15 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 	invoke_once(&once, char_cache_init);
 
 	// Fast path: avoid multibyte checks
-	size_t i, word;
-	for (i = 0; i + sizeof(word) <= len;) {
-		// Word-at-a-time isascii()
-		memcpy(&word, str + i, sizeof(word));
-		// 0xFFFF... / 0xFF == 0x10101...
-		size_t mask = (SIZE_MAX / 0xFF) << 7;
-		if (word & mask) {
-			goto multibyte;
-		}
-
-		for (size_t j = 0; j < sizeof(word); ++i, ++j) {
-			if (!wesc_isprint(str[i], flags)) {
-				return i;
-			}
-		}
-	}
-
-	for (; i < len; ++i) {
-		char c = str[i];
-		if (!xisascii(c)) {
-			goto multibyte;
-		}
-		if (!wesc_isprint(c, flags)) {
+	size_t asclen = asciinlen(str, len);
+	size_t i;
+	for (i = 0; i < asclen; ++i) {
+		if (!wesc_isprint(str[i], flags)) {
 			return i;
 		}
 	}
 
-multibyte:;
 	mbstate_t mb = {0};
-
 	for (size_t j = i; i < len; i = j) {
 		wint_t wc = xmbrtowc(str, &j, len, &mb);
 		if (wc == WEOF) {
