@@ -7,6 +7,7 @@
 #include "../src/diag.h"
 #include <limits.h>
 #include <stdint.h>
+#include <string.h>
 
 bfs_static_assert(UMAX_WIDTH(0x1) == 1);
 bfs_static_assert(UMAX_WIDTH(0x3) == 2);
@@ -57,6 +58,18 @@ bfs_static_assert(INTMAX_MAX == IWIDTH_MAX(INTMAX_WIDTH));
 
 bool check_bit(void) {
 	bool ret = true;
+
+	const char *str = "\x1\x2\x3\x4";
+	uint32_t word;
+	memcpy(&word, str, sizeof(word));
+
+#if ENDIAN_NATIVE == ENDIAN_LITTLE
+	ret &= check_eq(word, 0x04030201);
+#elif ENDIAN_NATIVE == ENDIAN_BIG
+	ret &= check_eq(word, 0x01020304);
+#else
+#  warning "Skipping byte order tests on mixed/unknown-endian machine"
+#endif
 
 	ret &= check_eq(bswap((uint8_t)0x12), 0x12);
 	ret &= check_eq(bswap((uint16_t)0x1234), 0x3412);

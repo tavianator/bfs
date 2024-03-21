@@ -167,8 +167,8 @@
 
 #ifdef __STDC_ENDIAN_NATIVE__
 #  define ENDIAN_NATIVE __STDC_ENDIAN_NATIVE__
-#elif defined(__ORDER_NATIVE_ENDIAN__)
-#  define ENDIAN_NATIVE __ORDER_NATIVE_ENDIAN__
+#elif defined(__BYTE_ORDER__)
+#  define ENDIAN_NATIVE __BYTE_ORDER__
 #else
 #  define ENDIAN_NATIVE 0
 #endif
