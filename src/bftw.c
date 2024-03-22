@@ -558,9 +558,7 @@ struct bftw_cache {
 	/** bfs_dir arena. */
 	struct arena dirs;
 	/** Remaining bfs_dir capacity. */
-	size_t dir_limit;
-	/** Excess force-allocated bfs_dirs. */
-	size_t dir_excess;
+	int dir_limit;
 
 	/** bfs_stat arena. */
 	struct arena stat_bufs;
@@ -576,47 +574,32 @@ static void bftw_cache_init(struct bftw_cache *cache, size_t capacity) {
 
 	bfs_dir_arena(&cache->dirs);
 
-	cache->dir_limit = capacity - 1;
-	if (cache->dir_limit > 1024) {
+	if (cache->capacity > 1024) {
 		cache->dir_limit = 1024;
+	} else {
+		cache->dir_limit = capacity - 1;
 	}
-
-	cache->dir_excess = 0;
 
 	ARENA_INIT(&cache->stat_bufs, struct bfs_stat);
 }
 
 /** Allocate a directory. */
 static struct bfs_dir *bftw_allocdir(struct bftw_cache *cache, bool force) {
-	size_t limit = cache->dir_limit;
-	size_t excess = cache->dir_excess;
-
-	if (cache->dir_limit > 0) {
-		--cache->dir_limit;
-	} else if (force) {
-		++cache->dir_excess;
-	} else {
+	if (!force && cache->dir_limit <= 0) {
 		errno = ENOMEM;
 		return NULL;
 	}
 
 	struct bfs_dir *dir = arena_alloc(&cache->dirs);
-	if (!dir) {
-		cache->dir_limit = limit;
-		cache->dir_excess = excess;
+	if (dir) {
+		--cache->dir_limit;
 	}
-
 	return dir;
 }
 
 /** Free a directory. */
 static void bftw_freedir(struct bftw_cache *cache, struct bfs_dir *dir) {
-	if (cache->dir_excess > 0) {
-		--cache->dir_excess;
-	} else {
-		++cache->dir_limit;
-	}
-
+	++cache->dir_limit;
 	arena_free(&cache->dirs, dir);
 }
 
