@@ -192,9 +192,7 @@ typedef long double max_align_t;
 /**
  * Silence warnings about switch/case fall-throughs.
  */
-#if __has_c_attribute(fallthrough)
-#  define fallthru [[fallthrough]]
-#elif __has_attribute(fallthrough)
+#if __has_attribute(fallthrough)
 #  define fallthru __attribute__((fallthrough))
 #else
 #  define fallthru ((void)0)
@@ -309,7 +307,7 @@ typedef long double max_align_t;
  *     attr_d
  */
 #define attr(...) \
-	attr__(attr_##__VA_ARGS__, none, none, none, none, none, none, none, none, none)
+	attr__(attr_##__VA_ARGS__, none, none, none, none, none, none, none, none, none, )
 
 /**
  * attr() helper.  For exposition, pretend we support only 2 args, instead of 9.

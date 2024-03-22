@@ -724,7 +724,7 @@ struct visitor {
 	visit_fn *leave;
 
 	/** A visitor lookup table. */
-	struct visitor_table table[];
+	const struct visitor_table *table;
 };
 
 /** Recursive visitor implementation. */
@@ -1331,7 +1331,7 @@ static struct bfs_expr *annotate_visit(struct bfs_opt *opt, struct bfs_expr *exp
 static const struct visitor annotate = {
 	.name = "annotate",
 	.visit = annotate_visit,
-	.table = {
+	.table = (const struct visitor_table[]) {
 		{eval_access, annotate_access},
 		{eval_empty, annotate_empty},
 		{eval_exec, annotate_exec},
@@ -1516,7 +1516,7 @@ static struct bfs_expr *canonicalize_assoc(struct bfs_opt *opt, struct bfs_expr 
  */
 static const struct visitor canonicalize = {
 	.name = "canonicalize",
-	.table = {
+	.table = (const struct visitor_table[]) {
 		{eval_not, canonicalize_not},
 		{eval_and, canonicalize_assoc},
 		{eval_or, canonicalize_assoc},
@@ -1609,7 +1609,7 @@ static struct bfs_expr *reorder_andor(struct bfs_opt *opt, struct bfs_expr *expr
  */
 static const struct visitor reorder = {
 	.name = "reorder",
-	.table = {
+	.table = (const struct visitor_table[]) {
 		{eval_and, reorder_andor},
 		{eval_or, reorder_andor},
 		{NULL, NULL},
@@ -1887,7 +1887,7 @@ static const struct visitor data_flow = {
 	.enter = data_flow_enter,
 	.visit = data_flow_visit,
 	.leave = data_flow_leave,
-	.table = {
+	.table = (const struct visitor_table[]) {
 		{eval_access, data_flow_access},
 		{eval_gid, data_flow_gid},
 		{eval_inum, data_flow_inum},
@@ -2103,7 +2103,7 @@ static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *exp
  */
 static const struct visitor simplify = {
 	.name = "simplify",
-	.table = {
+	.table = (const struct visitor_table[]) {
 		{eval_not, simplify_not},
 		{eval_and, simplify_and},
 		{eval_or, simplify_or},
