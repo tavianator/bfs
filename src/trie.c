@@ -206,9 +206,10 @@ static struct trie_leaf *trie_representative(const struct trie *trie, const void
 		if ((offset >> 1) < length) {
 			unsigned char nibble = trie_key_nibble(key, offset);
 			unsigned int bit = 1U << nibble;
-			if (node->bitmap & bit) {
-				index = count_ones(node->bitmap & (bit - 1));
-			}
+			// bits = bitmap & bit ? bitmap & (bit - 1) : 0
+			unsigned int mask = -!!(node->bitmap & bit);
+			unsigned int bits = node->bitmap & (bit - 1) & mask;
+			index = count_ones(bits);
 		}
 		ptr = node->children[index];
 	}
