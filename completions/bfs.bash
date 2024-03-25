@@ -18,6 +18,7 @@ _bfs() {
         -fstype
         -gid
         -group
+        -j
         -ok
         -okdir
         -regextype

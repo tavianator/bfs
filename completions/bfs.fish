@@ -20,6 +20,7 @@ complete -c bfs -o f -d "Treat specified path as a path to search" -a "(__fish_c
 complete -c bfs -o D -d "Turn on a debugging flag" -a $debug_flag_comp -x
 complete -c bfs -s O -d "Enable specified optimization level" -a $optimization_comp -x
 complete -c bfs -o S -d "Choose the search strategy" -a $strategy_comp -x
+complete -c bfs -s j -d "Use this many threads" -x
 
 # Operators
 
