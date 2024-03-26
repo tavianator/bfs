@@ -75,6 +75,7 @@ bool check_bfstd(void) {
 	ret &= check_wordesc("\"word's\"", "'\"word'\\''s\"'", WESC_SHELL);
 	ret &= check_wordesc("\033[1mbold's\033[0m", "$'\\e[1mbold\\'s\\e[0m'", WESC_SHELL | WESC_TTY);
 	ret &= check_wordesc("\x7F", "$'\\x7F'", WESC_SHELL | WESC_TTY);
+	ret &= check_wordesc("~user", "\"~user\"", WESC_SHELL);
 
 	const char *charmap = nl_langinfo(CODESET);
 	if (strcmp(charmap, "UTF-8") == 0) {
@@ -82,6 +83,7 @@ bool check_bfstd(void) {
 		ret &= check_wordesc("\xF0\x9F", "$'\\xF0\\x9F'", WESC_SHELL | WESC_TTY);
 		ret &= check_wordesc("\xF0\x9F\x98", "$'\\xF0\\x9F\\x98'", WESC_SHELL | WESC_TTY);
 		ret &= check_wordesc("\xF0\x9F\x98\x80", "\xF0\x9F\x98\x80", WESC_SHELL | WESC_TTY);
+		ret &= check_wordesc("\xCB\x9Cuser", "\xCB\x9Cuser", WESC_SHELL);
 	}
 
 	ret &= bfs_check(xstrwidth("Hello world") == 11);

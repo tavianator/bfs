@@ -908,7 +908,7 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len, en
 /** How much of this string is safe as a bare word? */
 static size_t bare_len(const char *str, size_t len) {
 	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
-	size_t ret = strcspn(str, "|&;<>()$`\\\"' *?[#˜=%!{}");
+	size_t ret = strcspn(str, "|&;<>()$`\\\"' *?[#~=%!{}");
 	return ret < len ? ret : len;
 }
 
