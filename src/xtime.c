@@ -69,73 +69,77 @@ static int month_length(int year, int month) {
 }
 
 int xtimegm(struct tm *tm, time_t *timep) {
-	tm->tm_isdst = 0;
+	struct tm copy = *tm;
+	copy.tm_isdst = 0;
 
-	if (wrap(&tm->tm_sec, 60, &tm->tm_min) != 0) {
+	if (wrap(&copy.tm_sec, 60, &copy.tm_min) != 0) {
 		goto overflow;
 	}
-	if (wrap(&tm->tm_min, 60, &tm->tm_hour) != 0) {
+	if (wrap(&copy.tm_min, 60, &copy.tm_hour) != 0) {
 		goto overflow;
 	}
-	if (wrap(&tm->tm_hour, 24, &tm->tm_mday) != 0) {
+	if (wrap(&copy.tm_hour, 24, &copy.tm_mday) != 0) {
 		goto overflow;
 	}
 
 	// In order to wrap the days of the month, we first need to know what
 	// month it is
-	if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+	if (wrap(&copy.tm_mon, 12, &copy.tm_year) != 0) {
 		goto overflow;
 	}
 
-	if (tm->tm_mday < 1) {
+	if (copy.tm_mday < 1) {
 		do {
-			--tm->tm_mon;
-			if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+			--copy.tm_mon;
+			if (wrap(&copy.tm_mon, 12, &copy.tm_year) != 0) {
 				goto overflow;
 			}
 
-			tm->tm_mday += month_length(tm->tm_year, tm->tm_mon);
-		} while (tm->tm_mday < 1);
+			copy.tm_mday += month_length(copy.tm_year, copy.tm_mon);
+		} while (copy.tm_mday < 1);
 	} else {
 		while (true) {
-			int days = month_length(tm->tm_year, tm->tm_mon);
-			if (tm->tm_mday <= days) {
+			int days = month_length(copy.tm_year, copy.tm_mon);
+			if (copy.tm_mday <= days) {
 				break;
 			}
 
-			tm->tm_mday -= days;
-			++tm->tm_mon;
-			if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+			copy.tm_mday -= days;
+			++copy.tm_mon;
+			if (wrap(&copy.tm_mon, 12, &copy.tm_year) != 0) {
 				goto overflow;
 			}
 		}
 	}
 
-	tm->tm_yday = 0;
-	for (int i = 0; i < tm->tm_mon; ++i) {
-		tm->tm_yday += month_length(tm->tm_year, i);
+	copy.tm_yday = 0;
+	for (int i = 0; i < copy.tm_mon; ++i) {
+		copy.tm_yday += month_length(copy.tm_year, i);
 	}
-	tm->tm_yday += tm->tm_mday - 1;
+	copy.tm_yday += copy.tm_mday - 1;
 
 	int leap_days;
 	// Compute floor((year - 69)/4) - floor((year - 1)/100) + floor((year + 299)/400) without overflows
-	if (tm->tm_year >= 0) {
-		leap_days = floor_div(tm->tm_year - 69, 4) - floor_div(tm->tm_year - 1, 100) + floor_div(tm->tm_year - 101, 400) + 1;
+	if (copy.tm_year >= 0) {
+		leap_days = floor_div(copy.tm_year - 69, 4) - floor_div(copy.tm_year - 1, 100) + floor_div(copy.tm_year - 101, 400) + 1;
 	} else {
-		leap_days = floor_div(tm->tm_year + 3, 4) - floor_div(tm->tm_year + 99, 100) + floor_div(tm->tm_year + 299, 400) - 17;
+		leap_days = floor_div(copy.tm_year + 3, 4) - floor_div(copy.tm_year + 99, 100) + floor_div(copy.tm_year + 299, 400) - 17;
 	}
 
-	long long epoch_days = 365LL * (tm->tm_year - 70) + leap_days + tm->tm_yday;
-	tm->tm_wday = (epoch_days + 4) % 7;
-	if (tm->tm_wday < 0) {
-		tm->tm_wday += 7;
+	long long epoch_days = 365LL * (copy.tm_year - 70) + leap_days + copy.tm_yday;
+	copy.tm_wday = (epoch_days + 4) % 7;
+	if (copy.tm_wday < 0) {
+		copy.tm_wday += 7;
 	}
 
-	long long epoch_time = tm->tm_sec + 60 * (tm->tm_min + 60 * (tm->tm_hour + 24 * epoch_days));
-	*timep = (time_t)epoch_time;
-	if ((long long)*timep != epoch_time) {
+	long long epoch_time = copy.tm_sec + 60 * (copy.tm_min + 60 * (copy.tm_hour + 24 * epoch_days));
+	time_t time = (time_t)epoch_time;
+	if ((long long)time != epoch_time) {
 		goto overflow;
 	}
+
+	*tm = copy;
+	*timep = time;
 	return 0;
 
 overflow:

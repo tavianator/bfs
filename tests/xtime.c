@@ -137,6 +137,24 @@ static bool check_one_xtimegm(const struct tm *tm) {
 	return ret;
 }
 
+/** Check an overflowing xtimegm() call. */
+static bool check_xtimegm_overflow(const struct tm *tm) {
+	struct tm copy = *tm;
+	time_t time = 123;
+
+	bool ret = true;
+	ret &= bfs_check(xtimegm(&copy, &time) == -1 && errno == EOVERFLOW);
+	ret &= bfs_check(tm_equal(&copy, tm));
+	ret &= bfs_check(time == 123);
+
+	if (!ret) {
+		bfs_diag("xtimegm(): " TM_FORMAT, TM_PRINTF(copy));
+		bfs_diag("(input):   " TM_FORMAT, TM_PRINTF(*tm));
+	}
+
+	return ret;
+}
+
 /** xtimegm() tests. */
 static bool check_xtimegm(void) {
 	bool ret = true;
@@ -144,7 +162,6 @@ static bool check_xtimegm(void) {
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
-	time_t time;
 
 	// Check equivalence with mktime()
 	for (tm.tm_year =  10; tm.tm_year <= 200; tm.tm_year += 10)
@@ -157,17 +174,10 @@ static bool check_xtimegm(void) {
 	}
 
 	// Check integer overflow cases
-	tm = (struct tm){ .tm_sec = INT_MAX, .tm_min = INT_MAX };
-	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
-
-	tm = (struct tm){ .tm_min = INT_MAX, .tm_hour = INT_MAX };
-	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
-
-	tm = (struct tm){ .tm_hour = INT_MAX, .tm_mday = INT_MAX };
-	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
-
-	tm = (struct tm){ .tm_mon = INT_MAX, .tm_year = INT_MAX };
-	ret &= bfs_check(xtimegm(&tm, &time) == -1 && errno == EOVERFLOW);
+	check_xtimegm_overflow(&(struct tm) { .tm_sec = INT_MAX, .tm_min = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_min = INT_MAX, .tm_hour = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_hour = INT_MAX, .tm_mday = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_mon = INT_MAX, .tm_year = INT_MAX });
 
 	return ret;
 }
