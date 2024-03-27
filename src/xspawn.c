@@ -26,6 +26,7 @@
  * Types of spawn actions.
  */
 enum bfs_spawn_op {
+	BFS_SPAWN_OPEN,
 	BFS_SPAWN_CLOSE,
 	BFS_SPAWN_DUP2,
 	BFS_SPAWN_FCHDIR,
@@ -36,13 +37,31 @@ enum bfs_spawn_op {
  * A spawn action.
  */
 struct bfs_spawn_action {
+	/** The next action in the list. */
 	struct bfs_spawn_action *next;
 
+	/** This action's operation. */
 	enum bfs_spawn_op op;
+	/** The input fd (or -1). */
 	int in_fd;
+	/** The output fd (or -1). */
 	int out_fd;
-	int resource;
-	struct rlimit rlimit;
+
+	/** Operation-specific args. */
+	union {
+		/** BFS_SPAWN_OPEN args. */
+		struct {
+			const char *path;
+			int flags;
+			mode_t mode;
+		};
+
+		/** BFS_SPAWN_SETRLIMIT args. */
+		struct {
+			int resource;
+			struct rlimit rlimit;
+		};
+	};
 };
 
 int bfs_spawn_init(struct bfs_spawn *ctx) {
@@ -114,6 +133,30 @@ static struct bfs_spawn_action *bfs_spawn_action(enum bfs_spawn_op op) {
 	action->in_fd = -1;
 	action->out_fd = -1;
 	return action;
+}
+
+int bfs_spawn_addopen(struct bfs_spawn *ctx, int fd, const char *path, int flags, mode_t mode) {
+	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_OPEN);
+	if (!action) {
+		return -1;
+	}
+
+#if _POSIX_SPAWN > 0
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		errno = posix_spawn_file_actions_addopen(&ctx->actions, fd, path, flags, mode);
+		if (errno != 0) {
+			free(action);
+			return -1;
+		}
+	}
+#endif
+
+	action->out_fd = fd;
+	action->path = path;
+	action->flags = flags;
+	action->mode = mode;
+	SLIST_APPEND(ctx, action);
+	return 0;
 }
 
 int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
@@ -249,9 +292,11 @@ static noreturn void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx
 	xclose(pipefd[0]);
 
 	for_slist (const struct bfs_spawn_action, action, ctx) {
+		int fd;
+
 		// Move the error-reporting pipe out of the way if necessary...
 		if (action->out_fd == pipefd[1]) {
-			int fd = dup_cloexec(pipefd[1]);
+			fd = dup_cloexec(pipefd[1]);
 			if (fd < 0) {
 				goto fail;
 			}
@@ -266,6 +311,17 @@ static noreturn void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx
 		}
 
 		switch (action->op) {
+		case BFS_SPAWN_OPEN:
+			fd = open(action->path, action->flags, action->mode);
+			if (fd < 0) {
+				goto fail;
+			}
+			if (fd != action->out_fd) {
+				if (dup2(fd, action->out_fd) < 0) {
+					goto fail;
+				}
+			}
+			break;
 		case BFS_SPAWN_CLOSE:
 			if (close(action->out_fd) != 0) {
 				goto fail;
