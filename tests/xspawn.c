@@ -50,7 +50,7 @@ fail:
 }
 
 /** Check that we resolve executables in $PATH correctly. */
-static bool check_path_resolution(bool use_posix) {
+static bool check_use_path(bool use_posix) {
 	bool ret = true;
 
 	struct bfs_spawn spawn;
@@ -146,11 +146,38 @@ out:
 	return ret;
 }
 
+/** Check path resolution of non-existent executables. */
+static bool check_enoent(bool use_posix) {
+	bool ret = true;
+
+	struct bfs_spawn spawn;
+	ret &= bfs_pcheck(bfs_spawn_init(&spawn) == 0);
+	if (!ret) {
+		goto out;
+	}
+
+	spawn.flags |= BFS_SPAWN_USE_PATH;
+	if (!use_posix) {
+		spawn.flags &= ~BFS_SPAWN_USE_POSIX;
+	}
+
+	char *argv[] = {"eW6f5RM9Qi", NULL};
+	pid_t pid = bfs_spawn("eW6f5RM9Qi", &spawn, argv, NULL);
+	ret &= bfs_pcheck(pid < 0 && errno == ENOENT, "bfs_spawn()");
+
+	ret &= bfs_pcheck(bfs_spawn_destroy(&spawn) == 0);
+out:
+	return ret;
+}
+
 bool check_xspawn(void) {
 	bool ret = true;
 
-	ret &= check_path_resolution(true);
-	ret &= check_path_resolution(false);
+	ret &= check_use_path(true);
+	ret &= check_use_path(false);
+
+	ret &= check_enoent(true);
+	ret &= check_enoent(false);
 
 	return ret;
 }
