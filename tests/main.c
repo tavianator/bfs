@@ -6,8 +6,10 @@
  */
 
 #include "tests.h"
+#include "../src/bfstd.h"
 #include "../src/color.h"
 #include "../src/config.h"
+#include <errno.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +88,10 @@ static void run_test(struct test_ctx *ctx, const char *test, test_fn *fn) {
 			ctx->ret = EXIT_FAILURE;
 		}
 	}
+}
+
+const char *bfs_errstr(void) {
+	return xstrerror(errno);
 }
 
 int main(int argc, char *argv[]) {

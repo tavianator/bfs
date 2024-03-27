@@ -51,4 +51,20 @@ static inline bool bfs_check(bool ret) {
 			: "Check failed: `%s`%s", \
 		str, __VA_ARGS__), false))
 
+/** Get a string description of the last error. */
+const char *bfs_errstr(void);
+
+/**
+ * Check a condition, logging the current error string on failure.
+ */
+#define bfs_pcheck(...) \
+	bfs_pcheck_(#__VA_ARGS__, __VA_ARGS__, "", "")
+
+#define bfs_pcheck_(str, cond, format, ...) \
+	((cond) ? true : (bfs_diag( \
+		sizeof(format) > 1 \
+			? "%.0s" format "%s%s: %s" \
+			: "Check failed: `%s`%s: %s", \
+		str, __VA_ARGS__, bfs_errstr()), false))
+
 #endif // BFS_TESTS_H

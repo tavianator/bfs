@@ -29,9 +29,9 @@ static bool check_one_xgetdate(const char *str, int error, time_t expected) {
 	int ret = xgetdate(str, &ts);
 
 	if (error) {
-		return bfs_check(ret == -1 && errno == error, "xgetdate('%s'): %s", str, xstrerror(errno));
+		return bfs_pcheck(ret == -1 && errno == error, "xgetdate('%s')", str);
 	} else {
-		return bfs_check(ret == 0, "xgetdate('%s'): %s", str, xstrerror(errno))
+		return bfs_pcheck(ret == 0, "xgetdate('%s')", str)
 			&& bfs_check(ts.tv_sec == expected && ts.tv_nsec == 0,
 				"xgetdate('%s'): %jd.%09jd != %jd",
 				str, (intmax_t)ts.tv_sec, (intmax_t)ts.tv_nsec, (intmax_t)expected);
@@ -87,7 +87,7 @@ static bool check_one_xmktime(time_t expected) {
 	}
 
 	time_t actual;
-	return bfs_check(xmktime(&tm, &actual) == 0, "xmktime(" TM_FORMAT "): %s", TM_PRINTF(tm), xstrerror(errno))
+	return bfs_pcheck(xmktime(&tm, &actual) == 0, "xmktime(" TM_FORMAT ")", TM_PRINTF(tm))
 		&& bfs_check(actual == expected, "xmktime(" TM_FORMAT "): %jd != %jd", TM_PRINTF(tm), (intmax_t)actual, (intmax_t)expected);
 }
 
