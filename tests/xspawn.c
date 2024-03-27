@@ -72,8 +72,10 @@ static bool check_path_resolution(bool use_posix) {
 	}
 
 	ret &= bfs_pcheck(bfs_spawn_addopen(&spawn, 10, bin, O_RDONLY | O_DIRECTORY, 0) == 0);
-	ret &= bfs_pcheck(bfs_spawn_addfchdir(&spawn, 10) == 0);
+	ret &= bfs_pcheck(bfs_spawn_adddup2(&spawn, 10, 11) == 0);
 	ret &= bfs_pcheck(bfs_spawn_addclose(&spawn, 10) == 0);
+	ret &= bfs_pcheck(bfs_spawn_addfchdir(&spawn, 11) == 0);
+	ret &= bfs_pcheck(bfs_spawn_addclose(&spawn, 11) == 0);
 	if (!ret) {
 		goto bin;
 	}
