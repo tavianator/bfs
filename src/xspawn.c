@@ -274,11 +274,219 @@ fail:
 	return -1;
 }
 
+/**
+ * Context for resolving executables in the $PATH.
+ */
+struct bfs_resolver {
+	/** The executable to spawn. */
+	const char *exe;
+	/** The $PATH to resolve in. */
+	char *path;
+	/** A buffer to hold the resolved path. */
+	char *buf;
+	/** The size of the buffer. */
+	size_t len;
+	/** Whether the executable is already resolved. */
+	bool done;
+	/** Whether to free(path). */
+	bool free;
+};
+
+/** Free a $PATH resolution context. */
+static void bfs_resolve_free(struct bfs_resolver *res) {
+	if (res->free) {
+		free(res->path);
+	}
+	free(res->buf);
+}
+
+/** Get the next component in the $PATH. */
+static bool bfs_resolve_next(const char **path, const char **next, size_t *len) {
+	*path = *next;
+	if (!*path) {
+		return false;
+	}
+
+	*next = strchr(*path, ':');
+	if (*next) {
+		*len = *next - *path;
+		++*next;
+	} else {
+		*len = strlen(*path);
+	}
+
+	if (*len == 0) {
+		// POSIX 8.3: "A zero-length prefix is a legacy feature that
+		// indicates the current working directory."
+		*path = ".";
+		*len = 1;
+	}
+
+	return true;
+}
+
+/** Finish resolving an executable, potentially from the child process. */
+static int bfs_resolve_late(struct bfs_resolver *res) {
+	if (res->done) {
+		return 0;
+	}
+
+	char *buf = res->buf;
+	char *end = buf + res->len;
+
+	const char *path;
+	const char *next = res->path;
+	size_t len;
+	while (bfs_resolve_next(&path, &next, &len)) {
+		char *cur = xstpencpy(buf, end, path, len);
+		cur = xstpecpy(cur, end, "/");
+		cur = xstpecpy(cur, end, res->exe);
+		if (cur == end) {
+			bfs_bug("PATH resolution buffer too small");
+			errno = ENOMEM;
+			return -1;
+		}
+
+		if (xfaccessat(AT_FDCWD, buf, X_OK) == 0) {
+			res->exe = buf;
+			res->done = true;
+			return 0;
+		}
+
+		if (end) {
+			path = end + 1;
+		} else {
+			errno = ENOENT;
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/** Check if we can skip path resolution entirely. */
+static bool bfs_can_skip_resolve(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
+	if (ctx && !(ctx->flags & BFS_SPAWN_USE_PATH)) {
+		return true;
+	}
+
+	if (strchr(res->exe, '/')) {
+		return true;
+	}
+
+	return false;
+}
+
+/** Check if any $PATH components are relative. */
+static bool bfs_resolve_relative(const struct bfs_resolver *res) {
+	const char *path;
+	const char *next = res->path;
+	size_t len;
+	while (bfs_resolve_next(&path, &next, &len)) {
+		if (path[0] != '/') {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/** Check if we can resolve the executable before file actions. */
+static bool bfs_can_resolve_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
+	if (!bfs_resolve_relative(res)) {
+		return true;
+	}
+
+	if (ctx) {
+		for_slist (const struct bfs_spawn_action, action, ctx) {
+			if (action->op == BFS_SPAWN_FCHDIR) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+/** Get the required path resolution buffer size. */
+static size_t bfs_resolve_capacity(const struct bfs_resolver *res) {
+	size_t max = 0;
+
+	const char *path;
+	const char *next = res->path;
+	size_t len;
+	while (bfs_resolve_next(&path, &next, &len)) {
+		if (len > max) {
+			max = len;
+		}
+	}
+
+	// path + "/" + exe + '\0'
+	return max + 1 + strlen(res->exe) + 1;
+}
+
+/** Begin resolving an executable, from the parent process. */
+static int bfs_resolve_early(struct bfs_resolver *res, const char *exe, const struct bfs_spawn *ctx) {
+	*res = (struct bfs_resolver) {
+		.exe = exe,
+	};
+
+	if (bfs_can_skip_resolve(res, ctx)) {
+		res->done = true;
+		return 0;
+	}
+
+	res->path = getenv("PATH");
+	if (!res->path) {
+#if defined(_CS_PATH)
+		res->path = xconfstr(_CS_PATH);
+		res->free = true;
+#elif defined(_PATH_DEFPATH)
+		res->path = _PATH_DEFPATH;
+#else
+		errno = ENOENT;
+#endif
+	}
+	if (!res->path) {
+		goto fail;
+	}
+
+	bool can_finish = bfs_can_resolve_early(res, ctx);
+	bool use_posix = ctx && (ctx->flags & BFS_SPAWN_USE_POSIX);
+	if (!can_finish && use_posix) {
+		// posix_spawnp() will do the resolution, so don't bother
+		// allocating a buffer
+		return 0;
+	}
+
+	res->len = bfs_resolve_capacity(res);
+	res->buf = malloc(res->len);
+	if (!res->buf) {
+		goto fail;
+	}
+
+	if (can_finish && bfs_resolve_late(res) != 0) {
+		goto fail;
+	}
+
+	return 0;
+
+fail:
+	bfs_resolve_free(res);
+	return -1;
+}
+
 #if _POSIX_SPAWN > 0
 /** bfs_spawn() implementation using posix_spawn(). */
-static pid_t bfs_posix_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+static pid_t bfs_posix_spawn(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	pid_t ret;
-	errno = posix_spawn(&ret, exe, &ctx->actions, &ctx->attr, argv, envp);
+
+	if (res->done) {
+		errno = posix_spawn(&ret, res->exe, &ctx->actions, &ctx->attr, argv, envp);
+	} else {
+		errno = posix_spawnp(&ret, res->exe, &ctx->actions, &ctx->attr, argv, envp);
+	}
+
 	if (errno != 0) {
 		return -1;
 	}
@@ -288,7 +496,7 @@ static pid_t bfs_posix_spawn(const char *exe, const struct bfs_spawn *ctx, char 
 #endif
 
 /** Actually exec() the new process. */
-static noreturn void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
+static noreturn void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
 	xclose(pipefd[0]);
 
 	for_slist (const struct bfs_spawn_action, action, ctx) {
@@ -345,11 +553,14 @@ static noreturn void bfs_spawn_exec(const char *exe, const struct bfs_spawn *ctx
 		}
 	}
 
-	execve(exe, argv, envp);
+	if (bfs_resolve_late(res) != 0) {
+		goto fail;
+	}
 
-	int error;
-fail:
-	error = errno;
+	execve(res->exe, argv, envp);
+
+fail:;
+	int error = errno;
 
 	// In case of a write error, the parent will still see that we exited
 	// unsuccessfully, but won't know why
@@ -360,7 +571,7 @@ fail:
 }
 
 /** bfs_spawn() implementation using fork()/exec(). */
-static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	// Use a pipe to report errors from the child
 	int pipefd[2];
 	if (pipe_cloexec(pipefd) != 0) {
@@ -374,7 +585,7 @@ static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char *
 		return -1;
 	} else if (pid == 0) {
 		// Child
-		bfs_spawn_exec(exe, ctx, argv, envp, pipefd);
+		bfs_spawn_exec(res, ctx, argv, envp, pipefd);
 	}
 
 	// Parent
@@ -394,26 +605,23 @@ static pid_t bfs_fork_spawn(const char *exe, const struct bfs_spawn *ctx, char *
 }
 
 /** Call the right bfs_spawn() implementation. */
-static pid_t bfs_spawn_impl(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+static pid_t bfs_spawn_impl(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
 #if _POSIX_SPAWN > 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
-		return bfs_posix_spawn(exe, ctx, argv, envp);
+		return bfs_posix_spawn(res, ctx, argv, envp);
 	}
 #endif
 
-	return bfs_fork_spawn(exe, ctx, argv, envp);
+	return bfs_fork_spawn(res, ctx, argv, envp);
 }
 
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	// execvp()/posix_spawnp() are typically implemented with repeated
 	// execv() calls for each $PATH component until one succeeds.  It's
 	// faster to resolve the full path ahead of time.
-	char *resolved = NULL;
-	if (ctx->flags & BFS_SPAWN_USE_PATH) {
-		exe = resolved = bfs_spawn_resolve(exe);
-		if (!resolved) {
-			return -1;
-		}
+	struct bfs_resolver res;
+	if (bfs_resolve_early(&res, exe, ctx) != 0) {
+		return -1;
 	}
 
 	extern char **environ;
@@ -421,78 +629,29 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
 		envp = environ;
 	}
 
-	pid_t ret = bfs_spawn_impl(exe, ctx, argv, envp);
-	free(resolved);
+	pid_t ret = bfs_spawn_impl(&res, ctx, argv, envp);
+	bfs_resolve_free(&res);
 	return ret;
 }
 
 char *bfs_spawn_resolve(const char *exe) {
-	if (strchr(exe, '/')) {
-		return strdup(exe);
+	struct bfs_resolver res;
+	if (bfs_resolve_early(&res, exe, NULL) != 0) {
+		return NULL;
 	}
-
-	const char *path = getenv("PATH");
-
-	char *confpath = NULL;
-	if (!path) {
-#if defined(_CS_PATH)
-		path = confpath = xconfstr(_CS_PATH);
-#elif defined(_PATH_DEFPATH)
-		path = _PATH_DEFPATH;
-#else
-		errno = ENOENT;
-#endif
-	}
-	if (!path) {
+	if (bfs_resolve_late(&res) != 0) {
+		bfs_resolve_free(&res);
 		return NULL;
 	}
 
-	size_t cap = 0;
-	char *ret = NULL;
-	while (true) {
-		const char *end = strchr(path, ':');
-		size_t len = end ? (size_t)(end - path) : strlen(path);
-
-		// POSIX 8.3: "A zero-length prefix is a legacy feature that
-		// indicates the current working directory."
-		if (len == 0) {
-			path = ".";
-			len = 1;
-		}
-
-		size_t total = len + 1 + strlen(exe) + 1;
-		if (cap < total) {
-			char *grown = realloc(ret, total);
-			if (!grown) {
-				goto fail;
-			}
-			ret = grown;
-			cap = total;
-		}
-
-		memcpy(ret, path, len);
-		if (ret[len - 1] != '/') {
-			ret[len++] = '/';
-		}
-		strcpy(ret + len, exe);
-
-		if (xfaccessat(AT_FDCWD, ret, X_OK) == 0) {
-			break;
-		}
-
-		if (!end) {
-			errno = ENOENT;
-			goto fail;
-		}
-
-		path = end + 1;
+	char *ret;
+	if (res.exe == res.buf) {
+		ret = res.buf;
+		res.buf = NULL;
+	} else {
+		ret = strdup(res.exe);
 	}
 
-	free(confpath);
+	bfs_resolve_free(&res);
 	return ret;
-
-fail:
-	free(confpath);
-	free(ret);
-	return NULL;
 }
