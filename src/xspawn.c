@@ -202,6 +202,18 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
 	return 0;
 }
 
+/**
+ * https://www.austingroupbugs.net/view.php?id=1208#c4830 says:
+ *
+ *     ... a search of the directories passed as the environment variable
+ *     PATH ..., using the working directory of the child process after all
+ *     file_actions have been performed.
+ *
+ * but macOS resolves the PATH *before* file_actions (because there
+ * posix_spawn() is its own syscall).
+ */
+#define BFS_POSIX_SPAWNP_AFTER_FCHDIR !__APPLE__
+
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
 	if (!action) {
@@ -452,12 +464,15 @@ static int bfs_resolve_early(struct bfs_resolver *res, const char *exe, const st
 	}
 
 	bool can_finish = bfs_can_resolve_early(res, ctx);
+
+#if BFS_POSIX_SPAWNP_AFTER_FCHDIR
 	bool use_posix = ctx && (ctx->flags & BFS_SPAWN_USE_POSIX);
 	if (!can_finish && use_posix) {
 		// posix_spawnp() will do the resolution, so don't bother
 		// allocating a buffer
 		return 0;
 	}
+#endif
 
 	res->len = bfs_resolve_capacity(res);
 	res->buf = malloc(res->len);
@@ -477,6 +492,7 @@ fail:
 }
 
 #if _POSIX_SPAWN > 0
+
 /** bfs_spawn() implementation using posix_spawn(). */
 static pid_t bfs_posix_spawn(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
 	pid_t ret;
@@ -493,7 +509,23 @@ static pid_t bfs_posix_spawn(struct bfs_resolver *res, const struct bfs_spawn *c
 
 	return ret;
 }
+
+/** Check if we can use posix_spawn(). */
+static bool bfs_use_posix_spawn(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
+	if (!(ctx->flags & BFS_SPAWN_USE_POSIX)) {
+		return false;
+	}
+
+#if !BFS_POSIX_SPAWNP_AFTER_FCHDIR
+	if (!res->done) {
+		return false;
+	}
 #endif
+
+	return true;
+}
+
+#endif // _POSIX_SPAWN > 0
 
 /** Actually exec() the new process. */
 static noreturn void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
@@ -607,7 +639,7 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 /** Call the right bfs_spawn() implementation. */
 static pid_t bfs_spawn_impl(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
 #if _POSIX_SPAWN > 0
-	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+	if (bfs_use_posix_spawn(res, ctx)) {
 		return bfs_posix_spawn(res, ctx, argv, envp);
 	}
 #endif
