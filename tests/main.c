@@ -117,6 +117,7 @@ int main(int argc, char *argv[]) {
 	run_test(&ctx, "bit", check_bit);
 	run_test(&ctx, "ioq", check_ioq);
 	run_test(&ctx, "trie", check_trie);
+	run_test(&ctx, "xspawn", check_xspawn);
 	run_test(&ctx, "xtime", check_xtime);
 
 done:

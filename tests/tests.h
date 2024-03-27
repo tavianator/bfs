@@ -29,6 +29,9 @@ bool check_ioq(void);
 /** Trie tests. */
 bool check_trie(void);
 
+/** Process spawning tests. */
+bool check_xspawn(void);
+
 /** Time tests. */
 bool check_xtime(void);
 

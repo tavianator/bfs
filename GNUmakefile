@@ -270,9 +270,14 @@ LIBBFS := \
 $(BIN)/bfs: $(OBJ)/src/main.o $(LIBBFS)
 
 # Testing utilities
-TEST_UTILS := $(BIN)/tests/mksock $(BIN)/tests/xtouch
+TEST_UTILS := \
+    $(BIN)/tests/mksock \
+    $(BIN)/tests/xspawnee \
+    $(BIN)/tests/xtouch
 
 $(BIN)/tests/mksock: $(OBJ)/tests/mksock.o $(LIBBFS)
+
+$(BIN)/tests/xspawnee: $(OBJ)/tests/xspawnee.o
 
 $(BIN)/tests/xtouch: $(OBJ)/tests/xtouch.o $(LIBBFS)
 
@@ -286,6 +291,7 @@ $(BIN)/tests/units: \
     $(OBJ)/tests/ioq.o \
     $(OBJ)/tests/main.o \
     $(OBJ)/tests/trie.o \
+    $(OBJ)/tests/xspawn.o \
     $(OBJ)/tests/xtime.o \
     $(LIBBFS)
 
@@ -294,7 +300,7 @@ tests: $(TESTS)
 .PHONY: tests
 
 # Run the unit tests
-unit-tests: $(BIN)/tests/units
+unit-tests: $(BIN)/tests/units $(BIN)/tests/xspawnee
 	$<
 .PHONY: unit-tests
 
