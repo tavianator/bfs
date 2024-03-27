@@ -364,16 +364,10 @@ static int bfs_resolve_late(struct bfs_resolver *res) {
 			res->done = true;
 			return 0;
 		}
-
-		if (end) {
-			path = end + 1;
-		} else {
-			errno = ENOENT;
-			return -1;
-		}
 	}
 
-	return 0;
+	errno = ENOENT;
+	return -1;
 }
 
 /** Check if we can skip path resolution entirely. */

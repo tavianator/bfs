@@ -170,6 +170,27 @@ out:
 	return ret;
 }
 
+static bool check_resolve(void) {
+	bool ret = true;
+	char *exe;
+
+	exe = bfs_spawn_resolve("sh");
+	ret &= bfs_pcheck(exe, "bfs_spawn_resolve('sh')");
+	free(exe);
+
+	exe = bfs_spawn_resolve("/bin/sh");
+	ret &= bfs_pcheck(exe && strcmp(exe, "/bin/sh") == 0);
+	free(exe);
+
+	exe = bfs_spawn_resolve("bin/tests/xspawnee");
+	ret &= bfs_pcheck(exe && strcmp(exe, "bin/tests/xspawnee") == 0);
+	free(exe);
+
+	ret &= bfs_pcheck(!bfs_spawn_resolve("eW6f5RM9Qi") && errno == ENOENT);
+
+	return ret;
+}
+
 bool check_xspawn(void) {
 	bool ret = true;
 
@@ -178,6 +199,8 @@ bool check_xspawn(void) {
 
 	ret &= check_enoent(true);
 	ret &= check_enoent(false);
+
+	ret &= check_resolve();
 
 	return ret;
 }
