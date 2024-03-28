@@ -247,7 +247,7 @@ typedef long double max_align_t;
  * Annotates allocator-like functions.
  */
 #if __has_attribute(malloc)
-#  if __GNUC__ >= 11
+#  if __GNUC__ >= 11 && !__OPTIMIZE__ // malloc(deallocator) disables inlining on GCC
 #    define attr_malloc(...) attr_nodiscard __attribute__((malloc(__VA_ARGS__)))
 #  else
 #    define attr_malloc(...) attr_nodiscard __attribute__((malloc))
