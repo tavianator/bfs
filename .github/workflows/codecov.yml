@@ -18,7 +18,6 @@ jobs:
               acl \
               libacl1-dev \
               attr \
-              libattr1-dev \
               libcap2-bin \
               libcap-dev \
               libonig-dev \

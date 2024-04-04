@@ -125,7 +125,6 @@ endif # USE_ONIGURUMA
 ifeq ($(OS),Linux)
 ifndef NOLIBS
 USE_ACL := y
-USE_ATTR := y
 USE_LIBCAP := y
 USE_LIBURING := y
 endif
@@ -134,12 +133,6 @@ ifdef USE_ACL
 LOCAL_LDLIBS += -lacl
 else
 LOCAL_CPPFLAGS += -DBFS_USE_SYS_ACL_H=0
-endif
-
-ifdef USE_ATTR
-LOCAL_LDLIBS += -lattr
-else
-LOCAL_CPPFLAGS += -DBFS_USE_SYS_XATTR_H=0
 endif
 
 ifdef USE_LIBCAP

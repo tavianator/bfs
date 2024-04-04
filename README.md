@@ -293,7 +293,7 @@ Here's how to install them on some common platforms:
 
 <pre>
 <strong>Alpine Linux</strong>
-# apk add acl{,-dev} attr{,-dev} libcap{,-dev} liburing-dev oniguruma-dev
+# apk add acl{,-dev} attr libcap{,-dev} liburing-dev oniguruma-dev
 
 <strong>Arch Linux</strong>
 # pacman -S acl attr libcap liburing oniguruma
@@ -302,13 +302,13 @@ Here's how to install them on some common platforms:
 # apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev liburing-dev libonig-dev
 
 <strong>Fedora</strong>
-# dnf install acl libacl-devel libattr-devel libcap-devel liburing-devel oniguruma-devel
+# dnf install acl libacl-devel attr libcap-devel liburing-devel oniguruma-devel
 
 <strong>NixOS</strong>
 # nix-env -i acl attr libcap liburing oniguruma
 
 <strong>Void Linux</strong>
-# xbps-install -S acl-{devel,progs} attr-{devel,progs} libcap-{devel,progs} liburing-devel oniguruma-devel
+# xbps-install -S acl-{devel,progs} attr-progs libcap-{devel,progs} liburing-devel oniguruma-devel
 
 <strong>Homebrew</strong>
 $ brew install oniguruma

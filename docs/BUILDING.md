@@ -56,7 +56,7 @@ Here are some of the common ones; check the [`GNUmakefile`](/GNUmakefile) for mo
 | `CC`                             | The C compiler to use, e.g. `make CC=clang` |
 | `CFLAGS`<br>`EXTRA_CFLAGS`       | Override/add to the default compiler flags  |
 | `LDFLAGS`<br>`EXTRA_LDFLAGS`     | Override/add to the linker flags            |
-| `USE_ACL`<br>`USE_ATTR`<br>...   | Enable/disable [optional dependencies]      |
+| `USE_ACL`<br>`USE_LIBCAP`<br>... | Enable/disable [optional dependencies]      |
 | `TEST_FLAGS`                     | `tests.sh` flags for `make check`           |
 | `BUILDDIR`                       | The build output directory (default: `.`)   |
 | `DESTDIR`                        | The root directory for `make install`       |
@@ -73,13 +73,11 @@ These dependencies are optional, and can be turned off at build time if necessar
 | Dependency  | Platforms  | `make` flag     |
 |-------------|------------|-----------------|
 | [acl]       | Linux only | `USE_ACL`       |
-| [attr]      | Linux only | `USE_ATTR`      |
 | [libcap]    | Linux only | `USE_LIBCAP`    |
 | [liburing]  | Linux only | `USE_LIBURING`  |
 | [Oniguruma] | All        | `USE_ONIGURUMA` |
 
 [acl]: https://savannah.nongnu.org/projects/acl
-[attr]: https://savannah.nongnu.org/projects/attr
 [libcap]: https://sites.google.com/site/fullycapable/
 [liburing]: https://github.com/axboe/liburing
 [Oniguruma]: https://github.com/kkos/oniguruma
