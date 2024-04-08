@@ -47,6 +47,7 @@ jobs:
 
       - name: Build
         run: |
+          make config
           make -j$(nproc) all
 
       - name: Perform CodeQL Analysis

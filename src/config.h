@@ -29,12 +29,13 @@
 #ifndef BFS_COMMAND
 #  define BFS_COMMAND "bfs"
 #endif
-#ifndef BFS_VERSION
-#  define BFS_VERSION "3.1.3"
-#endif
 #ifndef BFS_HOMEPAGE
 #  define BFS_HOMEPAGE "https://tavianator.com/projects/bfs.html"
 #endif
+
+// This is a symbol instead of a literal so we don't have to rebuild everything
+// when the version number changes
+extern const char bfs_version[];
 
 // Check for system headers
 
@@ -97,10 +98,10 @@
 #  define BFS_USE_PATHS_H BFS_HAS_PATHS_H
 #endif
 #ifndef BFS_USE_SYS_ACL_H
-#  define BFS_USE_SYS_ACL_H (BFS_HAS_SYS_ACL_H && !__illumos__)
+#  define BFS_USE_SYS_ACL_H (BFS_HAS_SYS_ACL_H && !__illumos__ && (!__linux__ || BFS_USE_LIBACL))
 #endif
 #ifndef BFS_USE_SYS_CAPABILITY_H
-#  define BFS_USE_SYS_CAPABILITY_H (BFS_HAS_SYS_CAPABILITY_H && !__FreeBSD__)
+#  define BFS_USE_SYS_CAPABILITY_H (BFS_HAS_SYS_CAPABILITY_H && !__FreeBSD__ && (!__linux__ || BFS_USE_LIBCAP))
 #endif
 #ifndef BFS_USE_SYS_EXTATTR_H
 #  define BFS_USE_SYS_EXTATTR_H (BFS_HAS_SYS_EXTATTR_H && !__DragonFly__)

@@ -156,7 +156,7 @@ comake() {
              -f "$TESTS/tests.mk" \
              DONE=$DONE_PIPE \
              READY=$READY_PIPE \
-             "${TEST_CASES[@]/#/tests/}" \
+             "${!TEST_CASES[@]}" \
              </dev/null >/dev/null
     }
 

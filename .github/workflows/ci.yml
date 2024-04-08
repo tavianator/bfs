@@ -53,12 +53,13 @@ jobs:
         run: |
           brew install \
               bash \
-              expect
+              expect \
+              make
 
       - name: Run tests
         run: |
           jobs=$(sysctl -n hw.ncpu)
-          make -j$jobs distcheck
+          gmake -j$jobs distcheck
 
   freebsd:
     name: FreeBSD
@@ -79,8 +80,8 @@ jobs:
             pkg install -y \
                 bash \
                 expect \
-                gmake \
                 oniguruma \
+                pkgconf \
                 sudo \
                 tcl-wrapper
             pw useradd -n action -m -G wheel -s /usr/local/bin/bash
@@ -89,7 +90,7 @@ jobs:
 
           run: |
             chown -R action:action .
-            sudo -u action gmake -j$(nproc) distcheck
+            sudo -u action make -j$(nproc) distcheck
 
   openbsd:
     name: OpenBSD
@@ -119,6 +120,7 @@ jobs:
           run: |
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
+            doas -u action gmake config
             doas -u action gmake -j$jobs check TEST_FLAGS="--sudo=doas --verbose=skipped"
 
   netbsd:
@@ -141,8 +143,8 @@ jobs:
             pkg_add \
                 bash \
                 clang \
-                gmake \
                 oniguruma \
+                pkgconf \
                 sudo \
                 tcl-expect
             useradd -m -G wheel -g =uid action
@@ -152,7 +154,8 @@ jobs:
             PATH="/sbin:/usr/sbin:$PATH"
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
-            sudo -u action gmake -j$jobs check CC=clang LDFLAGS="-rpath /usr/pkg/lib" TEST_FLAGS="--sudo --verbose=skipped"
+            sudo -u action make config CC=clang
+            sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
   dragonflybsd:
     name: DragonFly BSD
@@ -173,8 +176,8 @@ jobs:
             pkg install -y \
                 bash \
                 expect \
-                gmake \
                 oniguruma \
+                pkgconf \
                 sudo \
                 tcl-wrapper
             pw useradd -n action -m -G wheel -s /usr/local/bin/bash
@@ -183,7 +186,8 @@ jobs:
           run: |
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
-            sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            sudo -u action make config
+            sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
   omnios:
     name: OmniOS
@@ -215,4 +219,5 @@ jobs:
             PATH="/usr/xpg4/bin:$PATH"
             chown -R action:staff .
             jobs=$(getconf NPROCESSORS_ONLN)
-            sudo -u action gmake -j$jobs check LDFLAGS="-Wl,-rpath,/opt/ooce/lib/amd64" TEST_FLAGS="--sudo --verbose=skipped"
+            sudo -u action gmake config
+            sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"

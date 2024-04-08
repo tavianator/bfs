@@ -2909,7 +2909,7 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
  * "Parse" -version.
  */
 static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int arg2) {
-	cfprintf(parser->ctx->cout, "${ex}%s${rs} ${bld}%s${rs}\n\n", BFS_COMMAND, BFS_VERSION);
+	cfprintf(parser->ctx->cout, "${ex}%s${rs} ${bld}%s${rs}\n\n", BFS_COMMAND, bfs_version);
 
 	printf("%s\n", BFS_HOMEPAGE);
 

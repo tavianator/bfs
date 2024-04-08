@@ -333,6 +333,7 @@ Once you have the dependencies, you can build <code>bfs</code>.
 Download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
 Then run
 
+    $ make config
     $ make
 
 This will build the `./bin/bfs` binary.
@@ -342,7 +343,8 @@ Run the test suite to make sure it works correctly:
 
 If you're interested in speed, you may want to build the release version instead:
 
-    $ make release
+    $ make config RELEASE=y
+    $ make
 
 Finally, if you want to install it globally, run
 

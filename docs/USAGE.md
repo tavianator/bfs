@@ -7,8 +7,8 @@ When invoked with no arguments, `bfs` will list everything under the current dir
 ```console
 $ bfs
 .
-./GNUmakefile
 ./LICENSE
+./Makefile
 ./README.md
 ./completions
 ./docs
