@@ -209,10 +209,10 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
  *     PATH ..., using the working directory of the child process after all
  *     file_actions have been performed.
  *
- * but macOS resolves the PATH *before* file_actions (because there
+ * but macOS and NetBSD resolve the PATH *before* file_actions (because there
  * posix_spawn() is its own syscall).
  */
-#define BFS_POSIX_SPAWNP_AFTER_FCHDIR !__APPLE__
+#define BFS_POSIX_SPAWNP_AFTER_FCHDIR !(__APPLE__ || __NetBSD_Prereq__(10, 0, 0))
 
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
