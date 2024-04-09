@@ -102,7 +102,7 @@ jobs:
       - name: Run tests
         uses: vmactions/openbsd-vm@v1
         with:
-          release: "7.4"
+          release: "7.5"
           usesh: true
           copyback: false
 
@@ -132,7 +132,7 @@ jobs:
       - name: Run tests
         uses: vmactions/netbsd-vm@v1
         with:
-          release: "9.3"
+          release: "10.0"
           usesh: true
           copyback: false
 
