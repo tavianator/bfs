@@ -74,15 +74,17 @@ Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 `bfs` depends on some system libraries for some of its features.
 These dependencies are optional, and can be turned off in `make config` if necessary by setting the appropriate variable to `n` (e.g. `make config USE_ONIGURUMA=n`).
 
-| Dependency  | Platforms  | `make config` flag |
-|-------------|------------|--------------------|
-| [libacl]    | Linux only | `USE_LIBACL`       |
-| [libcap]    | Linux only | `USE_LIBCAP`       |
-| [liburing]  | Linux only | `USE_LIBURING`     |
-| [Oniguruma] | All        | `USE_ONIGURUMA`    |
+| Dependency   | Platforms  | `make config` flag |
+|--------------|------------|--------------------|
+| [libacl]     | Linux only | `USE_LIBACL`       |
+| [libcap]     | Linux only | `USE_LIBCAP`       |
+| [liburing]   | Linux only | `USE_LIBURING`     |
+| [libselinux] | Linux only | `USE_LIBSELINUX`   |
+| [Oniguruma]  | All        | `USE_ONIGURUMA`    |
 
 [libacl]: https://savannah.nongnu.org/projects/acl
 [libcap]: https://sites.google.com/site/fullycapable/
+[libselinux]: https://github.com/SELinuxProject/selinux
 [liburing]: https://github.com/axboe/liburing
 [Oniguruma]: https://github.com/kkos/oniguruma
 

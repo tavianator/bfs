@@ -37,6 +37,9 @@ else
             libcap)
                 LDLIB=-lcap
                 ;;
+            libselinux)
+                LDLIB=-lselinux
+                ;;
             liburing)
                 LDLIB=-luring
                 ;;
