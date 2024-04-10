@@ -49,6 +49,7 @@ bool eval_false(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_access(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_acl(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_capable(const struct bfs_expr *expr, struct bfs_eval *state);
+bool eval_context(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_perm(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_xattr(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_xattrname(const struct bfs_expr *expr, struct bfs_eval *state);

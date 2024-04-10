@@ -1076,6 +1076,67 @@ static struct bfs_expr *parse_color(struct bfs_parser *parser, int color, int ar
 }
 
 /**
+ * Common code for fnmatch() tests.
+ */
+static struct bfs_expr *parse_fnmatch(const struct bfs_parser *parser, struct bfs_expr *expr, bool casefold) {
+	if (!expr) {
+		return NULL;
+	}
+
+	expr->pattern = expr->argv[1];
+
+	if (casefold) {
+#ifdef FNM_CASEFOLD
+		expr->fnm_flags = FNM_CASEFOLD;
+#else
+		parse_expr_error(parser, expr, "Missing platform support.\n");
+		return NULL;
+#endif
+	} else {
+		expr->fnm_flags = 0;
+	}
+
+	// POSIX says, about fnmatch():
+	//
+	//     If pattern ends with an unescaped <backslash>, fnmatch() shall
+	//     return a non-zero value (indicating either no match or an error).
+	//
+	// But not all implementations obey this, so check for it ourselves.
+	size_t i, len = strlen(expr->pattern);
+	for (i = 0; i < len; ++i) {
+		if (expr->pattern[len - i - 1] != '\\') {
+			break;
+		}
+	}
+	if (i % 2 != 0) {
+		parse_expr_warning(parser, expr, "Unescaped trailing backslash.\n\n");
+		expr->eval_fn = eval_false;
+		return expr;
+	}
+
+	// strcmp() can be much faster than fnmatch() since it doesn't have to
+	// parse the pattern, so special-case patterns with no wildcards.
+	//
+	//     https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01
+	expr->literal = strcspn(expr->pattern, "?*\\[") == len;
+
+	return expr;
+}
+
+/**
+ * Parse -context.
+ */
+static struct bfs_expr *parse_context(struct bfs_parser *parser, int flag, int arg2) {
+#if BFS_CAN_CHECK_CONTEXT
+	struct bfs_expr *expr = parse_unary_test(parser, eval_context);
+	return parse_fnmatch(parser, expr, false);
+#else
+	parse_error(parser, "Missing platform support.\n");
+	return NULL;
+#endif
+}
+
+/**
  * Parse -{false,true}.
  */
 static struct bfs_expr *parse_const(struct bfs_parser *parser, int value, int arg2) {
@@ -1628,54 +1689,6 @@ static struct bfs_expr *parse_mount(struct bfs_parser *parser, int arg1, int arg
 
 	parser->ctx->flags |= BFTW_PRUNE_MOUNTS;
 	parser->mount_arg = expr->argv;
-	return expr;
-}
-
-/**
- * Common code for fnmatch() tests.
- */
-static struct bfs_expr *parse_fnmatch(const struct bfs_parser *parser, struct bfs_expr *expr, bool casefold) {
-	if (!expr) {
-		return NULL;
-	}
-
-	expr->pattern = expr->argv[1];
-
-	if (casefold) {
-#ifdef FNM_CASEFOLD
-		expr->fnm_flags = FNM_CASEFOLD;
-#else
-		parse_expr_error(parser, expr, "Missing platform support.\n");
-		return NULL;
-#endif
-	} else {
-		expr->fnm_flags = 0;
-	}
-
-	// POSIX says, about fnmatch():
-	//
-	//     If pattern ends with an unescaped <backslash>, fnmatch() shall
-	//     return a non-zero value (indicating either no match or an error).
-	//
-	// But not all implementations obey this, so check for it ourselves.
-	size_t i, len = strlen(expr->pattern);
-	for (i = 0; i < len; ++i) {
-		if (expr->pattern[len - i - 1] != '\\') {
-			break;
-		}
-	}
-	if (i % 2 != 0) {
-		parse_expr_warning(parser, expr, "Unescaped trailing backslash.\n\n");
-		expr->eval_fn = eval_false;
-		return expr;
-	}
-
-	// strcmp() can be much faster than fnmatch() since it doesn't have to
-	// parse the pattern, so special-case patterns with no wildcards.
-	//
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01
-	expr->literal = strcspn(expr->pattern, "?*\\[") == len;
-
 	return expr;
 }
 
@@ -2768,6 +2781,10 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "  ${blu}-capable${rs}\n");
 	cfprintf(cout, "      Find files with POSIX.1e capabilities set\n");
 #endif
+#if BFS_CAN_CHECK_CONTEXT
+	cfprintf(cout, "  ${blu}-context${rs} ${bld}GLOB${rs}\n");
+	cfprintf(cout, "      Find files with SELinux context matching a glob pattern\n");
+#endif
 	cfprintf(cout, "  ${blu}-depth${rs} ${bld}[-+]N${rs}\n");
 	cfprintf(cout, "      Find files with depth ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-empty${rs}\n");
@@ -2961,6 +2978,7 @@ static const struct table_entry parse_table[] = {
 	{"-cmin", T_TEST, parse_min, BFS_STAT_CTIME},
 	{"-cnewer", T_TEST, parse_newer, BFS_STAT_CTIME},
 	{"-color", T_OPTION, parse_color, true},
+	{"-context", T_TEST, parse_context, true},
 	{"-csince", T_TEST, parse_since, BFS_STAT_CTIME},
 	{"-ctime", T_TEST, parse_time, BFS_STAT_CTIME},
 	{"-d", T_FLAG, parse_depth},

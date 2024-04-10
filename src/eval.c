@@ -145,6 +145,20 @@ bool bfs_expr_cmp(const struct bfs_expr *expr, long long n) {
 	return false;
 }
 
+/** Common code for fnmatch() tests. */
+static bool eval_fnmatch(const struct bfs_expr *expr, const char *str) {
+	if (expr->literal) {
+#ifdef FNM_CASEFOLD
+		if (expr->fnm_flags & FNM_CASEFOLD) {
+			return strcasecmp(expr->pattern, str) == 0;
+		}
+#endif
+		return strcmp(expr->pattern, str) == 0;
+	} else {
+		return fnmatch(expr->pattern, str, expr->fnm_flags) == 0;
+	}
+}
+
 /**
  * -true test.
  */
@@ -191,6 +205,21 @@ bool eval_capable(const struct bfs_expr *expr, struct bfs_eval *state) {
 		eval_report_error(state);
 		return false;
 	}
+}
+
+/**
+ * -context test.
+ */
+bool eval_context(const struct bfs_expr *expr, struct bfs_eval *state) {
+	char *con = bfs_getfilecon(state->ftwbuf);
+	if (!con) {
+		eval_report_error(state);
+		return false;
+	}
+
+	bool ret = eval_fnmatch(expr, con);
+	bfs_freecon(con);
+	return ret;
 }
 
 /**
@@ -544,20 +573,6 @@ bool eval_links(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 
 	return bfs_expr_cmp(expr, statbuf->nlink);
-}
-
-/** Common code for fnmatch() tests. */
-static bool eval_fnmatch(const struct bfs_expr *expr, const char *str) {
-	if (expr->literal) {
-#ifdef FNM_CASEFOLD
-		if (expr->fnm_flags & FNM_CASEFOLD) {
-			return strcasecmp(expr->pattern, str) == 0;
-		}
-#endif
-		return strcmp(expr->pattern, str) == 0;
-	} else {
-		return fnmatch(expr->pattern, str, expr->fnm_flags) == 0;
-	}
 }
 
 /**

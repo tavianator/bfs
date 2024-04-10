@@ -32,6 +32,7 @@ _bfs() {
     # (e.g. because they are numeric, glob, regexp, time, etc.)
     local nocomp=(
         -{a,B,c,m}{min,since,time}
+        -context
         -ilname
         -iname
         -inum

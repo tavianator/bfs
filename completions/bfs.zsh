@@ -74,6 +74,7 @@ args=(
     '*-mtime[find files modified N days ago]:modification time (days):->times'
 
     '*-capable[find files with POSIX.1e capabilities set]'
+    '*-context[find files by SELinux context]:pattern'
     # -depth without parameters exist above. I don't know how to handle this gracefully
     '*-empty[find empty files/directories]'
     '*-executable[find files the current user can execute]'

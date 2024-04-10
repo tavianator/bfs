@@ -71,6 +71,7 @@ complete -c bfs -o Btime -d "Find files birthed specified number of days ago" -x
 complete -c bfs -o ctime -d "Find files changed specified number of days ago" -x
 complete -c bfs -o mtime -d "Find files modified specified number of days ago" -x
 complete -c bfs -o capable -d "Find files with capabilities set"
+complete -c bfs -o context -d "Find files by SELinux context" -x
 complete -c bfs -o depth -d "Find files with specified number of depth" -x
 complete -c bfs -o empty -d "Find empty files/directories"
 complete -c bfs -o executable -d "Find files the current user can execute"
