@@ -20,6 +20,8 @@
 #  endif
 #endif
 
+#define BFS_CAN_CHECK_CONTEXT BFS_USE_LIBSELINUX
+
 #define BFS_CAN_CHECK_XATTRS (BFS_USE_SYS_EXTATTR_H || BFS_USE_SYS_XATTR_H)
 
 struct BFTW;
@@ -65,5 +67,20 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf);
  *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
  */
 int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name);
+
+/**
+ * Get a file's SELinux context
+ *
+ * @param ftwbuf
+ *         The file to check.
+ * @return
+ *         The file's SELinux context, or NULL on failure.
+ */
+char *bfs_getfilecon(const struct BFTW *ftwbuf);
+
+/**
+ * Free a bfs_getfilecon() result.
+ */
+void bfs_freecon(char *con);
 
 #endif // BFS_FSADE_H

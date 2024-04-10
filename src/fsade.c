@@ -22,6 +22,10 @@
 #  include <sys/capability.h>
 #endif
 
+#if BFS_CAN_CHECK_CONTEXT
+#  include <selinux/selinux.h>
+#endif
+
 #if BFS_USE_SYS_EXTATTR_H
 #  include <sys/extattr.h>
 #elif BFS_USE_SYS_XATTR_H
@@ -414,3 +418,32 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 }
 
 #endif
+
+char *bfs_getfilecon(const struct BFTW *ftwbuf) {
+#if BFS_CAN_CHECK_CONTEXT
+	const char *path = fake_at(ftwbuf);
+
+	char *con;
+	int ret;
+	if (ftwbuf->type == BFS_LNK) {
+		ret = lgetfilecon(path, &con);
+	} else {
+		ret = getfilecon(path, &con);
+	}
+
+	if (ret >= 0) {
+		return con;
+	} else {
+		return NULL;
+	}
+#else
+	errno = ENOTSUP;
+	return NULL;
+#endif
+}
+
+void bfs_freecon(char *con) {
+#if BFS_CAN_CHECK_CONTEXT
+	freecon(con);
+#endif
+}
