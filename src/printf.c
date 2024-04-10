@@ -12,6 +12,7 @@
 #include "dir.h"
 #include "dstring.h"
 #include "expr.h"
+#include "fsade.h"
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
@@ -571,6 +572,19 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	return ret;
 }
 
+/** %Z: SELinux context */
+attr(maybe_unused)
+static int bfs_printf_Z(CFILE *cfile, const struct bfs_fmt *fmt, const struct BFTW *ftwbuf) {
+	char *con = bfs_getfilecon(ftwbuf);
+	if (!con) {
+		return -1;
+	}
+
+	int ret = dyn_fprintf(cfile->file, fmt, con);
+	bfs_freecon(con);
+	return ret;
+}
+
 /**
  * Append a literal string to the chain.
  */
@@ -840,6 +854,15 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 			case 'Y':
 				fmt.fn = bfs_printf_Y;
 				break;
+			case 'Z':
+#if BFS_CAN_CHECK_CONTEXT
+				fmt.fn = bfs_printf_Z;
+				break;
+#else
+				bfs_expr_error(ctx, expr);
+				bfs_error(ctx, "Missing platform support for '%%%c'.\n", c);
+				goto fmt_error;
+#endif
 
 			case 'A':
 				fmt.stat_field = BFS_STAT_ATIME;
