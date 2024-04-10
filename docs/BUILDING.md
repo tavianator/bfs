@@ -25,7 +25,7 @@ For example, to use all your cores, run `make -j$(nproc)`.
 | `make install`   | Installs `bfs` (with man page, shell completions, etc.)       |
 | `make uninstall` | Uninstalls `bfs`                                              |
 | `make clean`     | Delete the build products                                     |
-| `make mrclean`   | Delete all generated files, including the build configuration |
+| `make distclean` | Delete all generated files, including the build configuration |
 
 ### Build profiles
 
@@ -55,17 +55,17 @@ You can combine multiple profiles (e.g. `make config ASAN=y UBSAN=y`), but not a
 Other flags can be specified on the `make config` command line or in the environment.
 Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 
-| Flag                             | Description                                        |
-|----------------------------------|----------------------------------------------------|
-| `CC`                             | The C compiler to use, e.g. `make config CC=clang` |
-| `CFLAGS`<br>`EXTRA_CFLAGS`       | Override/add to the default compiler flags         |
-| `LDFLAGS`<br>`EXTRA_LDFLAGS`     | Override/add to the linker flags                   |
-| `USE_ACL`<br>`USE_LIBCAP`<br>... | Enable/disable [optional dependencies]             |
-| `TEST_FLAGS`                     | `tests.sh` flags for `make check`                  |
-| `BUILDDIR`                       | The build output directory (default: `.`)          |
-| `DESTDIR`                        | The root directory for `make install`              |
-| `PREFIX`                         | The installation prefix (default: `/usr`)          |
-| `MANDIR`                         | The man page installation directory                |
+| Flag                                | Description                                        |
+|-------------------------------------|----------------------------------------------------|
+| `CC`                                | The C compiler to use, e.g. `make config CC=clang` |
+| `CFLAGS`<br>`EXTRA_CFLAGS`          | Override/add to the default compiler flags         |
+| `LDFLAGS`<br>`EXTRA_LDFLAGS`        | Override/add to the linker flags                   |
+| `USE_LIBACL`<br>`USE_LIBCAP`<br>... | Enable/disable [optional dependencies]             |
+| `TEST_FLAGS`                        | `tests.sh` flags for `make check`                  |
+| `BUILDDIR`                          | The build output directory (default: `.`)          |
+| `DESTDIR`                           | The root directory for `make install`              |
+| `PREFIX`                            | The installation prefix (default: `/usr`)          |
+| `MANDIR`                            | The man page installation directory                |
 
 [optional dependencies]: #dependencies
 
@@ -76,12 +76,12 @@ These dependencies are optional, and can be turned off in `make config` if neces
 
 | Dependency  | Platforms  | `make config` flag |
 |-------------|------------|--------------------|
-| [acl]       | Linux only | `USE_ACL`          |
+| [libacl]    | Linux only | `USE_LIBACL`       |
 | [libcap]    | Linux only | `USE_LIBCAP`       |
 | [liburing]  | Linux only | `USE_LIBURING`     |
 | [Oniguruma] | All        | `USE_ONIGURUMA`    |
 
-[acl]: https://savannah.nongnu.org/projects/acl
+[libacl]: https://savannah.nongnu.org/projects/acl
 [libcap]: https://sites.google.com/site/fullycapable/
 [liburing]: https://github.com/axboe/liburing
 [Oniguruma]: https://github.com/kkos/oniguruma
