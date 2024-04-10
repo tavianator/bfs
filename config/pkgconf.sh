@@ -8,29 +8,47 @@
 set -eu
 
 MODE=
-if [[ "$1" == --* ]]; then
+if [[ "${1:-}" == --* ]]; then
     MODE="$1"
     shift
 fi
 
+if (($# < 1)); then
+    exit
+fi
+
+if [[ "$NOLIBS" == *y* ]]; then
+    exit 1
+fi
+
 if command -v "${PKG_CONFIG:-}" &>/dev/null; then
     case "$MODE" in
-        --cflags)
-            "$PKG_CONFIG" --cflags "$@"
-            ;;
-        --ldflags)
-            "$PKG_CONFIG" --libs-only-L --libs-only-other "$@"
-            ;;
-        --ldlibs)
-            "$PKG_CONFIG" --libs-only-l "$@"
-            ;;
         "")
             "$PKG_CONFIG" "$@"
             ;;
+        --cflags)
+            OUT=$("$PKG_CONFIG" --cflags "$@")
+            if [ "$OUT" ]; then
+                printf 'CFLAGS += %s\n' "$OUT"
+            fi
+            ;;
+        --ldflags)
+            OUT=$("$PKG_CONFIG" --libs-only-L --libs-only-other "$@")
+            if [ "$OUT" ]; then
+                printf 'LDFLAGS += %s\n' "$OUT"
+            fi
+            ;;
+        --ldlibs)
+            OUT=$("$PKG_CONFIG" --libs-only-l "$@")
+            if [ "$OUT" ]; then
+                printf 'LDLIBS := %s ${LDLIBS}\n' "$OUT"
+            fi
+            ;;
     esac
 else
-    for lib; do
-        case "$lib" in
+    LDLIBS=""
+    for LIB; do
+        case "$LIB" in
             libacl)
                 LDLIB=-lacl
                 ;;
@@ -47,21 +65,22 @@ else
                 LDLIB=-lonig
                 ;;
             *)
-                printf 'error: Unknown package %s\n' "$lib" >&2
+                printf 'error: Unknown package %s\n' "$LIB" >&2
                 exit 1
+                ;;
         esac
 
         case "$MODE" in
-            --ldlibs)
-                printf ' %s' "$LDLIB"
-                ;;
             "")
-                config/cc.sh "config/$lib.c" "$LDLIB" || exit $?
+                config/cc.sh "config/$LIB.c" "$LDLIB" || exit $?
+                ;;
+            --ldlibs)
+                LDLIBS="$LDLIBS $LDLIB"
                 ;;
         esac
     done
 
-    if [ "$MODE" = "--ldlibs" ]; then
-        printf '\n'
+    if [ "$MODE" = "--ldlibs" ] && [ "$LDLIBS" ]; then
+        printf 'LDLIBS :=%s ${LDLIBS}\n' "$LDLIBS"
     fi
 fi
