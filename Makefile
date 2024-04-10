@@ -123,7 +123,7 @@ export UBSAN_CFLAGS= -fsanitize=undefined
 export TSAN_CPPFLAGS= -DBFS_USE_TARGET_CLONES=0
 export TSAN_CFLAGS= -fsanitize=thread
 
-SAN := ${ASAN}${LSAN}${MSAN}${TSAN}${UBSAN}
+export SAN=${ASAN}${LSAN}${MSAN}${TSAN}${UBSAN}
 export SAN_CFLAGS= -fno-sanitize-recover=all
 
 # MSAN and TSAN both need all code to be instrumented
@@ -212,39 +212,7 @@ config: ${MKS}
 # Saves the configurable variables
 ${GEN}/vars.mk:
 	@${XMKDIR} ${@D}
-	@printf 'PREFIX := %s\n' "$$XPREFIX" >$@
-	@printf 'MANDIR := %s\n' "$$XMANDIR" >>$@
-	@printf 'OS := %s\n' "$$XOS" >>$@
-	@printf 'ARCH := %s\n' "$$XARCH" >>$@
-	@printf 'CC := %s\n' "$$XCC" >>$@
-	@printf 'INSTALL := %s\n' "$$XINSTALL" >>$@
-	@printf 'MKDIR := %s\n' "$$XMKDIR" >>$@
-	@printf 'RM := %s\n' "$$XRM" >>$@
-	@printf '# BFS_CPPFLAGS\nCPPFLAGS := %s\n' "$$BFS_CPPFLAGS" >>$@
-	@test "${TSAN}" != y || printf '# TSAN\nCPPFLAGS += %s\n' "$$TSAN_CPPFLAGS" >>$@
-	@test "${LINT}" != y || printf '# LINT\nCPPFLAGS += %s\n' "$$LINT_CPPFLAGS" >>$@
-	@test "${RELEASE}" != y || printf '# RELEASE\nCPPFLAGS += %s\n' "$$RELEASE_CPPFLAGS" >>$@
-	@printf '# CPPFLAGS\nCPPFLAGS += %s\n' "$$XCPPFLAGS" >>$@
-	@printf '# EXTRA_CPPFLAGS\nCPPFLAGS += %s\n' "$$EXTRA_CPPFLAGS" >>$@
-	@printf '# BFS_CFLAGS\nCFLAGS := %s\n' "$$BFS_CFLAGS" >>$@
-	@test "${ASAN}" != y || printf '# ASAN\nCFLAGS += %s\n' "$$ASAN_CFLAGS" >>$@
-	@test "${LSAN}" != y || printf '# LSAN\nCFLAGS += %s\n' "$$LSAN_CFLAGS" >>$@
-	@test "${MSAN}" != y || printf '# MSAN\nCFLAGS += %s\n' "$$MSAN_CFLAGS" >>$@
-	@test "${TSAN}" != y || printf '# TSAN\nCFLAGS += %s\n' "$$TSAN_CFLAGS" >>$@
-	@test "${UBSAN}" != y || printf '# UBSAN\nCFLAGS += %s\n' "$$UBSAN_CFLAGS" >>$@
-	@case "${SAN}" in *y*) printf '# *SAN\nCFLAGS += %s\n' "$$SAN_CFLAGS" >>$@ ;; esac
-	@test "${GCOV}" != y || printf '# GCOV\nCFLAGS += %s\n' "$$GCOV_CFLAGS" >>$@
-	@test "${LINT}" != y || printf '# LINT\nCFLAGS += %s\n' "$$LINT_CFLAGS" >>$@
-	@test "${RELEASE}" != y || printf '# RELEASE\nCFLAGS += %s\n' "$$RELEASE_CFLAGS" >>$@
-	@printf '# CFLAGS\nCFLAGS += %s\n' "$$XCFLAGS" >>$@
-	@printf '# EXTRA_CFLAGS\nCFLAGS += %s\n' "$$EXTRA_CFLAGS" >>$@
-	@printf '# LDFLAGS\nLDFLAGS := %s\n' "$$XLDFLAGS" >>$@
-	@printf '# EXTRA_LDFLAGS\nLDFLAGS += %s\n' "$$EXTRA_LDFLAGS" >>$@
-	@printf '# LDLIBS\nLDLIBS := %s\n' "$$XLDLIBS" >>$@
-	@printf '# EXTRA_LDLIBS\nLDLIBS += %s\n' "$$EXTRA_LDLIBS" >>$@
-	@printf '# BFS_LDLIBS\nLDLIBS += %s\n' "$$BFS_LDLIBS" >>$@
-	@printf 'PKGS :=\n' >>$@
-	@case "${OS}-${SAN}" in FreeBSD-*y*) printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@ ;; esac
+	@config/vars.sh >$@
 	@cat $@
 .PHONY: ${GEN}/vars.mk
 
