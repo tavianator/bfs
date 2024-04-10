@@ -5,8 +5,12 @@
 
 # Run the compiler and check if it succeeded
 
-printf '$ %s' "$XCC" >&2
-printf ' %q' "$@" >&2
-printf ' -o /dev/null\n' >&2
+set -eux
 
-$XCC "$@" -o /dev/null
+$XCC \
+    $BFS_CPPFLAGS $XCPPFLAGS ${EXTRA_CPPFLAGS:-} \
+    $BFS_CFLAGS $XCFLAGS ${EXTRA_CFLAGS:-} \
+    $XLDFLAGS ${EXTRA_LDFLAGS:-} \
+    "$@" \
+    $XLDLIBS ${EXTRA_LDLIBS:-} $BFS_LDLIBS \
+    -o /dev/null
