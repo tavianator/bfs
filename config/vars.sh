@@ -76,6 +76,6 @@ print PKGS
 # Disable ASLR on FreeBSD when sanitizers are enabled
 case "$XOS-$SAN" in
     FreeBSD-*y*)
-        printf 'POSTLINK = elfctl -e +noaslr $$@\n'
+        printf 'POSTLINK = elfctl -e +noaslr $@\n'
         ;;
 esac
