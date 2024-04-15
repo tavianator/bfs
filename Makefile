@@ -488,7 +488,7 @@ DISTCHECK_CONFIG_release := RELEASE=y
 
 ${DISTCHECKS}::
 	+${MAKE} -rs BUILDDIR=${BUILDDIR}/$@ config ${DISTCHECK_CONFIG_${@:distcheck-%=%}}
-	+${MAKE} -s BUILDDIR=${BUILDDIR}/$@ check TEST_FLAGS="--sudo --verbose=skipped posix/basic"
+	+${MAKE} -s BUILDDIR=${BUILDDIR}/$@ check TEST_FLAGS="--sudo --verbose=skipped"
 
 ## Packaging (`make install`)
 
