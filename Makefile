@@ -244,9 +244,16 @@ ${PKG_MKS}: ${GEN}/vars.mk
 # bfs used to have flag-like targets (`make release`, `make asan ubsan`, etc.).
 # Direct users to the new configuration system.
 asan lsan msan tsan ubsan gcov lint release::
-	@printf 'error: `make %s` is no longer supported. ' $@ >&2
-	@printf 'Use `make config %s=y` instead.\n' $$(echo $@ | tr '[a-z]' '[A-Z]') >&2
+	@printf 'error: `%s %s` is no longer supported. ' "${MAKE}" $@ >&2
+	@printf 'Use `%s config %s=y` instead.\n' "${MAKE}" $$(echo $@ | tr '[a-z]' '[A-Z]') >&2
 	@false
+
+# Print an error if `make` is run before `make config`
+${CONFIG}::
+	@if ! [ -e $@ ]; then \
+	    printf 'error: You must run `%s config` before `%s`.\n' "${MAKE}" "${MAKE}" >&2; \
+	    false; \
+	fi
 
 ## Build phase (`make`)
 
