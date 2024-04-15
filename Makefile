@@ -138,15 +138,6 @@ export LINT_CFLAGS= -Werror -O2
 export RELEASE_CPPFLAGS= -DNDEBUG
 export RELEASE_CFLAGS= -O3 -flto=auto
 
-# Auto-detected library dependencies.  Can be set manually with
-#
-#     $ make config USE_LIBURING=n USE_ONIGURUMA=y
-USE_LIBACL ?=
-USE_LIBCAP ?=
-USE_LIBSELINUX ?=
-USE_LIBURING ?=
-USE_ONIGURUMA ?=
-
 # Save the new value of these variables, before they potentially get overridden
 # by `-include ${CONFIG}` below
 
@@ -447,7 +438,7 @@ distcheck: ${DISTCHECKS}
 DISTCHECK_CONFIG_asan := ASAN=y UBSAN=y
 DISTCHECK_CONFIG_msan := MSAN=y UBSAN=y CC=clang
 DISTCHECK_CONFIG_tsan := TSAN=y UBSAN=y CC=clang
-DISTCHECK_CONFIG_m32 := EXTRA_CFLAGS="-m32" PKG_CONFIG_LIBDIR=/usr/lib32/pkgconfig USE_LIBURING=n
+DISTCHECK_CONFIG_m32 := EXTRA_CFLAGS="-m32" PKG_CONFIG_LIBDIR=/usr/lib32/pkgconfig
 DISTCHECK_CONFIG_release := RELEASE=y
 
 ${DISTCHECKS}::
