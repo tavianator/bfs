@@ -348,15 +348,6 @@ ${GEN}/VERSION: ${GEN}/NEWVERSION
 ${OBJ}/src/version.o: ${GEN}/VERSION
 ${OBJ}/src/version.o: CPPFLAGS := ${CPPFLAGS} -DBFS_VERSION='"${VERSION}"'
 
-# Clean all build products
-clean::
-	${RM} -r ${BIN} ${OBJ}
-
-# Clean everything, including generated files
-distclean: clean
-	${RM} -r ${GEN}
-.PHONY: distclean
-
 ## Test phase (`make check`)
 
 # Unit test binaries
@@ -482,3 +473,14 @@ check-install::
 	+${MAKE} uninstall DESTDIR=${BUILDDIR}/pkg
 	${BIN}/bfs ${BUILDDIR}/pkg -not -type d -print -exit 1
 	${RM} -r ${BUILDDIR}/pkg
+
+## Cleanup (`make clean`)
+
+# Clean all build products
+clean::
+	${RM} -r ${BIN} ${OBJ}
+
+# Clean everything, including generated files
+distclean: clean
+	${RM} -r ${GEN} ${DISTCHECKS}
+.PHONY: distclean
