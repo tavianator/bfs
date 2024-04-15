@@ -24,6 +24,30 @@ default: bfs
 # BSD's ${.ALLSRC} to GNU.
 .ALLSRC ?= $^
 
+# GNU and BSD make have incompatible syntax for conditionals, but we can do a
+# lot with just recursive variable expansion.  Inspired by
+# https://github.com/wahern/autoguess
+TRUTHY,y := y
+TRUTHY,1 := y
+
+# Normalize ${V} to either "y" or ""
+IS_V := ${TRUTHY,${V}}
+
+# Suppress output unless V=1
+Q, := @
+Q  := ${Q,${IS_V}}
+
+# Show full commands with `make V=1`, otherwise short summaries
+MSG = @msg() { \
+          MSG="$$1"; \
+          shift; \
+          test "${IS_V}" || printf '%s\n' "$$MSG"; \
+          test "$${1:-}" || return 0; \
+          test "${IS_V}" && printf '%s\n' "$$*"; \
+          "$$@"; \
+      }; \
+      msg
+
 # Platform detection
 OS != uname
 ARCH != uname -m
@@ -195,28 +219,38 @@ MKS := \
     ${GEN}/objs.mk \
     ${GEN}/pkgs.mk
 
+# cat a file if V=1
+VCAT,y := @cat
+VCAT,  := @:
+VCAT   := ${VCAT,${IS_V}}
+
 # The configuration goal itself
 config: ${MKS}
+	${MSG} "[ GEN] ${CONFIG}"
 	@printf 'include $${GEN}/%s\n' ${.ALLSRC:${GEN}/%=%} >${CONFIG}
+	${VCAT} ${CONFIG}
 .PHONY: config
 
 # Saves the configurable variables
 ${GEN}/vars.mk:
 	@${XMKDIR} ${@D}
+	${MSG} "[ GEN] $@"
 	@config/vars.sh >$@
-	@cat $@
+	${VCAT} $@
 .PHONY: ${GEN}/vars.mk
 
 # Check for dependency generation support
 ${GEN}/deps.mk: ${GEN}/vars.mk
+	${MSG} "[ GEN] $@"
 	@+${MAKE} -rs -f config/deps.mk TARGET=$@
-	@cat $@
+	${VCAT} $@
 	@printf -- '-include %s\n' ${OBJS:.o=.d} >>$@
 .PHONY: ${GEN}/deps.mk
 
 # Lists file.o: file.c dependencies
 ${GEN}/objs.mk:
-	@${MKDIR} ${@D}
+	@${XMKDIR} ${@D}
+	${MSG} "[ GEN] $@"
 	@for obj in ${OBJS:${OBJ}/%.o=%}; do printf '$${OBJ}/%s.o: %s.c\n' "$$obj" "$$obj"; done >$@
 .PHONY: ${GEN}/objs.mk
 
@@ -230,15 +264,22 @@ PKG_MKS := \
 
 # Auto-detect dependencies and their build flags
 ${GEN}/pkgs.mk: ${PKG_MKS}
+	${MSG} "[ GEN] $@"
 	@printf 'include $${GEN}/%s\n' ${.ALLSRC:${GEN}/%=%} >$@
 	@+${MAKE} -rs -f config/pkgs.mk TARGET=$@
-	@grep -v '^include' $@ || :
+	${VCAT} $@
 .PHONY: ${GEN}/pkgs.mk
 
 # Auto-detect dependencies
 ${PKG_MKS}: ${GEN}/vars.mk
 	@+${MAKE} -rs -f config/pkg.mk TARGET=$@
-	@cat $@
+	@if [ "${IS_V}" ]; then \
+	    cat $@; \
+	elif grep -q PKGS $@; then \
+	    printf '[ GEN] %-18s [y]\n' $@; \
+	else \
+	    printf '[ GEN] %-18s [n]\n' $@; \
+	fi
 .PHONY: ${PKG_MKS}
 
 # bfs used to have flag-like targets (`make release`, `make asan ubsan`, etc.).
@@ -311,7 +352,7 @@ ${BIN}/bfs: ${LIBBFS} ${OBJ}/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
+	+${MSG} "[  LD] $@" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
 	${POSTLINK}
 
 # All object files
@@ -330,11 +371,14 @@ OBJS := \
     ${OBJ}/tests/xtouch.o \
     ${LIBBFS}
 
+# Get the .c file for a .o file
+CSRC = ${@:${OBJ}/%.o=%.c}
+
 # Depend on ${CONFIG} to make sure `make config` runs first, and to rebuild when
 # the configuration changes
 ${OBJS}: ${CONFIG}
 	@${MKDIR} ${@D}
-	${CC} ${ALL_CFLAGS} -c ${@:${OBJ}/%.o=%.c} -o $@
+	${MSG} "[  CC] ${CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
 
 # Save the version number to this file, but only update VERSION if it changes
 ${GEN}/NEWVERSION::
@@ -370,7 +414,7 @@ check: unit-tests integration-tests
 
 # Run the unit tests
 unit-tests: ${UTEST_BINS}
-	${BIN}/tests/units
+	${MSG} "[TEST] tests/units" ${BIN}/tests/units
 .PHONY: unit-tests
 
 ${BIN}/tests/units: \
@@ -393,15 +437,18 @@ INTEGRATION_TESTS := ${INTEGRATIONS:%=check-%}
 
 # Check just `bfs`
 check-default: ${BIN}/bfs ${ITEST_BINS}
-	+./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs" ${TEST_FLAGS}
+	+${MSG} "[TEST] bfs" \
+	    ./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs" ${TEST_FLAGS}
 
 # Check the different search strategies
 check-dfs check-ids check-eds: ${BIN}/bfs ${ITEST_BINS}
-	+./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs -S ${@:check-%=%}" ${TEST_FLAGS}
+	+${MSG} "[TEST] bfs -S ${@:check-%=%}" \
+	    ./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs -S ${@:check-%=%}" ${TEST_FLAGS}
 
 # Check various flags
 check-j1 check-j2 check-j3 check-s: ${BIN}/bfs ${ITEST_BINS}
-	+./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs -${@:check-%=%}" ${TEST_FLAGS}
+	+${MSG} "[TEST] bfs -${@:check-%=%}" \
+	    ./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs -${@:check-%=%}" ${TEST_FLAGS}
 
 # Run the integration tests
 integration-tests: ${INTEGRATION_TESTS}
@@ -441,7 +488,7 @@ DISTCHECK_CONFIG_release := RELEASE=y
 
 ${DISTCHECKS}::
 	+${MAKE} -rs BUILDDIR=${BUILDDIR}/$@ config ${DISTCHECK_CONFIG_${@:distcheck-%=%}}
-	+${MAKE} -s BUILDDIR=${BUILDDIR}/$@ check TEST_FLAGS="--sudo --verbose=skipped"
+	+${MAKE} -s BUILDDIR=${BUILDDIR}/$@ check TEST_FLAGS="--sudo --verbose=skipped posix/basic"
 
 ## Packaging (`make install`)
 
@@ -449,16 +496,21 @@ DEST_PREFIX := ${DESTDIR}${PREFIX}
 DEST_MANDIR := ${DESTDIR}${MANDIR}
 
 install::
-	${MKDIR} ${DEST_PREFIX}/bin
-	${INSTALL} -m755 ${BIN}/bfs ${DEST_PREFIX}/bin/bfs
-	${MKDIR} ${DEST_MANDIR}/man1
-	${INSTALL} -m644 docs/bfs.1 ${DEST_MANDIR}/man1/bfs.1
-	${MKDIR} ${DEST_PREFIX}/share/bash-completion/completions
-	${INSTALL} -m644 completions/bfs.bash ${DEST_PREFIX}/share/bash-completion/completions/bfs
-	${MKDIR} ${DEST_PREFIX}/share/zsh/site-functions
-	${INSTALL} -m644 completions/bfs.zsh ${DEST_PREFIX}/share/zsh/site-functions/_bfs
-	${MKDIR} ${DEST_PREFIX}/share/fish/vendor_completions.d
-	${INSTALL} -m644 completions/bfs.fish ${DEST_PREFIX}/share/fish/vendor_completions.d/bfs.fish
+	${Q}${MKDIR} ${DEST_PREFIX}/bin
+	${MSG} "[INSTALL] bin/bfs" \
+	    ${INSTALL} -m755 ${BIN}/bfs ${DEST_PREFIX}/bin/bfs
+	${Q}${MKDIR} ${DEST_MANDIR}/man1
+	${MSG} "[INSTALL] man/man1/bfs.1" \
+	    ${INSTALL} -m644 docs/bfs.1 ${DEST_MANDIR}/man1/bfs.1
+	${Q}${MKDIR} ${DEST_PREFIX}/share/bash-completion/completions
+	${MSG} "[INSTALL] completions/bfs.bash" \
+	    ${INSTALL} -m644 completions/bfs.bash ${DEST_PREFIX}/share/bash-completion/completions/bfs
+	${Q}${MKDIR} ${DEST_PREFIX}/share/zsh/site-functions
+	${MSG} "[INSTALL] completions/bfs.zsh" \
+	    ${INSTALL} -m644 completions/bfs.zsh ${DEST_PREFIX}/share/zsh/site-functions/_bfs
+	${Q}${MKDIR} ${DEST_PREFIX}/share/fish/vendor_completions.d
+	${MSG} "[INSTALL] completions/bfs.fish" \
+	    ${INSTALL} -m644 completions/bfs.fish ${DEST_PREFIX}/share/fish/vendor_completions.d/bfs.fish
 
 uninstall::
 	${RM} ${DEST_PREFIX}/share/bash-completion/completions/bfs
