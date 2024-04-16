@@ -352,7 +352,7 @@ ${BIN}/bfs: ${LIBBFS} ${OBJ}/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${MSG} "[  LD] $@" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
+	+${MSG} "[ LD ] $@" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
 	${POSTLINK}
 
 # All object files
@@ -378,7 +378,7 @@ CSRC = ${@:${OBJ}/%.o=%.c}
 # the configuration changes
 ${OBJS}: ${CONFIG}
 	@${MKDIR} ${@D}
-	${MSG} "[  CC] ${CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
+	${MSG} "[ CC ] ${CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
 
 # Save the version number to this file, but only update VERSION if it changes
 ${GEN}/NEWVERSION::
