@@ -430,7 +430,7 @@ make_xattrs() {
 EX_DIFF=20
 
 # Detect colored diff support
-if diff --color /dev/null /dev/null 2>/dev/null; then
+if diff --color /dev/null /dev/null &>/dev/null; then
     DIFF="diff --color"
 else
     DIFF="diff"
@@ -447,7 +447,7 @@ diff_output() {
 
     if ((UPDATE)); then
         cp "$OUT" "$GOLD"
-    else
+    elif ! cmp -s "$GOLD" "$OUT"; then
         $DIFF -u "$GOLD" "$OUT" >&$DUPERR
     fi
 }
