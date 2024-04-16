@@ -17,29 +17,29 @@ if (($# < 1)); then
     exit
 fi
 
-if [[ "$NOLIBS" == *y* ]]; then
+if [[ "$XNOLIBS" == *y* ]]; then
     exit 1
 fi
 
-if command -v "${PKG_CONFIG:-}" &>/dev/null; then
+if command -v "${XPKG_CONFIG:-}" &>/dev/null; then
     case "$MODE" in
         "")
-            "$PKG_CONFIG" "$@"
+            "$XPKG_CONFIG" "$@"
             ;;
         --cflags)
-            OUT=$("$PKG_CONFIG" --cflags "$@")
+            OUT=$("$XPKG_CONFIG" --cflags "$@")
             if [ "$OUT" ]; then
                 printf 'CFLAGS += %s\n' "$OUT"
             fi
             ;;
         --ldflags)
-            OUT=$("$PKG_CONFIG" --libs-only-L --libs-only-other "$@")
+            OUT=$("$XPKG_CONFIG" --libs-only-L --libs-only-other "$@")
             if [ "$OUT" ]; then
                 printf 'LDFLAGS += %s\n' "$OUT"
             fi
             ;;
         --ldlibs)
-            OUT=$("$PKG_CONFIG" --libs-only-l "$@")
+            OUT=$("$XPKG_CONFIG" --libs-only-l "$@")
             if [ "$OUT" ]; then
                 printf 'LDLIBS := %s ${LDLIBS}\n' "$OUT"
             fi

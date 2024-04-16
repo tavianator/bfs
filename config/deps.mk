@@ -3,11 +3,16 @@
 
 # Makefile that generates gen/deps.mk
 
-.OBJDIR: .
+include config/prelude.mk
+include ${GEN}/vars.mk
+include ${GEN}/flags.mk
+include config/exports.mk
 
-include config/vars.mk
-
-default::
+${GEN}/deps.mk::
+	${MSG} "[ GEN] $@"
+	printf '# %s\n' "$@" >$@
 	if config/cc.sh -MD -MP -MF /dev/null config/empty.c; then \
 	    printf 'DEPFLAGS = -MD -MP -MF $${@:.o=.d}\n'; \
-	fi >${TARGET} 2>${TARGET}.log
+	fi >>$@ 2>$@.log
+	${VCAT} $@
+	@printf -- '-include %s\n' ${OBJS:.o=.d} >>$@

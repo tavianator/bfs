@@ -7,4 +7,4 @@
 
 set -eux
 
-$CC $CPPFLAGS $CFLAGS $LDFLAGS "$@" $LDLIBS -o /dev/null
+$XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS "$@" $XLDLIBS -o /dev/null

@@ -53,13 +53,12 @@ jobs:
         run: |
           brew install \
               bash \
-              expect \
-              make
+              expect
 
       - name: Run tests
         run: |
           jobs=$(sysctl -n hw.ncpu)
-          gmake -j$jobs distcheck
+          make -j$jobs distcheck
 
   freebsd:
     name: FreeBSD
