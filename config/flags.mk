@@ -6,6 +6,26 @@
 include config/prelude.mk
 include ${GEN}/vars.mk
 
+# Configurable flags
+CPPFLAGS ?=
+CFLAGS ?= \
+    -g \
+    -Wall \
+    -Wformat=2 \
+    -Werror=implicit \
+    -Wimplicit-fallthrough \
+    -Wmissing-declarations \
+    -Wshadow \
+    -Wsign-compare \
+    -Wstrict-prototypes
+LDFLAGS ?=
+LDLIBS ?=
+
+export XCPPFLAGS=${CPPFLAGS}
+export XCFLAGS=${CFLAGS}
+export XLDFLAGS=${LDFLAGS}
+export XLDLIBS=${LDLIBS}
+
 # Immutable flags
 export BFS_CPPFLAGS= \
     -D__EXTENSIONS__ \
@@ -26,12 +46,6 @@ LDLIBS,Linux := -lrt
 LDLIBS,NetBSD := -lutil
 LDLIBS,SunOS := -lsocket -lnsl
 export BFS_LDLIBS=${LDLIBS,${OS}}
-
-# Make sure we pick up any default flags from e.g. sys.mk
-export XCPPFLAGS=${CPPFLAGS}
-export XCFLAGS=${CFLAGS}
-export XLDFLAGS=${LDFLAGS}
-export XLDLIBS=${LDLIBS}
 
 # Build profiles
 _ASAN := ${TRUTHY,${ASAN}}
