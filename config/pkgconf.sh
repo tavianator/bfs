@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright © Tavian Barnes <tavianator@tavianator.com>
 # SPDX-License-Identifier: 0BSD
@@ -8,20 +8,22 @@
 set -eu
 
 MODE=
-if [[ "${1:-}" == --* ]]; then
-    MODE="$1"
-    shift
-fi
+case "${1:-}" in
+    --*)
+        MODE="$1"
+        shift
+esac
 
-if (($# < 1)); then
+if [ $# -lt 1 ]; then
     exit
 fi
 
-if [[ "$XNOLIBS" == [y1] ]]; then
-    exit 1
-fi
+case "$XNOLIBS" in
+    y|1)
+        exit 1
+esac
 
-if command -v "${XPKG_CONFIG:-}" &>/dev/null; then
+if command -v "${XPKG_CONFIG:-}" >/dev/null 2>&1; then
     case "$MODE" in
         "")
             "$XPKG_CONFIG" "$@"

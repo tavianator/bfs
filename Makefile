@@ -28,7 +28,7 @@ config::
 # Direct users to the new configuration system.
 asan lsan msan tsan ubsan gcov lint release::
 	@printf 'error: `%s %s` is no longer supported. ' "${MAKE}" $@ >&2
-	@printf 'Use `%s config %s=y` instead.\n' "${MAKE}" $$(echo $@ | tr '[a-z]' '[A-Z]') >&2
+	@printf 'Use `%s config %s=y` instead.\n' "${MAKE}" $$(echo $@ | tr 'a-z' 'A-Z') >&2
 	@false
 
 # Print an error if `make` is run before `make config`

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Copyright © Tavian Barnes <tavianator@tavianator.com>
 # SPDX-License-Identifier: 0BSD
@@ -7,10 +7,10 @@
 
 set -eu
 
-NAME="${1^^}"
-declare -n XUSE="USE_$NAME"
+NAME=$(printf '%s' "$1" | tr 'a-z' 'A-Z')
+eval "XUSE=\"\${USE_$NAME:-}\""
 
-if [ "${XUSE:-}" ]; then
+if [ "$XUSE" ]; then
     USE="$XUSE"
 elif config/pkgconf.sh "$1"; then
     USE=y
