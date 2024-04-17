@@ -17,7 +17,7 @@ if (($# < 1)); then
     exit
 fi
 
-if [[ "$XNOLIBS" == *y* ]]; then
+if [[ "$XNOLIBS" == [y1] ]]; then
     exit 1
 fi
 
