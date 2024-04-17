@@ -68,31 +68,30 @@ ${BINS}:
 	${POSTLINK}
 
 # Get the .c file for a .o file
-CSRC = ${@:${OBJ}/%.o=%.c}
+_CSRC = ${@:${OBJ}/%.o=%.c}
+CSRC = ${_CSRC:gen/%=${GEN}/%}
 
 # Depend on ${CONFIG} to make sure `make config` runs first, and to rebuild when
 # the configuration changes
 ${OBJS}: ${CONFIG}
 	@${MKDIR} ${@D}
-	${MSG} "[ CC ] ${CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
+	${MSG} "[ CC ] ${_CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
 
-# Save the version number to this file, but only update VERSION if it changes
-${GEN}/NEWVERSION::
+# Save the version number to this file, but only update version.c if it changes
+${GEN}/version.c.new::
 	@${MKDIR} ${@D}
+	@printf 'const char bfs_version[] = "' >$@
 	@if [ "$$VERSION" ]; then \
-	    printf '%s\n' "$$VERSION"; \
+	    printf '%s' "$$VERSION"; \
 	elif test -d .git && command -v git >/dev/null 2>&1; then \
 	    git describe --always --dirty; \
 	else \
 	    echo "3.1.3"; \
-	fi >$@
+	fi | tr -d '\n' >>$@
+	@printf '";\n' >>$@
 
-${GEN}/VERSION: ${GEN}/NEWVERSION
+${GEN}/version.c: ${GEN}/version.c.new
 	@test -e $@ && cmp -s $@ ${.ALLSRC} && rm ${.ALLSRC} || mv ${.ALLSRC} $@
-
-# Rebuild version.c whenever the version number changes
-${OBJ}/src/version.o: ${GEN}/VERSION
-${OBJ}/src/version.o: CPPFLAGS := ${CPPFLAGS} -DBFS_VERSION='"$$(cat ${GEN}/VERSION)"'
 
 ## Test phase (`make check`)
 

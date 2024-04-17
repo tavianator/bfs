@@ -12,7 +12,7 @@ include config/exports.mk
 SHORT = ${TARGET:${BUILDDIR}/%=%}
 
 default::
-	@printf '# %s\n' "${TARGET}" >${TARGET}
+	@printf '# %s\n' "${SHORT}" >${TARGET}
 	config/pkg.sh ${TARGET:${GEN}/%.mk=%} >>${TARGET} 2>${TARGET}.log
 	@if [ "${IS_V}" ]; then \
 	    cat ${TARGET}; \

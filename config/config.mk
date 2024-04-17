@@ -17,7 +17,7 @@ MKS := \
 # The main configuration file, which includes the others
 ${CONFIG}: ${MKS}
 	${MSG} "[ GEN] ${TGT}"
-	@printf '# %s\n' "$@" >$@
+	@printf '# %s\n' "${TGT}" >$@
 	@printf 'include $${GEN}/%s\n' ${.ALLSRC:${GEN}/%=%} >>$@
 	${VCAT} ${CONFIG}
 .PHONY: ${CONFIG}
@@ -26,7 +26,7 @@ ${CONFIG}: ${MKS}
 ${GEN}/vars.mk::
 	@${MKDIR} ${@D}
 	${MSG} "[ GEN] ${TGT}"
-	@printf '# %s\n' "$@" >$@
+	@printf '# %s\n' "${TGT}" >$@
 	@printf 'PREFIX := %s\n' "$$XPREFIX" >>$@
 	@printf 'MANDIR := %s\n' "$$XMANDIR" >>$@
 	@printf 'OS := %s\n' "$${OS:-$$(uname)}" >>$@
@@ -54,8 +54,10 @@ ${GEN}/deps.mk: ${GEN}/flags.mk
 ${GEN}/objs.mk::
 	@${MKDIR} ${@D}
 	${MSG} "[ GEN] ${TGT}"
-	@printf '# %s\n' "$@" >$@
-	@for obj in ${OBJS:${OBJ}/%.o=%}; do printf '$${OBJ}/%s.o: %s.c\n' "$$obj" "$$obj"; done >>$@
+	@printf '# %s\n' "${TGT}" >$@
+	@for obj in ${OBJS:${OBJ}/%.o=%}; do \
+	    printf '$${OBJ}/%s.o: %s.c\n' "$$obj" "$$obj"; \
+	done | sed 's|: gen/|: $${GEN}/|' >>$@
 
 # External dependencies
 PKG_MKS := \
@@ -67,7 +69,7 @@ PKG_MKS := \
 
 # Auto-detect dependencies and their build flags
 ${GEN}/pkgs.mk: ${PKG_MKS}
-	@printf '# %s\n' "$@" >$@
+	@printf '# %s\n' "${TGT}" >$@
 	@printf 'include $${GEN}/%s\n' ${.ALLSRC:${GEN}/%=%} >>$@
 	@+${MAKE} -sf config/pkgs.mk
 .PHONY: ${GEN}/pkgs.mk

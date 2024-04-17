@@ -141,10 +141,10 @@ LIBBFS := \
     ${OBJ}/src/thread.o \
     ${OBJ}/src/trie.o \
     ${OBJ}/src/typo.o \
-    ${OBJ}/src/version.o \
     ${OBJ}/src/xregex.o \
     ${OBJ}/src/xspawn.o \
-    ${OBJ}/src/xtime.o
+    ${OBJ}/src/xtime.o \
+    ${OBJ}/gen/version.o
 
 # Unit test objects
 UNIT_OBJS := \
