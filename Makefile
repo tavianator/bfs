@@ -93,6 +93,8 @@ ${GEN}/version.c.new::
 ${GEN}/version.c: ${GEN}/version.c.new
 	@test -e $@ && cmp -s $@ ${.ALLSRC} && rm ${.ALLSRC} || mv ${.ALLSRC} $@
 
+${OBJ}/gen/version.o: ${GEN}/version.c
+
 ## Test phase (`make check`)
 
 # Unit test binaries

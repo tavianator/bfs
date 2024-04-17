@@ -11,7 +11,6 @@ MKS := \
     ${GEN}/vars.mk \
     ${GEN}/flags.mk \
     ${GEN}/deps.mk \
-    ${GEN}/objs.mk \
     ${GEN}/pkgs.mk
 
 # The main configuration file, which includes the others
@@ -49,15 +48,6 @@ ${GEN}/flags.mk: ${GEN}/vars.mk
 ${GEN}/deps.mk: ${GEN}/flags.mk
 	@+${MAKE} -sf config/deps.mk
 .PHONY: ${GEN}/deps.mk
-
-# Lists file.o: file.c dependencies
-${GEN}/objs.mk::
-	@${MKDIR} ${@D}
-	${MSG} "[ GEN] ${TGT}"
-	@printf '# %s\n' "${TGT}" >$@
-	@for obj in ${OBJS:${OBJ}/%.o=%}; do \
-	    printf '$${OBJ}/%s.o: %s.c\n' "$$obj" "$$obj"; \
-	done | sed 's|: gen/|: $${GEN}/|' >>$@
 
 # External dependencies
 PKG_MKS := \
