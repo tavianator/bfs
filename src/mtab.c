@@ -41,11 +41,16 @@ struct bfs_mount {
 	char *path;
 	/** The filesystem type. */
 	char *type;
+	/** Buffer for the strings. */
+	char buf[];
 };
 
 struct bfs_mtab {
+	/** Mount point arena. */
+	struct varena varena;
+
 	/** The array of mount points. */
-	struct bfs_mount *mounts;
+	struct bfs_mount **mounts;
 	/** The number of mount points. */
 	size_t nmounts;
 
@@ -63,28 +68,37 @@ struct bfs_mtab {
  */
 attr(maybe_unused)
 static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
-	struct bfs_mount *mount = RESERVE(struct bfs_mount, &mtab->mounts, &mtab->nmounts);
+	size_t path_size = strlen(path) + 1;
+	size_t type_size = strlen(type) + 1;
+	size_t size = path_size + type_size;
+	struct bfs_mount *mount = varena_alloc(&mtab->varena, size);
 	if (!mount) {
 		return -1;
 	}
 
-	mount->path = strdup(path);
-	mount->type = strdup(type);
-	if (!mount->path || !mount->type) {
-		goto fail;
+	struct bfs_mount **ptr = RESERVE(struct bfs_mount *, &mtab->mounts, &mtab->nmounts);
+	if (!ptr) {
+		goto free;
 	}
+	*ptr = mount;
+
+	mount->path = mount->buf;
+	memcpy(mount->path, path, path_size);
+
+	mount->type = mount->buf + path_size;
+	memcpy(mount->type, type, type_size);
 
 	const char *name = path + xbaseoff(path);
 	if (!trie_insert_str(&mtab->names, name)) {
-		goto fail;
+		goto shrink;
 	}
 
 	return 0;
 
-fail:
-	free(mount->type);
-	free(mount->path);
+shrink:
 	--mtab->nmounts;
+free:
+	varena_free(&mtab->varena, mount, size);
 	return -1;
 }
 
@@ -93,6 +107,8 @@ struct bfs_mtab *bfs_mtab_parse(void) {
 	if (!mtab) {
 		return NULL;
 	}
+
+	VARENA_INIT(&mtab->varena, struct bfs_mount, buf);
 
 	trie_init(&mtab->names);
 	trie_init(&mtab->types);
@@ -195,7 +211,7 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 	struct bfs_stat parent_stat;
 
 	for (size_t i = 0; i < mtab->nmounts; ++i) {
-		struct bfs_mount *mount = &mtab->mounts[i];
+		struct bfs_mount *mount = mtab->mounts[i];
 		const char *path = mount->path;
 		int fd = AT_FDCWD;
 
@@ -280,11 +296,8 @@ void bfs_mtab_free(struct bfs_mtab *mtab) {
 		trie_destroy(&mtab->types);
 		trie_destroy(&mtab->names);
 
-		for (size_t i = 0; i < mtab->nmounts; ++i) {
-			free(mtab->mounts[i].type);
-			free(mtab->mounts[i].path);
-		}
 		free(mtab->mounts);
+		varena_destroy(&mtab->varena);
 
 		free(mtab);
 	}
