@@ -9,6 +9,7 @@ export XMANDIR=${MANDIR}
 export XCC=${CC}
 export XINSTALL=${INSTALL}
 export XMKDIR=${MKDIR}
+export XPKG_CONFIG=${PKG_CONFIG}
 export XRM=${RM}
 
 export XCPPFLAGS=${CPPFLAGS}

@@ -34,6 +34,7 @@ ${GEN}/vars.mk::
 	@printf 'CC := %s\n' "$$XCC" >>$@
 	@printf 'INSTALL := %s\n' "$$XINSTALL" >>$@
 	@printf 'MKDIR := %s\n' "$$XMKDIR" >>$@
+	@printf 'PKG_CONFIG := %s\n' "$$XPKG_CONFIG" >>$@
 	@printf 'RM := %s\n' "$$XRM" >>$@
 	@printf 'PKGS :=\n' >>$@
 	${VCAT} $@
