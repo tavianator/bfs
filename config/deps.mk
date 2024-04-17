@@ -9,7 +9,7 @@ include ${GEN}/flags.mk
 include config/exports.mk
 
 ${GEN}/deps.mk::
-	${MSG} "[ GEN] $@"
+	${MSG} "[ GEN] ${TGT}"
 	printf '# %s\n' "$@" >$@
 	if config/cc.sh -MD -MP -MF /dev/null config/empty.c; then \
 	    printf 'DEPFLAGS = -MD -MP -MF $${@:.o=.d}\n'; \

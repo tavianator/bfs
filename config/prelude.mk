@@ -95,6 +95,9 @@ IS_V := ${TRUTHY,${V}}
 Q, := @
 Q  := ${Q,${IS_V}}
 
+# The current target, with ${BUILDDIR} stripped for shorter messages
+TGT = ${@:${BUILDDIR}/%=%}
+
 # Show full commands with `make V=1`, otherwise short summaries
 MSG = @msg() { \
           MSG="$$1"; \

@@ -64,7 +64,7 @@ ${BIN}/bfs: ${LIBBFS} ${OBJ}/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${MSG} "[ LD ] $@" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
+	+${MSG} "[ LD ] ${TGT}" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
 	${POSTLINK}
 
 # Get the .c file for a .o file

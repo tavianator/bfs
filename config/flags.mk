@@ -104,7 +104,7 @@ SETVAR = printf '%s := %s\n' >>$@
 APPEND = append() { test -z "$$2" || printf '%s += %s\n' "$$1" "$$2" >>$@; }; append
 
 ${GEN}/flags.mk::
-	${MSG} "[ GEN] $@"
+	${MSG} "[ GEN] ${TGT}"
 	printf '# %s\n' "$@" >$@
 	${SETVAR} CPPFLAGS "$$BFS_CPPFLAGS"
 	${APPEND} CPPFLAGS "$$TSAN_CPPFLAGS"

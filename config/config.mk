@@ -16,7 +16,7 @@ MKS := \
 
 # The main configuration file, which includes the others
 ${CONFIG}: ${MKS}
-	${MSG} "[ GEN] $@"
+	${MSG} "[ GEN] ${TGT}"
 	@printf '# %s\n' "$@" >$@
 	@printf 'include $${GEN}/%s\n' ${.ALLSRC:${GEN}/%=%} >>$@
 	${VCAT} ${CONFIG}
@@ -25,7 +25,7 @@ ${CONFIG}: ${MKS}
 # Saves the configurable variables
 ${GEN}/vars.mk::
 	@${MKDIR} ${@D}
-	${MSG} "[ GEN] $@"
+	${MSG} "[ GEN] ${TGT}"
 	@printf '# %s\n' "$@" >$@
 	@printf 'PREFIX := %s\n' "$$XPREFIX" >>$@
 	@printf 'MANDIR := %s\n' "$$XMANDIR" >>$@
@@ -53,7 +53,7 @@ ${GEN}/deps.mk: ${GEN}/flags.mk
 # Lists file.o: file.c dependencies
 ${GEN}/objs.mk::
 	@${MKDIR} ${@D}
-	${MSG} "[ GEN] $@"
+	${MSG} "[ GEN] ${TGT}"
 	@printf '# %s\n' "$@" >$@
 	@for obj in ${OBJS:${OBJ}/%.o=%}; do printf '$${OBJ}/%s.o: %s.c\n' "$$obj" "$$obj"; done >>$@
 

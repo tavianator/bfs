@@ -10,7 +10,7 @@ include ${GEN}/pkgs.mk
 include config/exports.mk
 
 ${GEN}/pkgs.mk::
-	${MSG} "[ GEN] $@"
+	${MSG} "[ GEN] ${TGT}"
 	config/pkgconf.sh --cflags ${PKGS} >>$@ 2>>$@.log
 	config/pkgconf.sh --ldflags ${PKGS} >>$@ 2>>$@.log
 	config/pkgconf.sh --ldlibs ${PKGS} >>$@ 2>>$@.log
