@@ -17,7 +17,9 @@ HEADERS := \
     ${GEN}/getprogname.h \
     ${GEN}/getprogname-gnu.h \
     ${GEN}/posix-spawn-addfchdir.h \
-    ${GEN}/posix-spawn-addfchdir-np.h
+    ${GEN}/posix-spawn-addfchdir-np.h \
+    ${GEN}/statx.h \
+    ${GEN}/statx-syscall.h
 
 ${GEN}/config.h: ${HEADERS}
 	${MSG} "[ GEN] ${TGT}"

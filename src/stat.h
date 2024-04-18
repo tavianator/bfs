@@ -17,16 +17,12 @@
 #include <sys/types.h>
 #include <time.h>
 
-#if defined(STATX_BASIC_STATS) && (!__ANDROID__ || __ANDROID_API__ >= 30)
-#  define BFS_HAS_LIBC_STATX true
-#elif __linux__
+#if !BFS_HAS_STATX && BFS_HAS_STATX_SYSCALL
 #  include <linux/stat.h>
 #endif
 
 #ifndef BFS_USE_STATX
-#  ifdef STATX_BASIC_STATS
-#    define BFS_USE_STATX true
-#  endif
+#  define BFS_USE_STATX (BFS_HAS_STATX || BFS_HAS_STATX_SYSCALL)
 #endif
 
 #if BFS_USE_SYS_PARAM_H

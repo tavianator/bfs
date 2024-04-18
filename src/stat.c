@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if BFS_USE_STATX && !BFS_HAS_LIBC_STATX
+#if BFS_USE_STATX && !BFS_HAS_STATX
 #  include <linux/stat.h>
 #  include <sys/syscall.h>
 #  include <unistd.h>
@@ -137,7 +137,7 @@ static int bfs_stat_impl(int at_fd, const char *at_path, int at_flags, struct bf
  * Wrapper for the statx() system call, which had no glibc wrapper prior to 2.28.
  */
 static int bfs_statx(int at_fd, const char *at_path, int at_flags, unsigned int mask, struct statx *buf) {
-#if BFS_HAS_LIBC_STATX
+#if BFS_HAS_STATX
 	int ret = statx(at_fd, at_path, at_flags, mask, buf);
 #else
 	int ret = syscall(SYS_statx, at_fd, at_path, at_flags, mask, buf);
