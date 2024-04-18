@@ -74,7 +74,8 @@ export TSAN_CFLAGS=${TSAN_CFLAGS,${_TSAN}}
 export UBSAN_CFLAGS=${UBSAN_CFLAGS,${_UBSAN}}
 
 SAN_CFLAGS,y := -fno-sanitize-recover=all
-SAN := ${NOT,${NOR,${_ASAN},${_LSAN},${_MSAN},${_TSAN},${_UBSAN}}}
+NO_SAN := ${NOR,${_ASAN},${_LSAN},${_MSAN},${_TSAN},${_UBSAN}}
+SAN := ${NOT,${NO_SAN}}
 export SAN_CFLAGS=${SAN_CFLAGS,${SAN}}
 
 # MSAN and TSAN both need all code to be instrumented
