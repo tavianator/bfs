@@ -17,7 +17,7 @@ default::
 	@if [ "${IS_V}" ]; then \
 	    cat ${TARGET}; \
 	elif grep -q PKGS ${TARGET}; then \
-	    printf '[ GEN] %-18s [y]\n' ${SHORT}; \
+	    printf '[ GEN] %-18s  ✔\n' ${SHORT}; \
 	else \
-	    printf '[ GEN] %-18s [n]\n' ${SHORT}; \
+	    printf '[ GEN] %-18s  ✘\n' ${SHORT}; \
 	fi
