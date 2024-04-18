@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "tests.h"
-#include "../src/alloc.h"
-#include "../src/bfstd.h"
-#include "../src/config.h"
-#include "../src/dstring.h"
-#include "../src/xspawn.h"
+#include "alloc.h"
+#include "bfstd.h"
+#include "config.h"
+#include "dstring.h"
+#include "xspawn.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>

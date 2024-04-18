@@ -6,9 +6,9 @@
  */
 
 #include "tests.h"
-#include "../src/bfstd.h"
-#include "../src/color.h"
-#include "../src/config.h"
+#include "bfstd.h"
+#include "color.h"
+#include "config.h"
 #include <errno.h>
 #include <locale.h>
 #include <stdio.h>

@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "tests.h"
-#include "../src/alloc.h"
-#include "../src/config.h"
-#include "../src/diag.h"
+#include "alloc.h"
+#include "config.h"
+#include "diag.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>

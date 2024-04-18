@@ -1,10 +1,10 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "../src/bfstd.h"
-#include "../src/config.h"
-#include "../src/sanity.h"
-#include "../src/xtime.h"
+#include "bfstd.h"
+#include "config.h"
+#include "sanity.h"
+#include "xtime.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

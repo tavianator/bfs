@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "tests.h"
-#include "../src/ioq.h"
-#include "../src/bfstd.h"
-#include "../src/config.h"
-#include "../src/diag.h"
-#include "../src/dir.h"
+#include "ioq.h"
+#include "bfstd.h"
+#include "config.h"
+#include "diag.h"
+#include "dir.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>

@@ -28,6 +28,7 @@ export XLDLIBS=${LDLIBS}
 
 # Immutable flags
 export BFS_CPPFLAGS= \
+    -Isrc \
     -D__EXTENSIONS__ \
     -D_ATFILE_SOURCE \
     -D_BSD_SOURCE \

@@ -6,7 +6,7 @@
  * program does the job.
  */
 
-#include "../src/bfstd.h"
+#include "bfstd.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

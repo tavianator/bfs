@@ -8,8 +8,8 @@
 #ifndef BFS_TESTS_H
 #define BFS_TESTS_H
 
-#include "../src/config.h"
-#include "../src/diag.h"
+#include "config.h"
+#include "diag.h"
 
 /** Unit test function type. */
 typedef bool test_fn(void);

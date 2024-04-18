@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "tests.h"
-#include "../src/trie.h"
-#include "../src/config.h"
-#include "../src/diag.h"
+#include "trie.h"
+#include "config.h"
+#include "diag.h"
 #include <stdlib.h>
 #include <string.h>
 

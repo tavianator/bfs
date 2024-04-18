@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "tests.h"
-#include "../src/bfstd.h"
-#include "../src/config.h"
-#include "../src/diag.h"
+#include "bfstd.h"
+#include "config.h"
+#include "diag.h"
 #include <errno.h>
 #include <langinfo.h>
 #include <stdlib.h>
