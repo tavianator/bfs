@@ -489,7 +489,7 @@ int dup_cloexec(int fd) {
 }
 
 int pipe_cloexec(int pipefd[2]) {
-#if __linux__ || (BSD && !__APPLE__)
+#if BFS_HAS_PIPE2
 	return pipe2(pipefd, O_CLOEXEC);
 #else
 	if (pipe(pipefd) != 0) {
