@@ -29,7 +29,6 @@ ${GEN}/vars.mk::
 	@printf 'PREFIX := %s\n' "$$XPREFIX" >>$@
 	@printf 'MANDIR := %s\n' "$$XMANDIR" >>$@
 	@printf 'OS := %s\n' "$${OS:-$$(uname)}" >>$@
-	@printf 'ARCH := %s\n' "$${ARCH:-$$(uname -m)}" >>$@
 	@printf 'CC := %s\n' "$$XCC" >>$@
 	@printf 'INSTALL := %s\n' "$$XINSTALL" >>$@
 	@printf 'MKDIR := %s\n' "$$XMKDIR" >>$@
