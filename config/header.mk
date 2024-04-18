@@ -10,7 +10,9 @@ include config/exports.mk
 # All header fragments we generate
 HEADERS := \
     ${GEN}/getprogname.h \
-    ${GEN}/getprogname-gnu.h
+    ${GEN}/getprogname-gnu.h \
+    ${GEN}/posix-spawn-addfchdir.h \
+    ${GEN}/posix-spawn-addfchdir-np.h
 
 ${GEN}/config.h: ${HEADERS}
 	${MSG} "[ GEN] ${TGT}"

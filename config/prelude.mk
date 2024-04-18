@@ -110,7 +110,7 @@ MSG = @msg() { \
       msg
 
 # Maximum width of a short message, to align the [X]
-MSG_WIDTH := 24
+MSG_WIDTH := 33
 
 # cat a file if V=1
 VCAT,y := @cat

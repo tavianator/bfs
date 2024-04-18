@@ -212,7 +212,7 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
  * but macOS and NetBSD resolve the PATH *before* file_actions (because there
  * posix_spawn() is its own syscall).
  */
-#define BFS_POSIX_SPAWNP_AFTER_FCHDIR !(__APPLE__ || __NetBSD_Prereq__(10, 0, 0))
+#define BFS_POSIX_SPAWNP_AFTER_FCHDIR !(__APPLE__ || __NetBSD__)
 
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
@@ -220,29 +220,15 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 		return -1;
 	}
 
-#ifndef BFS_HAS_POSIX_SPAWN_FCHDIR
-#  define BFS_HAS_POSIX_SPAWN_FCHDIR __NetBSD_Prereq__(10, 0, 0)
-#endif
-
-#ifndef BFS_HAS_POSIX_SPAWN_FCHDIR_NP
-#  if __GLIBC__
-#    define BFS_HAS_POSIX_SPAWN_FCHDIR_NP __GLIBC_PREREQ(2, 29)
-#  elif __ANDROID__
-#    define BFS_HAS_POSIX_SPAWN_FCHDIR_NP (__ANDROID_API__ >= 34)
-#  else
-#    define BFS_HAS_POSIX_SPAWN_FCHDIR_NP (__linux__ || __FreeBSD__ || __APPLE__)
-#  endif
-#endif
-
-#if BFS_HAS_POSIX_SPAWN_FCHDIR
-#  define BFS_POSIX_SPAWN_FCHDIR posix_spawn_file_actions_addfchdir
-#elif BFS_HAS_POSIX_SPAWN_FCHDIR_NP
-#  define BFS_POSIX_SPAWN_FCHDIR posix_spawn_file_actions_addfchdir_np
+#if BFS_HAS_POSIX_SPAWN_ADDFCHDIR
+#  define BFS_POSIX_SPAWN_ADDFCHDIR posix_spawn_file_actions_addfchdir
+#elif BFS_HAS_POSIX_SPAWN_ADDFCHDIR_NP
+#  define BFS_POSIX_SPAWN_ADDFCHDIR posix_spawn_file_actions_addfchdir_np
 #endif
 
 #if _POSIX_SPAWN > 0 && defined(BFS_POSIX_SPAWN_FCHDIR)
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
-		errno = BFS_POSIX_SPAWN_FCHDIR(&ctx->actions, fd);
+		errno = BFS_POSIX_SPAWN_ADDFCHDIR(&ctx->actions, fd);
 		if (errno != 0) {
 			free(action);
 			return -1;
