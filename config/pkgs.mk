@@ -11,7 +11,7 @@ include config/exports.mk
 
 ${GEN}/pkgs.mk::
 	${MSG} "[ GEN] ${TGT}"
-	config/pkgconf.sh --cflags ${PKGS} >>$@ 2>>$@.log
-	config/pkgconf.sh --ldflags ${PKGS} >>$@ 2>>$@.log
-	config/pkgconf.sh --ldlibs ${PKGS} >>$@ 2>>$@.log
+	printf 'CFLAGS += %s\n' "$$(config/pkgconf.sh --cflags ${PKGS})" >>$@ 2>>$@.log
+	printf 'LDFLAGS += %s\n' "$$(config/pkgconf.sh --ldflags ${PKGS})" >>$@ 2>>$@.log
+	printf 'LDLIBS := %s $${LDLIBS}\n' "$$(config/pkgconf.sh --ldlibs ${PKGS})" >>$@ 2>>$@.log
 	${VCAT} $@

@@ -23,66 +23,66 @@ case "$XNOLIBS" in
         exit 1
 esac
 
+if [ -z "$MODE" ]; then
+    # Check whether the libraries exist at all
+    for LIB; do
+        CFLAGS=$("$0" --cflags "$LIB") || exit 1
+        LDFLAGS=$("$0" --ldflags "$LIB") || exit 1
+        LDLIBS=$("$0" --ldlibs "$LIB") || exit 1
+        config/cc.sh $CFLAGS $LDFLAGS config/$LIB.c $LDLIBS || exit 1
+    done
+fi
+
+# Defer to pkg-config if possible
 if command -v "${XPKG_CONFIG:-}" >/dev/null 2>&1; then
     case "$MODE" in
-        "")
-            "$XPKG_CONFIG" "$@"
-            ;;
         --cflags)
-            OUT=$("$XPKG_CONFIG" --cflags "$@")
-            if [ "$OUT" ]; then
-                printf 'CFLAGS += %s\n' "$OUT"
-            fi
+            "$XPKG_CONFIG" --cflags "$@"
             ;;
         --ldflags)
-            OUT=$("$XPKG_CONFIG" --libs-only-L --libs-only-other "$@")
-            if [ "$OUT" ]; then
-                printf 'LDFLAGS += %s\n' "$OUT"
-            fi
+            "$XPKG_CONFIG" --libs-only-L --libs-only-other "$@"
             ;;
         --ldlibs)
-            OUT=$("$XPKG_CONFIG" --libs-only-l "$@")
-            if [ "$OUT" ]; then
-                printf 'LDLIBS := %s ${LDLIBS}\n' "$OUT"
-            fi
+            "$XPKG_CONFIG" --libs-only-l "$@"
             ;;
     esac
-else
-    LDLIBS=""
-    for LIB; do
-        case "$LIB" in
-            libacl)
-                LDLIB=-lacl
-                ;;
-            libcap)
-                LDLIB=-lcap
-                ;;
-            libselinux)
-                LDLIB=-lselinux
-                ;;
-            liburing)
-                LDLIB=-luring
-                ;;
-            oniguruma)
-                LDLIB=-lonig
-                ;;
-            *)
-                printf 'error: Unknown package %s\n' "$LIB" >&2
-                exit 1
-                ;;
-        esac
 
-        case "$MODE" in
-            "")
-                config/cc.sh "config/$LIB.c" "$LDLIB" || exit $?
-                ;;
-            --ldlibs)
-                LDLIBS="$LDLIBS $LDLIB"
-                ;;
-        esac
-    done
-
-    if [ "$MODE" = "--ldlibs" ] && [ "$LDLIBS" ]; then
-        printf 'LDLIBS :=%s ${LDLIBS}\n' "$LDLIBS"
-    fi
+    exit
 fi
+
+# pkg-config unavailable, emulate it ourselves
+CFLAGS=""
+LDFLAGS=""
+LDLIBS=""
+
+for LIB; do
+    case "$LIB" in
+        libacl)
+            LDLIB=-lacl
+            ;;
+        libcap)
+            LDLIB=-lcap
+            ;;
+        libselinux)
+            LDLIB=-lselinux
+            ;;
+        liburing)
+            LDLIB=-luring
+            ;;
+        oniguruma)
+            LDLIB=-lonig
+            ;;
+        *)
+            printf 'error: Unknown package %s\n' "$LIB" >&2
+            exit 1
+            ;;
+    esac
+
+    LDLIBS="$LDLIBS$LDLIB "
+done
+
+case "$MODE" in
+    --ldlibs)
+        printf '%s\n' "$LDLIBS"
+    ;;
+esac
