@@ -186,10 +186,10 @@ char *xgetdelim(FILE *file, char delim) {
 
 const char *xgetprogname(void) {
 	const char *cmd = NULL;
-#if __GLIBC__
-	cmd = program_invocation_short_name;
-#elif BSD
+#if BFS_HAS_GETPROGNAME
 	cmd = getprogname();
+#elif BFS_HAS_GETPROGNAME_GNU
+	cmd = program_invocation_short_name;
 #endif
 
 	if (!cmd) {

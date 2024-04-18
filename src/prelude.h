@@ -26,6 +26,8 @@
 
 // bfs packaging configuration
 
+#include "config.h"
+
 #ifndef BFS_COMMAND
 #  define BFS_COMMAND "bfs"
 #endif
