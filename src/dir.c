@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #if BFS_USE_GETDENTS
-#  if __linux__
+#  if BFS_HAS_GETDENTS64_SYSCALL
 #    include <sys/syscall.h>
 #  endif
 
@@ -25,12 +25,14 @@
 static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 	sanitize_uninit(buf, size);
 
-#if (__linux__ && __GLIBC__ && !__GLIBC_PREREQ(2, 30)) || __ANDROID__
-	ssize_t ret = syscall(SYS_getdents64, fd, buf, size);
-#elif __linux__
-	ssize_t ret = getdents64(fd, buf, size);
-#else
+#if BFS_HAS_GETDENTS
 	ssize_t ret = getdents(fd, buf, size);
+#elif BFS_HAS_GETDENTS64
+	ssize_t ret = getdents64(fd, buf, size);
+#elif BFS_HAS_GETDENTS64_SYSCALL
+	ssize_t ret = syscall(SYS_getdents64, fd, buf, size);
+#else
+#  error "No getdents() implementation"
 #endif
 
 	if (ret > 0) {
@@ -42,7 +44,7 @@ static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 
 #endif // BFS_USE_GETDENTS
 
-#if BFS_USE_GETDENTS && __linux__
+#if BFS_USE_GETDENTS && !BFS_HAS_GETDENTS
 /** Directory entry type for bfs_getdents() */
 typedef struct dirent64 sys_dirent;
 #else

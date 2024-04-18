@@ -14,8 +14,8 @@
  * Whether the implementation uses the getdents() syscall directly, rather than
  * libc's readdir().
  */
-#ifndef BFS_USE_GETDENTS
-#  define BFS_USE_GETDENTS (__linux__ || __FreeBSD__)
+#if !defined(BFS_USE_GETDENTS) && (__linux__ || __FreeBSD__)
+#  define BFS_USE_GETDENTS (BFS_HAS_GETDENTS || BFS_HAS_GETDENTS64 | BFS_HAS_GETDENTS64_SYSCALL)
 #endif
 
 /**

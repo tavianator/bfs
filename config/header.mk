@@ -9,6 +9,9 @@ include config/exports.mk
 
 # All header fragments we generate
 HEADERS := \
+    ${GEN}/getdents.h \
+    ${GEN}/getdents64.h \
+    ${GEN}/getdents64-syscall.h \
     ${GEN}/getprogname.h \
     ${GEN}/getprogname-gnu.h \
     ${GEN}/posix-spawn-addfchdir.h \
