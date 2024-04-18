@@ -8,7 +8,7 @@
 #ifndef BFS_DIAG_H
 #define BFS_DIAG_H
 
-#include "config.h"
+#include "prelude.h"
 #include <stdarg.h>
 
 /**

@@ -25,11 +25,11 @@
  * effects are reachable at all, skipping the traversal if not.
  */
 
+#include "prelude.h"
 #include "opt.h"
 #include "bftw.h"
 #include "bit.h"
 #include "color.h"
-#include "config.h"
 #include "ctx.h"
 #include "diag.h"
 #include "dir.h"

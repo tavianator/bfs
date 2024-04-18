@@ -8,7 +8,7 @@
 #ifndef BFS_BFSTD_H
 #define BFS_BFSTD_H
 
-#include "config.h"
+#include "prelude.h"
 #include "sanity.h"
 #include <stddef.h>
 

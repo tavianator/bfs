@@ -8,7 +8,7 @@
 #ifndef BFS_IOQ_H
 #define BFS_IOQ_H
 
-#include "config.h"
+#include "prelude.h"
 #include "dir.h"
 #include "stat.h"
 #include <stddef.h>

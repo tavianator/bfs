@@ -8,7 +8,7 @@
 #ifndef BFS_ALLOC_H
 #define BFS_ALLOC_H
 
-#include "config.h"
+#include "prelude.h"
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>

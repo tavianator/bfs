@@ -8,7 +8,7 @@
 #ifndef BFS_COLOR_H
 #define BFS_COLOR_H
 
-#include "config.h"
+#include "prelude.h"
 #include "dstring.h"
 #include <stdio.h>
 

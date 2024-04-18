@@ -12,7 +12,7 @@
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
 
-#include "config.h"
+#include "prelude.h"
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>

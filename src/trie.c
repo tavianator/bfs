@@ -81,10 +81,10 @@
  * and insert intermediate singleton "jump" nodes when necessary.
  */
 
+#include "prelude.h"
 #include "trie.h"
 #include "alloc.h"
 #include "bit.h"
-#include "config.h"
 #include "diag.h"
 #include "list.h"
 #include <stdint.h>

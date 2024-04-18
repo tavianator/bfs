@@ -1,9 +1,9 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "alloc.h"
 #include "bit.h"
-#include "config.h"
 #include "diag.h"
 #include "sanity.h"
 #include <errno.h>

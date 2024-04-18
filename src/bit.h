@@ -8,7 +8,7 @@
 #ifndef BFS_BIT_H
 #define BFS_BIT_H
 
-#include "config.h"
+#include "prelude.h"
 #include <limits.h>
 #include <stdint.h>
 

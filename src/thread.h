@@ -8,7 +8,7 @@
 #ifndef BFS_THREAD_H
 #define BFS_THREAD_H
 
-#include "config.h"
+#include "prelude.h"
 #include <pthread.h>
 
 #if __STDC_VERSION__ < C23 && !defined(thread_local)

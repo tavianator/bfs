@@ -8,7 +8,7 @@
 #ifndef BFS_MTAB_H
 #define BFS_MTAB_H
 
-#include "config.h"
+#include "prelude.h"
 
 struct bfs_stat;
 

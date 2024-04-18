@@ -5,8 +5,8 @@
  * Configuration and feature/platform detection.
  */
 
-#ifndef BFS_CONFIG_H
-#define BFS_CONFIG_H
+#ifndef BFS_PRELUDE_H
+#define BFS_PRELUDE_H
 
 // Possible __STDC_VERSION__ values
 
@@ -374,4 +374,4 @@ typedef long double max_align_t;
 // Only trigger an error on more than 9 arguments
 #define attr_too_many_none(...)
 
-#endif // BFS_CONFIG_H
+#endif // BFS_PRELUDE_H

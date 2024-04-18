@@ -1,9 +1,9 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "tests.h"
 #include "bit.h"
-#include "config.h"
 #include "diag.h"
 #include <limits.h>
 #include <stdint.h>

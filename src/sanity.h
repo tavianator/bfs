@@ -8,7 +8,7 @@
 #ifndef BFS_SANITY_H
 #define BFS_SANITY_H
 
-#include "config.h"
+#include "prelude.h"
 #include <stddef.h>
 
 #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)

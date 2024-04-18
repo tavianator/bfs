@@ -8,12 +8,12 @@
  * flags like always-true options, and skipping over paths wherever they appear.
  */
 
+#include "prelude.h"
 #include "parse.h"
 #include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
-#include "config.h"
 #include "ctx.h"
 #include "diag.h"
 #include "dir.h"

@@ -8,9 +8,9 @@
 #ifndef BFS_CTX_H
 #define BFS_CTX_H
 
+#include "prelude.h"
 #include "alloc.h"
 #include "bftw.h"
-#include "config.h"
 #include "diag.h"
 #include "expr.h"
 #include "trie.h"

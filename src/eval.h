@@ -9,7 +9,7 @@
 #ifndef BFS_EVAL_H
 #define BFS_EVAL_H
 
-#include "config.h"
+#include "prelude.h"
 
 struct bfs_ctx;
 struct bfs_expr;

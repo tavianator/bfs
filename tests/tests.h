@@ -8,7 +8,7 @@
 #ifndef BFS_TESTS_H
 #define BFS_TESTS_H
 
-#include "config.h"
+#include "prelude.h"
 #include "diag.h"
 
 /** Unit test function type. */

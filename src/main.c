@@ -26,7 +26,7 @@
  *     - bit.h         (bit manipulation)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
- *     - config.h      (configuration and feature/platform detection)
+ *     - prelude.h     (configuration and feature/platform detection)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
@@ -45,8 +45,8 @@
  *     - xtime.[ch]    (date/time handling utilities)
  */
 
+#include "prelude.h"
 #include "bfstd.h"
-#include "config.h"
 #include "ctx.h"
 #include "diag.h"
 #include "eval.h"

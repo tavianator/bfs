@@ -1,11 +1,11 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "fsade.h"
 #include "atomic.h"
 #include "bfstd.h"
 #include "bftw.h"
-#include "config.h"
 #include "dir.h"
 #include "dstring.h"
 #include "sanity.h"

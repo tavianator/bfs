@@ -5,10 +5,10 @@
  * Entry point for unit tests.
  */
 
+#include "prelude.h"
 #include "tests.h"
 #include "bfstd.h"
 #include "color.h"
-#include "config.h"
 #include <errno.h>
 #include <locale.h>
 #include <stdio.h>

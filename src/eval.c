@@ -5,12 +5,12 @@
  * Implementation of all the primary expressions.
  */
 
+#include "prelude.h"
 #include "eval.h"
 #include "bar.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
-#include "config.h"
 #include "ctx.h"
 #include "diag.h"
 #include "dir.h"

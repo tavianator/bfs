@@ -118,12 +118,12 @@
  * [1]: https://arxiv.org/abs/2201.02179
  */
 
+#include "prelude.h"
 #include "ioq.h"
 #include "alloc.h"
 #include "atomic.h"
 #include "bfstd.h"
 #include "bit.h"
-#include "config.h"
 #include "diag.h"
 #include "dir.h"
 #include "stat.h"

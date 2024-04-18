@@ -18,10 +18,10 @@
  *   various helper functions to take fewer parameters.
  */
 
+#include "prelude.h"
 #include "bftw.h"
 #include "alloc.h"
 #include "bfstd.h"
-#include "config.h"
 #include "diag.h"
 #include "dir.h"
 #include "dstring.h"

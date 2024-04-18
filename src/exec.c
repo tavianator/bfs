@@ -1,12 +1,12 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "exec.h"
 #include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
-#include "config.h"
 #include "ctx.h"
 #include "diag.h"
 #include "dstring.h"
