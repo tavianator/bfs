@@ -581,10 +581,7 @@ int xfaccessat(int fd, const char *path, int amode) {
 }
 
 char *xconfstr(int name) {
-#if __ANDROID__
-	errno = ENOTSUP;
-	return NULL;
-#else
+#if BFS_HAS_CONFSTR
 	size_t len = confstr(name, NULL, 0);
 	if (len == 0) {
 		return NULL;
@@ -601,7 +598,10 @@ char *xconfstr(int name) {
 	}
 
 	return str;
-#endif // !__ANDROID__
+#else
+	errno = ENOTSUP;
+	return NULL;
+#endif
 }
 
 char *xreadlinkat(int fd, const char *path, size_t size) {

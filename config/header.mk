@@ -9,6 +9,7 @@ include config/exports.mk
 
 # All header fragments we generate
 HEADERS := \
+    ${GEN}/confstr.h \
     ${GEN}/getdents.h \
     ${GEN}/getdents64.h \
     ${GEN}/getdents64-syscall.h \
