@@ -199,7 +199,7 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 		return bfs_check_posix1e_acl(acl, false);
 	}
 
-#if __FreeBSD__
+#if BFS_HAS_ACL_IS_TRIVIAL_NP
 	int trivial;
 	int ret = acl_is_trivial_np(acl, &trivial);
 
@@ -213,7 +213,7 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 	} else {
 		return 1;
 	}
-#else // !__FreeBSD__
+#else
 	return bfs_check_posix1e_acl(acl, true);
 #endif
 }

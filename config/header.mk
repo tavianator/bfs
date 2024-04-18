@@ -9,6 +9,7 @@ include config/exports.mk
 
 # All header fragments we generate
 HEADERS := \
+    ${GEN}/acl-is-trivial-np.h \
     ${GEN}/confstr.h \
     ${GEN}/getdents.h \
     ${GEN}/getdents64.h \
