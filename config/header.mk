@@ -24,6 +24,7 @@ HEADERS := \
     ${GEN}/st-acmtimespec.h \
     ${GEN}/st-birthtim.h \
     ${GEN}/st-birthtimespec.h \
+    ${GEN}/st-flags.h \
     ${GEN}/statx.h \
     ${GEN}/statx-syscall.h \
     ${GEN}/strerror-l.h \

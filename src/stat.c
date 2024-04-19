@@ -99,7 +99,7 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 	dest->rdev = src->st_rdev;
 	dest->mask |= BFS_STAT_RDEV;
 
-#if BSD
+#if BFS_HAS_ST_FLAGS
 	dest->attrs = src->st_flags;
 	dest->mask |= BFS_STAT_ATTRS;
 #endif
