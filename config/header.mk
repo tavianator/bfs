@@ -18,6 +18,7 @@ HEADERS := \
     ${GEN}/getdents64-syscall.h \
     ${GEN}/getprogname.h \
     ${GEN}/getprogname-gnu.h \
+    ${GEN}/max-align-t.h \
     ${GEN}/pipe2.h \
     ${GEN}/posix-spawn-addfchdir.h \
     ${GEN}/posix-spawn-addfchdir-np.h \

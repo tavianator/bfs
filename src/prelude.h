@@ -182,13 +182,24 @@ extern const char bfs_version[];
 #endif
 
 /**
+ * Polyfill max_align_t if we don't already have it.
+ */
+#if !BFS_HAS_MAX_ALIGN_T
+typedef union {
+#  ifdef __BIGGEST_ALIGNMENT__
+	alignas(__BIGGEST_ALIGNMENT__) char c;
+#  else
+	long double ld;
+	long long ll;
+	void *ptr;
+#  endif
+} max_align_t;
+#endif
+
+/**
  * Alignment specifier that avoids false sharing.
  */
 #define cache_align alignas(FALSE_SHARING_SIZE)
-
-#if __COSMOPOLITAN__
-typedef long double max_align_t;
-#endif
 
 // Wrappers for attributes
 
