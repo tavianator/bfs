@@ -20,7 +20,11 @@ HEADERS := \
     ${GEN}/posix-spawn-addfchdir.h \
     ${GEN}/posix-spawn-addfchdir-np.h \
     ${GEN}/statx.h \
-    ${GEN}/statx-syscall.h
+    ${GEN}/statx-syscall.h \
+    ${GEN}/strerror-l.h \
+    ${GEN}/strerror-r-gnu.h \
+    ${GEN}/strerror-r-posix.h \
+    ${GEN}/uselocale.h
 
 ${GEN}/config.h: ${HEADERS}
 	${MSG} "[ GEN] ${TGT}"

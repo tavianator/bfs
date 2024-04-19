@@ -317,35 +317,33 @@ const char *xstrerror(int errnum) {
 	const char *ret = NULL;
 	static thread_local char buf[256];
 
-	// - __APPLE__
-	// - __COSMOPOLITAN__
-	//     - No strerror_l()
-	// - __FreeBSD__ && SANITIZE_MEMORY
-	//     - duplocale() triggers https://github.com/llvm/llvm-project/issues/65532
-#if __APPLE__ || __COSMOPOLITAN__ || (__FreeBSD__ && SANITIZE_MEMORY)
+	// On FreeBSD with MemorySanitizer, duplocale() triggers
+	// https://github.com/llvm/llvm-project/issues/65532
+#if BFS_HAS_STRERROR_L && !(__FreeBSD__ && SANITIZE_MEMORY)
+#  if BFS_HAS_USELOCALE
+	locale_t loc = uselocale((locale_t)0);
+#  else
+	locale_t loc = LC_GLOBAL_LOCALE;
+#  endif
+
+	bool free_loc = false;
+	if (loc == LC_GLOBAL_LOCALE) {
+		loc = duplocale(loc);
+		free_loc = true;
+	}
+
+	if (loc != (locale_t)0) {
+		ret = strerror_l(errnum, loc);
+		if (free_loc) {
+			freelocale(loc);
+		}
+	}
+#elif BFS_HAS_STRERROR_R_POSIX
 	if (strerror_r(errnum, buf, sizeof(buf)) == 0) {
 		ret = buf;
 	}
-#else
-#  if __NetBSD__
-	// NetBSD has no thread-specific locales
-	locale_t loc = LC_GLOBAL_LOCALE;
-#  else
-	locale_t loc = uselocale((locale_t)0);
-#  endif
-
-	locale_t copy = loc;
-	if (copy == LC_GLOBAL_LOCALE) {
-		copy = duplocale(copy);
-	}
-
-	if (copy != (locale_t)0) {
-		ret = strerror_l(errnum, copy);
-
-		if (loc == LC_GLOBAL_LOCALE) {
-			freelocale(copy);
-		}
-	}
+#elif BFS_HAS_STRERROR_R_GNU
+	ret = strerror_r(errnum, buf, sizeof(buf));
 #endif
 
 	if (!ret) {
