@@ -24,12 +24,12 @@ static void *xmemalign(size_t align, size_t size) {
 	bfs_assert(align >= sizeof(void *));
 	bfs_assert(is_aligned(align, size));
 
-#if __APPLE__
+#if BFS_HAS_ALIGNED_ALLOC
+	return aligned_alloc(align, size);
+#else
 	void *ptr = NULL;
 	errno = posix_memalign(&ptr, align, size);
 	return ptr;
-#else
-	return aligned_alloc(align, size);
 #endif
 }
 

@@ -10,6 +10,7 @@ include config/exports.mk
 # All header fragments we generate
 HEADERS := \
     ${GEN}/acl-is-trivial-np.h \
+    ${GEN}/aligned-alloc.h \
     ${GEN}/confstr.h \
     ${GEN}/fdclosedir.h \
     ${GEN}/getdents.h \
