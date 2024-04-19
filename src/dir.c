@@ -353,7 +353,7 @@ int bfs_closedir(struct bfs_dir *dir) {
 int bfs_unwrapdir(struct bfs_dir *dir) {
 #if BFS_USE_GETDENTS
 	int ret = dir->fd;
-#elif __FreeBSD__
+#elif BFS_HAS_FDCLOSEDIR
 	int ret = fdclosedir(dir->dir);
 #endif
 

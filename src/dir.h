@@ -152,7 +152,7 @@ int bfs_closedir(struct bfs_dir *dir);
  * Whether the bfs_unwrapdir() function is supported.
  */
 #ifndef BFS_USE_UNWRAPDIR
-#  define BFS_USE_UNWRAPDIR (BFS_USE_GETDENTS || __FreeBSD__)
+#  define BFS_USE_UNWRAPDIR (BFS_USE_GETDENTS || BFS_HAS_FDCLOSEDIR)
 #endif
 
 #if BFS_USE_UNWRAPDIR

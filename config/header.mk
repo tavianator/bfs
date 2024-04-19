@@ -11,6 +11,7 @@ include config/exports.mk
 HEADERS := \
     ${GEN}/acl-is-trivial-np.h \
     ${GEN}/confstr.h \
+    ${GEN}/fdclosedir.h \
     ${GEN}/getdents.h \
     ${GEN}/getdents64.h \
     ${GEN}/getdents64-syscall.h \
