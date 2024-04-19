@@ -25,6 +25,7 @@ HEADERS := \
     ${GEN}/strerror-l.h \
     ${GEN}/strerror-r-gnu.h \
     ${GEN}/strerror-r-posix.h \
+    ${GEN}/tm-gmtoff.h \
     ${GEN}/uselocale.h
 
 ${GEN}/config.h: ${HEADERS}

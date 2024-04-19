@@ -1755,7 +1755,7 @@ static int parse_reftime(const struct bfs_parser *parser, struct bfs_expr *expr)
 	fprintf(stderr, "  - %04d-%02d-%02d\n", year, month, tm.tm_mday);
 	fprintf(stderr, "  - %04d-%02d-%02dT%02d:%02d:%02d\n", year, month, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-#if __FreeBSD__
+#if BFS_HAS_TM_GMTOFF
 	int gmtoff = tm.tm_gmtoff;
 #else
 	int gmtoff = -timezone;
