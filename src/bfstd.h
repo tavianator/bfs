@@ -283,11 +283,21 @@ int xminor(dev_t dev);
 
 // #include <sys/stat.h>
 
-#if __APPLE__
-#  define st_atim st_atimespec
-#  define st_ctim st_ctimespec
-#  define st_mtim st_mtimespec
-#  define st_birthtim st_birthtimespec
+/**
+ * Get the access/change/modification time from a struct stat.
+ */
+#if BFS_HAS_ST_ACMTIM
+#  define ST_ATIM(sb) (sb).st_atim
+#  define ST_CTIM(sb) (sb).st_ctim
+#  define ST_MTIM(sb) (sb).st_mtim
+#elif BFS_HAS_ST_ACMTIMESPEC
+#  define ST_ATIM(sb) (sb).st_atimespec
+#  define ST_CTIM(sb) (sb).st_ctimespec
+#  define ST_MTIM(sb) (sb).st_mtimespec
+#else
+#  define ST_ATIM(sb) ((struct timespec) { .tv_sec = (sb).st_atime })
+#  define ST_CTIM(sb) ((struct timespec) { .tv_sec = (sb).st_ctime })
+#  define ST_MTIM(sb) ((struct timespec) { .tv_sec = (sb).st_mtime })
 #endif
 
 // #include <sys/wait.h>

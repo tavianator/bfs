@@ -237,8 +237,8 @@ int main(int argc, char *argv[]) {
 			fprintf(stderr, "%s: '%s': %s\n", cmd, rarg, xstrerror(errno));
 			return EXIT_FAILURE;
 		}
-		times[0] = buf.st_atim;
-		times[1] = buf.st_mtim;
+		times[0] = ST_ATIM(buf);
+		times[1] = ST_MTIM(buf);
 	} else if (darg) {
 		if (xgetdate(darg, &times[0]) != 0) {
 			fprintf(stderr, "%s: Parsing time '%s' failed: %s\n", cmd, darg, xstrerror(errno));

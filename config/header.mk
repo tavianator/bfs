@@ -20,6 +20,10 @@ HEADERS := \
     ${GEN}/pipe2.h \
     ${GEN}/posix-spawn-addfchdir.h \
     ${GEN}/posix-spawn-addfchdir-np.h \
+    ${GEN}/st-acmtim.h \
+    ${GEN}/st-acmtimespec.h \
+    ${GEN}/st-birthtim.h \
+    ${GEN}/st-birthtimespec.h \
     ${GEN}/statx.h \
     ${GEN}/statx-syscall.h \
     ${GEN}/strerror-l.h \

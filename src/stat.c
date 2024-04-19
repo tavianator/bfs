@@ -104,17 +104,20 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 	dest->mask |= BFS_STAT_ATTRS;
 #endif
 
-	dest->atime = src->st_atim;
+	dest->atime = ST_ATIM(*src);
 	dest->mask |= BFS_STAT_ATIME;
 
-	dest->ctime = src->st_ctim;
+	dest->ctime = ST_CTIM(*src);
 	dest->mask |= BFS_STAT_CTIME;
 
-	dest->mtime = src->st_mtim;
+	dest->mtime = ST_MTIM(*src);
 	dest->mask |= BFS_STAT_MTIME;
 
-#if __APPLE__ || __FreeBSD__ || __NetBSD__
+#if BFS_HAS_ST_BIRTHTIM
 	dest->btime = src->st_birthtim;
+	dest->mask |= BFS_STAT_BTIME;
+#elif BFS_HAS_ST_BIRTHTIMESPEC
+	dest->btime = src->st_birthtimespec;
 	dest->mask |= BFS_STAT_BTIME;
 #endif
 }
