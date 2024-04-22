@@ -12,6 +12,10 @@ HEADERS := \
     ${GEN}/acl-is-trivial-np.h \
     ${GEN}/aligned-alloc.h \
     ${GEN}/confstr.h \
+    ${GEN}/extattr-get-file.h \
+    ${GEN}/extattr-get-link.h \
+    ${GEN}/extattr-list-file.h \
+    ${GEN}/extattr-list-link.h \
     ${GEN}/fdclosedir.h \
     ${GEN}/getdents.h \
     ${GEN}/getdents64.h \

@@ -106,7 +106,7 @@ extern const char bfs_version[];
 #  define BFS_USE_SYS_CAPABILITY_H (BFS_HAS_SYS_CAPABILITY_H && !__FreeBSD__ && (!__linux__ || BFS_USE_LIBCAP))
 #endif
 #ifndef BFS_USE_SYS_EXTATTR_H
-#  define BFS_USE_SYS_EXTATTR_H (BFS_HAS_SYS_EXTATTR_H && !__DragonFly__)
+#  define BFS_USE_SYS_EXTATTR_H BFS_HAS_SYS_EXTATTR_H
 #endif
 #ifndef BFS_USE_SYS_MKDEV_H
 #  define BFS_USE_SYS_MKDEV_H BFS_HAS_SYS_MKDEV_H

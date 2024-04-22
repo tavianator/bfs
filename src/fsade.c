@@ -327,17 +327,62 @@ int bfs_check_capabilities(const struct BFTW *ftwbuf) {
 
 #if BFS_CAN_CHECK_XATTRS
 
+#if BFS_USE_SYS_EXTATTR_H
+
+/** Wrapper for extattr_list_{file,link}. */
+static ssize_t bfs_extattr_list(const char *path, enum bfs_type type, int namespace) {
+	if (type == BFS_LNK) {
+#if BFS_HAS_EXTATTR_LIST_LINK
+		return extattr_list_link(path, namespace, NULL, 0);
+#elif BFS_HAS_EXTATTR_GET_LINK
+		return extattr_get_link(path, namespace, "", NULL, 0);
+#else
+		return 0;
+#endif
+	}
+
+#if BFS_HAS_EXTATTR_LIST_FILE
+	return extattr_list_file(path, namespace, NULL, 0);
+#elif BFS_HAS_EXTATTR_GET_FILE
+	// From man extattr(2):
+	//
+	//     In earlier versions of this API, passing an empty string for the
+	//     attribute name to extattr_get_file() would return the list of attributes
+	//     defined for the target object.  This interface has been deprecated in
+	//     preference to using the explicit list API, and should not be used.
+	return extattr_get_file(path, namespace, "", NULL, 0);
+#else
+	return 0;
+#endif
+}
+
+/** Wrapper for extattr_get_{file,link}. */
+static ssize_t bfs_extattr_get(const char *path, enum bfs_type type, int namespace, const char *name) {
+	if (type == BFS_LNK) {
+#if BFS_HAS_EXTATTR_GET_LINK
+		return extattr_get_link(path, namespace, name, NULL, 0);
+#else
+		return 0;
+#endif
+	}
+
+#if BFS_HAS_EXTATTR_GET_FILE
+	return extattr_get_file(path, namespace, name, NULL, 0);
+#else
+	return 0;
+#endif
+}
+
+#endif // BFS_USE_SYS_EXTATTR_H
+
 int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	const char *path = fake_at(ftwbuf);
 	ssize_t len;
 
 #if BFS_USE_SYS_EXTATTR_H
-	ssize_t (*extattr_list)(const char *, int, void *, size_t) =
-		ftwbuf->type == BFS_LNK ? extattr_list_link : extattr_list_file;
-
-	len = extattr_list(path, EXTATTR_NAMESPACE_SYSTEM, NULL, 0);
+	len = bfs_extattr_list(path, ftwbuf->type, EXTATTR_NAMESPACE_SYSTEM);
 	if (len <= 0) {
-		len = extattr_list(path, EXTATTR_NAMESPACE_USER, NULL, 0);
+		len = bfs_extattr_list(path, ftwbuf->type, EXTATTR_NAMESPACE_USER);
 	}
 #elif __APPLE__
 	int options = ftwbuf->type == BFS_LNK ? XATTR_NOFOLLOW : 0;
@@ -371,12 +416,9 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 	ssize_t len;
 
 #if BFS_USE_SYS_EXTATTR_H
-	ssize_t (*extattr_get)(const char *, int, const char *, void *, size_t) =
-		ftwbuf->type == BFS_LNK ? extattr_get_link : extattr_get_file;
-
-	len = extattr_get(path, EXTATTR_NAMESPACE_SYSTEM, name, NULL, 0);
+	len = bfs_extattr_get(path, ftwbuf->type, EXTATTR_NAMESPACE_SYSTEM, name);
 	if (len < 0) {
-		len = extattr_get(path, EXTATTR_NAMESPACE_USER, name, NULL, 0);
+		len = bfs_extattr_get(path, ftwbuf->type, EXTATTR_NAMESPACE_USER, name);
 	}
 #elif __APPLE__
 	int options = ftwbuf->type == BFS_LNK ? XATTR_NOFOLLOW : 0;
