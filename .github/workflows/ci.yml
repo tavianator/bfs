@@ -94,27 +94,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        uses: vmactions/openbsd-vm@v1
+        uses: cross-platform-actions/action@v0.24.0
         with:
-          release: "7.5"
-          usesh: true
-          copyback: false
+          operating_system: openbsd
+          version: "7.5"
+          sync_files: runner-to-vm
 
-          prepare: |
-            pkg_add \
+          run: |
+            sudo pkg_add \
                 bash \
                 expect \
                 gmake \
                 oniguruma
-            adduser -group USER -batch action wheel </dev/null
-            cp /etc/examples/doas.conf /etc/doas.conf
-            echo "permit nopass keepenv :wheel" >>/etc/doas.conf
-
-          run: |
-            chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
-            doas -u action gmake config
-            doas -u action gmake -j$jobs check TEST_FLAGS="--sudo=doas --verbose=skipped"
+            gmake -j$jobs config
+            gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
   netbsd:
     name: NetBSD
