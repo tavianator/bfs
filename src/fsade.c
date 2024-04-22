@@ -123,9 +123,19 @@ static bool is_absence_error(int error) {
 
 /** Unified interface for incompatible acl_get_entry() implementations. */
 static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
-#if __DragonFly__ && !defined(ACL_FIRST_ENTRY) && !defined(ACL_NEXT_ENTRY)
-#  define ACL_FIRST_ENTRY 0
-#  define ACL_NEXT_ENTRY  1
+#if BFS_HAS_ACL_GET_ENTRY
+	int ret = acl_get_entry(acl, which, entry);
+#  if __APPLE__
+	// POSIX.1e specifies a return value of 1 for success, but macOS returns 0 instead
+	return !ret;
+#  else
+	return ret;
+#  endif
+#elif __DragonFly__
+#  if !defined(ACL_FIRST_ENTRY) && !defined(ACL_NEXT_ENTRY)
+#    define ACL_FIRST_ENTRY 0
+#    define ACL_NEXT_ENTRY  1
+#  endif
 
 	switch (which) {
 	case ACL_FIRST_ENTRY:
@@ -142,24 +152,22 @@ static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
 	acl_entry_t last = &acl->acl_entry[acl->acl_cnt];
 	return *entry == last;
 #else
-	int ret = acl_get_entry(acl, which, entry);
-#  if __APPLE__
-	// POSIX.1e specifies a return value of 1 for success, but macOS returns 0 instead
-	return !ret;
-#  else
-	return ret;
-#  endif
+	errno = ENOTSUP;
+	return -1;
 #endif
 }
 
 /** Unified interface for acl_get_tag_type(). */
 attr(maybe_unused)
 static int bfs_acl_tag_type(acl_entry_t entry, acl_tag_t *tag) {
-#if __DragonFly__
+#if BFS_HAS_ACL_GET_TAG_TYPE
+	return acl_get_tag_type(entry, tag);
+#elif __DragonFly__
 	*tag = entry->ae_tag;
 	return 0;
 #else
-	return acl_get_tag_type(entry, tag);
+	errno = ENOTSUP;
+	return -1;
 #endif
 }
 
