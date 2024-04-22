@@ -45,7 +45,7 @@ export BFS_CFLAGS= -std=c17 -pthread
 LDLIBS,DragonFly := -lposix1e
 LDLIBS,Linux := -lrt
 LDLIBS,NetBSD := -lutil
-LDLIBS,SunOS := -lsocket -lnsl
+LDLIBS,SunOS := -lsec -lsocket -lnsl
 export BFS_LDLIBS=${LDLIBS,${OS}}
 
 # Build profiles

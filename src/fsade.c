@@ -121,6 +121,8 @@ static bool is_absence_error(int error) {
 
 #if BFS_CAN_CHECK_ACL
 
+#if BFS_HAS_ACL_GET_FILE
+
 /** Unified interface for incompatible acl_get_entry() implementations. */
 static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
 #if BFS_HAS_ACL_GET_ENTRY
@@ -226,28 +228,34 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 #endif
 }
 
+#endif // BFS_HAS_ACL_GET_FILE
+
 int bfs_check_acl(const struct BFTW *ftwbuf) {
-	static const acl_type_t acl_types[] = {
-#if __APPLE__
-		// macOS gives EINVAL for either of the two standard ACL types,
-		// supporting only ACL_TYPE_EXTENDED
-		ACL_TYPE_EXTENDED,
-#else
-		// The two standard POSIX.1e ACL types
-		ACL_TYPE_ACCESS,
-		ACL_TYPE_DEFAULT,
-#endif
-
-#ifdef ACL_TYPE_NFS4
-		ACL_TYPE_NFS4,
-#endif
-	};
-
 	if (ftwbuf->type == BFS_LNK) {
 		return 0;
 	}
 
 	const char *path = fake_at(ftwbuf);
+
+#if BFS_HAS_ACL_TRIVIAL
+	int ret = acl_trivial(path);
+	int error = errno;
+#elif BFS_HAS_ACL_GET_FILE
+	static const acl_type_t acl_types[] = {
+#  if __APPLE__
+		// macOS gives EINVAL for either of the two standard ACL types,
+		// supporting only ACL_TYPE_EXTENDED
+		ACL_TYPE_EXTENDED,
+#  else
+		// The two standard POSIX.1e ACL types
+		ACL_TYPE_ACCESS,
+		ACL_TYPE_DEFAULT,
+#  endif
+
+#  ifdef ACL_TYPE_NFS4
+		ACL_TYPE_NFS4,
+#  endif
+	};
 
 	int ret = -1, error = 0;
 	for (size_t i = 0; i < countof(acl_types) && ret <= 0; ++i) {
@@ -272,6 +280,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 		error = errno;
 		acl_free(acl);
 	}
+#endif
 
 	free_fake_at(ftwbuf, path);
 	errno = error;
