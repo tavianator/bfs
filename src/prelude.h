@@ -49,9 +49,6 @@ extern const char bfs_version[];
 #if __has_include(<paths.h>)
 #  define BFS_HAS_PATHS_H true
 #endif
-#if __has_include(<sys/acl.h>)
-#  define BFS_HAS_SYS_ACL_H true
-#endif
 #if __has_include(<sys/extattr.h>)
 #  define BFS_HAS_SYS_EXTATTR_H true
 #endif
@@ -78,7 +75,6 @@ extern const char bfs_version[];
 
 #define BFS_HAS_MNTENT_H __GLIBC__
 #define BFS_HAS_PATHS_H true
-#define BFS_HAS_SYS_ACL_H true
 #define BFS_HAS_SYS_EXTATTR_H __FreeBSD__
 #define BFS_HAS_SYS_MKDEV_H false
 #define BFS_HAS_SYS_PARAM_H true
@@ -94,9 +90,6 @@ extern const char bfs_version[];
 #endif
 #ifndef BFS_USE_PATHS_H
 #  define BFS_USE_PATHS_H BFS_HAS_PATHS_H
-#endif
-#ifndef BFS_USE_SYS_ACL_H
-#  define BFS_USE_SYS_ACL_H (BFS_HAS_SYS_ACL_H && !__illumos__ && (!__linux__ || BFS_USE_LIBACL))
 #endif
 #ifndef BFS_USE_SYS_EXTATTR_H
 #  define BFS_USE_SYS_EXTATTR_H BFS_HAS_SYS_EXTATTR_H

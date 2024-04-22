@@ -10,6 +10,7 @@ include config/exports.mk
 # All header fragments we generate
 HEADERS := \
     ${GEN}/acl-get-entry.h \
+    ${GEN}/acl-get-file.h \
     ${GEN}/acl-get-tag-type.h \
     ${GEN}/acl-is-trivial-np.h \
     ${GEN}/aligned-alloc.h \
