@@ -39,15 +39,19 @@ jobs:
               libonig-dev \
               liburing-dev
 
+      - name: Configure
+        run: |
+          make -j$(nproc) config
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: cpp
           queries: +security-and-quality
+          config-file: .github/codeql.yml
 
       - name: Build
         run: |
-          make config
           make -j$(nproc) all
 
       - name: Perform CodeQL Analysis
