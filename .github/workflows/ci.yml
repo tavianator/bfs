@@ -69,27 +69,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        uses: vmactions/freebsd-vm@v1
+        uses: cross-platform-actions/action@v0.24.0
         with:
-          release: "14.0"
-          usesh: true
-          copyback: false
+          operating_system: freebsd
+          version: "14.0"
+          sync_files: runner-to-vm
 
-          prepare: |
-            pkg install -y \
+          run: |
+            sudo pkg install -y \
                 bash \
                 expect \
                 oniguruma \
                 pkgconf \
-                sudo \
                 tcl-wrapper
-            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
-            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
-            mount -t fdescfs none /dev/fd
-
-          run: |
-            chown -R action:action .
-            sudo -u action make -j$(nproc) distcheck
+            sudo mount -t fdescfs none /dev/fd
+            make -j$(nproc) distcheck
 
   openbsd:
     name: OpenBSD
