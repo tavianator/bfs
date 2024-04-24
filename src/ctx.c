@@ -237,7 +237,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 			if (bfs_ctx_fclose(ctx, ctx_file) != 0) {
 				if (cerr) {
-					bfs_error(ctx, "'%s': %m.\n", ctx_file->path);
+					bfs_error(ctx, "%pq: %m.\n", ctx_file->path);
 				}
 				ret = -1;
 			}
