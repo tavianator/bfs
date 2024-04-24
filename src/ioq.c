@@ -918,17 +918,14 @@ static void ioq_thread_join(struct ioq_thread *thread) {
 }
 
 struct ioq *ioq_create(size_t depth, size_t nthreads) {
-	struct ioq *ioq = ALLOC_FLEX(struct ioq, threads, nthreads);
+	struct ioq *ioq = ZALLOC_FLEX(struct ioq, threads, nthreads);
 	if (!ioq) {
 		goto fail;
 	}
 
 	ioq->depth = depth;
-	ioq->size = 0;
-	ioq->cancel = false;
 
 	ARENA_INIT(&ioq->ents, struct ioq_ent);
-
 #if BFS_USE_LIBURING && BFS_USE_STATX
 	ARENA_INIT(&ioq->xbufs, struct statx);
 #endif
