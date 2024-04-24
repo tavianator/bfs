@@ -947,8 +947,12 @@ static struct bfs_expr *visit_shallow(struct bfs_opt *opt, struct bfs_expr *expr
 		expr = general(opt, expr, visitor);
 	}
 
+	if (!expr) {
+		return NULL;
+	}
+
 	visit_fn *specific = look_up_visitor(expr, visitor->table);
-	if (expr && specific) {
+	if (specific) {
 		expr = specific(opt, expr, visitor);
 	}
 
