@@ -244,6 +244,15 @@ typedef union {
 #endif
 
 /**
+ * Annotates functions that potentially modify and return format strings.
+ */
+#if __has_attribute(format_arg)
+#  define attr_format_arg(arg) __attribute__((format_arg(arg)))
+#else
+#  define attr_format_arg(args)
+#endif
+
+/**
  * Annotates allocator-like functions.
  */
 #if __has_attribute(malloc)

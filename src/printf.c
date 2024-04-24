@@ -88,22 +88,20 @@ static bool should_color(CFILE *cfile, const struct bfs_fmt *fmt) {
 	bfs_assert(ret >= 0 && (size_t)ret < sizeof(buf)); \
 	(void)ret
 
-/**
- * Common entry point for fprintf() with a dynamic format string.
- */
-static int dyn_fprintf(FILE *file, const struct bfs_fmt *fmt, ...) {
+/** Return a dynamic format string. */
+attr(format_arg(2))
+static const char *dyn_fmt(const char *str, const char *fake) {
+	bfs_assert(strcmp(str + strlen(str) - strlen(fake) + 1, fake + 1) == 0,
+		"Mismatched format specifiers: '%s' vs. '%s'", str, fake);
+	return str;
+}
+
+/** Wrapper for fprintf(). */
+attr(printf(3, 4))
+static int bfs_fprintf(CFILE *cfile, const struct bfs_fmt *fmt, const char *fake, ...) {
 	va_list args;
-	va_start(args, fmt);
-
-#if __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wformat-nonliteral"
-#endif
-	int ret = vfprintf(file, fmt->str, args);
-#if __GNUC__
-#  pragma GCC diagnostic pop
-#endif
-
+	va_start(args, fake);
+	int ret = vfprintf(cfile->file, dyn_fmt(fmt->str, fake), args);
 	va_end(args);
 	return ret;
 }
@@ -139,7 +137,7 @@ static int bfs_printf_ctime(CFILE *cfile, const struct bfs_fmt *fmt, const struc
 		(long)ts->tv_nsec,
 		1900 + tm.tm_year);
 
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %A, %B/%W, %C, %T: strftime() */
@@ -214,7 +212,7 @@ static int bfs_printf_strftime(CFILE *cfile, const struct bfs_fmt *fmt, const st
 	bfs_assert(ret >= 0 && (size_t)ret < sizeof(buf));
 	(void)ret;
 
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %b: blocks */
@@ -226,12 +224,12 @@ static int bfs_printf_b(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks * BFS_STAT_BLKSIZE + 511) / 512;
 	BFS_PRINTF_BUF(buf, "%ju", blocks);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %d: depth */
 static int bfs_printf_d(CFILE *cfile, const struct bfs_fmt *fmt, const struct BFTW *ftwbuf) {
-	return dyn_fprintf(cfile->file, fmt, (intmax_t)ftwbuf->depth);
+	return bfs_fprintf(cfile, fmt, "%jd", (intmax_t)ftwbuf->depth);
 }
 
 /** %D: device */
@@ -242,7 +240,7 @@ static int bfs_printf_D(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->dev);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %f: file name */
@@ -250,7 +248,7 @@ static int bfs_printf_f(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	if (should_color(cfile, fmt)) {
 		return cfprintf(cfile, "%pF", ftwbuf);
 	} else {
-		return dyn_fprintf(cfile->file, fmt, ftwbuf->path + ftwbuf->nameoff);
+		return bfs_fprintf(cfile, fmt, "%s", ftwbuf->path + ftwbuf->nameoff);
 	}
 }
 
@@ -266,7 +264,7 @@ static int bfs_printf_F(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		return -1;
 	}
 
-	return dyn_fprintf(cfile->file, fmt, type);
+	return bfs_fprintf(cfile, fmt, "%s", type);
 }
 
 /** %G: gid */
@@ -277,7 +275,7 @@ static int bfs_printf_G(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->gid);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %g: group name */
@@ -293,7 +291,7 @@ static int bfs_printf_g(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		return bfs_printf_G(cfile, fmt, ftwbuf);
 	}
 
-	return dyn_fprintf(cfile->file, fmt, grp->gr_name);
+	return bfs_fprintf(cfile, fmt, "%s", grp->gr_name);
 }
 
 /** %h: leading directories */
@@ -322,7 +320,7 @@ static int bfs_printf_h(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	if (should_color(cfile, fmt)) {
 		ret = cfprintf(cfile, "${di}%pQ${rs}", buf);
 	} else {
-		ret = dyn_fprintf(cfile->file, fmt, buf);
+		ret = bfs_fprintf(cfile, fmt, "%s", buf);
 	}
 
 	free(copy);
@@ -338,7 +336,7 @@ static int bfs_printf_H(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 			return cfprintf(cfile, "${di}%pQ${rs}", ftwbuf->root);
 		}
 	} else {
-		return dyn_fprintf(cfile->file, fmt, ftwbuf->root);
+		return bfs_fprintf(cfile, fmt, "%s", ftwbuf->root);
 	}
 }
 
@@ -350,7 +348,7 @@ static int bfs_printf_i(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->ino);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %k: 1K blocks */
@@ -362,7 +360,7 @@ static int bfs_printf_k(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 
 	uintmax_t blocks = ((uintmax_t)statbuf->blocks * BFS_STAT_BLKSIZE + 1023) / 1024;
 	BFS_PRINTF_BUF(buf, "%ju", blocks);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %l: link target */
@@ -384,7 +382,7 @@ static int bfs_printf_l(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		}
 	}
 
-	int ret = dyn_fprintf(cfile->file, fmt, target);
+	int ret = bfs_fprintf(cfile, fmt, "%s", target);
 	free(buf);
 	return ret;
 }
@@ -396,7 +394,7 @@ static int bfs_printf_m(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		return -1;
 	}
 
-	return dyn_fprintf(cfile->file, fmt, (unsigned int)(statbuf->mode & 07777));
+	return bfs_fprintf(cfile, fmt, "%o", (unsigned int)(statbuf->mode & 07777));
 }
 
 /** %M: symbolic mode */
@@ -408,7 +406,7 @@ static int bfs_printf_M(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 
 	char buf[11];
 	xstrmode(statbuf->mode, buf);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %n: link count */
@@ -419,7 +417,7 @@ static int bfs_printf_n(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->nlink);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %p: full path */
@@ -427,7 +425,7 @@ static int bfs_printf_p(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	if (should_color(cfile, fmt)) {
 		return cfprintf(cfile, "%pP", ftwbuf);
 	} else {
-		return dyn_fprintf(cfile->file, fmt, ftwbuf->path);
+		return bfs_fprintf(cfile, fmt, "%s", ftwbuf->path);
 	}
 }
 
@@ -448,7 +446,7 @@ static int bfs_printf_P(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		copybuf.nameoff -= offset;
 		return cfprintf(cfile, "%pP", &copybuf);
 	} else {
-		return dyn_fprintf(cfile->file, fmt, ftwbuf->path + offset);
+		return bfs_fprintf(cfile, fmt, "%s", ftwbuf->path + offset);
 	}
 }
 
@@ -460,7 +458,7 @@ static int bfs_printf_s(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->size);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %S: sparseness */
@@ -476,7 +474,7 @@ static int bfs_printf_S(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	} else {
 		sparsity = (double)BFS_STAT_BLKSIZE * statbuf->blocks / statbuf->size;
 	}
-	return dyn_fprintf(cfile->file, fmt, sparsity);
+	return bfs_fprintf(cfile, fmt, "%g", sparsity);
 }
 
 /** %U: uid */
@@ -487,7 +485,7 @@ static int bfs_printf_U(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 	}
 
 	BFS_PRINTF_BUF(buf, "%ju", (uintmax_t)statbuf->uid);
-	return dyn_fprintf(cfile->file, fmt, buf);
+	return bfs_fprintf(cfile, fmt, "%s", buf);
 }
 
 /** %u: user name */
@@ -503,7 +501,7 @@ static int bfs_printf_u(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		return bfs_printf_U(cfile, fmt, ftwbuf);
 	}
 
-	return dyn_fprintf(cfile->file, fmt, pwd->pw_name);
+	return bfs_fprintf(cfile, fmt, "%s", pwd->pw_name);
 }
 
 static const char *bfs_printf_type(enum bfs_type type) {
@@ -536,7 +534,7 @@ static const char *bfs_printf_type(enum bfs_type type) {
 /** %y: type */
 static int bfs_printf_y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BFTW *ftwbuf) {
 	const char *type = bfs_printf_type(ftwbuf->type);
-	return dyn_fprintf(cfile->file, fmt, type);
+	return bfs_fprintf(cfile, fmt, "%s", type);
 }
 
 /** %Y: target type */
@@ -558,7 +556,7 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		str = bfs_printf_type(type);
 	}
 
-	int ret = dyn_fprintf(cfile->file, fmt, str);
+	int ret = bfs_fprintf(cfile, fmt, "%s", str);
 	if (error != 0) {
 		ret = -1;
 		errno = error;
@@ -574,7 +572,7 @@ static int bfs_printf_Z(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 		return -1;
 	}
 
-	int ret = dyn_fprintf(cfile->file, fmt, con);
+	int ret = bfs_fprintf(cfile, fmt, "%s", con);
 	bfs_freecon(con);
 	return ret;
 }
