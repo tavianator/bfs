@@ -245,6 +245,7 @@ int dstrvcatf(dchar **str, const char *format, va_list args) {
 	return 0;
 
 fail:
+	va_end(copy);
 	*tail = '\0';
 	return -1;
 }
