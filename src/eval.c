@@ -445,38 +445,42 @@ bool eval_depth(const struct bfs_expr *expr, struct bfs_eval *state) {
  * -empty test.
  */
 bool eval_empty(const struct bfs_expr *expr, struct bfs_eval *state) {
-	bool ret = false;
 	const struct BFTW *ftwbuf = state->ftwbuf;
+	const struct bfs_stat *statbuf;
+	struct bfs_dir *dir;
 
-	if (ftwbuf->type == BFS_DIR) {
-		struct bfs_dir *dir = bfs_allocdir();
+	switch (ftwbuf->type) {
+	case BFS_REG:
+		statbuf = eval_stat(state);
+		return statbuf && statbuf->size == 0;
+
+	case BFS_DIR:
+		dir = bfs_allocdir();
 		if (!dir) {
-			eval_report_error(state);
-			return ret;
+			goto error;
 		}
 
 		if (bfs_opendir(dir, ftwbuf->at_fd, ftwbuf->at_path, 0) != 0) {
-			eval_report_error(state);
-			return ret;
+			goto error;
 		}
 
 		int did_read = bfs_readdir(dir, NULL);
-		if (did_read < 0) {
-			eval_report_error(state);
-		} else {
-			ret = !did_read;
-		}
-
 		bfs_closedir(dir);
-		free(dir);
-	} else if (ftwbuf->type == BFS_REG) {
-		const struct bfs_stat *statbuf = eval_stat(state);
-		if (statbuf) {
-			ret = statbuf->size == 0;
-		}
-	}
 
-	return ret;
+		if (did_read < 0) {
+			goto error;
+		}
+
+		free(dir);
+		return did_read == 0;
+	error:
+		eval_report_error(state);
+		free(dir);
+		return false;
+
+	default:
+		return false;
+	}
 }
 
 /**
