@@ -252,40 +252,6 @@ int ynprompt(void) {
 	return ret;
 }
 
-/** Get the single character describing the given file type. */
-static char type_char(mode_t mode) {
-	switch (mode & S_IFMT) {
-	case S_IFREG:
-		return '-';
-	case S_IFBLK:
-		return 'b';
-	case S_IFCHR:
-		return 'c';
-	case S_IFDIR:
-		return 'd';
-	case S_IFLNK:
-		return 'l';
-	case S_IFIFO:
-		return 'p';
-	case S_IFSOCK:
-		return 's';
-#ifdef S_IFDOOR
-	case S_IFDOOR:
-		return 'D';
-#endif
-#ifdef S_IFPORT
-	case S_IFPORT:
-		return 'P';
-#endif
-#ifdef S_IFWHT
-	case S_IFWHT:
-		return 'w';
-#endif
-	}
-
-	return '?';
-}
-
 void *xmemdup(const void *src, size_t size) {
 	void *ret = malloc(size);
 	if (ret) {
@@ -354,6 +320,40 @@ const char *xstrerror(int errnum) {
 
 	errno = saved;
 	return ret;
+}
+
+/** Get the single character describing the given file type. */
+static char type_char(mode_t mode) {
+	switch (mode & S_IFMT) {
+	case S_IFREG:
+		return '-';
+	case S_IFBLK:
+		return 'b';
+	case S_IFCHR:
+		return 'c';
+	case S_IFDIR:
+		return 'd';
+	case S_IFLNK:
+		return 'l';
+	case S_IFIFO:
+		return 'p';
+	case S_IFSOCK:
+		return 's';
+#ifdef S_IFDOOR
+	case S_IFDOOR:
+		return 'D';
+#endif
+#ifdef S_IFPORT
+	case S_IFPORT:
+		return 'P';
+#endif
+#ifdef S_IFWHT
+	case S_IFWHT:
+		return 'w';
+#endif
+	}
+
+	return '?';
 }
 
 void xstrmode(mode_t mode, char str[11]) {

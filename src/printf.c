@@ -520,10 +520,14 @@ static const char *bfs_printf_type(enum bfs_type type) {
 		return "p";
 	case BFS_LNK:
 		return "l";
+	case BFS_PORT:
+		return "P";
 	case BFS_REG:
 		return "f";
 	case BFS_SOCK:
 		return "s";
+	case BFS_WHT:
+		return "w";
 	default:
 		return "U";
 	}
@@ -537,34 +541,24 @@ static int bfs_printf_y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 
 /** %Y: target type */
 static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BFTW *ftwbuf) {
+	enum bfs_type type = bftw_type(ftwbuf, BFS_STAT_FOLLOW);
+	const char *str;
+
 	int error = 0;
-
-	if (ftwbuf->type != BFS_LNK) {
-		return bfs_printf_y(cfile, fmt, ftwbuf);
-	}
-
-	const char *type = "U";
-
-	const struct bfs_stat *statbuf = bftw_stat(ftwbuf, BFS_STAT_FOLLOW);
-	if (statbuf) {
-		type = bfs_printf_type(bfs_mode_to_type(statbuf->mode));
-	} else {
-		switch (errno) {
-		case ELOOP:
-			type = "L";
-			break;
-		case ENOENT:
-		case ENOTDIR:
-			type = "N";
-			break;
-		default:
-			type = "?";
+	if (type == BFS_ERROR) {
+		if (errno_is_like(ELOOP)) {
+			str = "L";
+		} else if (errno_is_like(ENOENT)) {
+			str = "N";
+		} else {
+			str = "?";
 			error = errno;
-			break;
 		}
+	} else {
+		str = bfs_printf_type(type);
 	}
 
-	int ret = dyn_fprintf(cfile->file, fmt, type);
+	int ret = dyn_fprintf(cfile->file, fmt, str);
 	if (error != 0) {
 		ret = -1;
 		errno = error;

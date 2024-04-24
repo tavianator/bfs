@@ -54,7 +54,7 @@ struct BFTW {
 
 	/** The file type. */
 	enum bfs_type type;
-	/** The errno that occurred, if type == BFTW_ERROR. */
+	/** The errno that occurred, if type == BFS_ERROR. */
 	int error;
 
 	/** A parent file descriptor for the *at() family of calls. */
@@ -104,7 +104,7 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
  * @param flags
  *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
  * @return
- *         The type of the file, or BFTW_ERROR if an error occurred.
+ *         The type of the file, or BFS_ERROR if an error occurred.
  */
 enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
 
