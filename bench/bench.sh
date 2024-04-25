@@ -221,7 +221,8 @@ setup() {
     fi
 
     echo "Building bfs ..."
-    as-user make -s -j"$nproc" release all
+    as-user make -s -j"$nproc" RELEASE=y
+    as-user make -s -j"$nproc" all
 
     as-user mkdir -p bench/corpus
 
@@ -253,7 +254,13 @@ setup() {
                 echo "Building bfs $commit ..."
                 cd "$worktree"
                 as-user git checkout -qd "$commit" --
-                as-user make -s -j"$nproc" release
+                ls
+                if [ -e config ]; then
+                    as-user make -s -j"$nproc" config RELEASE=1
+                    as-user make -s -j"$nproc"
+                else
+                    as-user make -s -j"$nproc" release
+                fi
                 if [ -e ./bin/bfs ]; then
                     as-user cp ./bin/bfs "$bin/bfs-$commit"
                 else
