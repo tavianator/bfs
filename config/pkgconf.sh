@@ -26,6 +26,18 @@ esac
 if [ -z "$MODE" ]; then
     # Check whether the libraries exist at all
     for LIB; do
+        # Check ${USE_$LIB}
+        USE_LIB="USE_$(printf '%s' "$LIB" | tr 'a-z-' 'A-Z_')"
+        eval "USE=\"\${$USE_LIB:-}\""
+        case "$USE" in
+            y|1)
+                continue
+                ;;
+            n|0)
+                exit 1
+                ;;
+        esac
+
         CFLAGS=$("$0" --cflags "$LIB") || exit 1
         LDFLAGS=$("$0" --ldflags "$LIB") || exit 1
         LDLIBS=$("$0" --ldlibs "$LIB") || exit 1

@@ -8,6 +8,7 @@
 #ifndef BFS_DIR_H
 #define BFS_DIR_H
 
+#include "prelude.h"
 #include <sys/types.h>
 
 /**

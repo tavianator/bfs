@@ -48,6 +48,7 @@ ${GEN}/config.h: ${HEADERS}
 	printf '// %s\n' "${TGT}" >$@
 	printf '#ifndef BFS_CONFIG_H\n' >>$@
 	printf '#define BFS_CONFIG_H\n' >>$@
+	printf '#define BFS_USE_%s true\n' $$(printf '%s\n' ${PKGS} | tr 'a-z-' 'A-Z_') >>$@
 	cat ${.ALLSRC} >>$@
 	printf '#endif // BFS_CONFIG_H\n' >>$@
 	cat ${.ALLSRC:%=%.log} >$@.log

@@ -15,4 +15,4 @@ ${GEN}/deps.mk::
 	    printf 'DEPFLAGS = -MD -MP\n'; \
 	fi >>$@ 2>$@.log
 	${VCAT} $@
-	@printf -- '-include %s\n' ${OBJS:.o=.d} >>$@
+	printf -- '-include %s\n' ${OBJS:.o=.d} >>$@

@@ -109,7 +109,7 @@ MSG = @msg() { \
       }; \
       msg
 
-# Maximum width of a short message, to align the [X]
+# Maximum width of a short message, to align the ✔/✘
 MSG_WIDTH := 33
 
 # cat a file if V=1
