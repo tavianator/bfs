@@ -70,23 +70,7 @@ TRUTHY,y := y
 TRUTHY,1 := y
 
 # Boolean operators are also implemented with nested expansion
-NOT,y :=
 NOT,  := y
-
-# Support up to 5 arguments
-AND,y         := y
-AND,y,y       := y
-AND,y,y,y     := y
-AND,y,y,y,y   := y
-AND,y,y,y,y,y := y
-
-# NOR can be defined without combinatorial explosion.
-# OR is just ${NOT,${NOR,...}}
-NOR,     := y
-NOR,,    := y
-NOR,,,   := y
-NOR,,,,  := y
-NOR,,,,, := y
 
 # Normalize ${V} to either "y" or ""
 IS_V := ${TRUTHY,${V}}
