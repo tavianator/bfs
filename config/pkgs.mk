@@ -8,15 +8,9 @@ include ${GEN}/vars.mk
 include ${GEN}/flags.mk
 include config/exports.mk
 
-# External dependencies
-USE_PKGS := \
-    ${GEN}/libacl.use \
-    ${GEN}/libcap.use \
-    ${GEN}/libselinux.use \
-    ${GEN}/liburing.use \
-    ${GEN}/oniguruma.use
+HEADERS := ${ALL_PKGS:%=${GEN}/use/%.h}
 
-${GEN}/pkgs.mk: ${USE_PKGS}
+${GEN}/pkgs.mk: ${HEADERS}
 	${MSG} "[ GEN] ${TGT}"
 	printf '# %s\n' "${TGT}" >$@
 	gen() { \
@@ -25,18 +19,18 @@ ${GEN}/pkgs.mk: ${USE_PKGS}
 	    printf 'LDFLAGS += %s\n' "$$(config/pkgconf.sh --ldflags "$$@")"; \
 	    printf 'LDLIBS := %s $${LDLIBS}\n' "$$(config/pkgconf.sh --ldlibs "$$@")"; \
 	}; \
-	gen $$(cat ${.ALLSRC}) >>$@
+	gen $$(grep -l ' true$$' ${.ALLSRC} | sed 's|.*/\(.*\)\.h|\1|') >>$@
 	${VCAT} $@
+
 .PHONY: ${GEN}/pkgs.mk
 
-# Convert ${GEN}/foo.use to foo
-PKG = ${@:${GEN}/%.use=%}
+# Convert ${GEN}/use/foo.h to foo
+PKG = ${@:${GEN}/use/%.h=%}
 
-${USE_PKGS}::
-	if config/pkgconf.sh ${PKG} 2>$@.log; then \
-	    printf '%s\n' ${PKG} >$@; \
-	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✔\n' config/${PKG}.c; \
+${HEADERS}::
+	${MKDIR} ${@D}
+	if config/define-if.sh use/${PKG} config/pkgconf.sh ${PKG} >$@ 2>$@.log; then \
+	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✔\n' use/${PKG}.c; \
 	else \
-	    : >$@; \
-	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✘\n' config/${PKG}.c; \
+	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✘\n' use/${PKG}.c; \
 	fi

@@ -110,12 +110,20 @@ MSG = @msg() { \
       msg
 
 # Maximum width of a short message, to align the ✔/✘
-MSG_WIDTH := 33
+MSG_WIDTH := 30
 
 # cat a file if V=1
 VCAT,y := @cat
 VCAT,  := @:
 VCAT   := ${VCAT,${IS_V}}
+
+# All external dependencies
+ALL_PKGS := \
+    libacl \
+    libcap \
+    libselinux \
+    liburing \
+    oniguruma
 
 # List all object files here, as they're needed by both `make config` and `make`
 
