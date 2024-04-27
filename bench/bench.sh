@@ -254,7 +254,6 @@ setup() {
                 echo "Building bfs $commit ..."
                 cd "$worktree"
                 as-user git checkout -qd "$commit" --
-                ls
                 if [ -e config ]; then
                     as-user make -s -j"$nproc" config RELEASE=1
                     as-user make -s -j"$nproc"
