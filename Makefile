@@ -1,56 +1,50 @@
 # Copyright © Tavian Barnes <tavianator@tavianator.com>
 # SPDX-License-Identifier: 0BSD
 
-# This Makefile implements the configuration and build steps for bfs.  It is
-# portable to both GNU make and most BSD make implementations.  To build bfs,
-# run
+# To build bfs, run
 #
-#     $ make config
+#     $ ./configure
 #     $ make
 
 # Utilities and GNU/BSD portability
-include config/prelude.mk
+include build/prelude.mk
 
 # The default build target
 default: bfs
 .PHONY: default
 
 # Include the generated build config, if it exists
--include ${CONFIG}
+-include gen/config.mk
 
-## Configuration phase (`make config`)
-
-# The configuration goal itself
-config::
-	@+${MAKE} -sf config/config.mk
+## Configuration phase (`./configure`)
 
 # bfs used to have flag-like targets (`make release`, `make asan ubsan`, etc.).
 # Direct users to the new configuration system.
 asan lsan msan tsan ubsan gcov lint release::
-	@printf 'error: `%s %s` is no longer supported. ' "${MAKE}" $@ >&2
-	@printf 'Use `%s config %s=y` instead.\n' "${MAKE}" $$(echo $@ | tr 'a-z' 'A-Z') >&2
+	@printf 'error: `%s %s` is no longer supported. Use `./configure %s=y` instead.\n' \
+	    "${MAKE}" $@ $$(echo $@ | tr 'a-z' 'A-Z') >&2
 	@false
 
-# Print an error if `make` is run before `make config`
-${CONFIG}::
+# Print an error if `make` is run before `./configure`
+gen/config.mk::
 	@if ! [ -e $@ ]; then \
-	    printf 'error: You must run `%s config` before `%s`.\n' "${MAKE}" "${MAKE}" >&2; \
+	    printf 'error: You must run `./configure` before `%s`.\n' "${MAKE}" >&2; \
 	    false; \
 	fi
 
 ## Build phase (`make`)
 
 # The main binary
-bfs: ${BIN}/bfs
+bfs: bin/bfs
 .PHONY: bfs
 
 # All binaries
 BINS := \
-    ${BIN}/bfs \
-    ${BIN}/tests/mksock \
-    ${BIN}/tests/units \
-    ${BIN}/tests/xspawnee \
-    ${BIN}/tests/xtouch
+    bin/bfs \
+    bin/tests/mksock \
+    bin/tests/units \
+    bin/tests/xspawnee \
+    bin/tests/xtouch
 
 all: ${BINS}
 .PHONY: all
@@ -60,52 +54,50 @@ ALL_CFLAGS = ${CPPFLAGS} ${CFLAGS} ${DEPFLAGS}
 ALL_LDFLAGS = ${CFLAGS} ${LDFLAGS}
 
 # The main binary
-${BIN}/bfs: ${LIBBFS} ${OBJ}/src/main.o
+bin/bfs: ${LIBBFS} obj/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${MSG} "[ LD ] ${TGT}" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
+	+${MSG} "[ LD ] $@" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
 	${POSTLINK}
 
 # Get the .c file for a .o file
-_CSRC = ${@:${OBJ}/%.o=%.c}
-CSRC = ${_CSRC:gen/%=${GEN}/%}
+CSRC = ${@:obj/%.o=%.c}
 
-# Depend on ${CONFIG} to make sure `make config` runs first, and to rebuild when
-# the configuration changes
-${OBJS}: ${CONFIG}
+# Rebuild when the configuration changes
+${OBJS}: gen/config.mk
 	@${MKDIR} ${@D}
-	${MSG} "[ CC ] ${_CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
+	${MSG} "[ CC ] ${CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
 
 # Save the version number to this file, but only update version.c if it changes
-${GEN}/version.c.new::
+gen/version.c.new::
 	@${MKDIR} ${@D}
 	@printf 'const char bfs_version[] = "' >$@
 	@if [ "$$VERSION" ]; then \
 	    printf '%s' "$$VERSION"; \
-	elif test -d .git && command -v git >/dev/null 2>&1; then \
-	    git describe --always --dirty; \
+	elif test -e src/../.git && command -v git >/dev/null 2>&1; then \
+	    git -C src/.. describe --always --dirty; \
 	else \
 	    echo "3.1.3"; \
 	fi | tr -d '\n' >>$@
 	@printf '";\n' >>$@
 
-${GEN}/version.c: ${GEN}/version.c.new
+gen/version.c: gen/version.c.new
 	@test -e $@ && cmp -s $@ ${.ALLSRC} && rm ${.ALLSRC} || mv ${.ALLSRC} $@
 
-${OBJ}/gen/version.o: ${GEN}/version.c
+obj/gen/version.o: gen/version.c
 
 ## Test phase (`make check`)
 
 # Unit test binaries
 UTEST_BINS := \
-    ${BIN}/tests/units \
-    ${BIN}/tests/xspawnee
+    bin/tests/units \
+    bin/tests/xspawnee
 
 # Integration test binaries
 ITEST_BINS := \
-    ${BIN}/tests/mksock \
-    ${BIN}/tests/xtouch
+    bin/tests/mksock \
+    bin/tests/xtouch
 
 # Build (but don't run) test binaries
 tests: ${UTEST_BINS} ${ITEST_BINS}
@@ -117,45 +109,45 @@ check: unit-tests integration-tests
 
 # Run the unit tests
 unit-tests: ${UTEST_BINS}
-	${MSG} "[TEST] tests/units" ${BIN}/tests/units
+	${MSG} "[TEST] tests/units" bin/tests/units
 .PHONY: unit-tests
 
-${BIN}/tests/units: \
+bin/tests/units: \
     ${UNIT_OBJS} \
     ${LIBBFS}
 
-${BIN}/tests/xspawnee: \
-    ${OBJ}/tests/xspawnee.o
+bin/tests/xspawnee: \
+    obj/tests/xspawnee.o
 
 # The different flag combinations we check
 INTEGRATIONS := default dfs ids eds j1 j2 j3 s
 INTEGRATION_TESTS := ${INTEGRATIONS:%=check-%}
 
 # Check just `bfs`
-check-default: ${BIN}/bfs ${ITEST_BINS}
+check-default: bin/bfs ${ITEST_BINS}
 	+${MSG} "[TEST] bfs" \
-	    ./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs" ${TEST_FLAGS}
+	    ./tests/tests.sh --make="${MAKE}" --bfs="bin/bfs" ${TEST_FLAGS}
 
 # Check the different search strategies
-check-dfs check-ids check-eds: ${BIN}/bfs ${ITEST_BINS}
+check-dfs check-ids check-eds: bin/bfs ${ITEST_BINS}
 	+${MSG} "[TEST] bfs -S ${@:check-%=%}" \
-	    ./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs -S ${@:check-%=%}" ${TEST_FLAGS}
+	    ./tests/tests.sh --make="${MAKE}" --bfs="bin/bfs -S ${@:check-%=%}" ${TEST_FLAGS}
 
 # Check various flags
-check-j1 check-j2 check-j3 check-s: ${BIN}/bfs ${ITEST_BINS}
+check-j1 check-j2 check-j3 check-s: bin/bfs ${ITEST_BINS}
 	+${MSG} "[TEST] bfs -${@:check-%=%}" \
-	    ./tests/tests.sh --make="${MAKE}" --bfs="${BIN}/bfs -${@:check-%=%}" ${TEST_FLAGS}
+	    ./tests/tests.sh --make="${MAKE}" --bfs="bin/bfs -${@:check-%=%}" ${TEST_FLAGS}
 
 # Run the integration tests
 integration-tests: ${INTEGRATION_TESTS}
 .PHONY: integration-tests
 
-${BIN}/tests/mksock: \
-    ${OBJ}/tests/mksock.o \
+bin/tests/mksock: \
+    obj/tests/mksock.o \
     ${LIBBFS}
 
-${BIN}/tests/xtouch: \
-    ${OBJ}/tests/xtouch.o \
+bin/tests/xtouch: \
+    obj/tests/xtouch.o \
     ${LIBBFS}
 
 # `make distcheck` configurations
@@ -183,8 +175,10 @@ DISTCHECK_CONFIG_m32 := EXTRA_CFLAGS="-m32" PKG_CONFIG_LIBDIR=/usr/lib32/pkgconf
 DISTCHECK_CONFIG_release := RELEASE=y
 
 ${DISTCHECKS}::
-	+${MAKE} -rs BUILDDIR=${BUILDDIR}/$@ config ${DISTCHECK_CONFIG_${@:distcheck-%=%}}
-	+${MAKE} -s BUILDDIR=${BUILDDIR}/$@ check TEST_FLAGS="--sudo --verbose=skipped"
+	@${MKDIR} $@
+	@+cd $@ \
+	    && ../configure ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
+	    && ${MAKE} -s check TEST_FLAGS="--sudo --verbose=skipped"
 
 ## Packaging (`make install`)
 
@@ -193,44 +187,49 @@ DEST_MANDIR := ${DESTDIR}${MANDIR}
 
 install::
 	${Q}${MKDIR} ${DEST_PREFIX}/bin
-	${MSG} "[INSTALL] bin/bfs" \
-	    ${INSTALL} -m755 ${BIN}/bfs ${DEST_PREFIX}/bin/bfs
+	${MSG} "[INST] bin/bfs" \
+	    ${INSTALL} -m755 bin/bfs ${DEST_PREFIX}/bin/bfs
 	${Q}${MKDIR} ${DEST_MANDIR}/man1
-	${MSG} "[INSTALL] man/man1/bfs.1" \
+	${MSG} "[INST] man/man1/bfs.1" \
 	    ${INSTALL} -m644 docs/bfs.1 ${DEST_MANDIR}/man1/bfs.1
 	${Q}${MKDIR} ${DEST_PREFIX}/share/bash-completion/completions
-	${MSG} "[INSTALL] completions/bfs.bash" \
+	${MSG} "[INST] completions/bfs.bash" \
 	    ${INSTALL} -m644 completions/bfs.bash ${DEST_PREFIX}/share/bash-completion/completions/bfs
 	${Q}${MKDIR} ${DEST_PREFIX}/share/zsh/site-functions
-	${MSG} "[INSTALL] completions/bfs.zsh" \
+	${MSG} "[INST] completions/bfs.zsh" \
 	    ${INSTALL} -m644 completions/bfs.zsh ${DEST_PREFIX}/share/zsh/site-functions/_bfs
 	${Q}${MKDIR} ${DEST_PREFIX}/share/fish/vendor_completions.d
-	${MSG} "[INSTALL] completions/bfs.fish" \
+		${MSG} "[INST] completions/bfs.fish" \
 	    ${INSTALL} -m644 completions/bfs.fish ${DEST_PREFIX}/share/fish/vendor_completions.d/bfs.fish
 
 uninstall::
-	${RM} ${DEST_PREFIX}/share/bash-completion/completions/bfs
-	${RM} ${DEST_PREFIX}/share/zsh/site-functions/_bfs
-	${RM} ${DEST_PREFIX}/share/fish/vendor_completions.d/bfs.fish
-	${RM} ${DEST_MANDIR}/man1/bfs.1
-	${RM} ${DEST_PREFIX}/bin/bfs
+	${MSG} "[ RM ] completions/bfs.bash" \
+	    ${RM} ${DEST_PREFIX}/share/bash-completion/completions/bfs
+	${MSG} "[ RM ] completions/bfs.zsh" \
+	    ${RM} ${DEST_PREFIX}/share/zsh/site-functions/_bfs
+	${MSG} "[ RM ] completions/bfs.fish" \
+	    ${RM} ${DEST_PREFIX}/share/fish/vendor_completions.d/bfs.fish
+	${MSG} "[ RM ] man/man1/bfs.1" \
+	    ${RM} ${DEST_MANDIR}/man1/bfs.1
+	${MSG} "[ RM ] bin/bfs" \
+	    ${RM} ${DEST_PREFIX}/bin/bfs
 
 # Check that `make install` works and `make uninstall` removes everything
 check-install::
-	+${MAKE} install DESTDIR=${BUILDDIR}/pkg
-	+${MAKE} uninstall DESTDIR=${BUILDDIR}/pkg
-	${BIN}/bfs ${BUILDDIR}/pkg -not -type d -print -exit 1
-	${RM} -r ${BUILDDIR}/pkg
+	+${MAKE} install DESTDIR=pkg
+	+${MAKE} uninstall DESTDIR=pkg
+	bin/bfs pkg -not -type d -print -exit 1
+	${RM} -r pkg
 
 ## Cleanup (`make clean`)
 
 # Clean all build products
 clean::
 	${MSG} "[ RM ] bin obj" \
-	    ${RM} -r ${BIN} ${OBJ}
+	    ${RM} -r bin obj
 
 # Clean everything, including generated files
 distclean: clean
 	${MSG} "[ RM ] gen" \
-	    ${RM} -r ${GEN} ${DISTCHECKS}
+	    ${RM} -r gen ${DISTCHECKS}
 .PHONY: distclean

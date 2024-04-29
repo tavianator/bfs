@@ -12,12 +12,9 @@ _realpath() (
 )
 
 # Globals
-TESTS=$(_realpath "$TESTS")
-if [ "${BUILDDIR-}" ]; then
-    BIN=$(_realpath "$BUILDDIR/bin")
-else
-    BIN=$(_realpath "$TESTS/../bin")
-fi
+ROOT=$(_realpath "$(dirname -- "$TESTS")")
+TESTS="$ROOT/tests"
+BIN="$ROOT/bin"
 MKSOCK="$BIN/tests/mksock"
 XTOUCH="$BIN/tests/xtouch"
 UNAME=$(uname)

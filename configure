@@ -1,0 +1,98 @@
+#!/bin/sh
+
+# Copyright © Tavian Barnes <tavianator@tavianator.com>
+# SPDX-License-Identifier: 0BSD
+
+# bfs build configuration script
+
+set -eu
+
+help() {
+    cat <<EOF
+Usage: $0 [-j<N>] [CC=...] [CFLAGS=...] [...]
+
+Compiler configuration:
+
+  CC
+      The C compiler to use
+  CPPFLAGS
+      C preprocessor flags
+  CFLAGS
+      C compiler flags
+  LDFLAGS
+      Linker flags
+  LDLIBS
+      Dynamic libraries to link
+
+  EXTRA_CPPFLAGS
+  EXTRA_CFLAGS
+  EXTRA_LDFLAGS
+  EXTRA_LDLIBS
+      Adds to the default flags, instead of replacing them
+
+Build profiles:
+
+  RELEASE=y
+      Enable optimizations, disable assertions
+  ASAN=y
+  LSAN=y
+  MSAN=y
+  TSAN=y
+  UBSAN=y
+      Enable sanitizers
+  GCOV=y
+      Enable code coverage instrumentation
+
+External dependencies:
+
+  PKG_CONFIG
+      The pkg-config binary to use
+
+  USE_LIBACL=[y|n]
+  USE_LIBCAP=[y|n]
+  USE_LIBSELINUX=[y|n]
+  USE_LIBURIG=[y|n]
+  USE_ONIGURUMA=[y|n]
+      Enable or disable external dependencies
+
+Packaging configuration:
+
+  PREFIX
+      Set the installation prefix (default: /usr)
+  MANDIR
+      Set the man page directory (default: \$PREFIX/share/man)
+EOF
+}
+
+for arg; do
+    case "$arg" in
+        --help)
+            help
+            exit 0
+            ;;
+        -*|*=*)
+            continue # make flag (-j2) or variable (CC=clang)
+            ;;
+        *)
+            printf 'error: Unrecognized option "%s"\n\n' "$arg" >&2
+            help >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Get the relative path to the source tree based on how the script was run
+DIR=$(dirname -- "$0")
+
+# Set up symbolic links for out-of-tree builds
+for f in Makefile build completions docs src tests; do
+    test -e "$f" || ln -s "$DIR/$f" "$f"
+done
+
+# Infer -jN unless MAKEFLAGS is set
+j=
+if ! [ "${MAKEFLAGS+y}" ]; then
+    j="-j$({ nproc || sysctl -n hw.ncpu || getconf _NPROCESSORS_ONLN || echo 1; } 2>/dev/null)"
+fi
+
+${MAKE:-make} $j -rsf build/config.mk "$@"

@@ -7,7 +7,7 @@
 
 set -eu
 
-SLUG="${1#config/}"
+SLUG="${1#build/}"
 SLUG="${SLUG%.c}"
 MACRO="BFS_$(printf '%s' "$SLUG" | tr '/a-z-' '_A-Z_')"
 shift

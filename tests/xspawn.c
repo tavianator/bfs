@@ -64,27 +64,20 @@ static bool check_use_path(bool use_posix) {
 		spawn.flags &= ~BFS_SPAWN_USE_POSIX;
 	}
 
-	const char *builddir = getenv("BUILDDIR");
-	dchar *bin = dstrprintf("%s/bin", builddir ? builddir : ".");
-	ret &= bfs_pcheck(bin, "dstrprintf()");
-	if (!ret) {
-		goto destroy;
-	}
-
-	ret &= bfs_pcheck(bfs_spawn_addopen(&spawn, 10, bin, O_RDONLY | O_DIRECTORY, 0) == 0);
+	ret &= bfs_pcheck(bfs_spawn_addopen(&spawn, 10, "bin", O_RDONLY | O_DIRECTORY, 0) == 0);
 	ret &= bfs_pcheck(bfs_spawn_adddup2(&spawn, 10, 11) == 0);
 	ret &= bfs_pcheck(bfs_spawn_addclose(&spawn, 10) == 0);
 	ret &= bfs_pcheck(bfs_spawn_addfchdir(&spawn, 11) == 0);
 	ret &= bfs_pcheck(bfs_spawn_addclose(&spawn, 11) == 0);
 	if (!ret) {
-		goto bin;
+		goto destroy;
 	}
 
 	// Check that $PATH is resolved in the parent's environment
 	char **envp;
 	ret &= bfs_pcheck(envp = envdup());
 	if (!ret) {
-		goto bin;
+		goto destroy;
 	}
 
 	// Check that $PATH is resolved after the file actions
@@ -138,8 +131,6 @@ env:
 		free(*var);
 	}
 	free(envp);
-bin:
-	dstrfree(bin);
 destroy:
 	ret &= bfs_pcheck(bfs_spawn_destroy(&spawn) == 0);
 out:

@@ -41,7 +41,7 @@ if [ -z "$MODE" ]; then
         CFLAGS=$("$0" --cflags "$LIB") || exit 1
         LDFLAGS=$("$0" --ldflags "$LIB") || exit 1
         LDLIBS=$("$0" --ldlibs "$LIB") || exit 1
-        config/cc.sh $CFLAGS $LDFLAGS config/use/$LIB.c $LDLIBS || exit 1
+        build/cc.sh $CFLAGS $LDFLAGS build/use/$LIB.c $LDLIBS || exit 1
     done
 fi
 

@@ -107,7 +107,7 @@ jobs:
                 gmake \
                 oniguruma
             jobs=$(sysctl -n hw.ncpu)
-            gmake -j$jobs config
+            MAKE=gmake ./configure
             gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
   netbsd:
@@ -133,7 +133,7 @@ jobs:
                 pkgconf \
                 tcl-expect
             jobs=$(sysctl -n hw.ncpu)
-            make -j$jobs config
+            ./configure
             make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
   dragonflybsd:
@@ -165,7 +165,7 @@ jobs:
           run: |
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
-            sudo -u action make config
+            sudo -u action ./configure
             sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
   omnios:
@@ -198,5 +198,5 @@ jobs:
             PATH="/usr/xpg4/bin:$PATH"
             chown -R action:staff .
             jobs=$(getconf NPROCESSORS_ONLN)
-            sudo -u action gmake config
+            sudo -u action MAKE=gmake ./configure
             sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"

@@ -3,8 +3,8 @@
 
 # Makefile that generates gen/flags.mk
 
-include config/prelude.mk
-include ${GEN}/vars.mk
+include build/prelude.mk
+include gen/vars.mk
 
 # Configurable flags
 CPPFLAGS ?=
@@ -29,7 +29,7 @@ export XLDLIBS=${LDLIBS}
 # Immutable flags
 export BFS_CPPFLAGS= \
     -Isrc \
-    -I${GEN} \
+    -Igen \
     -D__EXTENSIONS__ \
     -D_ATFILE_SOURCE \
     -D_BSD_SOURCE \
@@ -106,9 +106,9 @@ SETVAR = printf '%s := %s\n' >>$@
 # Append to a variable, if non-empty
 APPEND = append() { test -z "$$2" || printf '%s += %s\n' "$$1" "$$2" >>$@; }; append
 
-${GEN}/flags.mk::
-	${MSG} "[ GEN] ${TGT}"
-	printf '# %s\n' "${TGT}" >$@
+gen/flags.mk::
+	${MSG} "[ GEN] $@"
+	printf '# %s\n' "$@" >$@
 	${SETVAR} CPPFLAGS "$$BFS_CPPFLAGS"
 	${APPEND} CPPFLAGS "$$TSAN_CPPFLAGS"
 	${APPEND} CPPFLAGS "$$LINT_CPPFLAGS"

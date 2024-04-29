@@ -41,7 +41,7 @@ jobs:
 
       - name: Configure
         run: |
-          make -j$(nproc) config
+          ./configure
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3

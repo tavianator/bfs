@@ -4,10 +4,9 @@ Building `bfs`
 Compiling
 ---------
 
-`bfs` uses [GNU Make](https://www.gnu.org/software/make/) as its build system.
 A simple invocation of
 
-    $ make config
+    $ ./configure
     $ make
 
 should build `bfs` successfully.
@@ -18,7 +17,6 @@ For example, to use all your cores, run `make -j$(nproc)`.
 
 | Command          | Description                                                   |
 |------------------|---------------------------------------------------------------|
-| `make config`    | Configures the build system                                   |
 | `make`           | Builds just the `bfs` binary                                  |
 | `make all`       | Builds everything, including the tests (but doesn't run them) |
 | `make check`     | Builds everything, and runs the tests                         |
@@ -33,13 +31,13 @@ The configuration system provides a few shorthand flags for handy configurations
 
 | Command                 | Description                                                 |
 |-------------------------|-------------------------------------------------------------|
-| `make config RELEASE=y` | Build `bfs` with optimizations, LTO, and without assertions |
-| `make config ASAN=y`    | Enable [AddressSanitizer]                                   |
-| `make config LSAN=y`    | Enable [LeakSanitizer]                                      |
-| `make config MSAN=y`    | Enable [MemorySanitizer]                                    |
-| `make config TSAN=y`    | Enable [ThreadSanitizer]                                    |
-| `make config UBSAN=y`   | Enable [UndefinedBehaviorSanitizer]                         |
-| `make config GCOV=y`    | Enable [code coverage]                                      |
+| `./configure RELEASE=y` | Build `bfs` with optimizations, LTO, and without assertions |
+| `./configure ASAN=y`    | Enable [AddressSanitizer]                                   |
+| `./configure LSAN=y`    | Enable [LeakSanitizer]                                      |
+| `./configure MSAN=y`    | Enable [MemorySanitizer]                                    |
+| `./configure TSAN=y`    | Enable [ThreadSanitizer]                                    |
+| `./configure UBSAN=y`   | Enable [UndefinedBehaviorSanitizer]                         |
+| `./configure GCOV=y`    | Enable [code coverage]                                      |
 
 [AddressSanitizer]: https://github.com/google/sanitizers/wiki/AddressSanitizer
 [LeakSanitizer]: https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#stand-alone-mode
@@ -48,21 +46,20 @@ The configuration system provides a few shorthand flags for handy configurations
 [UndefinedBehaviorSanitizer]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
 [code coverage]: https://gcc.gnu.org/onlinedocs/gcc/Gcov.html
 
-You can combine multiple profiles (e.g. `make config ASAN=y UBSAN=y`), but not all of them will work together.
+You can combine multiple profiles (e.g. `./configure ASAN=y UBSAN=y`), but not all of them will work together.
 
 ### Flags
 
-Other flags can be specified on the `make config` command line or in the environment.
+Other flags can be specified on the `./configure` command line or in the environment.
 Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 
 | Flag                                | Description                                        |
 |-------------------------------------|----------------------------------------------------|
-| `CC`                                | The C compiler to use, e.g. `make config CC=clang` |
+| `CC`                                | The C compiler to use, e.g. `./configure CC=clang` |
 | `CFLAGS`<br>`EXTRA_CFLAGS`          | Override/add to the default compiler flags         |
 | `LDFLAGS`<br>`EXTRA_LDFLAGS`        | Override/add to the linker flags                   |
 | `USE_LIBACL`<br>`USE_LIBCAP`<br>... | Enable/disable [optional dependencies]             |
 | `TEST_FLAGS`                        | `tests.sh` flags for `make check`                  |
-| `BUILDDIR`                          | The build output directory (default: `.`)          |
 | `DESTDIR`                           | The root directory for `make install`              |
 | `PREFIX`                            | The installation prefix (default: `/usr`)          |
 | `MANDIR`                            | The man page installation directory                |
@@ -72,9 +69,9 @@ Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
 ### Dependencies
 
 `bfs` depends on some system libraries for some of its features.
-These dependencies are optional, and can be turned off in `make config` if necessary by setting the appropriate variable to `n` (e.g. `make config USE_ONIGURUMA=n`).
+These dependencies are optional, and can be turned off in `./configure` if necessary by setting the appropriate variable to `n` (e.g. `./configure USE_ONIGURUMA=n`).
 
-| Dependency   | Platforms  | `make config` flag |
+| Dependency   | Platforms  | `./configure` flag |
 |--------------|------------|--------------------|
 | [libacl]     | Linux only | `USE_LIBACL`       |
 | [libcap]     | Linux only | `USE_LIBCAP`       |
@@ -90,21 +87,27 @@ These dependencies are optional, and can be turned off in `make config` if neces
 
 ### Dependency tracking
 
-The build system automatically tracks header dependencies with the `-M` family of compiler options (see `DEPFLAGS` in the [`Makefile`](/Makefile)).
+The build system automatically tracks header dependencies with the `-M` family of compiler options (see `DEPFLAGS` in [`build/deps.mk`](/build/deps.mk)).
 So if you edit a header file, `make` will rebuild the necessary object files ensuring they don't go out of sync.
 
 We also add a dependency on the current configuration, so you can change configurations and rebuild without having to `make clean`.
-
-We go one step further than most build systems by tracking the flags that were used for the previous compilation.
-That means you can change configurations without having to `make clean`.
 For example,
 
-    $ make config
+    $ ./configure
     $ make
-    $ make config RELEASE=y
+    $ ./configure RELEASE=y
     $ make
 
 will build the project in debug mode and then rebuild it in release mode.
+
+### Out-of-tree builds
+
+You can set up an out-of-tree build by running the `configure` script from another directory, for example:
+
+    $ mkdir out
+    $ cd out
+    $ ../configure
+    $ make
 
 
 Testing
