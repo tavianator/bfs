@@ -44,33 +44,22 @@ TRUTHY,y := y
 TRUTHY,1 := y
 
 # Boolean operators are also implemented with nested expansion
-NOT,  := y
+NOT, := y
 
 # Normalize ${V} to either "y" or ""
-IS_V := ${TRUTHY,${V}}
+export XV=${TRUTHY,${V}}
 
 # Suppress output unless V=1
 Q, := @
-Q  := ${Q,${IS_V}}
+Q  := ${Q,${XV}}
 
 # Show full commands with `make V=1`, otherwise short summaries
-MSG = @msg() { \
-          MSG="$$1"; \
-          shift; \
-          test "${IS_V}" || printf '%s\n' "$$MSG"; \
-          test "$${1:-}" || return 0; \
-          test "${IS_V}" && printf '%s\n' "$$*"; \
-          "$$@"; \
-      }; \
-      msg
-
-# Maximum width of a short message, to align the ✔/✘
-MSG_WIDTH := 30
+MSG = @build/msg.sh
 
 # cat a file if V=1
 VCAT,y := @cat
 VCAT,  := @:
-VCAT   := ${VCAT,${IS_V}}
+VCAT   := ${VCAT,${XV}}
 
 # All external dependencies
 ALL_PKGS := \

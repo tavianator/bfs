@@ -43,20 +43,20 @@ gen/vars.mk::
 # Sets the build flags.  This depends on vars.mk and uses a recursive make so
 # that the default flags can depend on variables like ${OS}.
 gen/flags.mk: gen/vars.mk
-	@+${MAKE} -sf build/flags.mk $@
+	@+XMAKEFLAGS="$$MAKEFLAGS" ${MAKE} -sf build/flags.mk $@
 .PHONY: gen/flags.mk
 
 # Check for dependency generation support
 gen/deps.mk: gen/flags.mk
-	@+${MAKE} -sf build/deps.mk $@
+	@+XMAKEFLAGS="$$MAKEFLAGS" ${MAKE} -sf build/deps.mk $@
 .PHONY: gen/deps.mk
 
 # Auto-detect dependencies and their build flags
 gen/pkgs.mk: gen/flags.mk
-	@+${MAKE} -sf build/pkgs.mk $@
+	@+XMAKEFLAGS="$$MAKEFLAGS" ${MAKE} -sf build/pkgs.mk $@
 .PHONY: gen/pkgs.mk
 
 # Compile-time feature detection
 gen/config.h: gen/config.mk
-	@+${MAKE} -sf build/header.mk $@
+	@+XMAKEFLAGS="$$MAKEFLAGS" ${MAKE} -sf build/header.mk $@
 .PHONY: gen/config.h

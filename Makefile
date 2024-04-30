@@ -49,16 +49,12 @@ BINS := \
 all: ${BINS}
 .PHONY: all
 
-# Group relevant flags together
-ALL_CFLAGS = ${CPPFLAGS} ${CFLAGS} ${DEPFLAGS}
-ALL_LDFLAGS = ${CFLAGS} ${LDFLAGS}
-
 # The main binary
 bin/bfs: ${LIBBFS} obj/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${MSG} "[ LD ] $@" ${CC} ${ALL_LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
+	+${MSG} "[ LD ] $@" ${CC} ${CFLAGS} ${LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
 	${POSTLINK}
 
 # Get the .c file for a .o file
@@ -67,7 +63,7 @@ CSRC = ${@:obj/%.o=%.c}
 # Rebuild when the configuration changes
 ${OBJS}: gen/config.mk
 	@${MKDIR} ${@D}
-	${MSG} "[ CC ] ${CSRC}" ${CC} ${ALL_CFLAGS} -c ${CSRC} -o $@
+	${MSG} "[ CC ] ${CSRC}" ${CC} ${CPPFLAGS} ${CFLAGS} -c ${CSRC} -o $@
 
 # Save the version number to this file, but only update version.c if it changes
 gen/version.c.new::

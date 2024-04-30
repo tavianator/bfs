@@ -12,8 +12,8 @@ HEADERS := ${ALL_PKGS:%=gen/use/%.h}
 
 gen/pkgs.mk: ${HEADERS}
 	${MSG} "[ GEN] $@"
-	printf '# %s\n' "$@" >$@
-	gen() { \
+	@printf '# %s\n' "$@" >$@
+	@gen() { \
 	    printf 'PKGS := %s\n' "$$*"; \
 	    printf 'CFLAGS += %s\n' "$$(build/pkgconf.sh --cflags "$$@")"; \
 	    printf 'LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
@@ -28,9 +28,6 @@ gen/pkgs.mk: ${HEADERS}
 PKG = ${@:gen/use/%.h=%}
 
 ${HEADERS}::
-	${MKDIR} ${@D}
-	if build/define-if.sh use/${PKG} build/pkgconf.sh ${PKG} >$@ 2>$@.log; then \
-	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✔\n' use/${PKG}.c; \
-	else \
-	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✘\n' use/${PKG}.c; \
-	fi
+	@${MKDIR} ${@D}
+	@build/define-if.sh use/${PKG} build/pkgconf.sh ${PKG} >$@ 2>$@.log; \
+	    build/msg-if.sh "[ CC ] use/${PKG}.c" test $$? -eq 0;

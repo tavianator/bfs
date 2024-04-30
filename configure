@@ -95,4 +95,4 @@ if ! [ "${MAKEFLAGS+y}" ]; then
     j="-j$({ nproc || sysctl -n hw.ncpu || getconf _NPROCESSORS_ONLN || echo 1; } 2>/dev/null)"
 fi
 
-${MAKE:-make} $j -rsf build/config.mk "$@"
+${MAKE:-make} $j -rf build/config.mk "$@"

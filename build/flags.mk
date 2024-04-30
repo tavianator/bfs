@@ -101,14 +101,14 @@ export RELEASE_CPPFLAGS=${RELEASE_CPPFLAGS,${_RELEASE}}
 export RELEASE_CFLAGS=${RELEASE_CFLAGS,${_RELEASE}}
 
 # Set a variable
-SETVAR = printf '%s := %s\n' >>$@
+SETVAR = @printf '%s := %s\n' >>$@
 
 # Append to a variable, if non-empty
-APPEND = append() { test -z "$$2" || printf '%s += %s\n' "$$1" "$$2" >>$@; }; append
+APPEND = @append() { test -z "$$2" || printf '%s += %s\n' "$$1" "$$2" >>$@; }; append
 
 gen/flags.mk::
 	${MSG} "[ GEN] $@"
-	printf '# %s\n' "$@" >$@
+	@printf '# %s\n' "$@" >$@
 	${SETVAR} CPPFLAGS "$$BFS_CPPFLAGS"
 	${APPEND} CPPFLAGS "$$TSAN_CPPFLAGS"
 	${APPEND} CPPFLAGS "$$LINT_CPPFLAGS"
@@ -132,5 +132,5 @@ gen/flags.mk::
 	${APPEND} LDLIBS "$$EXTRA_LDLIBS"
 	${APPEND} LDLIBS "$$BFS_LDLIBS"
 	${SETVAR} NOLIBS "$$XNOLIBS"
-	test "${OS}-${SAN}" != FreeBSD-y || printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@
+	@test "${OS}-${SAN}" != FreeBSD-y || printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@
 	${VCAT} $@

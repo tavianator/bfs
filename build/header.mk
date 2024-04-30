@@ -48,12 +48,12 @@ PKG_HEADERS := ${ALL_PKGS:%=gen/use/%.h}
 
 gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	${MSG} "[ GEN] $@"
-	printf '// %s\n' "$@" >$@
-	printf '#ifndef BFS_CONFIG_H\n' >>$@
-	printf '#define BFS_CONFIG_H\n' >>$@
-	cat ${.ALLSRC} >>$@
-	printf '#endif // BFS_CONFIG_H\n' >>$@
-	cat ${.ALLSRC:%=%.log} >$@.log
+	@printf '// %s\n' "$@" >$@
+	@printf '#ifndef BFS_CONFIG_H\n' >>$@
+	@printf '#define BFS_CONFIG_H\n' >>$@
+	@cat ${.ALLSRC} >>$@
+	@printf '#endif // BFS_CONFIG_H\n' >>$@
+	@cat ${.ALLSRC:%=%.log} >$@.log
 	${VCAT} $@
 .PHONY: gen/config.h
 
@@ -61,9 +61,6 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 SLUG = ${@:gen/%.h=%}
 
 ${HEADERS}::
-	${MKDIR} ${@D}
-	if build/define-if.sh ${SLUG} build/cc.sh build/${SLUG}.c >$@ 2>$@.log; then \
-	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✔\n' ${SLUG}.c; \
-	else \
-	    test "${IS_V}" || printf '[ CC ] %-${MSG_WIDTH}s  ✘\n' ${SLUG}.c; \
-	fi
+	@${MKDIR} ${@D}
+	@build/define-if.sh ${SLUG} build/cc.sh build/${SLUG}.c >$@ 2>$@.log; \
+	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
