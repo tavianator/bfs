@@ -25,7 +25,7 @@ jobs:
 
       - name: Generate coverage
         run: |
-          ./configure GCOV=y
+          ./configure --enable-gcov
           make -j$(nproc) check TEST_FLAGS="--sudo"
           gcov -abcfpu obj/*/*.o
 

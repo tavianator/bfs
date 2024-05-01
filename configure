@@ -7,75 +7,117 @@
 
 set -eu
 
-help() {
-    cat <<EOF
-Usage: $0 [-j<N>] [CC=...] [CFLAGS=...] [...]
+# Default to `make`
+MAKE="${MAKE:-make}"
 
-Compiler configuration:
-
-  CC
-      The C compiler to use
-  CPPFLAGS
-      C preprocessor flags
-  CFLAGS
-      C compiler flags
-  LDFLAGS
-      Linker flags
-  LDLIBS
-      Dynamic libraries to link
-
-  EXTRA_CPPFLAGS
-  EXTRA_CFLAGS
-  EXTRA_LDFLAGS
-  EXTRA_LDLIBS
-      Adds to the default flags, instead of replacing them
-
-Build profiles:
-
-  RELEASE=y
-      Enable optimizations, disable assertions
-  ASAN=y
-  LSAN=y
-  MSAN=y
-  TSAN=y
-  UBSAN=y
-      Enable sanitizers
-  GCOV=y
-      Enable code coverage instrumentation
-
-External dependencies:
-
-  PKG_CONFIG
-      The pkg-config binary to use
-
-  USE_LIBACL=[y|n]
-  USE_LIBCAP=[y|n]
-  USE_LIBSELINUX=[y|n]
-  USE_LIBURIG=[y|n]
-  USE_ONIGURUMA=[y|n]
-      Enable or disable external dependencies
-
-Packaging configuration:
-
-  PREFIX
-      Set the installation prefix (default: /usr)
-  MANDIR
-      Set the man page directory (default: \$PREFIX/share/man)
-EOF
-}
+# Pass -j$(nproc) unless MAKEFLAGS is set
+if [ "${MAKEFLAGS+y}" ]; then
+    j=""
+else
+    j="-j$({ nproc || sysctl -n hw.ncpu || getconf _NPROCESSORS_ONLN || echo 1; } 2>/dev/null)"
+fi
 
 for arg; do
     case "$arg" in
-        --help)
-            help
+        -h|--help)
+            cat <<EOF
+Usage:
+
+  \$ $0 [--enable-*|--disable-*] [CC=...] [CFLAGS=...] [...]
+  \$ $MAKE $j
+
+Variables set in the environment or on the command line will be picked up:
+
+  MAKE
+      The make implementation to use
+  CC
+      The C compiler to use
+
+  CPPFLAGS="-I... -D..."
+  CFLAGS="-W... -f..."
+  LDFLAGS="-L... -Wl,..."
+      Preprocessor/compiler/linker flags
+
+  LDLIBS="-l... -l..."
+      Dynamic libraries to link
+
+  EXTRA_{CPPFLAGS,CFLAGS,LDFLAGS,LDLIBS}
+      Adds to the default flags, instead of replacing them
+
+The default flags result in a plain debug build.  Other build profiles include:
+
+  --enable-release
+      Enable optimizations, disable assertions
+  --enable-{asan,lsan,msan,tsan,ubsan}
+      Enable sanitizers
+  --enable-gcov
+      Enable code coverage instrumentation
+
+External dependencies are auto-detected by default, but you can --enable or
+--disable them manually:
+
+  --enable-libacl      --disable-libacl
+  --enable-libcap      --disable-libcap
+  --enable-libselinux  --disable-libselinux
+  --enable-liburing    --disable-liburing
+  --enable-oniguruma   --disable-oniguruma
+
+Packaging:
+
+  --prefix=/path
+      Set the installation prefix (default: /usr)
+
+This script is a thin wrapper around a makefile-based configuration system.
+Any other arguments will be passed directly to the $MAKE invocation, e.g.
+
+  \$ $0 $j V=1
+EOF
             exit 0
             ;;
-        -*|*=*)
-            continue # make flag (-j2) or variable (CC=clang)
+
+        --enable-*|--disable-*)
+            case "$arg" in
+                --enable-*) yn=y ;;
+                --disable-*) yn=n ;;
+            esac
+
+            name="${arg#--*able-}"
+            NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
+            case "$name" in
+                libacl|libcap|libselinux|liburing|oniguruma)
+                    shift
+                    set -- "$@" "USE_$NAME=$yn"
+                    ;;
+                release|asan|lsan|msan|tsan|ubsan|lint|gcov)
+                    shift
+                    set -- "$@" "$NAME=$yn"
+                    ;;
+                *)
+                    printf 'error: Unrecognized option "%s"\n\n' "$arg" >&2
+                    printf 'Run %s --help for more information.\n' "$0" >&2
+                    exit 1
+                    ;;
+            esac
             ;;
+
+        --prefix=*)
+            shift
+            set -- "$@" "PREFIX=${arg#*=}"
+            ;;
+
+        MAKE=*)
+            MAKE="${arg#*=}"
+            shift
+            ;;
+
+        # make flag (-j2) or variable (CC=clang)
+        -*|*=*)
+            continue
+            ;;
+
         *)
             printf 'error: Unrecognized option "%s"\n\n' "$arg" >&2
-            help >&2
+            printf 'Run %s --help for more information.\n' "$0" >&2
             exit 1
             ;;
     esac
@@ -89,10 +131,7 @@ for f in Makefile build completions docs src tests; do
     test -e "$f" || ln -s "$DIR/$f" "$f"
 done
 
-# Infer -jN unless MAKEFLAGS is set
-j=
-if ! [ "${MAKEFLAGS+y}" ]; then
-    j="-j$({ nproc || sysctl -n hw.ncpu || getconf _NPROCESSORS_ONLN || echo 1; } 2>/dev/null)"
-fi
+# Set MAKEFLAGS to -j$(nproc) if it's unset
+export MAKEFLAGS="${MAKEFLAGS-$j}"
 
-${MAKE:-make} $j -rf build/config.mk "$@"
+$MAKE -rf build/config.mk "$@"

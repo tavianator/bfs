@@ -53,7 +53,7 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	@printf '#define BFS_CONFIG_H\n' >>$@
 	@cat ${.ALLSRC} >>$@
 	@printf '#endif // BFS_CONFIG_H\n' >>$@
-	@cat ${.ALLSRC:%=%.log} >$@.log
+	@cat ${.ALLSRC:%=%.log} >gen/config.log
 	${VCAT} $@
 .PHONY: gen/config.h
 

@@ -164,11 +164,11 @@ distcheck:
 .PHONY: distcheck
 
 # Per-distcheck configuration
-DISTCHECK_CONFIG_asan := ASAN=y UBSAN=y
-DISTCHECK_CONFIG_msan := MSAN=y UBSAN=y CC=clang
-DISTCHECK_CONFIG_tsan := TSAN=y UBSAN=y CC=clang
+DISTCHECK_CONFIG_asan := --enable-asan --enable-ubsan
+DISTCHECK_CONFIG_msan := --enable-msan --enable-ubsan CC=clang
+DISTCHECK_CONFIG_tsan := --enable-tsan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_m32 := EXTRA_CFLAGS="-m32" PKG_CONFIG_LIBDIR=/usr/lib32/pkgconfig
-DISTCHECK_CONFIG_release := RELEASE=y
+DISTCHECK_CONFIG_release := --enable-release
 
 ${DISTCHECKS}::
 	@${MKDIR} $@
@@ -195,7 +195,7 @@ install::
 	${MSG} "[INST] completions/bfs.zsh" \
 	    ${INSTALL} -m644 completions/bfs.zsh ${DEST_PREFIX}/share/zsh/site-functions/_bfs
 	${Q}${MKDIR} ${DEST_PREFIX}/share/fish/vendor_completions.d
-		${MSG} "[INST] completions/bfs.fish" \
+	${MSG} "[INST] completions/bfs.fish" \
 	    ${INSTALL} -m644 completions/bfs.fish ${DEST_PREFIX}/share/fish/vendor_completions.d/bfs.fish
 
 uninstall::

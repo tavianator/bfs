@@ -1,104 +1,101 @@
 Building `bfs`
 ==============
 
-Compiling
----------
-
 A simple invocation of
 
     $ ./configure
     $ make
 
 should build `bfs` successfully.
-As usual with `make`, you can run a [parallel build](https://www.gnu.org/software/make/manual/html_node/Parallel.html) with `-j`.
-For example, to use all your cores, run `make -j$(nproc)`.
 
-### Targets
 
-| Command          | Description                                                   |
-|------------------|---------------------------------------------------------------|
-| `make`           | Builds just the `bfs` binary                                  |
-| `make all`       | Builds everything, including the tests (but doesn't run them) |
-| `make check`     | Builds everything, and runs the tests                         |
-| `make install`   | Installs `bfs` (with man page, shell completions, etc.)       |
-| `make uninstall` | Uninstalls `bfs`                                              |
-| `make clean`     | Delete the build products                                     |
-| `make distclean` | Delete all generated files, including the build configuration |
+Configuration
+-------------
+
+```console
+$ ./configure --help
+Usage:
+
+  $ ./configure [--enable-*|--disable-*] [CC=...] [CFLAGS=...] [...]
+  $ make
+
+...
+```
+
+### Variables
+
+Variables set in the environment or on the command line will be picked up:
+These variables specify binaries to run during the configuration and build process:
+
+<pre>
+<b>MAKE</b>=<i>make</i>
+    <a href="https://en.wikipedia.org/wiki/Make_(software)">make</a> implementation
+<b>CC</b>=<i>cc</i>
+    C compiler
+<b>INSTALL</b>=<i>install</i>
+    Copy files during <i>make install</i>
+<b>MKDIR</b>="<i>mkdir -p</i>"
+    Create directories
+<b>PKG_CONFIG</b>=<i>pkg-config</i>
+    Detect external libraries and required build flags
+<b>RM</b>="<i>rm -f</i>"
+    Delete files
+</pre>
+
+These flags will be used by the build process:
+
+<pre>
+<b>CPPFLAGS</b>="<i>-I... -D...</i>"
+<b>CFLAGS</b>="<i>-W... -f...</i>"
+<b>LDFLAGS</b>="<i>-L... -Wl,...</i>"
+    Preprocessor/compiler/linker flags
+
+<b>LDLIBS</b>="<i>-l... -l...</i>"
+    Dynamic libraries to link
+
+<b>EXTRA_</b>{<b>CPPFLAGS</b>,<b>CFLAGS</b>,<b>LDFLAGS</b>,<b>LDLIBS</b>}="<i>...</i>"
+    Adds to the default flags, instead of replacing them
+</pre>
 
 ### Build profiles
 
-The configuration system provides a few shorthand flags for handy configurations:
+The default flags result in a plain debug build.
+Other build profiles can be enabled:
 
-| Command                 | Description                                                 |
-|-------------------------|-------------------------------------------------------------|
-| `./configure RELEASE=y` | Build `bfs` with optimizations, LTO, and without assertions |
-| `./configure ASAN=y`    | Enable [AddressSanitizer]                                   |
-| `./configure LSAN=y`    | Enable [LeakSanitizer]                                      |
-| `./configure MSAN=y`    | Enable [MemorySanitizer]                                    |
-| `./configure TSAN=y`    | Enable [ThreadSanitizer]                                    |
-| `./configure UBSAN=y`   | Enable [UndefinedBehaviorSanitizer]                         |
-| `./configure GCOV=y`    | Enable [code coverage]                                      |
+<pre>
+--enable-release
+    Enable optimizations, disable assertions
 
-[AddressSanitizer]: https://github.com/google/sanitizers/wiki/AddressSanitizer
-[LeakSanitizer]: https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#stand-alone-mode
-[MemorySanitizer]: https://github.com/google/sanitizers/wiki/MemorySanitizer
-[ThreadSanitizer]: https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
-[UndefinedBehaviorSanitizer]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
-[code coverage]: https://gcc.gnu.org/onlinedocs/gcc/Gcov.html
+--enable-<a href="https://github.com/google/sanitizers/wiki/AddressSanitizer">asan</a>
+--enable-<a href="https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#stand-alone-mode">lsan</a>
+--enable-<a href="https://github.com/google/sanitizers/wiki/MemorySanitizer">msan</a>
+--enable-<a href="https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual">tsan</a>
+--enable-<a href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">ubsan</a>
+    Enable sanitizers
 
-You can combine multiple profiles (e.g. `./configure ASAN=y UBSAN=y`), but not all of them will work together.
+--enable-<a href="https://gcc.gnu.org/onlinedocs/gcc/gcov/introduction-to-gcov.html">gcov</a>
+    Enable code coverage instrumentation
+</pre>
 
-### Flags
-
-Other flags can be specified on the `./configure` command line or in the environment.
-Here are some of the common ones; check the [`Makefile`](/Makefile) for more.
-
-| Flag                                | Description                                        |
-|-------------------------------------|----------------------------------------------------|
-| `CC`                                | The C compiler to use, e.g. `./configure CC=clang` |
-| `CFLAGS`<br>`EXTRA_CFLAGS`          | Override/add to the default compiler flags         |
-| `LDFLAGS`<br>`EXTRA_LDFLAGS`        | Override/add to the linker flags                   |
-| `USE_LIBACL`<br>`USE_LIBCAP`<br>... | Enable/disable [optional dependencies]             |
-| `TEST_FLAGS`                        | `tests.sh` flags for `make check`                  |
-| `DESTDIR`                           | The root directory for `make install`              |
-| `PREFIX`                            | The installation prefix (default: `/usr`)          |
-| `MANDIR`                            | The man page installation directory                |
-
-[optional dependencies]: #dependencies
+You can combine multiple profiles (e.g. `./configure --enable-asan --enable-ubsan`), but not all of them will work together.
 
 ### Dependencies
 
 `bfs` depends on some system libraries for some of its features.
-These dependencies are optional, and can be turned off in `./configure` if necessary by setting the appropriate variable to `n` (e.g. `./configure USE_ONIGURUMA=n`).
+External dependencies are auto-detected by default, but you can `--enable` or `--disable` them manually:
 
-| Dependency   | Platforms  | `./configure` flag |
-|--------------|------------|--------------------|
-| [libacl]     | Linux only | `USE_LIBACL`       |
-| [libcap]     | Linux only | `USE_LIBCAP`       |
-| [liburing]   | Linux only | `USE_LIBURING`     |
-| [libselinux] | Linux only | `USE_LIBSELINUX`   |
-| [Oniguruma]  | All        | `USE_ONIGURUMA`    |
+<pre>
+--enable-<a href="https://savannah.nongnu.org/projects/acl">libacl</a>      --disable-libacl
+--enable-<a href="https://sites.google.com/site/fullycapable/">libcap</a>      --disable-libcap
+--enable-<a href="https://github.com/SELinuxProject/selinux">libselinux</a>  --disable-libselinux
+--enable-<a href="https://github.com/axboe/liburing">liburing</a>    --disable-liburing
+--enable-<a href="https://github.com/kkos/oniguruma">oniguruma</a>   --disable-oniguruma
+</pre>
 
-[libacl]: https://savannah.nongnu.org/projects/acl
-[libcap]: https://sites.google.com/site/fullycapable/
-[libselinux]: https://github.com/SELinuxProject/selinux
-[liburing]: https://github.com/axboe/liburing
-[Oniguruma]: https://github.com/kkos/oniguruma
+[`pkg-config`] is used, if available, to detect these libraries and any additional build flags they may require.
+If this is undesireable, disable it by setting `PKG_CONFIG` to the empty string (`./configure PKG_CONFIG=""`).
 
-### Dependency tracking
-
-The build system automatically tracks header dependencies with the `-M` family of compiler options (see `DEPFLAGS` in [`build/deps.mk`](/build/deps.mk)).
-So if you edit a header file, `make` will rebuild the necessary object files ensuring they don't go out of sync.
-
-We also add a dependency on the current configuration, so you can change configurations and rebuild without having to `make clean`.
-For example,
-
-    $ ./configure
-    $ make
-    $ ./configure RELEASE=y
-    $ make
-
-will build the project in debug mode and then rebuild it in release mode.
+[`pkg-config`]: https://www.freedesktop.org/wiki/Software/pkg-config/
 
 ### Out-of-tree builds
 
@@ -108,6 +105,53 @@ You can set up an out-of-tree build by running the `configure` script from anoth
     $ cd out
     $ ../configure
     $ make
+
+
+Building
+--------
+
+### Targets
+
+The [`Makefile`](/Makefile) supports several different build targets:
+
+<pre>
+make
+    The default target; builds just the <i>bfs</i> binary
+make <b>all</b>
+    Builds everything, including the tests (but doesn't run them)
+
+make <b>check</b>
+    Builds everything, and runs all tests
+make <b>unit-tests</b>
+    Builds and runs the unit tests
+make <b>integration-tests</b>
+    Builds and runs the integration tests
+make <b>distcheck</b>
+    Builds and runs the tests in multiple different configurations
+
+make <b>install</b>
+    Installs bfs globally
+make <b>uninstall</b>
+    Uninstalls bfs
+
+make <b>clean</b>
+    Deletes all built files
+make <b>distclean</b>
+    Also deletes files generated by ./configure
+</pre>
+
+
+Troubleshooting
+---------------
+
+If the build fails or behaves unexpectedly, start by enabling verbose mode:
+
+    $ ./configure V=1
+    $ make V=1
+
+This will print the generated configuration and the exact commands that are executed.
+
+You can also check the file `gen/config.log`, which contains any errors from commands run during the configuration phase.
 
 
 Testing
