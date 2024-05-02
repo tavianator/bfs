@@ -1,6 +1,36 @@
 3.*
 ===
 
+3.2
+---
+
+**May 2, 2024**
+
+### New features
+
+- New `-limit N` action that quits immediately after `N` results
+
+- Implemented `-context` (from GNU find) for matching SELinux contexts ([#27](https://github.com/tavianator/bfs/issues/27))
+
+- Implemented `-printf %Z` for printing SELinux contexts
+
+### Changes
+
+- The build system has been rewritten, and there is now a configure step:
+
+      $ ./configure
+      $ make
+
+  See `./configure --help` or [docs/BUILDING.md](/docs/BUILDING.md) for more details.
+
+- Improved platform support
+  - Implemented `-acl` on Solaris/Illumos
+  - Implemented `-xattr` on DragonFly BSD
+
+### Bug fixes
+
+- Fixed some rarely-used code paths that clean up after allocation failures
+
 3.1.3
 -----
 
