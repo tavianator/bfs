@@ -21,8 +21,8 @@ default: bfs
 # bfs used to have flag-like targets (`make release`, `make asan ubsan`, etc.).
 # Direct users to the new configuration system.
 asan lsan msan tsan ubsan gcov lint release::
-	@printf 'error: `%s %s` is no longer supported. Use `./configure %s=y` instead.\n' \
-	    "${MAKE}" $@ $$(echo $@ | tr 'a-z' 'A-Z') >&2
+	@printf 'error: `%s %s` is no longer supported. Use `./configure --enable-%s` instead.\n' \
+	    "${MAKE}" $@ $@ >&2
 	@false
 
 # Print an error if `make` is run before `./configure`
