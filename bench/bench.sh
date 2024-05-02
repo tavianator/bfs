@@ -221,7 +221,7 @@ setup() {
     fi
 
     echo "Building bfs ..."
-    as-user ./configure RELEASE=y
+    as-user ./configure --enable-release
     as-user make -s -j"$nproc" all
 
     as-user mkdir -p bench/corpus
@@ -255,7 +255,7 @@ setup() {
                 cd "$worktree"
                 as-user git checkout -qd "$commit" --
                 if [ -e configure ]; then
-                    as-user ./configure RELEASE=1
+                    as-user ./configure --enable-release
                     as-user make -s -j"$nproc"
                 else
                     as-user make -s -j"$nproc" release

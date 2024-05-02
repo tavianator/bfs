@@ -343,7 +343,7 @@ Run the test suite to make sure it works correctly:
 
 If you're interested in speed, you may want to build the release version instead:
 
-    $ ./configure RELEASE=y
+    $ ./configure --enable-release
     $ make
 
 Finally, if you want to install it globally, run
