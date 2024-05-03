@@ -30,6 +30,8 @@ is_quiet() {
         case "$flag" in
             # Ignore things like --jobserver-auth
             --*) continue ;;
+            # Skip variable assignments
+            *=*) break ;;
             -*s*) return 0 ;;
         esac
     done
