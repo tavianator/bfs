@@ -40,6 +40,7 @@ HEADERS := \
     gen/has/strerror-l.h \
     gen/has/strerror-r-gnu.h \
     gen/has/strerror-r-posix.h \
+    gen/has/timegm.h \
     gen/has/tm-gmtoff.h \
     gen/has/uselocale.h
 

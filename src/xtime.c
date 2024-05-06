@@ -12,13 +12,13 @@
 #include <unistd.h>
 
 int xmktime(struct tm *tm, time_t *timep) {
-	*timep = mktime(tm);
+	time_t time = mktime(tm);
 
-	if (*timep == -1) {
+	if (time == -1) {
 		int error = errno;
 
 		struct tm tmp;
-		if (!localtime_r(timep, &tmp)) {
+		if (!localtime_r(&time, &tmp)) {
 			bfs_bug("localtime_r(-1): %s", xstrerror(errno));
 			return -1;
 		}
@@ -30,8 +30,36 @@ int xmktime(struct tm *tm, time_t *timep) {
 		}
 	}
 
+	*timep = time;
 	return 0;
 }
+
+#if BFS_HAS_TIMEGM
+
+int xtimegm(struct tm *tm, time_t *timep) {
+	time_t time = timegm(tm);
+
+	if (time == -1) {
+		int error = errno;
+
+		struct tm tmp;
+		if (!gmtime_r(&time, &tmp)) {
+			bfs_bug("gmtime_r(-1): %s", xstrerror(errno));
+			return -1;
+		}
+
+		if (tm->tm_year != tmp.tm_year || tm->tm_yday != tmp.tm_yday
+		    || tm->tm_hour != tmp.tm_hour || tm->tm_min != tmp.tm_min || tm->tm_sec != tmp.tm_sec) {
+			errno = error;
+			return -1;
+		}
+	}
+
+	*timep = time;
+	return 0;
+}
+
+#else
 
 static int safe_add(int *value, int delta) {
 	if (*value >= 0) {
@@ -146,6 +174,8 @@ overflow:
 	errno = EOVERFLOW;
 	return -1;
 }
+
+#endif // !BFS_HAS_TIMEGM
 
 /** Parse a decimal digit. */
 static int xgetdigit(char c) {
