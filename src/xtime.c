@@ -5,6 +5,7 @@
 #include "xtime.h"
 #include "bfstd.h"
 #include "diag.h"
+#include "sanity.h"
 #include <errno.h>
 #include <limits.h>
 #include <sys/time.h>
@@ -34,7 +35,8 @@ int xmktime(struct tm *tm, time_t *timep) {
 	return 0;
 }
 
-#if BFS_HAS_TIMEGM
+// FreeBSD is missing an interceptor
+#if BFS_HAS_TIMEGM && !(__FreeBSD__ && SANITIZE_MEMORY)
 
 int xtimegm(struct tm *tm, time_t *timep) {
 	time_t time = timegm(tm);
