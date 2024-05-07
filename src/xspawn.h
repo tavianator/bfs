@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2018-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * A process-spawning library inspired by posix_spawn().
@@ -21,74 +8,98 @@
 #ifndef BFS_XSPAWN_H
 #define BFS_XSPAWN_H
 
+#include "prelude.h"
 #include <sys/resource.h>
 #include <sys/types.h>
+#include <unistd.h>
+
+#if _POSIX_SPAWN > 0
+#  include <spawn.h>
+#endif
 
 /**
  * bfs_spawn() flags.
  */
 enum bfs_spawn_flags {
 	/** Use the PATH variable to resolve the executable (like execvp()). */
-	BFS_SPAWN_USEPATH = 1 << 0,
+	BFS_SPAWN_USE_PATH  = 1 << 0,
+	/** Whether posix_spawn() can be used. */
+	BFS_SPAWN_USE_POSIX = 1 << 1,
 };
 
 /**
  * bfs_spawn() attributes, controlling the context of the new process.
  */
 struct bfs_spawn {
+	/** Spawn flags. */
 	enum bfs_spawn_flags flags;
-	struct bfs_spawn_action *actions;
+
+	/** Linked list of actions. */
+	struct bfs_spawn_action *head;
 	struct bfs_spawn_action **tail;
+
+#if _POSIX_SPAWN > 0
+	/** posix_spawn() context, for when we can use it. */
+	posix_spawn_file_actions_t actions;
+	posix_spawnattr_t attr;
+#endif
 };
 
 /**
  * Create a new bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_init(struct bfs_spawn *ctx);
 
 /**
  * Destroy a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_destroy(struct bfs_spawn *ctx);
 
 /**
- * Set the flags for a bfs_spawn() context.
+ * Add an open() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
-int bfs_spawn_setflags(struct bfs_spawn *ctx, enum bfs_spawn_flags flags);
+int bfs_spawn_addopen(struct bfs_spawn *ctx, int fd, const char *path, int flags, mode_t mode);
 
 /**
  * Add a close() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd);
 
 /**
  * Add a dup2() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd);
 
 /**
  * Add an fchdir() action to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd);
 
 /**
- * Add a setrlimit() action to a bfs_spawn() context.
+ * Apply setrlimit() to a bfs_spawn() context.
  *
- * @return 0 on success, -1 on failure.
+ * @return
+ *         0 on success, -1 on failure.
  */
-int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl);
+int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl);
 
 /**
  * Spawn a new process.
@@ -108,7 +119,7 @@ int bfs_spawn_addsetrlimit(struct bfs_spawn *ctx, int resource, const struct rli
 pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp);
 
 /**
- * Look up an executable in the current PATH, as BFS_SPAWN_USEPATH or execvp()
+ * Look up an executable in the current PATH, as BFS_SPAWN_USE_PATH or execvp()
  * would do.
  *
  * @param exe

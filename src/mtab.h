@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2017-2020 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * A facade over platform-specific APIs for enumerating mounted filesystems.
@@ -21,7 +8,7 @@
 #ifndef BFS_MTAB_H
 #define BFS_MTAB_H
 
-#include <stdbool.h>
+#include "prelude.h"
 
 struct bfs_stat;
 
@@ -56,12 +43,12 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
  *
  * @param mtab
  *         The current mount table.
- * @param path
- *         The path to check.
+ * @param name
+ *         The name of the file to check.
  * @return
  *         Whether the named file could be a mount point.
  */
-bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *path);
+bool bfs_might_be_mount(const struct bfs_mtab *mtab, const char *name);
 
 /**
  * Free a mount table.

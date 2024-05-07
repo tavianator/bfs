@@ -1,5 +1,2 @@
-stderr=$(invoke_bfs basic -execdir "$TESTS/nonexistent" {} \; 2>&1 >/dev/null)
-[ -n "$stderr" ] || return 1
-
-bfs_diff basic -print -execdir "$TESTS/nonexistent" {} \; -print
-(($? == EX_BFS))
+bfs_diff basic -print -execdir "$TESTS/nonexistent" {} \; -print 2>"$TEST/err" && fail
+test -s "$TEST/err"

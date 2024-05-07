@@ -6,82 +6,222 @@ jobs:
   linux:
     name: Linux
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -y
           sudo apt-get install -y \
+              expect \
               gcc-multilib \
+              libgcc-s1:i386 \
               acl \
               libacl1-dev \
               libacl1:i386 \
               attr \
-              libattr1-dev \
-              libattr1:i386 \
               libcap2-bin \
               libcap-dev \
               libcap2:i386 \
               libonig-dev \
-              libonig5:i386
+              libonig5:i386 \
+              liburing-dev
           # Ubuntu doesn't let you install the -dev packages for both amd64 and
-          # i386 at once, so we make our own symlinks to fix -m32 -lacl -lattr -lcap
+          # i386 at once, so we make our own symlinks to fix -m32 -lacl -l...
           sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
-          sudo ln -s libattr.so.1 /lib/i386-linux-gnu/libattr.so
           sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
           sudo ln -s libonig.so.5 /lib/i386-linux-gnu/libonig.so
+          # Work around https://github.com/actions/runner-images/issues/9491
+          sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Run tests
         run: |
           make -j$(nproc) distcheck
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-config.log
+          path: distcheck-*/gen/config.log
+
   macos:
     name: macOS
 
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          brew install coreutils
+          brew install \
+              bash \
+              expect
 
       - name: Run tests
         run: |
-          make -j$(sysctl -n hw.ncpu) distcheck
+          jobs=$(sysctl -n hw.ncpu)
+          make -j$jobs distcheck
 
   freebsd:
     name: FreeBSD
 
-    if: ${{ github.repository_owner == 'tavianator' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-
-    runs-on: ubuntu-latest
-
-    concurrency: spurion
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: tailscale/github-action@main
-        with:
-          authkey: ${{ secrets.TAILSCALE_KEY }}
-
-      - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-        run: |
-          mkdir ~/.ssh
-          printf '%s' "$SSH_KEY" >~/.ssh/github-actions
-          chmod 0600 ~/.ssh/github-actions
-          printf 'Host %s\n\tStrictHostKeyChecking=accept-new\n\tUser github\n\tIdentityFile ~/.ssh/github-actions\n' "$(tailscale ip -6 spurion)" >~/.ssh/config
+      - uses: actions/checkout@v4
 
       - name: Run tests
-        run: |
-          spurion=$(tailscale ip -6 spurion)
-          rsync -rl --delete . "[$spurion]:bfs"
-          ssh "$spurion" 'gmake -C bfs -j$(sysctl -n hw.ncpu) distcheck'
+        uses: cross-platform-actions/action@v0.24.0
+        with:
+          operating_system: freebsd
+          version: "14.0"
+
+          run: |
+            sudo pkg install -y \
+                bash \
+                expect \
+                oniguruma \
+                pkgconf \
+                tcl-wrapper
+            sudo mount -t fdescfs none /dev/fd
+            make -j$(nproc) distcheck
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-config.log
+          path: distcheck-*/gen/config.log
+
+  openbsd:
+    name: OpenBSD
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: cross-platform-actions/action@v0.24.0
+        with:
+          operating_system: openbsd
+          version: "7.5"
+
+          run: |
+            sudo pkg_add \
+                bash \
+                expect \
+                gmake \
+                oniguruma
+            jobs=$(sysctl -n hw.ncpu)
+            ./configure MAKE=gmake
+            gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openbsd-config.log
+          path: gen/config.log
+
+  netbsd:
+    name: NetBSD
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: cross-platform-actions/action@v0.24.0
+        with:
+          operating_system: netbsd
+          version: "10.0"
+
+          run: |
+            PATH="/sbin:/usr/sbin:$PATH"
+            sudo pkgin -y install \
+                bash \
+                oniguruma \
+                pkgconf \
+                tcl-expect
+            jobs=$(sysctl -n hw.ncpu)
+            ./configure
+            make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: netbsd-config.log
+          path: gen/config.log
+
+  dragonflybsd:
+    name: DragonFly BSD
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: vmactions/dragonflybsd-vm@v1
+        with:
+          release: "6.4.0"
+          usesh: true
+
+          prepare: |
+            pkg install -y \
+                bash \
+                expect \
+                oniguruma \
+                pkgconf \
+                sudo \
+                tcl-wrapper
+            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
+            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
+
+          run: |
+            chown -R action:action .
+            jobs=$(sysctl -n hw.ncpu)
+            sudo -u action ./configure
+            sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragonfly-config.log
+          path: gen/config.log
+
+  omnios:
+    name: OmniOS
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        uses: vmactions/omnios-vm@v1
+        with:
+          release: "r151048"
+          usesh: true
+
+          prepare: |
+            pkg install \
+                bash \
+                build-essential \
+                expect \
+                gnu-make \
+                onig \
+                sudo
+            useradd -m -g staff action
+            echo "%staff ALL=(ALL) NOPASSWD: ALL" >>/etc/sudoers
+
+          run: |
+            PATH="/usr/xpg4/bin:$PATH"
+            chown -R action:staff .
+            jobs=$(getconf NPROCESSORS_ONLN)
+            sudo -u action ./configure MAKE=gmake
+            sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omnios-config.log
+          path: gen/config.log

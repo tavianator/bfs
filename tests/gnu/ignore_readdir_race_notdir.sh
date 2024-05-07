@@ -1,5 +1,7 @@
 # Check -ignore_readdir_race handling when a directory is replaced with a file
-clean_scratch
-"$XTOUCH" -p scratch/foo/bar
+cd "$TEST"
+mkdir foo
 
-invoke_bfs scratch -mindepth 1 -ignore_readdir_race -execdir rm -r {} \; -execdir "$XTOUCH" {} \;
+invoke_bfs . -mindepth 1 -ignore_readdir_race \
+    -type d -execdir rmdir {} \; \
+    -execdir "$XTOUCH" {} \;

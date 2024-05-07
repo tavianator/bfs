@@ -1,12 +1,9 @@
-skip_unless test "$SUDO"
-skip_if test "$UNAME" = "Darwin"
+test "$UNAME" = "Darwin" && skip
 
-clean_scratch
-mkdir scratch/{foo,mnt}
-sudo mount -t tmpfs tmpfs scratch/mnt
+cd "$TEST"
+mkdir foo mnt
 
-bfs_diff scratch -inum "$(inum scratch/mnt)"
-ret=$?
+bfs_sudo mount -t tmpfs tmpfs mnt || skip
+defer bfs_sudo umount mnt
 
-sudo umount scratch/mnt
-return $ret
+bfs_diff . -inum "$(inum mnt)"

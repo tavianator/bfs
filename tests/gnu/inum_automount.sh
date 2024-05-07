@@ -1,17 +1,14 @@
 # bfs shouldn't trigger automounts unless it descends into them
 
-skip_unless test "$SUDO"
-skip_unless command -v systemd-mount &>/dev/null
+command -v systemd-mount &>/dev/null || skip
 
-clean_scratch
-mkdir scratch/{foo,automnt}
-skip_unless sudo systemd-mount -A -o bind basic scratch/automnt
+cd "$TEST"
+mkdir foo automnt
 
-before=$(inum scratch/automnt)
-bfs_diff scratch -inum "$before" -prune
-ret=$?
-after=$(inum scratch/automnt)
+bfs_sudo systemd-mount -A -o bind "$TMP/basic" automnt || skip
+defer bfs_sudo systemd-umount automnt
 
-sudo systemd-umount scratch/automnt
-
-((ret == 0 && before == after))
+before=$(inum automnt)
+bfs_diff . -inum "$before" -prune
+after=$(inum automnt)
+((before == after))

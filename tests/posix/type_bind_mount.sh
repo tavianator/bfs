@@ -1,12 +1,9 @@
-skip_unless test "$SUDO"
-skip_unless test "$UNAME" = "Linux"
+test "$UNAME" = "Linux" || skip
 
-clean_scratch
-"$XTOUCH" scratch/{file,null}
-sudo mount --bind /dev/null scratch/null
+cd "$TEST"
+"$XTOUCH" file null
 
-bfs_diff scratch -type c
-ret=$?
+bfs_sudo mount --bind /dev/null null || skip
+defer bfs_sudo umount null
 
-sudo umount scratch/null
-return $ret
+bfs_diff . -type c

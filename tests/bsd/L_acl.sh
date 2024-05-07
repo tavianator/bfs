@@ -1,9 +1,9 @@
-clean_scratch
+cd "$TEST"
 
-skip_unless invoke_bfs scratch -quit -acl
+invoke_bfs . -quit -acl || skip
 
-"$XTOUCH" scratch/{normal,acl}
-skip_unless set_acl scratch/acl
-ln -s acl scratch/link
+"$XTOUCH" normal acl
+set_acl acl || skip
+ln -s acl link
 
-bfs_diff -L scratch -acl
+bfs_diff -L . -acl

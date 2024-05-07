@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * The evaluation functions that implement primary expressions like -name,
@@ -22,7 +9,7 @@
 #ifndef BFS_EVAL_H
 #define BFS_EVAL_H
 
-#include <stdbool.h>
+#include "prelude.h"
 
 struct bfs_ctx;
 struct bfs_expr;
@@ -52,7 +39,7 @@ typedef bool bfs_eval_fn(const struct bfs_expr *expr, struct bfs_eval *state);
  * @return
  *         EXIT_SUCCESS on success, otherwise on failure.
  */
-int bfs_eval(const struct bfs_ctx *ctx);
+int bfs_eval(struct bfs_ctx *ctx);
 
 // Predicate evaluation functions
 
@@ -62,6 +49,7 @@ bool eval_false(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_access(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_acl(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_capable(const struct bfs_expr *expr, struct bfs_eval *state);
+bool eval_context(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_perm(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_xattr(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_xattrname(const struct bfs_expr *expr, struct bfs_eval *state);
@@ -101,6 +89,7 @@ bool eval_fprint(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_fprint0(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_fprintf(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_fprintx(const struct bfs_expr *expr, struct bfs_eval *state);
+bool eval_limit(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_prune(const struct bfs_expr *expr, struct bfs_eval *state);
 bool eval_quit(const struct bfs_expr *expr, struct bfs_eval *state);
 

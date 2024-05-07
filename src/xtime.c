@@ -1,67 +1,26 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "xtime.h"
+#include "bfstd.h"
+#include "diag.h"
+#include "sanity.h"
 #include <errno.h>
 #include <limits.h>
-#include <stdbool.h>
-#include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
-/** Whether tzset() has been called. */
-static bool tz_is_set = false;
-
-int xlocaltime(const time_t *timep, struct tm *result) {
-	// Should be called before localtime_r() according to POSIX.1-2004
-	if (!tz_is_set) {
-		tzset();
-		tz_is_set = true;
-	}
-
-	if (localtime_r(timep, result)) {
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
-int xgmtime(const time_t *timep, struct tm *result) {
-	// Should be called before gmtime_r() according to POSIX.1-2004
-	if (!tz_is_set) {
-		tzset();
-		tz_is_set = true;
-	}
-
-	if (gmtime_r(timep, result)) {
-		return 0;
-	} else {
-		return -1;
-	}
-}
-
 int xmktime(struct tm *tm, time_t *timep) {
-	*timep = mktime(tm);
+	time_t time = mktime(tm);
 
-	if (*timep == -1) {
+	if (time == -1) {
 		int error = errno;
 
 		struct tm tmp;
-		if (xlocaltime(timep, &tmp) != 0) {
+		if (!localtime_r(&time, &tmp)) {
+			bfs_bug("localtime_r(-1): %s", xstrerror(errno));
 			return -1;
 		}
 
@@ -72,8 +31,37 @@ int xmktime(struct tm *tm, time_t *timep) {
 		}
 	}
 
+	*timep = time;
 	return 0;
 }
+
+// FreeBSD is missing an interceptor
+#if BFS_HAS_TIMEGM && !(__FreeBSD__ && SANITIZE_MEMORY)
+
+int xtimegm(struct tm *tm, time_t *timep) {
+	time_t time = timegm(tm);
+
+	if (time == -1) {
+		int error = errno;
+
+		struct tm tmp;
+		if (!gmtime_r(&time, &tmp)) {
+			bfs_bug("gmtime_r(-1): %s", xstrerror(errno));
+			return -1;
+		}
+
+		if (tm->tm_year != tmp.tm_year || tm->tm_yday != tmp.tm_yday
+		    || tm->tm_hour != tmp.tm_hour || tm->tm_min != tmp.tm_min || tm->tm_sec != tmp.tm_sec) {
+			errno = error;
+			return -1;
+		}
+	}
+
+	*timep = time;
+	return 0;
+}
+
+#else
 
 static int safe_add(int *value, int delta) {
 	if (*value >= 0) {
@@ -92,7 +80,7 @@ static int safe_add(int *value, int delta) {
 
 static int floor_div(int n, int d) {
 	int a = n < 0;
-	return (n + a)/d - a;
+	return (n + a) / d - a;
 }
 
 static int wrap(int *value, int max, int *next) {
@@ -104,80 +92,84 @@ static int wrap(int *value, int max, int *next) {
 static int month_length(int year, int month) {
 	static const int month_lengths[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 	int ret = month_lengths[month];
-	if (month == 1 && year%4 == 0 && (year%100 != 0 || (year + 300)%400 == 0)) {
+	if (month == 1 && year % 4 == 0 && (year % 100 != 0 || (year + 300) % 400 == 0)) {
 		++ret;
 	}
 	return ret;
 }
 
 int xtimegm(struct tm *tm, time_t *timep) {
-	tm->tm_isdst = 0;
+	struct tm copy = *tm;
+	copy.tm_isdst = 0;
 
-	if (wrap(&tm->tm_sec, 60, &tm->tm_min) != 0) {
+	if (wrap(&copy.tm_sec, 60, &copy.tm_min) != 0) {
 		goto overflow;
 	}
-	if (wrap(&tm->tm_min, 60, &tm->tm_hour) != 0) {
+	if (wrap(&copy.tm_min, 60, &copy.tm_hour) != 0) {
 		goto overflow;
 	}
-	if (wrap(&tm->tm_hour, 24, &tm->tm_mday) != 0) {
+	if (wrap(&copy.tm_hour, 24, &copy.tm_mday) != 0) {
 		goto overflow;
 	}
 
 	// In order to wrap the days of the month, we first need to know what
 	// month it is
-	if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+	if (wrap(&copy.tm_mon, 12, &copy.tm_year) != 0) {
 		goto overflow;
 	}
 
-	if (tm->tm_mday < 1) {
+	if (copy.tm_mday < 1) {
 		do {
-			--tm->tm_mon;
-			if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+			--copy.tm_mon;
+			if (wrap(&copy.tm_mon, 12, &copy.tm_year) != 0) {
 				goto overflow;
 			}
 
-			tm->tm_mday += month_length(tm->tm_year, tm->tm_mon);
-		} while (tm->tm_mday < 1);
+			copy.tm_mday += month_length(copy.tm_year, copy.tm_mon);
+		} while (copy.tm_mday < 1);
 	} else {
 		while (true) {
-			int days = month_length(tm->tm_year, tm->tm_mon);
-			if (tm->tm_mday <= days) {
+			int days = month_length(copy.tm_year, copy.tm_mon);
+			if (copy.tm_mday <= days) {
 				break;
 			}
 
-			tm->tm_mday -= days;
-			++tm->tm_mon;
-			if (wrap(&tm->tm_mon, 12, &tm->tm_year) != 0) {
+			copy.tm_mday -= days;
+			++copy.tm_mon;
+			if (wrap(&copy.tm_mon, 12, &copy.tm_year) != 0) {
 				goto overflow;
 			}
 		}
 	}
 
-	tm->tm_yday = 0;
-	for (int i = 0; i < tm->tm_mon; ++i) {
-		tm->tm_yday += month_length(tm->tm_year, i);
+	copy.tm_yday = 0;
+	for (int i = 0; i < copy.tm_mon; ++i) {
+		copy.tm_yday += month_length(copy.tm_year, i);
 	}
-	tm->tm_yday += tm->tm_mday - 1;
+	copy.tm_yday += copy.tm_mday - 1;
 
 	int leap_days;
 	// Compute floor((year - 69)/4) - floor((year - 1)/100) + floor((year + 299)/400) without overflows
-	if (tm->tm_year >= 0) {
-		leap_days = floor_div(tm->tm_year - 69, 4) - floor_div(tm->tm_year - 1, 100) + floor_div(tm->tm_year - 101, 400) + 1;
+	if (copy.tm_year >= 0) {
+		leap_days = floor_div(copy.tm_year - 69, 4) - floor_div(copy.tm_year - 1, 100) + floor_div(copy.tm_year - 101, 400) + 1;
 	} else {
-		leap_days = floor_div(tm->tm_year + 3, 4) - floor_div(tm->tm_year + 99, 100) + floor_div(tm->tm_year + 299, 400) - 17;
+		leap_days = floor_div(copy.tm_year + 3, 4) - floor_div(copy.tm_year + 99, 100) + floor_div(copy.tm_year + 299, 400) - 17;
 	}
 
-	long long epoch_days = 365LL*(tm->tm_year - 70) + leap_days + tm->tm_yday;
-	tm->tm_wday = (epoch_days + 4)%7;
-	if (tm->tm_wday < 0) {
-		tm->tm_wday += 7;
+	long long epoch_days = 365LL * (copy.tm_year - 70) + leap_days + copy.tm_yday;
+	copy.tm_wday = (epoch_days + 4) % 7;
+	if (copy.tm_wday < 0) {
+		copy.tm_wday += 7;
 	}
 
-	long long epoch_time = tm->tm_sec + 60*(tm->tm_min + 60*(tm->tm_hour + 24*epoch_days));
-	*timep = (time_t)epoch_time;
-	if ((long long)*timep != epoch_time) {
+	long long epoch_time = copy.tm_sec + 60 * (copy.tm_min + 60 * (copy.tm_hour + 24 * epoch_days));
+	time_t time = (time_t)epoch_time;
+	if ((long long)time != epoch_time) {
 		goto overflow;
 	}
+
+	*tm = copy;
+	*timep = time;
 	return 0;
 
 overflow:
@@ -185,19 +177,31 @@ overflow:
 	return -1;
 }
 
+#endif // !BFS_HAS_TIMEGM
+
+/** Parse a decimal digit. */
+static int xgetdigit(char c) {
+	int ret = c - '0';
+	if (ret < 0 || ret > 9) {
+		return -1;
+	} else {
+		return ret;
+	}
+}
+
 /** Parse some digits from a timestamp. */
 static int xgetpart(const char **str, size_t n, int *result) {
-	char buf[n + 1];
+	*result = 0;
+
 	for (size_t i = 0; i < n; ++i, ++*str) {
-		char c = **str;
-		if (c < '0' || c > '9') {
+		int dig = xgetdigit(**str);
+		if (dig < 0) {
 			return -1;
 		}
-		buf[i] = c;
+		*result *= 10;
+		*result += dig;
 	}
-	buf[n] = '\0';
 
-	*result = atoi(buf);
 	return 0;
 }
 
@@ -250,6 +254,8 @@ int xgetdate(const char *str, struct timespec *result) {
 		goto end;
 	} else if (*str == ':') {
 		++str;
+	} else if (xgetdigit(*str) < 0) {
+		goto zone;
 	}
 	if (xgetpart(&str, 2, &tm.tm_min) != 0) {
 		goto invalid;
@@ -260,11 +266,14 @@ int xgetdate(const char *str, struct timespec *result) {
 		goto end;
 	} else if (*str == ':') {
 		++str;
+	} else if (xgetdigit(*str) < 0) {
+		goto zone;
 	}
 	if (xgetpart(&str, 2, &tm.tm_sec) != 0) {
 		goto invalid;
 	}
 
+zone:
 	if (!*str) {
 		goto end;
 	} else if (*str == 'Z') {
@@ -307,11 +316,11 @@ end:
 			goto error;
 		}
 
-		int offset = 60*tz_hour + tz_min;
+		int offset = (tz_hour * 60 + tz_min) * 60;
 		if (tz_negative) {
-			result->tv_sec -= offset;
-		} else {
 			result->tv_sec += offset;
+		} else {
+			result->tv_sec -= offset;
 		}
 	}
 

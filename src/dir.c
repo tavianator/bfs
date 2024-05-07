@@ -1,33 +1,54 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2021-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "dir.h"
+#include "alloc.h"
 #include "bfstd.h"
-#include "config.h"
+#include "diag.h"
+#include "sanity.h"
+#include "trie.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#if __linux__
-#	include <sys/syscall.h>
+#if BFS_USE_GETDENTS
+#  if BFS_HAS_GETDENTS64_SYSCALL
+#    include <sys/syscall.h>
+#  endif
+
+/** getdents() syscall wrapper. */
+static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
+	sanitize_uninit(buf, size);
+
+#if BFS_HAS_GETDENTS
+	ssize_t ret = getdents(fd, buf, size);
+#elif BFS_HAS_GETDENTS64
+	ssize_t ret = getdents64(fd, buf, size);
+#elif BFS_HAS_GETDENTS64_SYSCALL
+	ssize_t ret = syscall(SYS_getdents64, fd, buf, size);
+#else
+#  error "No getdents() implementation"
+#endif
+
+	if (ret > 0) {
+		sanitize_init(buf, ret);
+	}
+
+	return ret;
+}
+
+#endif // BFS_USE_GETDENTS
+
+#if BFS_USE_GETDENTS && !BFS_HAS_GETDENTS
+/** Directory entry type for bfs_getdents() */
+typedef struct dirent64 sys_dirent;
+#else
+typedef struct dirent sys_dirent;
 #endif
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
@@ -78,227 +99,265 @@ enum bfs_type bfs_mode_to_type(mode_t mode) {
 	}
 }
 
-#if __linux__
 /**
- * This is not defined in the kernel headers for some reason, callers have to
- * define it themselves.
+ * Private directory flags.
  */
-struct linux_dirent64 {
-	ino64_t d_ino;
-	off64_t d_off;
-	unsigned short d_reclen;
-	unsigned char d_type;
-	char d_name[];
+enum {
+	/** We've reached the end of the directory. */
+	BFS_DIR_EOF   = BFS_DIR_PRIVATE << 0,
+	/** This directory is a union mount we need to dedup manually. */
+	BFS_DIR_UNION = BFS_DIR_PRIVATE << 1,
 };
 
-// Make the whole allocation 64k
-#define BUF_SIZE ((64 << 10) - 8)
-#endif
-
 struct bfs_dir {
-#if __linux__
+	unsigned int flags;
+
+#if BFS_USE_GETDENTS
 	int fd;
 	unsigned short pos;
 	unsigned short size;
+#  if __FreeBSD__
+	struct trie trie;
+#  endif
+	alignas(sys_dirent) char buf[];
 #else
 	DIR *dir;
 	struct dirent *de;
 #endif
 };
 
-struct bfs_dir *bfs_opendir(int at_fd, const char *at_path) {
-#if __linux__
-	struct bfs_dir *dir = malloc(sizeof(*dir) + BUF_SIZE);
+#if BFS_USE_GETDENTS
+#  define DIR_SIZE (64 << 10)
+#  define BUF_SIZE (DIR_SIZE - sizeof(struct bfs_dir))
 #else
-	struct bfs_dir *dir = malloc(sizeof(*dir));
+#  define DIR_SIZE sizeof(struct bfs_dir)
 #endif
-	if (!dir) {
-		return NULL;
-	}
 
+struct bfs_dir *bfs_allocdir(void) {
+	return malloc(DIR_SIZE);
+}
+
+void bfs_dir_arena(struct arena *arena) {
+	arena_init(arena, alignof(struct bfs_dir), DIR_SIZE);
+}
+
+int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path, enum bfs_dir_flags flags) {
 	int fd;
 	if (at_path) {
 		fd = openat(at_fd, at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+		if (fd < 0) {
+			return -1;
+		}
 	} else if (at_fd >= 0) {
 		fd = at_fd;
 	} else {
-		free(dir);
 		errno = EBADF;
-		return NULL;
+		return -1;
 	}
 
-	if (fd < 0) {
-		free(dir);
-		return NULL;
-	}
+	dir->flags = flags;
 
-#if __linux__
+#if BFS_USE_GETDENTS
 	dir->fd = fd;
 	dir->pos = 0;
 	dir->size = 0;
-#else
+
+#  if __FreeBSD__ && defined(F_ISUNIONSTACK)
+	if (fcntl(fd, F_ISUNIONSTACK) > 0) {
+		dir->flags |= BFS_DIR_UNION;
+		trie_init(&dir->trie);
+	}
+#  endif
+#else // !BFS_USE_GETDENTS
 	dir->dir = fdopendir(fd);
 	if (!dir->dir) {
 		if (at_path) {
 			close_quietly(fd);
 		}
-		free(dir);
-		return NULL;
+		return -1;
 	}
-
 	dir->de = NULL;
-#endif // __linux__
+#endif
 
-	return dir;
+	return 0;
 }
 
 int bfs_dirfd(const struct bfs_dir *dir) {
-#if __linux__
+#if BFS_USE_GETDENTS
 	return dir->fd;
 #else
 	return dirfd(dir->dir);
 #endif
 }
 
-/** Convert a dirent type to a bfs_type. */
-static enum bfs_type translate_type(int d_type) {
-	switch (d_type) {
-#ifdef DT_BLK
-	case DT_BLK:
-		return BFS_BLK;
-#endif
-#ifdef DT_CHR
-	case DT_CHR:
-		return BFS_CHR;
-#endif
-#ifdef DT_DIR
-	case DT_DIR:
-		return BFS_DIR;
-#endif
-#ifdef DT_DOOR
-	case DT_DOOR:
-		return BFS_DOOR;
-#endif
-#ifdef DT_FIFO
-	case DT_FIFO:
-		return BFS_FIFO;
-#endif
-#ifdef DT_LNK
-	case DT_LNK:
-		return BFS_LNK;
-#endif
-#ifdef DT_PORT
-	case DT_PORT:
-		return BFS_PORT;
-#endif
-#ifdef DT_REG
-	case DT_REG:
-		return BFS_REG;
-#endif
-#ifdef DT_SOCK
-	case DT_SOCK:
-		return BFS_SOCK;
-#endif
-#ifdef DT_WHT
-	case DT_WHT:
-		return BFS_WHT;
-#endif
+int bfs_polldir(struct bfs_dir *dir) {
+#if BFS_USE_GETDENTS
+	if (dir->pos < dir->size) {
+		return 1;
+	} else if (dir->flags & BFS_DIR_EOF) {
+		return 0;
 	}
 
-	return BFS_UNKNOWN;
+	char *buf = (char *)(dir + 1);
+	ssize_t size = bfs_getdents(dir->fd, buf, BUF_SIZE);
+	if (size == 0) {
+		dir->flags |= BFS_DIR_EOF;
+		return 0;
+	} else if (size < 0) {
+		return -1;
+	}
+
+	dir->pos = 0;
+	dir->size = size;
+
+	// Like read(), getdents() doesn't indicate EOF until another call returns zero.
+	// Check that eagerly here to hopefully avoid a syscall in the last bfs_readdir().
+	size_t rest = BUF_SIZE - size;
+	if (rest >= sizeof(sys_dirent)) {
+		size = bfs_getdents(dir->fd, buf + size, rest);
+		if (size > 0) {
+			dir->size += size;
+		} else if (size == 0) {
+			dir->flags |= BFS_DIR_EOF;
+		}
+	}
+
+	return 1;
+#else // !BFS_USE_GETDENTS
+	if (dir->de) {
+		return 1;
+	} else if (dir->flags & BFS_DIR_EOF) {
+		return 0;
+	}
+
+	errno = 0;
+	dir->de = readdir(dir->dir);
+	if (dir->de) {
+		return 1;
+	} else if (errno == 0) {
+		dir->flags |= BFS_DIR_EOF;
+		return 0;
+	} else {
+		return -1;
+	}
+#endif
 }
 
-#if !__linux__
-/** Get the type from a struct dirent if it exists, and convert it. */
-static enum bfs_type dirent_type(const struct dirent *de) {
-#if defined(_DIRENT_HAVE_D_TYPE) || defined(DT_UNKNOWN)
-	return translate_type(de->d_type);
+/** Read a single directory entry. */
+static int bfs_getdent(struct bfs_dir *dir, const sys_dirent **de) {
+	int ret = bfs_polldir(dir);
+	if (ret > 0) {
+#if BFS_USE_GETDENTS
+		char *buf = (char *)(dir + 1);
+		*de = (const sys_dirent *)(buf + dir->pos);
+		dir->pos += (*de)->d_reclen;
+#else
+		*de = dir->de;
+		dir->de = NULL;
+#endif
+	}
+	return ret;
+}
+
+/** Skip ".", "..", and deleted/empty dirents. */
+static int bfs_skipdent(struct bfs_dir *dir, const sys_dirent *de) {
+#if BFS_USE_GETDENTS
+#  if __FreeBSD__
+	// Union mounts on FreeBSD have to be de-duplicated in userspace
+	if (dir->flags & BFS_DIR_UNION) {
+		struct trie_leaf *leaf = trie_insert_str(&dir->trie, de->d_name);
+		if (!leaf) {
+			return -1;
+		} else if (leaf->value) {
+			return 1;
+		} else {
+			leaf->value = leaf;
+		}
+	}
+
+	// NFS mounts on FreeBSD can return empty dirents with inode number 0
+	if (de->d_ino == 0) {
+		return 1;
+	}
+#  endif
+
+#  ifdef DT_WHT
+	if (de->d_type == DT_WHT && !(dir->flags & BFS_DIR_WHITEOUTS)) {
+		return 1;
+	}
+#  endif
+#endif // BFS_USE_GETDENTS
+
+	const char *name = de->d_name;
+	return name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'));
+}
+
+/** Convert de->d_type to a bfs_type, if it exists. */
+static enum bfs_type bfs_d_type(const sys_dirent *de) {
+#ifdef DTTOIF
+	return bfs_mode_to_type(DTTOIF(de->d_type));
 #else
 	return BFS_UNKNOWN;
 #endif
-}
-#endif
-
-/** Check if a name is . or .. */
-static bool is_dot(const char *name) {
-	return name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'));
 }
 
 int bfs_readdir(struct bfs_dir *dir, struct bfs_dirent *de) {
 	while (true) {
-#if __linux__
-		char *buf = (char *)(dir + 1);
-
-		if (dir->pos >= dir->size) {
-#if __has_feature(memory_sanitizer)
-			// Make sure msan knows the buffer is initialized
-			memset(buf, 0, BUF_SIZE);
-#endif
-
-			ssize_t size = syscall(__NR_getdents64, dir->fd, buf, BUF_SIZE);
-			if (size <= 0) {
-				return size;
-			}
-			dir->pos = 0;
-			dir->size = size;
+		const sys_dirent *sysde;
+		int ret = bfs_getdent(dir, &sysde);
+		if (ret <= 0) {
+			return ret;
 		}
 
-		const struct linux_dirent64 *lde = (void *)(buf + dir->pos);
-		dir->pos += lde->d_reclen;
-
-		if (is_dot(lde->d_name)) {
+		int skip = bfs_skipdent(dir, sysde);
+		if (skip < 0) {
+			return skip;
+		} else if (skip) {
 			continue;
 		}
 
 		if (de) {
-			de->type = translate_type(lde->d_type);
-			de->name = lde->d_name;
+			de->type = bfs_d_type(sysde);
+			de->name = sysde->d_name;
 		}
 
 		return 1;
-#else // !__linux__
-		errno = 0;
-		dir->de = readdir(dir->dir);
-		if (dir->de) {
-			if (is_dot(dir->de->d_name)) {
-				continue;
-			}
-			if (de) {
-				de->type = dirent_type(dir->de);
-				de->name = dir->de->d_name;
-			}
-			return 1;
-		} else if (errno != 0) {
-			return -1;
-		} else {
-			return 0;
-		}
-#endif // !__linux__
 	}
 }
 
+static void bfs_destroydir(struct bfs_dir *dir) {
+#if BFS_USE_GETDENTS && __FreeBSD__
+	if (dir->flags & BFS_DIR_UNION) {
+		trie_destroy(&dir->trie);
+	}
+#endif
+
+	sanitize_uninit(dir, DIR_SIZE);
+}
+
 int bfs_closedir(struct bfs_dir *dir) {
-#if __linux__
+#if BFS_USE_GETDENTS
 	int ret = xclose(dir->fd);
 #else
 	int ret = closedir(dir->dir);
+	if (ret != 0) {
+		bfs_verify(errno != EBADF);
+	}
 #endif
-	free(dir);
+
+	bfs_destroydir(dir);
 	return ret;
 }
 
-int bfs_freedir(struct bfs_dir *dir) {
-#if __linux__
+#if BFS_USE_UNWRAPDIR
+int bfs_unwrapdir(struct bfs_dir *dir) {
+#if BFS_USE_GETDENTS
 	int ret = dir->fd;
-	free(dir);
-	return ret;
-#elif __FreeBSD__
+#elif BFS_HAS_FDCLOSEDIR
 	int ret = fdclosedir(dir->dir);
-	free(dir);
-	return ret;
-#else
-	int ret = dup_cloexec(dirfd(dir->dir));
-	bfs_closedir(dir);
-	return ret;
 #endif
+
+	bfs_destroydir(dir);
+	return ret;
 }
+#endif

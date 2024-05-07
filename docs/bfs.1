@@ -90,7 +90,7 @@ Follow all symbolic links.
 Never follow symbolic links (the default).
 .TP
 .B \-E
-Use extended regular expressions (same as \fB\-regextype posix-extended\fR).
+Use extended regular expressions (same as \fB\-regextype \fIposix-extended\fR).
 .TP
 .B \-X
 Filter out files with
@@ -171,12 +171,18 @@ consumes too much memory.
 .TP
 .I eds
 Exponential deepening search.
-A compromise between breadth- and depth-first search, which searches exponentially increasing depth ranges (e.g 0-1, 1-2, 2-4, 4-8, etc.).
+A compromise between breadth- and depth-first search, which searches exponentially increasing depth ranges (e.g. 0-1, 1-2, 2-4, 4-8, etc.).
 Provides many of the benefits of breadth-first search with depth-first's reduced memory consumption.
 Typically far faster than
 .B \-S
 .IR ids .
 .RE
+.TP
+\fB\-j\fIN\fR
+Search with
+.I N
+threads in parallel (default: number of CPUs, up to
+.IR 8 ).
 .SH OPERATORS
 .TP
 \fB( \fIexpression \fB)\fR
@@ -245,6 +251,20 @@ or
 .B \-mindepth
 for example.
 Exclusions are always applied before other expressions, so it may be least confusing to put them first on the command line.
+.PP
+.B \-help
+.br
+.B \-\-help
+.RS
+Print usage information, and exit immediately (without parsing the rest of the command line or processing any files).
+.RE
+.PP
+.B \-version
+.br
+.B \-\-version
+.RS
+Print version information, and exit immediately.
+.RE
 .SH OPTIONS
 .PP
 .B \-color
@@ -309,11 +329,40 @@ Ignored; for compatibility with GNU find.
 \fB\-regextype \fITYPE\fR
 Use
 .IR TYPE -flavored
-regexes (default:
-.IR posix-basic ;
-see
-.B \-regextype
-.IR help ).
+regular expressions.
+The possible types are
+.RS
+.TP
+.I posix-basic
+POSIX basic regular expressions (the default).
+.TP
+.I posix-extended
+POSIX extended resular expressions.
+.TP
+.I ed
+Like
+.BR ed (1)
+(same as
+.IR posix-basic ).
+.TP
+.I emacs
+Like
+.BR emacs (1).
+.TP
+.I grep
+Like
+.BR grep (1).
+.TP
+.I sed
+Like
+.BR sed (1)
+(same as
+.IR posix-basic ).
+.PP
+See
+.BR regex (7)
+for a description of regular expression syntax.
+.RE
 .TP
 .B \-status
 Display a status bar while searching.
@@ -403,6 +452,10 @@ Find files with POSIX.1e
 .BR capabilities (7)
 set.
 .TP
+\fB\-context \fIGLOB\fR
+Find files whose SELinux context matches the
+.IR GLOB .
+.TP
 \fB\-depth\fR [\fI\-+\fR]\fIN\fR
 Find files with depth
 .IR N .
@@ -426,9 +479,9 @@ Find files the current user can execute/read/write.
 Always false/true.
 .RE
 .TP
-.B \-fstype TYPE
+\fB\-fstype \fITYPE\fR
 Find files on file systems with the given
-.BR TYPE .
+.IR TYPE .
 .PP
 \fB\-gid\fR [\fI\-+\fR]\fIN\fR
 .br
@@ -506,13 +559,12 @@ to parse
 as an ISO 8601-style timestamp.  For example:
 .PP
 .RS
-1991-12-14
-.br
-1991-12-14T03:00
-.br
-1991-12-14T03:00-07:00
-.br
-1991-12-14T10:00Z
+.nf
+\(bu  \fI1991-12-14\fR
+\(bu  \fI1991-12-14T03:00\fR
+\(bu  \fI1991-12-14T03:00-07:00\fR
+\(bu '\fI1991-12-14 10:00Z\fR'
+.fi
 .RE
 .PP
 .B \-nogroup
@@ -549,35 +601,67 @@ See
 for examples of the timestamp format.
 .TP
 \fB\-size\fR [\fI\-+\fR]\fIN\fR[\fIcwbkMGTP\fR]
-Find files with the given size, in 1-byte
-.IR c haracters,
-2-byte
-.IR w ords,
-512-byte
-.IR b locks
-(default), or
-.IR k iB/ M iB/ G iB/ T iB/ P iB.
+Find files with the given size.
+The unit can be one of
+.PP
+.RS
+.nf
+\(bu \fIc\fRhars  (1 byte)
+\(bu \fIw\fRords  (2 bytes)
+\(bu \fIb\fRlocks (512 bytes, the default)
+\(bu \fIk\fRiB    (1024 bytes)
+\(bu \fIM\fRiB    (1024 kiB)
+\(bu \fIG\fRiB    (1024 MiB)
+\(bu \fIT\fRiB    (1024 GiB)
+\(bu \fIP\fRiB    (1024 TiB)
+.fi
+.RE
 .TP
 .B \-sparse
 Find files that occupy fewer disk blocks than expected.
 .TP
 \fB\-type\fR [\fIbcdlpfswD\fR]
 Find files of the given type.
-Possible types are
+The possible types are
+.PP
+.RS
+\(bu
 .IR b lock
-device,
+device
+.br
+\(bu
 .IR c haracter
-device,
-.IR d irectory,
-symbolic
-.IR l ink,
-.IR p ipe,
-regular
-.IR f ile,
-.IR s ocket,
-.IR w hiteout,
-and
-.IR D oor.
+device
+.br
+\(bu
+.IR d irectory
+.br
+\(bu
+.IR l ink
+(symbolic)
+.br
+\(bu
+.IR p ipe
+.br
+\(bu
+.IR f ile
+(regular)
+.br
+\(bu
+.IR s ocket
+.br
+\(bu
+.IR w hiteout
+.br
+\(bu
+.IR D oor
+.PP
+Multiple types can be given at once, separated by commas.
+For example,
+.B \-type
+.I d,f
+matches both directories and regular files.
+.RE
 .TP
 \fB\-used\fR [\fI\-+\fR]\fIN\fR
 Find files last accessed
@@ -626,7 +710,9 @@ but run the command in the same directory as the found file(s).
 .RE
 .TP
 \fB\-exit\fR [\fISTATUS\fR]
-Exit immediately with the given status (0 if unspecified).
+Exit immediately with the given status
+.RI ( 0
+if unspecified).
 .PP
 \fB\-fls \fIFILE\fR
 .br
@@ -642,6 +728,11 @@ but write to
 .I FILE
 instead of standard output.
 .RE
+.TP
+\fB\-limit \fIN\fR
+Quit once this action is evaluated
+.I N
+times.
 .TP
 .B \-ls
 List files like
@@ -689,15 +780,16 @@ instead.
 .TP
 .B \-prune
 Don't descend into this directory.
+This has no effect if
+.B \-depth
+is enabled (either explicitly, or implicitly by
+.BR \-delete ).
+Use
+.B \-exclude
+instead in that case.
 .TP
 .B \-quit
 Quit immediately.
-.TP
-.B \-version
-Print version information.
-.TP
-.B \-help
-Print usage information.
 .SH ENVIRONMENT
 Certain environment variables affect the behavior of
 .BR bfs .
@@ -748,17 +840,48 @@ Specifies the pager used for
 .B \-help
 output.
 Defaults to
+.BR less (1),
+if found on the current
+.BR PATH ,
+otherwise
 .BR more (1).
+.TP
+.B PATH
+Used to resolve executables for
+.BR \-exec [ dir ]
+and
+.BR \-ok [ dir ].
 .TP
 .B POSIXLY_CORRECT
 Makes
 .B bfs
 conform more strictly to the POSIX.1-2017 specification for
 .BR find (1).
-Currently this just disables warnings by default.
+Currently this has two effects:
+.RS
+.IP \(bu
+Disables warnings by default, because POSIX prohibits writing to standard error (except for the
+.B \-ok
+prompt), unless the command also fails with a non-zero exit status.
+.IP \(bu
+Makes
+.B \-ls
+and
+.B \-fls
+use 512-byte blocks instead of 1024-byte blocks.
+(POSIX does not specify these actions, but BSD
+.BR find (1)
+implementations use 512-byte blocks, while GNU
+.BR find (1)
+uses 1024-byte blocks by default.)
+.PP
 It does not disable
 .BR bfs 's
 various extensions to the base POSIX functionality.
+.B POSIXLY_CORRECT
+has the same effects on GNU
+.BR find (1).
+.RE
 .SH EXAMPLES
 .TP
 .B bfs
@@ -795,7 +918,7 @@ skipping every
 .B .git
 directory.
 .TP
-.B bfs \-type f \-executable \-exec strip '{}' +
+.B bfs \-type f \-executable \-exec strip {} +
 Runs
 .BR strip (1)
 on all executable files it finds, passing it multiple files at a time.

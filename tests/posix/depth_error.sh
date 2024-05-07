@@ -1,11 +1,7 @@
-clean_scratch
-"$XTOUCH" -p scratch/foo/bar
-chmod a-r scratch/foo
+cd "$TEST"
+"$XTOUCH" -p foo/bar
 
-bfs_diff scratch -depth
-ret=$?
+chmod a-r foo
+defer chmod +r foo
 
-chmod +r scratch/foo
-clean_scratch
-
-[ $ret -eq $EX_BFS ]
+! bfs_diff . -depth

@@ -20,6 +20,7 @@ complete -c bfs -o f -d "Treat specified path as a path to search" -a "(__fish_c
 complete -c bfs -o D -d "Turn on a debugging flag" -a $debug_flag_comp -x
 complete -c bfs -s O -d "Enable specified optimization level" -a $optimization_comp -x
 complete -c bfs -o S -d "Choose the search strategy" -a $strategy_comp -x
+complete -c bfs -s j -d "Use this many threads" -x
 
 # Operators
 
@@ -70,6 +71,7 @@ complete -c bfs -o Btime -d "Find files birthed specified number of days ago" -x
 complete -c bfs -o ctime -d "Find files changed specified number of days ago" -x
 complete -c bfs -o mtime -d "Find files modified specified number of days ago" -x
 complete -c bfs -o capable -d "Find files with capabilities set"
+complete -c bfs -o context -d "Find files by SELinux context" -x
 complete -c bfs -o depth -d "Find files with specified number of depth" -x
 complete -c bfs -o empty -d "Find empty files/directories"
 complete -c bfs -o executable -d "Find files the current user can execute"
@@ -133,6 +135,7 @@ complete -c bfs -o fls -d "Like -ls, but write to specified file" -F
 complete -c bfs -o fprint -d "Like -print, but write to specified file" -F
 complete -c bfs -o fprint0 -d "Like -print0, but write to specified file" -F
 complete -c bfs -o fprintf -d "Like -printf, but write to specified file" -F
+complete -c bfs -o limit -d "Limit the number of results" -x
 complete -c bfs -o ls -d "List files like ls -dils"
 complete -c bfs -o print -d "Print the path to the found file"
 complete -c bfs -o print0 -d "Like -print, but use the null character as a separator rather than newlines"

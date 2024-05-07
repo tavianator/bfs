@@ -1,1 +1,1 @@
-fail invoke_bfs -$'\xFF'
+! invoke_bfs -$'\xFF'

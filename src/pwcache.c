@@ -1,26 +1,13 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "pwcache.h"
-#include "darray.h"
+#include "alloc.h"
 #include "trie.h"
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -29,54 +16,58 @@
 static void *MISSING = &MISSING;
 
 /** Callback type for bfs_getent(). */
-typedef void *bfs_getent_fn(const void *key, void *ent, void *buf, size_t bufsize);
+typedef void *bfs_getent_fn(const void *key, void *ptr, size_t bufsize);
 
 /** Shared scaffolding for get{pw,gr}{nam,?id}_r(). */
-static void *bfs_getent(struct trie_leaf *leaf, bfs_getent_fn *fn, const void *key, size_t entsize, size_t bufsize) {
+static void *bfs_getent(bfs_getent_fn *fn, const void *key, struct trie_leaf *leaf, struct varena *varena) {
 	if (leaf->value) {
 		errno = 0;
 		return leaf->value == MISSING ? NULL : leaf->value;
 	}
 
-	void *buf = NULL;
+	// _SC_GET{PW,GR}_R_SIZE_MAX tend to be fairly large (~1K).  That's okay
+	// for temporary allocations, but for these long-lived ones, let's start
+	// with a smaller buffer.
+	size_t bufsize = 128;
+	void *ptr = varena_alloc(varena, bufsize);
+	if (!ptr) {
+		return NULL;
+	}
+
 	while (true) {
-		void *result = buf;
-		buf = realloc(buf, entsize + bufsize);
-		if (!buf) {
-			free(result);
-			return NULL;
-		}
-
-		result = fn(key, buf, (char *)buf + entsize, bufsize);
-		if (result) {
-			leaf->value = result;
-			return result;
+		void *ret = fn(key, ptr, bufsize);
+		if (ret) {
+			leaf->value = ret;
+			return ret;
 		} else if (errno == 0) {
-			free(buf);
 			leaf->value = MISSING;
-			return NULL;
+			break;
 		} else if (errno == ERANGE) {
-			bufsize *= 2;
+			void *next = varena_grow(varena, ptr, &bufsize);
+			if (!next) {
+				break;
+			}
+			ptr = next;
 		} else {
-			free(buf);
-			return NULL;
+			break;
 		}
 	}
+
+	varena_free(varena, ptr, bufsize);
+	return NULL;
 }
 
-/** Flush a single cache. */
-static void bfs_pwcache_flush(struct trie *trie) {
-	TRIE_FOR_EACH(trie, leaf) {
-		if (leaf->value != MISSING) {
-			free(leaf->value);
-		}
-		trie_remove(trie, leaf);
-	}
-}
+/**
+ * An arena-allocated struct passwd.
+ */
+struct bfs_passwd {
+	struct passwd pwd;
+	char buf[];
+};
 
 struct bfs_users {
-	/** Initial buffer size for getpw*_r(). */
-	size_t bufsize;
+	/** bfs_passwd arena. */
+	struct varena varena;
 	/** A map from usernames to entries. */
 	struct trie by_name;
 	/** A map from UIDs to entries. */
@@ -84,28 +75,24 @@ struct bfs_users {
 };
 
 struct bfs_users *bfs_users_new(void) {
-	struct bfs_users *users = malloc(sizeof(*users));
+	struct bfs_users *users = ALLOC(struct bfs_users);
 	if (!users) {
 		return NULL;
 	}
 
-	long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-	if (bufsize > 0) {
-		users->bufsize = bufsize;
-	} else {
-		users->bufsize = 1024;
-	}
-
+	VARENA_INIT(&users->varena, struct bfs_passwd, buf);
 	trie_init(&users->by_name);
 	trie_init(&users->by_uid);
 	return users;
 }
 
 /** bfs_getent() callback for getpwnam_r(). */
-static void *bfs_getpwnam_impl(const void *key, void *ent, void *buf, size_t bufsize) {
-	struct passwd *result;
-	errno = getpwnam_r(key, ent, buf, bufsize, &result);
-	return result;
+static void *bfs_getpwnam_impl(const void *key, void *ptr, size_t bufsize) {
+	struct bfs_passwd *storage = ptr;
+
+	struct passwd *ret = NULL;
+	errno = getpwnam_r(key, &storage->pwd, storage->buf, bufsize, &ret);
+	return ret;
 }
 
 const struct passwd *bfs_getpwnam(struct bfs_users *users, const char *name) {
@@ -114,14 +101,17 @@ const struct passwd *bfs_getpwnam(struct bfs_users *users, const char *name) {
 		return NULL;
 	}
 
-	return bfs_getent(leaf, bfs_getpwnam_impl, name, sizeof(struct passwd), users->bufsize);
+	return bfs_getent(bfs_getpwnam_impl, name, leaf, &users->varena);
 }
 
 /** bfs_getent() callback for getpwuid_r(). */
-static void *bfs_getpwuid_impl(const void *key, void *ent, void *buf, size_t bufsize) {
-	struct passwd *result;
-	errno = getpwuid_r(*(const uid_t *)key, ent, buf, bufsize, &result);
-	return result;
+static void *bfs_getpwuid_impl(const void *key, void *ptr, size_t bufsize) {
+	const uid_t *uid = key;
+	struct bfs_passwd *storage = ptr;
+
+	struct passwd *ret = NULL;
+	errno = getpwuid_r(*uid, &storage->pwd, storage->buf, bufsize, &ret);
+	return ret;
 }
 
 const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid) {
@@ -130,26 +120,35 @@ const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid) {
 		return NULL;
 	}
 
-	return bfs_getent(leaf, bfs_getpwuid_impl, &uid, sizeof(struct passwd), users->bufsize);
+	return bfs_getent(bfs_getpwuid_impl, &uid, leaf, &users->varena);
 }
 
 void bfs_users_flush(struct bfs_users *users) {
-	bfs_pwcache_flush(&users->by_name);
-	bfs_pwcache_flush(&users->by_uid);
+	trie_clear(&users->by_uid);
+	trie_clear(&users->by_name);
+	varena_clear(&users->varena);
 }
 
 void bfs_users_free(struct bfs_users *users) {
 	if (users) {
-		bfs_users_flush(users);
 		trie_destroy(&users->by_uid);
 		trie_destroy(&users->by_name);
+		varena_destroy(&users->varena);
 		free(users);
 	}
 }
 
+/**
+ * An arena-allocated struct group.
+ */
+struct bfs_group {
+	struct group grp;
+	char buf[];
+};
+
 struct bfs_groups {
-	/** Initial buffer size for getgr*_r(). */
-	size_t bufsize;
+	/** bfs_group arena. */
+	struct varena varena;
 	/** A map from group names to entries. */
 	struct trie by_name;
 	/** A map from GIDs to entries. */
@@ -157,28 +156,24 @@ struct bfs_groups {
 };
 
 struct bfs_groups *bfs_groups_new(void) {
-	struct bfs_groups *groups = malloc(sizeof(*groups));
+	struct bfs_groups *groups = ALLOC(struct bfs_groups);
 	if (!groups) {
 		return NULL;
 	}
 
-	long bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
-	if (bufsize > 0) {
-		groups->bufsize = bufsize;
-	} else {
-		groups->bufsize = 1024;
-	}
-
+	VARENA_INIT(&groups->varena, struct bfs_group, buf);
 	trie_init(&groups->by_name);
 	trie_init(&groups->by_gid);
 	return groups;
 }
 
 /** bfs_getent() callback for getgrnam_r(). */
-static void *bfs_getgrnam_impl(const void *key, void *ent, void *buf, size_t bufsize) {
-	struct group *result;
-	errno = getgrnam_r(key, ent, buf, bufsize, &result);
-	return result;
+static void *bfs_getgrnam_impl(const void *key, void *ptr, size_t bufsize) {
+	struct bfs_group *storage = ptr;
+
+	struct group *ret = NULL;
+	errno = getgrnam_r(key, &storage->grp, storage->buf, bufsize, &ret);
+	return ret;
 }
 
 const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name) {
@@ -187,14 +182,17 @@ const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name) {
 		return NULL;
 	}
 
-	return bfs_getent(leaf, bfs_getgrnam_impl, name, sizeof(struct group), groups->bufsize);
+	return bfs_getent(bfs_getgrnam_impl, name, leaf, &groups->varena);
 }
 
 /** bfs_getent() callback for getgrgid_r(). */
-static void *bfs_getgrgid_impl(const void *key, void *ent, void *buf, size_t bufsize) {
-	struct group *result;
-	errno = getgrgid_r(*(const gid_t *)key, ent, buf, bufsize, &result);
-	return result;
+static void *bfs_getgrgid_impl(const void *key, void *ptr, size_t bufsize) {
+	const gid_t *gid = key;
+	struct bfs_group *storage = ptr;
+
+	struct group *ret = NULL;
+	errno = getgrgid_r(*gid, &storage->grp, storage->buf, bufsize, &ret);
+	return ret;
 }
 
 const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid) {
@@ -203,19 +201,20 @@ const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid) {
 		return NULL;
 	}
 
-	return bfs_getent(leaf, bfs_getgrgid_impl, &gid, sizeof(struct group), groups->bufsize);
+	return bfs_getent(bfs_getgrgid_impl, &gid, leaf, &groups->varena);
 }
 
 void bfs_groups_flush(struct bfs_groups *groups) {
-	bfs_pwcache_flush(&groups->by_name);
-	bfs_pwcache_flush(&groups->by_gid);
+	trie_clear(&groups->by_gid);
+	trie_clear(&groups->by_name);
+	varena_clear(&groups->varena);
 }
 
 void bfs_groups_free(struct bfs_groups *groups) {
 	if (groups) {
-		bfs_groups_flush(groups);
 		trie_destroy(&groups->by_gid);
 		trie_destroy(&groups->by_name);
+		varena_destroy(&groups->varena);
 		free(groups);
 	}
 }

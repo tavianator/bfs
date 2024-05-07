@@ -1,23 +1,10 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
-#undef NDEBUG
-
-#include "../src/trie.h"
-#include <assert.h>
+#include "prelude.h"
+#include "tests.h"
+#include "trie.h"
+#include "diag.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -50,14 +37,16 @@ const char *keys[] = {
 	">>>",
 };
 
-const size_t nkeys = sizeof(keys) / sizeof(keys[0]);
+const size_t nkeys = countof(keys);
 
-int main(void) {
+bool check_trie(void) {
+	bool ret = true;
+
 	struct trie trie;
 	trie_init(&trie);
 
 	for (size_t i = 0; i < nkeys; ++i) {
-		assert(!trie_find_str(&trie, keys[i]));
+		ret &= bfs_check(!trie_find_str(&trie, keys[i]));
 
 		const char *prefix = NULL;
 		for (size_t j = 0; j < i; ++j) {
@@ -70,38 +59,38 @@ int main(void) {
 
 		struct trie_leaf *leaf = trie_find_prefix(&trie, keys[i]);
 		if (prefix) {
-			assert(leaf);
-			assert(strcmp(prefix, leaf->key) == 0);
+			bfs_verify(leaf);
+			ret &= bfs_check(strcmp(prefix, leaf->key) == 0);
 		} else {
-			assert(!leaf);
+			ret &= bfs_check(!leaf);
 		}
 
 		leaf = trie_insert_str(&trie, keys[i]);
-		assert(leaf);
-		assert(strcmp(keys[i], leaf->key) == 0);
-		assert(leaf->length == strlen(keys[i]) + 1);
+		bfs_verify(leaf);
+		ret &= bfs_check(strcmp(keys[i], leaf->key) == 0);
+		ret &= bfs_check(leaf->length == strlen(keys[i]) + 1);
 	}
 
 	{
 		size_t i = 0;
-		TRIE_FOR_EACH(&trie, leaf) {
-			assert(leaf == trie_find_str(&trie, keys[i]));
-			assert(!leaf->prev || leaf->prev->next == leaf);
-			assert(!leaf->next || leaf->next->prev == leaf);
+		for_trie (leaf, &trie) {
+			ret &= bfs_check(leaf == trie_find_str(&trie, keys[i]));
+			ret &= bfs_check(!leaf->prev || leaf->prev->next == leaf);
+			ret &= bfs_check(!leaf->next || leaf->next->prev == leaf);
 			++i;
 		}
-		assert(i == nkeys);
+		ret &= bfs_check(i == nkeys);
 	}
 
 	for (size_t i = 0; i < nkeys; ++i) {
 		struct trie_leaf *leaf = trie_find_str(&trie, keys[i]);
-		assert(leaf);
-		assert(strcmp(keys[i], leaf->key) == 0);
-		assert(leaf->length == strlen(keys[i]) + 1);
+		bfs_verify(leaf);
+		ret &= bfs_check(strcmp(keys[i], leaf->key) == 0);
+		ret &= bfs_check(leaf->length == strlen(keys[i]) + 1);
 
 		trie_remove(&trie, leaf);
 		leaf = trie_find_str(&trie, keys[i]);
-		assert(!leaf);
+		ret &= bfs_check(!leaf);
 
 		const char *postfix = NULL;
 		for (size_t j = i + 1; j < nkeys; ++j) {
@@ -114,35 +103,35 @@ int main(void) {
 
 		leaf = trie_find_postfix(&trie, keys[i]);
 		if (postfix) {
-			assert(leaf);
-			assert(strcmp(postfix, leaf->key) == 0);
+			bfs_verify(leaf);
+			ret &= bfs_check(strcmp(postfix, leaf->key) == 0);
 		} else {
-			assert(!leaf);
+			ret &= bfs_check(!leaf);
 		}
 	}
 
-	TRIE_FOR_EACH(&trie, leaf) {
-		assert(false);
+	for_trie (leaf, &trie) {
+		ret &= bfs_check(false, "trie should be empty");
 	}
 
 	// This tests the "jump" node handling on 32-bit platforms
 	size_t longsize = 1 << 20;
 	char *longstr = malloc(longsize);
-	assert(longstr);
+	bfs_verify(longstr);
 
 	memset(longstr, 0xAC, longsize);
-	assert(!trie_find_mem(&trie, longstr, longsize));
-	assert(trie_insert_mem(&trie, longstr, longsize));
+	ret &= bfs_check(!trie_find_mem(&trie, longstr, longsize));
+	ret &= bfs_check(trie_insert_mem(&trie, longstr, longsize));
 
-	memset(longstr + longsize/2, 0xAB, longsize/2);
-	assert(!trie_find_mem(&trie, longstr, longsize));
-	assert(trie_insert_mem(&trie, longstr, longsize));
+	memset(longstr + longsize / 2, 0xAB, longsize / 2);
+	ret &= bfs_check(!trie_find_mem(&trie, longstr, longsize));
+	ret &= bfs_check(trie_insert_mem(&trie, longstr, longsize));
 
-	memset(longstr, 0xAA, longsize/2);
-	assert(!trie_find_mem(&trie, longstr, longsize));
-	assert(trie_insert_mem(&trie, longstr, longsize));
+	memset(longstr, 0xAA, longsize / 2);
+	ret &= bfs_check(!trie_find_mem(&trie, longstr, longsize));
+	ret &= bfs_check(trie_insert_mem(&trie, longstr, longsize));
 
 	free(longstr);
 	trie_destroy(&trie);
-	return EXIT_SUCCESS;
+	return ret;
 }

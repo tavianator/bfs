@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * This is an implementation of a "qp trie," as documented at
@@ -94,31 +81,29 @@
  * and insert intermediate singleton "jump" nodes when necessary.
  */
 
+#include "prelude.h"
 #include "trie.h"
-#include "config.h"
-#include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
+#include "alloc.h"
+#include "bit.h"
+#include "diag.h"
+#include "list.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
-#if __has_attribute(target_clones) && (__i386__ || __x86_64__)
-#	define TARGET_CLONES_POPCNT __attribute__((target_clones("popcnt", "default")))
-#else
-#	define TARGET_CLONES_POPCNT
-#endif
+bfs_static_assert(CHAR_WIDTH == 8);
 
-#if CHAR_BIT != 8
-#	error "This trie implementation assumes 8-bit bytes."
+#if __i386__ || __x86_64__
+#  define trie_clones attr(target_clones("popcnt", "default"))
+#else
+#  define trie_clones
 #endif
 
 /** Number of bits for the sparse array bitmap, aka the range of a nibble. */
-#define BITMAP_BITS 16
+#define BITMAP_WIDTH 16
 /** The number of remaining bits in a word, to hold the offset. */
-#define OFFSET_BITS (sizeof(size_t)*CHAR_BIT - BITMAP_BITS)
+#define OFFSET_WIDTH (SIZE_WIDTH - BITMAP_WIDTH)
 /** The highest representable offset (only 64k on a 32-bit architecture). */
-#define OFFSET_MAX (((size_t)1 << OFFSET_BITS) - 1)
+#define OFFSET_MAX (((size_t)1 << OFFSET_WIDTH) - 1)
 
 /**
  * An internal node of the trie.
@@ -129,13 +114,13 @@ struct trie_node {
 	 * Bit i will be set if a child exists at logical index i, and its index
 	 * into the array will be popcount(bitmap & ((1 << i) - 1)).
 	 */
-	size_t bitmap : BITMAP_BITS;
+	size_t bitmap : BITMAP_WIDTH;
 
 	/**
 	 * The offset into the key in nibbles.  This is relative to the parent
 	 * node, to support offsets larger than OFFSET_MAX.
 	 */
-	size_t offset : OFFSET_BITS;
+	size_t offset : OFFSET_WIDTH;
 
 	/**
 	 * Flexible array of children.  Each pointer uses the lowest bit as a
@@ -152,53 +137,35 @@ static bool trie_is_leaf(uintptr_t ptr) {
 
 /** Decode a pointer to a leaf. */
 static struct trie_leaf *trie_decode_leaf(uintptr_t ptr) {
-	assert(trie_is_leaf(ptr));
+	bfs_assert(trie_is_leaf(ptr));
 	return (struct trie_leaf *)(ptr ^ 1);
 }
 
 /** Encode a pointer to a leaf. */
 static uintptr_t trie_encode_leaf(const struct trie_leaf *leaf) {
 	uintptr_t ptr = (uintptr_t)leaf ^ 1;
-	assert(trie_is_leaf(ptr));
+	bfs_assert(trie_is_leaf(ptr));
 	return ptr;
 }
 
 /** Decode a pointer to an internal node. */
 static struct trie_node *trie_decode_node(uintptr_t ptr) {
-	assert(!trie_is_leaf(ptr));
+	bfs_assert(!trie_is_leaf(ptr));
 	return (struct trie_node *)ptr;
 }
 
 /** Encode a pointer to an internal node. */
 static uintptr_t trie_encode_node(const struct trie_node *node) {
 	uintptr_t ptr = (uintptr_t)node;
-	assert(!trie_is_leaf(ptr));
+	bfs_assert(!trie_is_leaf(ptr));
 	return ptr;
 }
 
 void trie_init(struct trie *trie) {
 	trie->root = 0;
-	trie->head = NULL;
-	trie->tail = NULL;
-}
-
-/** Check if a number is a power of two. */
-static bool is_power_of_two(size_t n) {
-	return (n & (n - 1)) == 0;
-}
-
-/** Compute the popcount (Hamming weight) of a bitmap. */
-static unsigned int trie_popcount(unsigned int n) {
-#if __GNUC__
-	return __builtin_popcount(n);
-#else
-	// See https://en.wikipedia.org/wiki/Hamming_weight#Efficient_implementation
-	n -= (n >> 1) & 0x5555;
-	n = (n & 0x3333) + ((n >> 2) & 0x3333);
-	n = (n + (n >> 4)) & 0x0F0F;
-	n = (n + (n >> 8)) & 0xFF;
-	return n;
-#endif
+	LIST_INIT(trie);
+	VARENA_INIT(&trie->nodes, struct trie_node, children);
+	VARENA_INIT(&trie->leaves, struct trie_leaf, key);
 }
 
 /** Extract the nibble at a certain offset from a byte sequence. */
@@ -223,7 +190,7 @@ static unsigned char trie_key_nibble(const void *key, size_t offset) {
  * that case, the first mismatch between the key and the representative will be
  * the depth at which to make a new branch to insert the key.
  */
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_representative(const struct trie *trie, const void *key, size_t length) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
@@ -239,9 +206,10 @@ static struct trie_leaf *trie_representative(const struct trie *trie, const void
 		if ((offset >> 1) < length) {
 			unsigned char nibble = trie_key_nibble(key, offset);
 			unsigned int bit = 1U << nibble;
-			if (node->bitmap & bit) {
-				index = trie_popcount(node->bitmap & (bit - 1));
-			}
+			// bits = bitmap & bit ? bitmap & (bit - 1) : 0
+			unsigned int mask = -!!(node->bitmap & bit);
+			unsigned int bits = node->bitmap & (bit - 1) & mask;
+			index = count_ones(bits);
 		}
 		ptr = node->children[index];
 	}
@@ -302,7 +270,7 @@ static bool trie_check_prefix(struct trie_leaf *leaf, size_t skip, const char *k
 	}
 }
 
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const char *key) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
@@ -330,7 +298,7 @@ static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const ch
 		unsigned char nibble = trie_key_nibble(key, offset);
 		unsigned int bit = 1U << nibble;
 		if (node->bitmap & bit) {
-			unsigned int index = trie_popcount(node->bitmap & (bit - 1));
+			unsigned int index = count_ones(node->bitmap & (bit - 1));
 			ptr = node->children[index];
 		} else {
 			return best;
@@ -351,21 +319,13 @@ struct trie_leaf *trie_find_prefix(const struct trie *trie, const char *key) {
 
 /** Create a new leaf, holding a copy of the given key. */
 static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, size_t length) {
-	struct trie_leaf *leaf = malloc(BFS_FLEX_SIZEOF(struct trie_leaf, key, length));
+	struct trie_leaf *leaf = varena_alloc(&trie->leaves, length);
 	if (!leaf) {
 		return NULL;
 	}
 
-	leaf->prev = trie->tail;
-	leaf->next = NULL;
-
-	if (leaf->prev) {
-		leaf->prev->next = leaf;
-	} else {
-		trie->head = leaf;
-	}
-
-	trie->tail = leaf;
+	LIST_ITEM_INIT(leaf);
+	LIST_APPEND(trie, leaf);
 
 	leaf->value = NULL;
 	leaf->length = length;
@@ -376,49 +336,33 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 
 /** Free a leaf. */
 static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
-	if (leaf->prev) {
-		leaf->prev->next = leaf->next;
-	} else {
-		trie->head = leaf->next;
-	}
-
-	if (leaf->next) {
-		leaf->next->prev = leaf->prev;
-	} else {
-		trie->tail = leaf->prev;
-	}
-
-	free(leaf);
+	LIST_REMOVE(trie, leaf);
+	varena_free(&trie->leaves, leaf, leaf->length);
 }
 
-/** Compute the size of a trie node with a certain number of children. */
-static size_t trie_node_size(unsigned int size) {
-	// Empty nodes aren't supported
-	assert(size > 0);
-	// Node size must be a power of two
-	assert(is_power_of_two(size));
-
-	return BFS_FLEX_SIZEOF(struct trie_node, children, size);
+/** Create a new node. */
+static struct trie_node *trie_node_alloc(struct trie *trie, size_t size) {
+	bfs_assert(has_single_bit(size));
+	return varena_alloc(&trie->nodes, size);
 }
 
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#	define TRIE_BSWAP(n) (n)
-#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-#	if __SIZEOF_SIZE_T__ == 8
-#		define TRIE_BSWAP(n) __builtin_bswap64(n)
-#	elif __SIZEOF_SIZE_T__ == 4
-#		define TRIE_BSWAP(n) __builtin_bswap32(n)
-#	endif
-#endif
+/** Reallocate a trie node. */
+static struct trie_node *trie_node_realloc(struct trie *trie, struct trie_node *node, size_t old_size, size_t new_size) {
+	bfs_assert(has_single_bit(old_size));
+	bfs_assert(has_single_bit(new_size));
+	return varena_realloc(&trie->nodes, node, old_size, new_size);
+}
 
-#ifdef TRIE_BSWAP
-#	if __SIZEOF_SIZE_T__ == __SIZEOF_LONG_LONG__
-#		define TRIE_CTZ(n) __builtin_ctzll(n)
-#	elif __SIZEOF_SIZE_T__ == __SIZEOF_LONG__
-#		define TRIE_CTZ(n) __builtin_ctzl(n)
-#	elif __SIZEOF_SIZE_T__ == __SIZEOF_INT__
-#		define TRIE_CTZ(n) __builtin_ctz(n)
-#	endif
+/** Free a node. */
+static void trie_node_free(struct trie *trie, struct trie_node *node, size_t size) {
+	bfs_assert(size == (size_t)count_ones(node->bitmap));
+	varena_free(&trie->nodes, node, size);
+}
+
+#if ENDIAN_NATIVE == ENDIAN_LITTLE
+#  define TRIE_BSWAP(n) (n)
+#elif ENDIAN_NATIVE == ENDIAN_BIG
+#  define TRIE_BSWAP(n) bswap(n)
 #endif
 
 /** Find the offset of the first nibble that differs between two keys. */
@@ -441,10 +385,10 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 		memcpy(&key_chunk, key_bytes + i, sizeof(key_chunk));
 
 		if (rep_chunk != key_chunk) {
-#ifdef TRIE_CTZ
+#ifdef TRIE_BSWAP
 			size_t diff = TRIE_BSWAP(rep_chunk ^ key_chunk);
 			i *= 2;
-			i += TRIE_CTZ(diff) / 4;
+			i += trailing_zeros(diff) / 4;
 			return i;
 #else
 			break;
@@ -484,14 +428,14 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
  *      | Z
  *      +--->...
  */
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, unsigned char nibble) {
 	struct trie_node *node = trie_decode_node(*ptr);
-	unsigned int size = trie_popcount(node->bitmap);
+	unsigned int size = count_ones(node->bitmap);
 
 	// Double the capacity every power of two
-	if (is_power_of_two(size)) {
-		node = realloc(node, trie_node_size(2 * size));
+	if (has_single_bit(size)) {
+		node = trie_node_realloc(trie, node, size, 2 * size);
 		if (!node) {
 			trie_leaf_free(trie, leaf);
 			return NULL;
@@ -502,10 +446,10 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
 	unsigned int bit = 1U << nibble;
 
 	// The child must not already be present
-	assert(!(node->bitmap & bit));
+	bfs_assert(!(node->bitmap & bit));
 	node->bitmap |= bit;
 
-	unsigned int target = trie_popcount(node->bitmap & (bit - 1));
+	unsigned int target = count_ones(node->bitmap & (bit - 1));
 	for (size_t i = size; i > target; --i) {
 		node->children[i] = node->children[i - 1];
 	}
@@ -538,12 +482,12 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
  *           | Y
  *           +--->key
  */
-static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
+static uintptr_t *trie_jump(struct trie *trie, uintptr_t *ptr, const char *key, size_t *offset) {
 	// We only ever need to jump to leaf nodes, since internal nodes are
 	// guaranteed to be within OFFSET_MAX anyway
-	assert(trie_is_leaf(*ptr));
+	bfs_assert(trie_is_leaf(*ptr));
 
-	struct trie_node *node = malloc(trie_node_size(1));
+	struct trie_node *node = trie_node_alloc(trie, 1);
 	if (!node) {
 		return NULL;
 	}
@@ -579,9 +523,9 @@ static uintptr_t *trie_jump(uintptr_t *ptr, const char *key, size_t *offset) {
 static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, struct trie_leaf *rep, size_t offset, size_t mismatch) {
 	unsigned char key_nibble = trie_key_nibble(leaf->key, mismatch);
 	unsigned char rep_nibble = trie_key_nibble(rep->key, mismatch);
-	assert(key_nibble != rep_nibble);
+	bfs_assert(key_nibble != rep_nibble);
 
-	struct trie_node *node = malloc(trie_node_size(2));
+	struct trie_node *node = trie_node_alloc(trie, 2);
 	if (!node) {
 		trie_leaf_free(trie, leaf);
 		return NULL;
@@ -607,7 +551,7 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key) {
 	return trie_insert_mem(trie, key, strlen(key) + 1);
 }
 
-TARGET_CLONES_POPCNT
+trie_clones
 static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	size_t mismatch = trie_mismatch(rep, key, length);
@@ -637,17 +581,17 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 		unsigned char nibble = trie_key_nibble(key, offset);
 		unsigned int bit = 1U << nibble;
 		if (node->bitmap & bit) {
-			assert(offset < mismatch);
-			unsigned int index = trie_popcount(node->bitmap & (bit - 1));
+			bfs_assert(offset < mismatch);
+			unsigned int index = count_ones(node->bitmap & (bit - 1));
 			ptr = &node->children[index];
 		} else {
-			assert(offset == mismatch);
+			bfs_assert(offset == mismatch);
 			return trie_node_insert(trie, ptr, leaf, nibble);
 		}
 	}
 
 	while (mismatch - offset > OFFSET_MAX) {
-		ptr = trie_jump(ptr, key, &offset);
+		ptr = trie_jump(trie, ptr, key, &offset);
 		if (!ptr) {
 			trie_leaf_free(trie, leaf);
 			return NULL;
@@ -667,10 +611,10 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
 		struct trie_node *node = trie_decode_node(ptr);
 
 		// Make sure the bitmap is a power of two, i.e. it has just one child
-		assert(is_power_of_two(node->bitmap));
+		bfs_assert(has_single_bit(node->bitmap));
 
 		ptr = node->children[0];
-		free(node);
+		trie_node_free(trie, node, 1);
 	}
 
 	trie_leaf_free(trie, trie_decode_leaf(ptr));
@@ -693,7 +637,7 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
  *       v
  *     other
  */
-static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, unsigned int child_index) {
+static int trie_collapse_node(struct trie *trie, uintptr_t *parent, struct trie_node *parent_node, unsigned int child_index) {
 	uintptr_t other = parent_node->children[child_index ^ 1];
 	if (!trie_is_leaf(other)) {
 		struct trie_node *other_node = trie_decode_node(other);
@@ -705,11 +649,11 @@ static int trie_collapse_node(uintptr_t *parent, struct trie_node *parent_node, 
 	}
 
 	*parent = other;
-	free(parent_node);
+	trie_node_free(trie, parent_node, 1);
 	return 0;
 }
 
-TARGET_CLONES_POPCNT
+trie_clones
 static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	uintptr_t *child = &trie->root;
 	uintptr_t *parent = NULL;
@@ -718,16 +662,16 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	while (!trie_is_leaf(*child)) {
 		struct trie_node *node = trie_decode_node(*child);
 		offset += node->offset;
-		assert((offset >> 1) < leaf->length);
+		bfs_assert((offset >> 1) < leaf->length);
 
 		unsigned char nibble = trie_key_nibble(leaf->key, offset);
 		unsigned int bit = 1U << nibble;
 		unsigned int bitmap = node->bitmap;
-		assert(bitmap & bit);
-		unsigned int index = trie_popcount(bitmap & (bit - 1));
+		bfs_assert(bitmap & bit);
+		unsigned int index = count_ones(bitmap & (bit - 1));
 
 		// Advance the parent pointer, unless this node had only one child
-		if (!is_power_of_two(bitmap)) {
+		if (!has_single_bit(bitmap)) {
 			parent = child;
 			child_bit = bit;
 			child_index = index;
@@ -736,7 +680,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 		child = &node->children[index];
 	}
 
-	assert(trie_decode_leaf(*child) == leaf);
+	bfs_assert(trie_decode_leaf(*child) == leaf);
 
 	if (!parent) {
 		trie_free_singletons(trie, trie->root);
@@ -749,18 +693,18 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	trie_free_singletons(trie, *child);
 
 	node->bitmap ^= child_bit;
-	unsigned int parent_size = trie_popcount(node->bitmap);
-	assert(parent_size > 0);
-	if (parent_size == 1 && trie_collapse_node(parent, node, child_index) == 0) {
+	unsigned int parent_size = count_ones(node->bitmap);
+	bfs_assert(parent_size > 0);
+	if (parent_size == 1 && trie_collapse_node(trie, parent, node, child_index) == 0) {
 		return;
 	}
 
 	if (child_index < parent_size) {
-		memmove(child, child + 1, (parent_size - child_index)*sizeof(*child));
+		memmove(child, child + 1, (parent_size - child_index) * sizeof(*child));
 	}
 
-	if (is_power_of_two(parent_size)) {
-		node = realloc(node, trie_node_size(parent_size));
+	if (has_single_bit(parent_size)) {
+		node = trie_node_realloc(trie, node, 2 * parent_size, parent_size);
 		if (node) {
 			*parent = trie_encode_node(node);
 		}
@@ -771,23 +715,15 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 	trie_remove_impl(trie, leaf);
 }
 
-/** Free an encoded pointer to a node. */
-TARGET_CLONES_POPCNT
-static void free_trie_ptr(uintptr_t ptr) {
-	if (trie_is_leaf(ptr)) {
-		free(trie_decode_leaf(ptr));
-	} else {
-		struct trie_node *node = trie_decode_node(ptr);
-		size_t size = trie_popcount(node->bitmap);
-		for (size_t i = 0; i < size; ++i) {
-			free_trie_ptr(node->children[i]);
-		}
-		free(node);
-	}
+void trie_clear(struct trie *trie) {
+	trie->root = 0;
+	LIST_INIT(trie);
+
+	varena_clear(&trie->leaves);
+	varena_clear(&trie->nodes);
 }
 
 void trie_destroy(struct trie *trie) {
-	if (trie->root) {
-		free_trie_ptr(trie->root);
-	}
+	varena_destroy(&trie->leaves);
+	varena_destroy(&trie->nodes);
 }

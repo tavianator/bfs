@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * - main(): the entry point for bfs(1), a breadth-first version of find(1)
@@ -33,18 +20,24 @@
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
+ *     - alloc.[ch]    (memory allocation)
+ *     - atomic.h      (atomic operations)
  *     - bar.[ch]      (a terminal status bar)
+ *     - bit.h         (bit manipulation)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
- *     - config.h      (configuration and feature/platform detection)
- *     - darray.[ch]   (a dynamic array library)
+ *     - prelude.h     (configuration and feature/platform detection)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
  *     - fsade.[ch]    (a facade over non-standard filesystem features)
+ *     - ioq.[ch]      (an async I/O queue)
+ *     - list.h        (linked list macros)
  *     - mtab.[ch]     (parses the system's mount table)
  *     - pwcache.[ch]  (a cache for the user/group tables)
+ *     - sanity.h      (sanitizer interfaces)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
+ *     - thread.h      (multi-threading)
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
  *     - xregex.[ch]   (regular expression support)
@@ -52,11 +45,10 @@
  *     - xtime.[ch]    (date/time handling utilities)
  */
 
+#include "prelude.h"
 #include "bfstd.h"
 #include "ctx.h"
-#include "darray.h"
 #include "diag.h"
-#include "dstring.h"
 #include "eval.h"
 #include "exec.h"
 #include "expr.h"
@@ -65,10 +57,8 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <locale.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 /**
@@ -120,30 +110,19 @@ static int open_std_streams(void) {
 	return 0;
 }
 
-static int find2fd_flatten(struct bfs_expr ***chain, struct bfs_expr *expr) {
-	if (!expr) {
-		return 0;
-	} else if (expr->eval_fn == eval_and) {
-		if (find2fd_flatten(chain, expr->lhs) != 0) {
-			return -1;
-		}
-		return find2fd_flatten(chain, expr->rhs);
+static void find2fd_extract(struct bfs_exprs *exprs, struct bfs_expr *expr) {
+	SLIST_INIT(exprs);
+
+	if (expr->eval_fn == eval_and) {
+		SLIST_EXTEND(exprs, &expr->children);
 	} else {
-		return DARRAY_PUSH(chain, &expr);
+		SLIST_APPEND(exprs, expr);
 	}
 }
 
-static void shellesc(char **cmdline, const char *str) {
-	// https://stackoverflow.com/a/3669819/502399
-	dstrcat(cmdline, " '");
-	for (const char *c = str; *c; ++c) {
-		if (*c == '\'') {
-			dstrcat(cmdline, "'\\''");
-		} else {
-			dstrapp(cmdline, *c);
-		}
-	}
-	dstrcat(cmdline, "'");
+static void shellesc(dchar **cmdline, const char *str) {
+	dstrcat(cmdline, " ");
+	dstrescat(cmdline, str, WESC_SHELL | WESC_TTY);
 }
 
 /**
@@ -156,36 +135,43 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Use the system locale instead of "C"
-	setlocale(LC_ALL, "");
+	int locale_err = 0;
+	if (!setlocale(LC_ALL, "")) {
+		locale_err = errno;
+	}
 
+	// Apply the environment's timezone
+	tzset();
+
+	// Parse the command line
 	struct bfs_ctx *ctx = bfs_parse_cmdline(argc, argv);
 	if (!ctx) {
 		return EXIT_FAILURE;
 	}
 
-	bool hidden = true;
-	if (ctx->exclude != &bfs_false) {
-		if (ctx->exclude->eval_fn == eval_hidden) {
-			hidden = false;
-		} else {
-			bfs_expr_error(ctx, ctx->exclude);
-			bfs_error(ctx, "${ex}fd${rs} does not support ${red}-exclude${rs}.\n");
-			return EXIT_FAILURE;
-		}
+	// Warn if setlocale() failed, unless there's no expression to evaluate
+	if (locale_err && ctx->warn && ctx->expr) {
+		bfs_warning(ctx, "Failed to set locale: %s\n\n", xstrerror(locale_err));
 	}
 
-	struct bfs_expr **exprs = NULL;
-	if (find2fd_flatten(&exprs, ctx->expr) != 0) {
+	bool hidden = true;
+	if (ctx->exclude->eval_fn == eval_hidden) {
+		hidden = false;
+	} else if (ctx->exclude->eval_fn != eval_false) {
+		bfs_expr_error(ctx, ctx->exclude);
+		bfs_error(ctx, "${ex}fd${rs} does not support ${red}-exclude${rs}.\n");
 		return EXIT_FAILURE;
 	}
+
+	struct bfs_exprs exprs;
+	find2fd_extract(&exprs, ctx->expr);
 
 	struct bfs_expr *pattern = NULL;
 	struct bfs_expr *type = NULL;
 	struct bfs_expr *executable = NULL;
 	struct bfs_expr *empty = NULL;
 	struct bfs_expr *action = NULL;
-	for (size_t i = 0; i < darray_length(exprs); ++i) {
-		struct bfs_expr *expr = exprs[i];
+	for_slist (struct bfs_expr, expr, &exprs) {
 		struct bfs_expr **target = NULL;
 		if (expr->eval_fn == eval_name
 		    || expr->eval_fn == eval_path
@@ -209,7 +195,7 @@ int main(int argc, char *argv[]) {
 
 		if (!target) {
 			bfs_expr_error(ctx, expr);
-			if (bfs_expr_has_children(expr)) {
+			if (bfs_expr_is_parent(expr)) {
 				bfs_error(ctx, "Too complicated to convert to ${ex}fd${rs}.\n");
 			} else {
 				bfs_error(ctx, "No equivalent ${ex}fd${rs} option.\n");
@@ -241,7 +227,7 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	char *cmdline = dstralloc(0);
+	dchar *cmdline = dstralloc(0);
 
 	dstrcat(&cmdline, "fd --no-ignore");
 
@@ -333,7 +319,7 @@ int main(int argc, char *argv[]) {
 		shellesc(&cmdline, pattern->argv[1]);
 	}
 
-	for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+	for (size_t i = 0; i < ctx->npaths; ++i) {
 		const char *path = ctx->paths[i];
 		if (!pattern || path[0] == '-') {
 			dstrcat(&cmdline, " --search-path");

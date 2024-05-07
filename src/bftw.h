@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * A file-walking API based on nftw().
@@ -39,12 +26,14 @@ enum bftw_visit {
  * Cached bfs_stat() info for a file.
  */
 struct bftw_stat {
-	/** A pointer to the bfs_stat() buffer, if available. */
-	const struct bfs_stat *buf;
-	/** Storage for the bfs_stat() buffer, if needed. */
-	struct bfs_stat storage;
-	/** The cached error code, if any. */
-	int error;
+	/** The bfs_stat(BFS_STAT_FOLLOW) buffer. */
+	const struct bfs_stat *stat_buf;
+	/** The bfs_stat(BFS_STAT_NOFOLLOW) buffer. */
+	const struct bfs_stat *lstat_buf;
+	/** The cached bfs_stat(BFS_STAT_FOLLOW) error. */
+	int stat_err;
+	/** The cached bfs_stat(BFS_STAT_NOFOLLOW) error. */
+	int lstat_err;
 };
 
 /**
@@ -65,7 +54,7 @@ struct BFTW {
 
 	/** The file type. */
 	enum bfs_type type;
-	/** The errno that occurred, if type == BFTW_ERROR. */
+	/** The errno that occurred, if type == BFS_ERROR. */
 	int error;
 
 	/** A parent file descriptor for the *at() family of calls. */
@@ -75,10 +64,8 @@ struct BFTW {
 
 	/** Flags for bfs_stat(). */
 	enum bfs_stat_flags stat_flags;
-	/** Cached bfs_stat() info for BFS_STAT_NOFOLLOW. */
-	struct bftw_stat lstat_cache;
-	/** Cached bfs_stat() info for BFS_STAT_FOLLOW. */
-	struct bftw_stat stat_cache;
+	/** Cached bfs_stat() info. */
+	struct bftw_stat stat_bufs;
 };
 
 /**
@@ -117,7 +104,7 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
  * @param flags
  *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
  * @return
- *         The type of the file, or BFTW_ERROR if an error occurred.
+ *         The type of the file, or BFS_ERROR if an error occurred.
  */
 enum bfs_type bftw_type(const struct BFTW *ftwbuf, enum bfs_stat_flags flags);
 
@@ -169,6 +156,8 @@ enum bftw_flags {
 	BFTW_SORT          = 1 << 8,
 	/** Read each directory into memory before processing its children. */
 	BFTW_BUFFER        = 1 << 9,
+	/** Include whiteouts in the search results. */
+	BFTW_WHITEOUTS     = 1 << 10,
 };
 
 /**
@@ -193,16 +182,22 @@ struct bftw_args {
 	const char **paths;
 	/** The number of starting paths. */
 	size_t npaths;
+
 	/** The callback to invoke. */
 	bftw_callback *callback;
 	/** A pointer which is passed to the callback. */
 	void *ptr;
+
 	/** The maximum number of file descriptors to keep open. */
 	int nopenfd;
+	/** The maximum number of threads to use. */
+	int nthreads;
+
 	/** Flags that control bftw() behaviour. */
 	enum bftw_flags flags;
 	/** The search strategy to use. */
 	enum bftw_strategy strategy;
+
 	/** The parsed mount table, if available. */
 	const struct bfs_mtab *mtab;
 };

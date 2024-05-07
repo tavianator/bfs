@@ -1,15 +1,13 @@
-skip_unless test "$SUDO"
-skip_if test "$UNAME" = "Darwin"
+test "$UNAME" = "Darwin" && skip
 
-clean_scratch
-mkdir scratch/{foo,mnt}
-sudo mount -t tmpfs tmpfs scratch/mnt
-ln -s ../mnt scratch/foo/bar
-"$XTOUCH" scratch/mnt/baz
-ln -s ../mnt/baz scratch/foo/qux
+cd "$TEST"
+mkdir foo mnt
 
-bfs_diff -L scratch -xdev
-ret=$?
+bfs_sudo mount -t tmpfs tmpfs mnt || skip
+defer bfs_sudo umount mnt
 
-sudo umount scratch/mnt
-return $ret
+ln -s ../mnt foo/bar
+"$XTOUCH" mnt/baz
+ln -s ../mnt/baz foo/qux
+
+bfs_diff -L . -xdev

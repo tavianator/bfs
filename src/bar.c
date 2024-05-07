@@ -1,26 +1,14 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2020-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "bar.h"
+#include "atomic.h"
 #include "bfstd.h"
-#include "config.h"
+#include "bit.h"
 #include "dstring.h"
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -29,8 +17,8 @@
 
 struct bfs_bar {
 	int fd;
-	volatile sig_atomic_t width;
-	volatile sig_atomic_t height;
+	atomic unsigned int width;
+	atomic unsigned int height;
 };
 
 /** The global status bar instance. */
@@ -46,8 +34,8 @@ static int bfs_bar_getsize(struct bfs_bar *bar) {
 		return -1;
 	}
 
-	bar->width = ws.ws_col;
-	bar->height = ws.ws_row;
+	store(&bar->width, ws.ws_col, relaxed);
+	store(&bar->height, ws.ws_row, relaxed);
 	return 0;
 #else
 	errno = ENOTSUP;
@@ -62,7 +50,7 @@ static int ass_puts(int fd, const char *str) {
 }
 
 /** Number of decimal digits needed for terminal sizes. */
-#define ITOA_DIGITS ((sizeof(unsigned short) * CHAR_BIT + 2) / 3)
+#define ITOA_DIGITS ((USHRT_WIDTH + 2) / 3)
 
 /** Async Signal Safe itoa(). */
 static char *ass_itoa(char *str, unsigned int n) {
@@ -87,8 +75,9 @@ static int bfs_bar_resize(struct bfs_bar *bar) {
 		"\033[;"; // DECSTBM: Set scrollable region
 
 	// DECSTBM takes the height as the second argument
+	unsigned int height = load(&bar->height, relaxed);
 	char *ptr = esc_seq + strlen(esc_seq);
-	ptr = ass_itoa(ptr, bar->height - 1);
+	ptr = ass_itoa(ptr, height - 1);
 
 	strcpy(ptr,
 		"r"      // DECSTBM
@@ -138,11 +127,11 @@ static void reset_before_death_by(int sig) {
 }
 
 /** printf() to the status bar with a single write(). */
-BFS_FORMATTER(2, 3)
+attr(printf(2, 3))
 static int bfs_bar_printf(struct bfs_bar *bar, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	char *str = dstrvprintf(format, args);
+	dchar *str = dstrvprintf(format, args);
 	va_end(args);
 
 	if (!str) {
@@ -191,13 +180,14 @@ struct bfs_bar *bfs_bar_show(void) {
 	sigaction(SIGWINCH, &sa, NULL);
 #endif
 
+	unsigned int height = load(&the_bar.height, relaxed);
 	bfs_bar_printf(&the_bar,
 		"\n"        // Make space for the bar
 		"\0337"     // DECSC: Save cursor
 		"\033[;%ur" // DECSTBM: Set scrollable region
 		"\0338"     // DECRC: Restore cursor
 		"\033[1A",  // CUU: Move cursor up 1 row
-		(unsigned int)(the_bar.height - 1)
+		height - 1
 	);
 
 	return &the_bar;
@@ -210,10 +200,11 @@ fail:
 }
 
 unsigned int bfs_bar_width(const struct bfs_bar *bar) {
-	return bar->width;
+	return load(&bar->width, relaxed);
 }
 
 int bfs_bar_update(struct bfs_bar *bar, const char *str) {
+	unsigned int height = load(&bar->height, relaxed);
 	return bfs_bar_printf(bar,
 		"\0337"      // DECSC: Save cursor
 		"\033[%u;0f" // HVP: Move cursor to row, column
@@ -222,7 +213,7 @@ int bfs_bar_update(struct bfs_bar *bar, const char *str) {
 		"%s"
 		"\033[27m"   // SGR reverse video off
 		"\0338",     // DECRC: Restore cursor
-		(unsigned int)bar->height,
+		height,
 		str
 	);
 }

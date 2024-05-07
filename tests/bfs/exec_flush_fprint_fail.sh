@@ -1,2 +1,2 @@
-skip_unless test -e /dev/full
-fail invoke_bfs basic/a -fprint /dev/full -exec true \;
+test -e /dev/full || skip
+! invoke_bfs basic/a -fprint /dev/full -exec true \;

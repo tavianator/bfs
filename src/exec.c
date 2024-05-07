@@ -1,33 +1,19 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2017-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "exec.h"
+#include "alloc.h"
 #include "bfstd.h"
 #include "bftw.h"
-#include "ctx.h"
 #include "color.h"
-#include "config.h"
+#include "ctx.h"
 #include "diag.h"
 #include "dstring.h"
 #include "xspawn.h"
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +22,7 @@
 #include <unistd.h>
 
 /** Print some debugging info. */
-BFS_FORMATTER(2, 3)
+attr(printf(2, 3))
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
 	const struct bfs_ctx *ctx = execbuf->ctx;
 
@@ -139,26 +125,16 @@ static void bfs_exec_parse_error(const struct bfs_ctx *ctx, const struct bfs_exe
 }
 
 struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs_exec_flags flags) {
-	struct bfs_exec *execbuf = malloc(sizeof(*execbuf));
+	struct bfs_exec *execbuf = ZALLOC(struct bfs_exec);
 	if (!execbuf) {
-		bfs_perror(ctx, "malloc()");
+		bfs_perror(ctx, "zalloc()");
 		goto fail;
 	}
 
 	execbuf->flags = flags;
 	execbuf->ctx = ctx;
 	execbuf->tmpl_argv = argv + 1;
-	execbuf->tmpl_argc = 0;
-	execbuf->argv = NULL;
-	execbuf->argc = 0;
-	execbuf->argv_cap = 0;
-	execbuf->arg_size = 0;
-	execbuf->arg_max = 0;
-	execbuf->arg_min = 0;
 	execbuf->wd_fd = -1;
-	execbuf->wd_path = NULL;
-	execbuf->wd_len = 0;
-	execbuf->ret = 0;
 
 	while (true) {
 		const char *arg = execbuf->tmpl_argv[execbuf->tmpl_argc];
@@ -191,9 +167,9 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 	}
 
 	execbuf->argv_cap = execbuf->tmpl_argc + 1;
-	execbuf->argv = malloc(execbuf->argv_cap*sizeof(*execbuf->argv));
+	execbuf->argv = ALLOC_ARRAY(char *, execbuf->argv_cap);
 	if (!execbuf->argv) {
-		bfs_perror(ctx, "malloc()");
+		bfs_perror(ctx, "alloc()");
 		goto fail;
 	}
 
@@ -239,9 +215,8 @@ static char *bfs_exec_format_path(const struct bfs_exec *execbuf, const struct B
 		return NULL;
 	}
 
-	strcpy(path, "./");
-	strcpy(path + 2, name);
-
+	char *cur = stpcpy(path, "./");
+	cur = stpcpy(cur, name);
 	return path;
 }
 
@@ -252,7 +227,7 @@ static char *bfs_exec_format_arg(char *arg, const char *path) {
 		return arg;
 	}
 
-	char *ret = dstralloc(0);
+	dchar *ret = dstralloc(0);
 	if (!ret) {
 		return NULL;
 	}
@@ -284,18 +259,18 @@ err:
 /** Free a formatted argument. */
 static void bfs_exec_free_arg(char *arg, const char *tmpl) {
 	if (arg != tmpl) {
-		dstrfree(arg);
+		dstrfree((dchar *)arg);
 	}
 }
 
 /** Open a file to use as the working directory. */
 static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
-	assert(execbuf->wd_fd < 0);
-	assert(!execbuf->wd_path);
+	bfs_assert(execbuf->wd_fd < 0);
+	bfs_assert(!execbuf->wd_path);
 
 	if (ftwbuf->at_fd != AT_FDCWD) {
 		// Rely on at_fd being the immediate parent
-		assert(ftwbuf->at_path == xbasename(ftwbuf->at_path));
+		bfs_assert(xbaseoff(ftwbuf->at_path) == 0);
 
 		execbuf->wd_fd = ftwbuf->at_fd;
 		if (!(execbuf->flags & BFS_EXEC_MULTI)) {
@@ -352,8 +327,10 @@ static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf
 
 /** Actually spawn the process. */
 static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
+	const struct bfs_ctx *ctx = execbuf->ctx;
+
 	// Flush the context state for consistency with the external process
-	bfs_ctx_flush(execbuf->ctx);
+	bfs_ctx_flush(ctx);
 
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
 		for (size_t i = 0; i < execbuf->argc; ++i) {
@@ -373,49 +350,46 @@ static int bfs_exec_spawn(const struct bfs_exec *execbuf) {
 
 	if (execbuf->flags & BFS_EXEC_MULTI) {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments] (size %zu)\n",
-		               execbuf->argv[0], execbuf->argc - 1, execbuf->arg_size);
+			execbuf->argv[0], execbuf->argc - 1, execbuf->arg_size);
 	} else {
 		bfs_exec_debug(execbuf, "Executing '%s' ... [%zu arguments]\n", execbuf->argv[0], execbuf->argc - 1);
 	}
 
 	pid_t pid = -1;
-	int error;
 
-	struct bfs_spawn ctx;
-	if (bfs_spawn_init(&ctx) != 0) {
+	struct bfs_spawn spawn;
+	if (bfs_spawn_init(&spawn) != 0) {
 		return -1;
 	}
 
-	if (bfs_spawn_setflags(&ctx, BFS_SPAWN_USEPATH) != 0) {
-		goto fail;
-	}
-
-	// Reset RLIMIT_NOFILE, to avoid breaking applications that use select()
-	struct rlimit rl = {
-		.rlim_cur = execbuf->ctx->nofile_soft,
-		.rlim_max = execbuf->ctx->nofile_hard,
-	};
-	if (bfs_spawn_addsetrlimit(&ctx, RLIMIT_NOFILE, &rl) != 0) {
-		goto fail;
-	}
+	spawn.flags |= BFS_SPAWN_USE_PATH;
 
 	if (execbuf->wd_fd >= 0) {
-		if (bfs_spawn_addfchdir(&ctx, execbuf->wd_fd) != 0) {
+		if (bfs_spawn_addfchdir(&spawn, execbuf->wd_fd) != 0) {
 			goto fail;
 		}
 	}
 
-	pid = bfs_spawn(execbuf->argv[0], &ctx, execbuf->argv, NULL);
-fail:
-	error = errno;
-	bfs_spawn_destroy(&ctx);
+	// Reset RLIMIT_NOFILE if necessary, to avoid breaking applications that use select()
+	if (rlim_cmp(ctx->orig_nofile.rlim_cur, ctx->cur_nofile.rlim_cur) < 0) {
+		if (bfs_spawn_setrlimit(&spawn, RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
+			goto fail;
+		}
+	}
+
+	pid = bfs_spawn(execbuf->argv[0], &spawn, execbuf->argv, NULL);
+
+fail:;
+	int error = errno;
+
+	bfs_spawn_destroy(&spawn);
 	if (pid < 0) {
 		errno = error;
 		return -1;
 	}
 
 	int wstatus;
-	if (waitpid(pid, &wstatus, 0) < 0) {
+	if (xwaitpid(pid, &wstatus, 0) < 0) {
 		return -1;
 	}
 
@@ -434,9 +408,9 @@ fail:
 		if (!str) {
 			str = "unknown";
 		}
-		bfs_warning(execbuf->ctx, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
+		bfs_warning(ctx, "Command '${ex}%s${rs}' terminated by signal %d (%s)\n", execbuf->argv[0], sig, str);
 	} else {
-		bfs_warning(execbuf->ctx, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
+		bfs_warning(ctx, "Command '${ex}%s${rs}' terminated abnormally\n", execbuf->argv[0]);
 	}
 
 	errno = 0;
@@ -496,7 +470,7 @@ static bool bfs_exec_args_remain(const struct bfs_exec *execbuf) {
 static size_t bfs_exec_estimate_max(const struct bfs_exec *execbuf) {
 	size_t min = execbuf->arg_min;
 	size_t max = execbuf->arg_max;
-	return min + (max - min)/2;
+	return min + (max - min) / 2;
 }
 
 /** Update the ARG_MAX lower bound from a successful execution. */
@@ -511,7 +485,7 @@ static void bfs_exec_update_min(struct bfs_exec *execbuf) {
 
 		size_t estimate = bfs_exec_estimate_max(execbuf);
 		bfs_exec_debug(execbuf, "ARG_MAX between [%zu, %zu], trying %zu\n",
-		               execbuf->arg_min, execbuf->arg_max, estimate);
+			execbuf->arg_min, execbuf->arg_max, estimate);
 	}
 }
 
@@ -527,7 +501,7 @@ static size_t bfs_exec_update_max(struct bfs_exec *execbuf) {
 
 	// Trim a fraction off the max size to avoid repeated failures near the
 	// top end of the working range
-	size -= size/16;
+	size -= size / 16;
 	if (size < execbuf->arg_max) {
 		execbuf->arg_max = size;
 
@@ -540,7 +514,7 @@ static size_t bfs_exec_update_max(struct bfs_exec *execbuf) {
 	// Binary search for a more precise bound
 	size_t estimate = bfs_exec_estimate_max(execbuf);
 	bfs_exec_debug(execbuf, "ARG_MAX between [%zu, %zu], trying %zu\n",
-	               execbuf->arg_min, execbuf->arg_max, estimate);
+		execbuf->arg_min, execbuf->arg_max, estimate);
 	return estimate;
 }
 
@@ -614,7 +588,7 @@ static bool bfs_exec_would_overflow(const struct bfs_exec *execbuf, const char *
 	size_t next_size = execbuf->arg_size + bfs_exec_arg_size(arg);
 	if (next_size > arg_max) {
 		bfs_exec_debug(execbuf, "Command size (%zu) would exceed maximum (%zu), executing buffered command\n",
-		               next_size, arg_max);
+			next_size, arg_max);
 		return true;
 	}
 
@@ -626,8 +600,8 @@ static int bfs_exec_push(struct bfs_exec *execbuf, char *arg) {
 	execbuf->argv[execbuf->argc] = arg;
 
 	if (execbuf->argc + 1 >= execbuf->argv_cap) {
-		size_t cap = 2*execbuf->argv_cap;
-		char **argv = realloc(execbuf->argv, cap*sizeof(*argv));
+		size_t cap = 2 * execbuf->argv_cap;
+		char **argv = REALLOC_ARRAY(char *, execbuf->argv, execbuf->argv_cap, cap);
 		if (!argv) {
 			return -1;
 		}

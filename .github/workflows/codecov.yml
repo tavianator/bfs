@@ -4,30 +4,32 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
+              expect \
               gcc \
               acl \
               libacl1-dev \
               attr \
-              libattr1-dev \
               libcap2-bin \
               libcap-dev \
-              libonig-dev
+              libonig-dev \
+              liburing-dev
 
       - name: Generate coverage
         run: |
-          make -j$(nproc) gcov check TEST_FLAGS="--sudo"
+          ./configure --enable-gcov
+          make -j$(nproc) check TEST_FLAGS="--sudo"
           gcov -abcfpu obj/*/*.o
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true

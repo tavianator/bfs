@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2021 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * Utilities for colored output on ANSI terminals.
@@ -21,9 +8,8 @@
 #ifndef BFS_COLOR_H
 #define BFS_COLOR_H
 
-#include "config.h"
-#include <stdarg.h>
-#include <stdbool.h>
+#include "prelude.h"
+#include "dstring.h"
 #include <stdio.h>
 
 /**
@@ -32,17 +18,17 @@
 struct colors;
 
 /**
- * Parse a color table.
- *
- * @return The parsed color table.
+ * Parse the color table from the environment.
  */
 struct colors *parse_colors(void);
 
 /**
+ * Check if stat() info is required to color a file correctly.
+ */
+bool colors_need_stat(const struct colors *colors);
+
+/**
  * Free a color table.
- *
- * @param colors
- *         The color table to free.
  */
 void free_colors(struct colors *colors);
 
@@ -55,7 +41,9 @@ typedef struct CFILE {
 	/** The color table to use, if any. */
 	const struct colors *colors;
 	/** A buffer for colored formatting. */
-	char *buffer;
+	dchar *buffer;
+	/** Whether the next ${rs} is actually necessary. */
+	bool need_reset;
 	/** Whether to close the underlying stream. */
 	bool close;
 } CFILE;
@@ -98,6 +86,8 @@ int cfclose(CFILE *cfile);
  *         %s: A string
  *         %zu: A size_t
  *         %m: strerror(errno)
+ *         %pq: A shell-escaped string, like bash's printf %q
+ *         %pQ: A TTY-escaped string.
  *         %pF: A colored file name, from a const struct BFTW * argument
  *         %pP: A colored file path, from a const struct BFTW * argument
  *         %pL: A colored link target, from a const struct BFTW * argument
@@ -109,12 +99,13 @@ int cfclose(CFILE *cfile);
  * @return
  *         0 on success, -1 on failure.
  */
-BFS_FORMATTER(2, 3)
+attr(printf(2, 3))
 int cfprintf(CFILE *cfile, const char *format, ...);
 
 /**
  * cfprintf() variant that takes a va_list.
  */
+attr(printf(2, 0))
 int cvfprintf(CFILE *cfile, const char *format, va_list args);
 
 #endif // BFS_COLOR_H

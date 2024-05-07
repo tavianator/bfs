@@ -10,7 +10,7 @@ args=(
     '-D[print diagnostics]:debug option:(cost exec opt rates search stat time tree all help)'
     '-E[use extended regular expressions with -regex/-iregex]'
     '-f[specify file hierarchy to traverse]:path:_directories'
-    '-O+[enable query optimisation]:level:(1 2 3)'
+    '-O+[enable query optimisation]:level:(0 1 2 3 4 fast)'
     '-s[traverse directories in sorted order]'
     '-X[warn if filename contains characters special to xargs]'
     "-x[don't span filesystems]"
@@ -19,6 +19,7 @@ args=(
     '(-L -P)-H[only follow symlinks when resolving command-line arguments]'
     "-S[select search method]:value:(bfs dfs ids eds)"
     '-f[treat path as path to search]:path:_files -/'
+    '-j+[use this many threads]:threads:'
 
     # Operators
     '*-and'
@@ -73,6 +74,7 @@ args=(
     '*-mtime[find files modified N days ago]:modification time (days):->times'
 
     '*-capable[find files with POSIX.1e capabilities set]'
+    '*-context[find files by SELinux context]:pattern'
     # -depth without parameters exist above. I don't know how to handle this gracefully
     '*-empty[find empty files/directories]'
     '*-executable[find files the current user can execute]'
@@ -81,7 +83,7 @@ args=(
     '*-false[always false]'
     '*-true[always true]'
     '*-fstype[find files on file systems with the given type]:file system type:_file_systems'
-    
+
     '*-gid[find files owned by group ID N]:numeric group ID:'
     '*-group[find files owned by group NAME]:group:_groups'
     '*-uid[find files owned by user ID N]:numeric user ID'
@@ -117,7 +119,7 @@ args=(
     '*-xattr[find files with extended attributes]'
     '*-xattrname[find files with extended attribute NAME]:name:'
     '*-xtype[find files of the given type following links when -type would not, and vice versa]:file type:((b\:block\ device c\:character\ device d\:directory p\:named\ pipe f\:normal\ file l\:symbolic\ link s\:socket w\:whiteout D\:Door))'
-    
+
     # Actions
     '*-delete[delete any found files (-implies -depth)]'
     '*-rm[delete any found files (-implies -depth)]'
@@ -126,13 +128,14 @@ args=(
     '*-execdir[execute a command in the same directory as the found files]:program: _command_names -e:*(\;|+)::program arguments: _normal'
     '*-ok[prompt the user whether to execute a command]:program: _command_names -e:*(\;|+)::program arguments: _normal'
     '*-okdir[prompt the user whether to execute a command in the same directory as the found files]:program: _command_names -e:*(\;|+)::program arguments: _normal'
-    
+
     '-exit[exit with status if found, default 0]'
     '*-fls[list files like ls -dils, but write to FILE instead of standard output]:output file:_files'
     '*-fprint[print the path to the found file, but write to FILE instead of standard output]:output file:_files'
     '*-fprint0[print the path to the found file using null character as separator, but write to FILE instead of standard output]:output file:_files'
     '*-fprintf[print according to format string, but write to FILE instead of standard output]:output file:_files:output format'
 
+    '*-limit[quit after N results]:maximum result count'
     '*-ls[list files like ls -dils]'
     '*-print[print the path to the found file]'
     '*-print0[print the path to the found file using null character as separator]'

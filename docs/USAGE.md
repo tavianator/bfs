@@ -18,7 +18,7 @@ $ bfs
 ./completions/bfs.zsh
 ./docs/BUILDING.md
 ./docs/CHANGELOG.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ./docs/USAGE.md
 ./docs/bfs.1
 ...
@@ -53,7 +53,7 @@ $ bfs -name '*.md'
 ./README.md
 ./docs/BUILDING.md
 ./docs/CHANGELOG.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ./docs/USAGE.md
 ```
 
@@ -64,7 +64,7 @@ When you put multiple expressions next to each other, both of them must match:
 ```console
 $ bfs -name '*.md' -name '*ING*'
 ./docs/BUILDING.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ```
 
 This works because the expressions are implicitly combined with *logical and*.
@@ -84,7 +84,7 @@ $ bfs -name '*.md' -or -name 'bfs.*'
 ./completions/bfs.zsh
 ./docs/BUILDING.md
 ./docs/CHANGELOG.md
-./docs/HACKING.md
+./docs/CONTRIBUTING.md
 ./docs/USAGE.md
 ./docs/bfs.1
 ```
@@ -127,6 +127,40 @@ to the equivalent
     find ! \( -name .git -prune \) -name config
 
 Unlike `-prune`, `-exclude` even works in combination with `-depth`/`-delete`.
+
+---
+
+### `-limit`
+
+The `-limit N` action makes `bfs` quit once it gets evaluated `N` times.
+Placing it after an action like `-print` limits the number of results that get printed, for example:
+
+```console
+$ bfs -s -type f -name '*.txt'
+./1.txt
+./2.txt
+./3.txt
+./4.txt
+$ bfs -s -type f -name '*.txt' -print -limit 2
+./1.txt
+./2.txt
+```
+
+This is similar to
+
+```console
+$ bfs -s -type f -name '*.txt' | head -n2
+```
+
+but more powerful because you can apply separate limits to different expressions:
+
+```console
+$ bfs \( -name '*.txt' -print -limit 3 -o -name '*.log' -print -limit 4 \) -limit 5
+[At most 3 .txt files, at most 4 .log files, and at most 5 in total]
+```
+
+and more efficient because it will quit immediately.
+When piping to `head`, `bfs` will only quit *after* it tries to output too many results.
 
 ---
 

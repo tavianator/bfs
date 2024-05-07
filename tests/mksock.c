@@ -1,29 +1,16 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * There's no standard Unix utility that creates a socket file, so this small
  * program does the job.
  */
 
+#include "bfstd.h"
 #include <errno.h>
-#include <libgen.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -32,7 +19,7 @@
  * Print an error message.
  */
 static void errmsg(const char *cmd, const char *path) {
-	fprintf(stderr, "%s: '%s': %s.\n", cmd, path, strerror(errno));
+	fprintf(stderr, "%s: '%s': %s.\n", cmd, path, xstrerror(errno));
 }
 
 /**
@@ -41,18 +28,13 @@ static void errmsg(const char *cmd, const char *path) {
  * file name is not.
  */
 static int chdir_parent(const char *path) {
-	char *copy = strdup(path);
-	if (!copy) {
+	char *dir = xdirname(path);
+	if (!dir) {
 		return -1;
 	}
-	const char *dir = dirname(copy);
 
 	int ret = chdir(dir);
-
-	int error = errno;
-	free(copy);
-	errno = error;
-
+	free(dir);
 	return ret;
 }
 
@@ -66,22 +48,21 @@ static int init_sun(struct sockaddr_un *sock, const char *path) {
 		return -1;
 	}
 
-	char *copy = strdup(path);
-	if (!copy) {
+	char *base = xbasename(path);
+	if (!base) {
 		return -1;
 	}
-	const char *base = basename(copy);
 
 	len = strlen(base);
 	if (len >= sizeof(sock->sun_path)) {
-		free(copy);
+		free(base);
 		errno = ENAMETOOLONG;
 		return -1;
 	}
 
 	sock->sun_family = AF_UNIX;
 	memcpy(sock->sun_path, base, len + 1);
-	free(copy);
+	free(base);
 	return 0;
 }
 
@@ -119,7 +100,7 @@ int main(int argc, char *argv[]) {
 		ret = EXIT_FAILURE;
 	}
 
-	if (close(fd) != 0) {
+	if (xclose(fd) != 0) {
 		errmsg(cmd, path);
 		ret = EXIT_FAILURE;
 	}

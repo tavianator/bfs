@@ -1,4 +1,4 @@
-scratch
-scratch/foo
-scratch/foo/bar
-scratch/mnt
+.
+./foo
+./foo/bar
+./mnt

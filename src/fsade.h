@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2019-2020 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * A facade over (file)system features that are (un)implemented differently
@@ -22,17 +9,13 @@
 #ifndef BFS_FSADE_H
 #define BFS_FSADE_H
 
-#include "config.h"
-#include <stdbool.h>
+#include "prelude.h"
 
-#define BFS_CAN_CHECK_ACL BFS_USE_SYS_ACL_H
+#define BFS_CAN_CHECK_ACL (BFS_HAS_ACL_GET_FILE || BFS_HAS_ACL_TRIVIAL)
 
-#if !defined(BFS_CAN_CHECK_CAPABILITIES) && BFS_USE_SYS_CAPABILITY_H && !__FreeBSD__
-#	include <sys/capability.h>
-#	ifdef CAP_CHOWN
-#		define BFS_CAN_CHECK_CAPABILITIES true
-#	endif
-#endif
+#define BFS_CAN_CHECK_CAPABILITIES BFS_USE_LIBCAP
+
+#define BFS_CAN_CHECK_CONTEXT BFS_USE_LIBSELINUX
 
 #define BFS_CAN_CHECK_XATTRS (BFS_USE_SYS_EXTATTR_H || BFS_USE_SYS_XATTR_H)
 
@@ -79,5 +62,20 @@ int bfs_check_xattrs(const struct BFTW *ftwbuf);
  *         1 if it does, 0 if it doesn't, or -1 if an error occurred.
  */
 int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name);
+
+/**
+ * Get a file's SELinux context
+ *
+ * @param ftwbuf
+ *         The file to check.
+ * @return
+ *         The file's SELinux context, or NULL on failure.
+ */
+char *bfs_getfilecon(const struct BFTW *ftwbuf);
+
+/**
+ * Free a bfs_getfilecon() result.
+ */
+void bfs_freecon(char *con);
 
 #endif // BFS_FSADE_H

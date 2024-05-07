@@ -1,8 +1,8 @@
-skip_unless invoke_bfs scratch -quit -flags offline
+invoke_bfs . -quit -flags offline || skip
 
-clean_scratch
+cd "$TEST"
 
-"$XTOUCH" scratch/{foo,bar}
-skip_unless chflags offline scratch/bar
+"$XTOUCH" foo bar
+chflags offline bar || skip
 
-bfs_diff scratch -flags -offline,nohidden
+bfs_diff . -flags -offline,nohidden

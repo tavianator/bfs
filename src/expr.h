@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * The expression tree representation.
@@ -21,11 +8,10 @@
 #ifndef BFS_EXPR_H
 #define BFS_EXPR_H
 
+#include "prelude.h"
 #include "color.h"
 #include "eval.h"
 #include "stat.h"
-#include <stdbool.h>
-#include <stddef.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -88,9 +74,22 @@ enum bfs_size_unit {
 };
 
 /**
+ * A linked list of expressions.
+ */
+struct bfs_exprs {
+	struct bfs_expr *head;
+	struct bfs_expr **tail;
+};
+
+/**
  * A command line expression.
  */
 struct bfs_expr {
+	/** This expression's next sibling, if any. */
+	struct bfs_expr *next;
+	/** The next allocated expression. */
+	struct { struct bfs_expr *next; } freelist;
+
 	/** The function that evaluates this expression. */
 	bfs_eval_fn *eval_fn;
 
@@ -110,8 +109,8 @@ struct bfs_expr {
 	bool always_true;
 	/** Whether this expression always evaluates to false. */
 	bool always_false;
-	/** Whether this expression doesn't appear on the command line. */
-	bool synthetic;
+	/** Whether this expression uses stat(). */
+	bool calls_stat;
 
 	/** Estimated cost. */
 	float cost;
@@ -127,12 +126,7 @@ struct bfs_expr {
 	/** Auxilliary data for the evaluation function. */
 	union {
 		/** Child expressions. */
-		struct {
-			/** The left hand side of the expression. */
-			struct bfs_expr *lhs;
-			/** The right hand side of the expression. */
-			struct bfs_expr *rhs;
-		};
+		struct bfs_exprs children;
 
 		/** Integer comparisons. */
 		struct {
@@ -141,21 +135,25 @@ struct bfs_expr {
 			/** The comparison mode. */
 			enum bfs_int_cmp int_cmp;
 
-			/** Optional extra data. */
-			union {
-				/** -size data. */
-				enum bfs_size_unit size_unit;
+			/** -size data. */
+			enum bfs_size_unit size_unit;
 
-				/** Timestamp comparison data. */
-				struct {
-					/** The stat field to look at. */
-					enum bfs_stat_field stat_field;
-					/** The reference time. */
-					struct timespec reftime;
-					/** The time unit. */
-					enum bfs_time_unit time_unit;
-				};
-			};
+			/** The stat field to look at. */
+			enum bfs_stat_field stat_field;
+			/** The time unit. */
+			enum bfs_time_unit time_unit;
+			/** The reference time. */
+			struct timespec reftime;
+		};
+
+		/** String comparisons. */
+		struct {
+			/** String pattern. */
+			const char *pattern;
+			/** fnmatch() flags. */
+			int fnm_flags;
+			/** Whether strcmp() can be used instead of fnmatch(). */
+			bool literal;
 		};
 
 		/** Printing actions. */
@@ -204,20 +202,32 @@ struct bfs_expr {
 	};
 };
 
-/** Singleton true expression instance. */
-extern struct bfs_expr bfs_true;
-/** Singleton false expression instance. */
-extern struct bfs_expr bfs_false;
+struct bfs_ctx;
 
 /**
  * Create a new expression.
  */
-struct bfs_expr *bfs_expr_new(bfs_eval_fn *eval, size_t argc, char **argv);
+struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv);
 
 /**
- * @return Whether the expression has child expressions.
+ * @return Whether this type of expression has children.
  */
-bool bfs_expr_has_children(const struct bfs_expr *expr);
+bool bfs_expr_is_parent(const struct bfs_expr *expr);
+
+/**
+ * @return The first child of this expression, or NULL if it has none.
+ */
+struct bfs_expr *bfs_expr_children(const struct bfs_expr *expr);
+
+/**
+ * Add a child to an expression.
+ */
+void bfs_expr_append(struct bfs_expr *expr, struct bfs_expr *child);
+
+/**
+ * Add a list of children to an expression.
+ */
+void bfs_expr_extend(struct bfs_expr *expr, struct bfs_exprs *children);
 
 /**
  * @return Whether expr is known to always quit.
@@ -230,8 +240,8 @@ bool bfs_expr_never_returns(const struct bfs_expr *expr);
 bool bfs_expr_cmp(const struct bfs_expr *expr, long long n);
 
 /**
- * Free an expression tree.
+ * Free any resources owned by an expression.
  */
-void bfs_expr_free(struct bfs_expr *expr);
+void bfs_expr_clear(struct bfs_expr *expr);
 
 #endif // BFS_EXPR_H

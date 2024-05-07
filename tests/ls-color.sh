@@ -1,35 +1,49 @@
 #!/usr/bin/env bash
 
-############################################################################
-# bfs                                                                      #
-# Copyright (C) 2019 Tavian Barnes <tavianator@tavianator.com>             #
-#                                                                          #
-# Permission to use, copy, modify, and/or distribute this software for any #
-# purpose with or without fee is hereby granted.                           #
-#                                                                          #
-# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES #
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         #
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  #
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   #
-# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    #
-# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  #
-# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
-############################################################################
+# Copyright © Tavian Barnes <tavianator@tavianator.com>
+# SPDX-License-Identifier: 0BSD
 
 # Prints the "ground truth" coloring of a path using ls
 
 set -e
+
+parse_ls_colors() {
+    for key; do
+        local -n var="$key"
+        if [[ "$LS_COLORS" =~ (^|:)$key=(([^:]|\\:)*) ]]; then
+            var="${BASH_REMATCH[2]}"
+            # Interpret escapes
+            var=$(printf "$var" | sed $'s/\^\[/\033/g; s/\\\\:/:/g')
+        fi
+    done
+}
+
+re_escape() {
+    # https://stackoverflow.com/a/29613573/502399
+    sed 's/[^^]/[&]/g; s/\^/\\^/g' <<<"$1"
+}
+
+rs=0
+lc=$'\033['
+rc=m
+ec=
+no=
+
+parse_ls_colors rs lc rc ec no
+: "${ec:=$lc$rs$rc}"
+
+strip="(($(re_escape "$lc$no$rc"))?($(re_escape "$ec")|$(re_escape "$lc$rc")))+"
+
+ls_color() {
+    # Strip the leading reset sequence from the ls output
+    ls -1d --color "$@" | sed -E "s/^$strip([a-z].*)$strip/\4/; s/^$strip//"
+}
 
 L=
 if [ "$1" = "-L" ]; then
     L="$1"
     shift
 fi
-
-function ls_color() {
-    # Strip the leading reset sequence from the ls output
-    ls -1d --color "$@" | sed $'s/^\033\\[0m//'
-}
 
 DIR="${1%/*}"
 if [ "$DIR" = "$1" ]; then

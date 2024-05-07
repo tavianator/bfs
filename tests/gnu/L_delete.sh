@@ -1,9 +1,8 @@
-clean_scratch
-mkdir scratch/foo
-mkdir scratch/bar
-ln -s ../foo scratch/bar/baz
+cd "$TEST"
+mkdir foo bar
+ln -s ../foo bar/baz
 
 # Don't try to rmdir() a symlink
-invoke_bfs -L scratch/bar -delete || return 1
+invoke_bfs -L bar -delete
 
-bfs_diff scratch
+bfs_diff .

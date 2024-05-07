@@ -1,2 +1,1 @@
-bfs_diff -X weirdnames
-[ $? -eq $EX_BFS ]
+! bfs_diff -X weirdnames

@@ -1,1 +1,1 @@
-fail invoke_bfs basic -exclude -exclude -name foo
+! invoke_bfs basic -exclude -exclude -name foo

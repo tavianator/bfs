@@ -1,32 +1,18 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2017-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * The expression optimizer.  Different optimization levels are supported:
  *
  * -O1: basic logical simplifications, like folding (-true -and -foo) to -foo.
  *
- * -O2: dead code elimination and data flow analysis.  struct opt_facts is used
+ * -O2: dead code elimination and data flow analysis.  struct df_domain is used
  * to record data flow facts that are true at various points of evaluation.
- * Specifically, struct opt_facts records the facts that must be true before an
- * expression is evaluated (state->facts), and those that must be true after the
- * expression is evaluated, given that it returns true (state->facts_when_true)
- * or false (state->facts_when_true).  Additionally, state->facts_when_impure
- * records the possible data flow facts before any expressions with side effects
- * are evaluated.
+ * Specifically, struct df_domain records the state before an expression is
+ * evaluated (opt->before), and after an expression returns true
+ * (opt->after_true) or false (opt->after_false).  Additionally, opt->impure
+ * records the possible state before any expression with side effects is
+ * evaluated.
  *
  * -O3: expression re-ordering to reduce expected cost.  In an expression like
  * (-foo -and -bar), if both -foo and -bar are pure (no side effects), they can
@@ -35,158 +21,55 @@
  * -bar is likely to return false.
  *
  * -O4/-Ofast: aggressive optimizations that may affect correctness in corner
- * cases.  The main effect is to use facts_when_impure to determine if any side-
- * effects are reachable at all, and skipping the traversal if not.
+ * cases.  The main effect is to use opt->impure to determine if any side-
+ * effects are reachable at all, skipping the traversal if not.
  */
 
+#include "prelude.h"
 #include "opt.h"
+#include "bftw.h"
+#include "bit.h"
 #include "color.h"
-#include "config.h"
 #include "ctx.h"
 #include "diag.h"
+#include "dir.h"
 #include "eval.h"
+#include "exec.h"
 #include "expr.h"
+#include "list.h"
 #include "pwcache.h"
-#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 
-static char *fake_and_arg = "-a";
-static char *fake_or_arg = "-o";
-static char *fake_not_arg = "!";
+static char *fake_and_arg = "-and";
+static char *fake_or_arg = "-or";
+static char *fake_not_arg = "-not";
 
 /**
- * A contrained integer range.
+ * The data flow domain for predicates.
  */
-struct range {
-	/** The (inclusive) minimum value. */
-	long long min;
-	/** The (inclusive) maximum value. */
-	long long max;
-};
-
-/** Compute the minimum of two values. */
-static long long min_value(long long a, long long b) {
-	if (a < b) {
-		return a;
-	} else {
-		return b;
-	}
-}
-
-/** Compute the maximum of two values. */
-static long long max_value(long long a, long long b) {
-	if (a > b) {
-		return a;
-	} else {
-		return b;
-	}
-}
-
-/** Constrain the minimum of a range. */
-static void constrain_min(struct range *range, long long value) {
-	range->min = max_value(range->min, value);
-}
-
-/** Contrain the maximum of a range. */
-static void constrain_max(struct range *range, long long value) {
-	range->max = min_value(range->max, value);
-}
-
-/** Remove a single value from a range. */
-static void range_remove(struct range *range, long long value) {
-	if (range->min == value) {
-		if (range->min == LLONG_MAX) {
-			range->max = LLONG_MIN;
-		} else {
-			++range->min;
-		}
-	}
-
-	if (range->max == value) {
-		if (range->max == LLONG_MIN) {
-			range->min = LLONG_MAX;
-		} else {
-			--range->max;
-		}
-	}
-}
-
-/** Compute the union of two ranges. */
-static void range_union(struct range *result, const struct range *lhs, const struct range *rhs) {
-	result->min = min_value(lhs->min, rhs->min);
-	result->max = max_value(lhs->max, rhs->max);
-}
-
-/** Check if a range contains no values. */
-static bool range_is_impossible(const struct range *range) {
-	return range->min > range->max;
-}
-
-/** Set a range to contain no values. */
-static void set_range_impossible(struct range *range) {
-	range->min = LLONG_MAX;
-	range->max = LLONG_MIN;
-}
-
-/**
- * Types of ranges we track.
- */
-enum range_type {
-	/** Search tree depth. */
-	DEPTH_RANGE,
-	/** Group ID. */
-	GID_RANGE,
-	/** Inode number.  */
-	INUM_RANGE,
-	/** Hard link count. */
-	LINKS_RANGE,
-	/** File size. */
-	SIZE_RANGE,
-	/** User ID. */
-	UID_RANGE,
-	/** The number of range_types. */
-	RANGE_TYPES,
-};
-
-/**
- * A possibly-known value of a predicate.
- */
-enum known_pred {
-	/** The state is impossible to reach. */
-	PRED_IMPOSSIBLE = -2,
-	/** The value of the predicate is not known. */
-	PRED_UNKNOWN = -1,
+enum df_pred {
+	/** The bottom state (unreachable). */
+	PRED_BOTTOM = 0,
 	/** The predicate is known to be false. */
-	PRED_FALSE = false,
+	PRED_FALSE = 1 << false,
 	/** The predicate is known to be true. */
-	PRED_TRUE = true,
+	PRED_TRUE = 1 << true,
+	/** The top state (unknown). */
+	PRED_TOP = PRED_FALSE | PRED_TRUE,
 };
 
 /** Make a predicate known. */
-static void constrain_pred(enum known_pred *pred, bool value) {
-	if (*pred == PRED_UNKNOWN) {
-		*pred = value;
-	} else if (*pred == !value) {
-		*pred = PRED_IMPOSSIBLE;
-	}
+static void constrain_pred(enum df_pred *pred, bool value) {
+	*pred &= 1 << value;
 }
 
-/** Compute the union of two known predicates. */
-static enum known_pred pred_union(enum known_pred lhs, enum known_pred rhs) {
-	if (lhs == PRED_IMPOSSIBLE) {
-		return rhs;
-	} else if (rhs == PRED_IMPOSSIBLE) {
-		return lhs;
-	} else if (lhs == rhs) {
-		return lhs;
-	} else {
-		return PRED_UNKNOWN;
-	}
+/** Compute the join (union) of two predicates. */
+static void pred_join(enum df_pred *dest, enum df_pred src) {
+	*dest |= src;
 }
 
 /**
@@ -219,871 +102,2198 @@ enum pred_type {
 	PRED_TYPES,
 };
 
+/** Get the name of a predicate type. */
+static const char *pred_type_name(enum pred_type type) {
+	switch (type) {
+	case READABLE_PRED:
+		return "-readable";
+	case WRITABLE_PRED:
+		return "-writable";
+	case EXECUTABLE_PRED:
+		return "-executable";
+	case ACL_PRED:
+		return "-acl";
+	case CAPABLE_PRED:
+		return "-capable";
+	case EMPTY_PRED:
+		return "-empty";
+	case HIDDEN_PRED:
+		return "-hidden";
+	case NOGROUP_PRED:
+		return "-nogroup";
+	case NOUSER_PRED:
+		return "-nouser";
+	case SPARSE_PRED:
+		return "-sparse";
+	case XATTR_PRED:
+		return "-xattr";
+
+	case PRED_TYPES:
+		break;
+	}
+
+	bfs_bug("Unknown predicate %d", (int)type);
+	return "???";
+}
+
 /**
- * Data flow facts about an evaluation point.
+ * A contrained integer range.
  */
-struct opt_facts {
-	/** The value ranges we track. */
-	struct range ranges[RANGE_TYPES];
+struct df_range {
+	/** The (inclusive) minimum value. */
+	long long min;
+	/** The (inclusive) maximum value. */
+	long long max;
+};
 
+/** Initialize an empty range. */
+static void range_init_bottom(struct df_range *range) {
+	range->min = LLONG_MAX;
+	range->max = LLONG_MIN;
+}
+
+/** Check if a range is empty. */
+static bool range_is_bottom(const struct df_range *range) {
+	return range->min > range->max;
+}
+
+/** Initialize a full range. */
+static void range_init_top(struct df_range *range) {
+	// All ranges we currently track are non-negative
+	range->min = 0;
+	range->max = LLONG_MAX;
+}
+
+/** Check for an infinite range. */
+static bool range_is_top(const struct df_range *range) {
+	return range->min == 0 && range->max == LLONG_MAX;
+}
+
+/** Compute the minimum of two values. */
+static long long min_value(long long a, long long b) {
+	if (a < b) {
+		return a;
+	} else {
+		return b;
+	}
+}
+
+/** Compute the maximum of two values. */
+static long long max_value(long long a, long long b) {
+	if (a > b) {
+		return a;
+	} else {
+		return b;
+	}
+}
+
+/** Constrain the minimum of a range. */
+static void constrain_min(struct df_range *range, long long value) {
+	range->min = max_value(range->min, value);
+}
+
+/** Contrain the maximum of a range. */
+static void constrain_max(struct df_range *range, long long value) {
+	range->max = min_value(range->max, value);
+}
+
+/** Remove a single value from a range. */
+static void range_remove(struct df_range *range, long long value) {
+	if (range->min == value) {
+		if (range->min == LLONG_MAX) {
+			range->max = LLONG_MIN;
+		} else {
+			++range->min;
+		}
+	}
+
+	if (range->max == value) {
+		if (range->max == LLONG_MIN) {
+			range->min = LLONG_MAX;
+		} else {
+			--range->max;
+		}
+	}
+}
+
+/** Compute the union of two ranges. */
+static void range_join(struct df_range *dest, const struct df_range *src) {
+	dest->min = min_value(dest->min, src->min);
+	dest->max = max_value(dest->max, src->max);
+}
+
+/**
+ * Types of ranges we track.
+ */
+enum range_type {
+	/** Search tree depth. */
+	DEPTH_RANGE,
+	/** Group ID. */
+	GID_RANGE,
+	/** Inode number.  */
+	INUM_RANGE,
+	/** Hard link count. */
+	LINKS_RANGE,
+	/** File size. */
+	SIZE_RANGE,
+	/** User ID. */
+	UID_RANGE,
+	/** The number of range_types. */
+	RANGE_TYPES,
+};
+
+/** Get the name of a range type. */
+static const char *range_type_name(enum range_type type) {
+	switch (type) {
+	case DEPTH_RANGE:
+		return "-depth";
+	case GID_RANGE:
+		return "-gid";
+	case INUM_RANGE:
+		return "-inum";
+	case LINKS_RANGE:
+		return "-links";
+	case SIZE_RANGE:
+		return "-size";
+	case UID_RANGE:
+		return "-uid";
+
+	case RANGE_TYPES:
+		break;
+	}
+
+	bfs_bug("Unknown range %d", (int)type);
+	return "???";
+}
+
+/**
+ * The data flow analysis domain.
+ */
+struct df_domain {
 	/** The predicates we track. */
-	enum known_pred preds[PRED_TYPES];
+	enum df_pred preds[PRED_TYPES];
 
-	/** Bitmask of possible file types. */
+	/** The value ranges we track. */
+	struct df_range ranges[RANGE_TYPES];
+
+	/** Bitmask of possible -types. */
 	unsigned int types;
-	/** Bitmask of possible link target types. */
+	/** Bitmask of possible -xtypes. */
 	unsigned int xtypes;
 };
 
-/** Initialize some data flow facts. */
-static void facts_init(struct opt_facts *facts) {
-	for (int i = 0; i < RANGE_TYPES; ++i) {
-		struct range *range = &facts->ranges[i];
-		range->min = 0; // All ranges we currently track are non-negative
-		range->max = LLONG_MAX;
-	}
-
+/** Set a data flow value to bottom. */
+static void df_init_bottom(struct df_domain *value) {
 	for (int i = 0; i < PRED_TYPES; ++i) {
-		facts->preds[i] = PRED_UNKNOWN;
+		value->preds[i] = PRED_BOTTOM;
 	}
 
-	facts->types = ~0;
-	facts->xtypes = ~0;
-}
-
-/** Compute the union of two fact sets. */
-static void facts_union(struct opt_facts *result, const struct opt_facts *lhs, const struct opt_facts *rhs) {
 	for (int i = 0; i < RANGE_TYPES; ++i) {
-		range_union(&result->ranges[i], &lhs->ranges[i], &rhs->ranges[i]);
+		range_init_bottom(&value->ranges[i]);
 	}
 
-	for (int i = 0; i < PRED_TYPES; ++i) {
-		result->preds[i] = pred_union(lhs->preds[i], rhs->preds[i]);
-	}
-
-	result->types = lhs->types | rhs->types;
-	result->xtypes = lhs->xtypes | rhs->xtypes;
+	value->types = 0;
+	value->xtypes = 0;
 }
 
 /** Determine whether a fact set is impossible. */
-static bool facts_are_impossible(const struct opt_facts *facts) {
+static bool df_is_bottom(const struct df_domain *value) {
 	for (int i = 0; i < RANGE_TYPES; ++i) {
-		if (range_is_impossible(&facts->ranges[i])) {
+		if (range_is_bottom(&value->ranges[i])) {
 			return true;
 		}
 	}
 
 	for (int i = 0; i < PRED_TYPES; ++i) {
-		if (facts->preds[i] == PRED_IMPOSSIBLE) {
+		if (value->preds[i] == PRED_BOTTOM) {
 			return true;
 		}
 	}
 
-	if (!facts->types || !facts->xtypes) {
+	if (!value->types || !value->xtypes) {
 		return true;
 	}
 
 	return false;
 }
 
-/** Set some facts to be impossible. */
-static void set_facts_impossible(struct opt_facts *facts) {
-	for (int i = 0; i < RANGE_TYPES; ++i) {
-		set_range_impossible(&facts->ranges[i]);
-	}
-
+/** Initialize some data flow value. */
+static void df_init_top(struct df_domain *value) {
 	for (int i = 0; i < PRED_TYPES; ++i) {
-		facts->preds[i] = PRED_IMPOSSIBLE;
+		value->preds[i] = PRED_TOP;
 	}
 
-	facts->types = 0;
-	facts->xtypes = 0;
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		range_init_top(&value->ranges[i]);
+	}
+
+	value->types = ~0;
+	value->xtypes = ~0;
+}
+
+/** Check for the top element. */
+static bool df_is_top(const struct df_domain *value) {
+        for (int i = 0; i < PRED_TYPES; ++i) {
+                if (value->preds[i] != PRED_TOP) {
+                        return false;
+                }
+        }
+
+        for (int i = 0; i < RANGE_TYPES; ++i) {
+                if (!range_is_top(&value->ranges[i])) {
+                        return false;
+                }
+        }
+
+        if (value->types != ~0U) {
+                return false;
+        }
+
+        if (value->xtypes != ~0U) {
+                return false;
+        }
+
+        return true;
+}
+
+/** Compute the union of two fact sets. */
+static void df_join(struct df_domain *dest, const struct df_domain *src) {
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		pred_join(&dest->preds[i], src->preds[i]);
+	}
+
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		range_join(&dest->ranges[i], &src->ranges[i]);
+	}
+
+	dest->types |= src->types;
+	dest->xtypes |= src->xtypes;
 }
 
 /**
  * Optimizer state.
  */
-struct opt_state {
+struct bfs_opt {
 	/** The context we're optimizing. */
-	const struct bfs_ctx *ctx;
+	struct bfs_ctx *ctx;
+	/** Optimization level (ctx->optlevel). */
+	int level;
+	/** Recursion depth. */
+	int depth;
 
-	/** Data flow facts before this expression is evaluated. */
-	struct opt_facts facts;
-	/** Data flow facts after this expression returns true. */
-	struct opt_facts facts_when_true;
-	/** Data flow facts after this expression returns false. */
-	struct opt_facts facts_when_false;
-	/** Data flow facts before any side-effecting expressions are evaluated. */
-	struct opt_facts *facts_when_impure;
+	/** Whether to produce warnings. */
+	bool warn;
+	/** Whether the result of this expression is ignored. */
+	bool ignore_result;
+
+	/** Data flow state before this expression is evaluated. */
+	struct df_domain before;
+	/** Data flow state after this expression returns true. */
+	struct df_domain after_true;
+	/** Data flow state after this expression returns false. */
+	struct df_domain after_false;
+	/** Data flow state before any side-effecting expressions are evaluated. */
+	struct df_domain *impure;
 };
 
 /** Log an optimization. */
-BFS_FORMATTER(3, 4)
-static bool opt_debug(const struct opt_state *state, int level, const char *format, ...) {
-	assert(state->ctx->optlevel >= level);
+attr(printf(2, 3))
+static bool opt_debug(struct bfs_opt *opt, const char *format, ...) {
+	if (bfs_debug_prefix(opt->ctx, DEBUG_OPT)) {
+		for (int i = 0; i < opt->depth; ++i) {
+			cfprintf(opt->ctx->cerr, "│ ");
+		}
 
-	if (bfs_debug(state->ctx, DEBUG_OPT, "${cyn}-O%d${rs}: ", level)) {
 		va_list args;
 		va_start(args, format);
-		cvfprintf(state->ctx->cerr, format, args);
+		cvfprintf(opt->ctx->cerr, format, args);
 		va_end(args);
 		return true;
 	} else {
 		return false;
 	}
+}
+
+/** Log a recursive call. */
+attr(printf(2, 3))
+static bool opt_enter(struct bfs_opt *opt, const char *format, ...) {
+	int depth = opt->depth;
+	if (depth > 0) {
+		--opt->depth;
+	}
+
+	bool debug = opt_debug(opt, "%s", depth > 0 ? "├─╮ " : "");
+	if (debug) {
+		va_list args;
+		va_start(args, format);
+		cvfprintf(opt->ctx->cerr, format, args);
+		va_end(args);
+	}
+
+	opt->depth = depth + 1;
+	return debug;
+}
+
+/** Log a recursive return. */
+attr(printf(2, 3))
+static bool opt_leave(struct bfs_opt *opt, const char *format, ...) {
+	bool debug = false;
+	int depth = opt->depth;
+
+	if (format) {
+		if (depth > 1) {
+			opt->depth -= 2;
+		}
+
+		debug = opt_debug(opt, "%s", depth > 1 ? "├─╯ " : "");
+		if (debug) {
+			va_list args;
+			va_start(args, format);
+			cvfprintf(opt->ctx->cerr, format, args);
+			va_end(args);
+		}
+	}
+
+	opt->depth = depth - 1;
+	return debug;
+}
+
+/** Log a shallow visit. */
+attr(printf(2, 3))
+static bool opt_visit(struct bfs_opt *opt, const char *format, ...) {
+	int depth = opt->depth;
+	if (depth > 0) {
+		--opt->depth;
+	}
+
+	bool debug = opt_debug(opt, "%s", depth > 0 ? "├─◯ " : "");
+	if (debug) {
+		va_list args;
+		va_start(args, format);
+		cvfprintf(opt->ctx->cerr, format, args);
+		va_end(args);
+	}
+
+	opt->depth = depth;
+	return debug;
+}
+
+/** Log the deletion of an expression. */
+attr(printf(2, 3))
+static bool opt_delete(struct bfs_opt *opt, const char *format, ...) {
+	int depth = opt->depth;
+
+	if (depth > 0) {
+		--opt->depth;
+	}
+
+	bool debug = opt_debug(opt, "%s", depth > 0 ? "├─✘ " : "");
+	if (debug) {
+		va_list args;
+		va_start(args, format);
+		cvfprintf(opt->ctx->cerr, format, args);
+		va_end(args);
+	}
+
+	opt->depth = depth;
+	return debug;
+}
+
+typedef bool dump_fn(struct bfs_opt *opt, const char *format, ...);
+
+/** Print a df_pred. */
+static void pred_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain *value, enum pred_type type) {
+	dump(opt, "${blu}%s${rs}: ", pred_type_name(type));
+
+	FILE *file = opt->ctx->cerr->file;
+	switch (value->preds[type]) {
+	case PRED_BOTTOM:
+		fprintf(file, "⊥\n");
+		break;
+	case PRED_TOP:
+		fprintf(file, "⊤\n");
+		break;
+	case PRED_TRUE:
+		fprintf(file, "true\n");
+		break;
+	case PRED_FALSE:
+		fprintf(file, "false\n");
+		break;
+	}
+}
+
+/** Print a df_range. */
+static void range_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain *value, enum range_type type) {
+	dump(opt, "${blu}%s${rs}: ", range_type_name(type));
+
+	FILE *file = opt->ctx->cerr->file;
+	const struct df_range *range = &value->ranges[type];
+	if (range_is_bottom(range)) {
+		fprintf(file, "⊥\n");
+	} else if (range_is_top(range)) {
+		fprintf(file, "⊤\n");
+	} else if (range->min == range->max) {
+		fprintf(file, "%lld\n", range->min);
+	} else {
+		if (range->min == LLONG_MIN) {
+			fprintf(file, "(-∞, ");
+		} else {
+			fprintf(file, "[%lld, ", range->min);
+		}
+		if (range->max == LLONG_MAX) {
+			fprintf(file, "∞)\n");
+		} else {
+			fprintf(file, "%lld]\n", range->max);
+		}
+	}
+}
+
+/** Print a set of types. */
+static void types_dump(dump_fn *dump, struct bfs_opt *opt, const char *name, unsigned int types) {
+	dump(opt, "${blu}%s${rs}: ", name);
+
+	FILE *file = opt->ctx->cerr->file;
+	if (types == 0) {
+		fprintf(file, " ⊥\n");
+	} else if (types == ~0U) {
+		fprintf(file, " ⊤\n");
+	} else if (count_ones(types) < count_ones(~types)) {
+		fprintf(file, " 0x%X\n", types);
+	} else {
+		fprintf(file, "~0x%X\n", ~types);
+	}
+}
+
+/** Calculate the number of lines of df_dump() output. */
+static int df_dump_lines(const struct df_domain *value) {
+	int lines = 0;
+
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		lines += value->preds[i] != PRED_TOP;
+	}
+
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		lines += !range_is_top(&value->ranges[i]);
+	}
+
+	lines += value->types != ~0U;
+	lines += value->xtypes != ~0U;
+
+	return lines;
+}
+
+/** Get the right debugging function for a df_dump() line. */
+static dump_fn *df_dump_line(int lines, int *line) {
+	++*line;
+
+	if (lines == 1) {
+		return opt_visit;
+	} else if (*line == 1) {
+		return opt_enter;
+	} else if (*line == lines) {
+		return opt_leave;
+	} else {
+		return opt_debug;
+	}
+}
+
+/** Print a data flow value. */
+static void df_dump(struct bfs_opt *opt, const char *str, const struct df_domain *value) {
+	if (df_is_bottom(value)) {
+		opt_debug(opt, "%s: ⊥\n", str);
+		return;
+	} else if (df_is_top(value)) {
+		opt_debug(opt, "%s: ⊤\n", str);
+		return;
+	}
+
+	if (!opt_debug(opt, "%s:\n", str)) {
+		return;
+	}
+
+	int lines = df_dump_lines(value);
+	int line = 0;
+
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		if (value->preds[i] != PRED_TOP) {
+			pred_dump(df_dump_line(lines, &line), opt, value, i);
+		}
+	}
+
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		if (!range_is_top(&value->ranges[i])) {
+			range_dump(df_dump_line(lines, &line), opt, value, i);
+		}
+	}
+
+	if (value->types != ~0U) {
+		types_dump(df_dump_line(lines, &line), opt, "-type", value->types);
+	}
+
+	if (value->xtypes != ~0U) {
+		types_dump(df_dump_line(lines, &line), opt, "-xtype", value->xtypes);
+	}
+}
+
+/** Check if an expression is constant. */
+static bool is_const(const struct bfs_expr *expr) {
+	return expr->eval_fn == eval_true || expr->eval_fn == eval_false;
 }
 
 /** Warn about an expression. */
-BFS_FORMATTER(3, 4)
-static void opt_warning(const struct opt_state *state, const struct bfs_expr *expr, const char *format, ...) {
-	if (bfs_expr_warning(state->ctx, expr)) {
+attr(printf(3, 4))
+static void opt_warning(const struct bfs_opt *opt, const struct bfs_expr *expr, const char *format, ...) {
+	if (!opt->warn) {
+		return;
+	}
+
+	if (bfs_expr_is_parent(expr) || is_const(expr)) {
+		return;
+	}
+
+	if (bfs_expr_warning(opt->ctx, expr)) {
 		va_list args;
 		va_start(args, format);
-		bfs_warning(state->ctx, format, args);
+		bfs_vwarning(opt->ctx, format, args);
 		va_end(args);
 	}
 }
 
-/** Extract a child expression, freeing the outer expression. */
-static struct bfs_expr *extract_child_expr(struct bfs_expr *expr, struct bfs_expr **child) {
-	struct bfs_expr *ret = *child;
-	*child = NULL;
-	bfs_expr_free(expr);
-	return ret;
+/** Remove and return an expression's children. */
+static void foster_children(struct bfs_expr *expr, struct bfs_exprs *children) {
+	bfs_assert(bfs_expr_is_parent(expr));
+
+	SLIST_INIT(children);
+	SLIST_EXTEND(children, &expr->children);
+
+	expr->persistent_fds = 0;
+	expr->ephemeral_fds = 0;
+	expr->pure = true;
 }
 
-/**
- * Negate an expression.
- */
-static struct bfs_expr *negate_expr(struct bfs_expr *rhs, char **argv) {
-	if (rhs->eval_fn == eval_not) {
-		return extract_child_expr(rhs, &rhs->rhs);
-	}
-
-	struct bfs_expr *expr = bfs_expr_new(eval_not, 1, argv);
-	if (!expr) {
-		bfs_expr_free(rhs);
-		return NULL;
-	}
-
-	if (argv == &fake_not_arg) {
-		expr->synthetic = true;
-	}
-
-	expr->lhs = NULL;
-	expr->rhs = rhs;
-	return expr;
+/** Return an expression's only child. */
+static struct bfs_expr *only_child(struct bfs_expr *expr) {
+	bfs_assert(bfs_expr_is_parent(expr));
+	struct bfs_expr *child = bfs_expr_children(expr);
+	bfs_assert(child && !child->next);
+	return child;
 }
 
-static struct bfs_expr *optimize_not_expr(const struct opt_state *state, struct bfs_expr *expr);
-static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct bfs_expr *expr);
-static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct bfs_expr *expr);
-
-/**
- * Apply De Morgan's laws.
- */
-static struct bfs_expr *de_morgan(const struct opt_state *state, struct bfs_expr *expr, char **argv) {
-	bool debug = opt_debug(state, 1, "De Morgan's laws: %pe ", expr);
-
-	struct bfs_expr *parent = negate_expr(expr, argv);
-	if (!parent) {
-		return NULL;
-	}
-
-	bool has_parent = true;
-	if (parent->eval_fn != eval_not) {
-		expr = parent;
-		has_parent = false;
-	}
-
-	assert(expr->eval_fn == eval_and || expr->eval_fn == eval_or);
-	if (expr->eval_fn == eval_and) {
-		expr->eval_fn = eval_or;
-		expr->argv = &fake_or_arg;
-	} else {
-		expr->eval_fn = eval_and;
-		expr->argv = &fake_and_arg;
-	}
-	expr->synthetic = true;
-
-	expr->lhs = negate_expr(expr->lhs, argv);
-	expr->rhs = negate_expr(expr->rhs, argv);
-	if (!expr->lhs || !expr->rhs) {
-		bfs_expr_free(parent);
-		return NULL;
-	}
-
-	if (debug) {
-		cfprintf(state->ctx->cerr, "<==> %pe\n", parent);
-	}
-
-	if (expr->lhs->eval_fn == eval_not) {
-		expr->lhs = optimize_not_expr(state, expr->lhs);
-	}
-	if (expr->rhs->eval_fn == eval_not) {
-		expr->rhs = optimize_not_expr(state, expr->rhs);
-	}
-	if (!expr->lhs || !expr->rhs) {
-		bfs_expr_free(parent);
-		return NULL;
-	}
-
-	if (expr->eval_fn == eval_and) {
-		expr = optimize_and_expr(state, expr);
-	} else {
-		expr = optimize_or_expr(state, expr);
-	}
-	if (has_parent) {
-		parent->rhs = expr;
-	} else {
-		parent = expr;
-	}
-	if (!expr) {
-		bfs_expr_free(parent);
-		return NULL;
-	}
-
-	if (has_parent) {
-		parent = optimize_not_expr(state, parent);
-	}
-	return parent;
+/** Foster an expression's only child. */
+static struct bfs_expr *foster_only_child(struct bfs_expr *expr) {
+	struct bfs_expr *child = only_child(expr);
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+	return child;
 }
 
-/** Optimize an expression recursively. */
-static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct bfs_expr *expr);
+/** An expression visitor. */
+struct visitor;
 
-/**
- * Optimize a negation.
- */
-static struct bfs_expr *optimize_not_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_not);
+/** An expression-visiting function. */
+typedef struct bfs_expr *visit_fn(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor);
 
-	struct bfs_expr *rhs = expr->rhs;
+/** An entry in a visitor lookup table. */
+struct visitor_table {
+	/** The evaluation function to match on. */
+	bfs_eval_fn *eval_fn;
+	/** The visitor function. */
+	visit_fn *visit;
+};
 
-	int optlevel = state->ctx->optlevel;
-	if (optlevel >= 1) {
-		if (rhs == &bfs_true) {
-			opt_debug(state, 1, "constant propagation: %pe <==> %pe\n", expr, &bfs_false);
-			bfs_expr_free(expr);
-			return &bfs_false;
-		} else if (rhs == &bfs_false) {
-			opt_debug(state, 1, "constant propagation: %pe <==> %pe\n", expr, &bfs_true);
-			bfs_expr_free(expr);
-			return &bfs_true;
-		} else if (rhs->eval_fn == eval_not) {
-			opt_debug(state, 1, "double negation: %pe <==> %pe\n", expr, rhs->rhs);
-			return extract_child_expr(expr, &rhs->rhs);
-		} else if (bfs_expr_never_returns(rhs)) {
-			opt_debug(state, 1, "reachability: %pe <==> %pe\n", expr, rhs);
-			return extract_child_expr(expr, &expr->rhs);
-		} else if ((rhs->eval_fn == eval_and || rhs->eval_fn == eval_or)
-			   && (rhs->lhs->eval_fn == eval_not || rhs->rhs->eval_fn == eval_not)) {
-			return de_morgan(state, expr, expr->argv);
+/** Look up a visitor in a table. */
+static visit_fn *look_up_visitor(const struct bfs_expr *expr, const struct visitor_table table[]) {
+	for (size_t i = 0; table[i].eval_fn; ++i) {
+		if (expr->eval_fn == table[i].eval_fn) {
+			return table[i].visit;
 		}
 	}
 
-	expr->pure = rhs->pure;
-	expr->always_true = rhs->always_false;
-	expr->always_false = rhs->always_true;
-	expr->cost = rhs->cost;
-	expr->probability = 1.0 - rhs->probability;
-
-	return expr;
-}
-
-/** Optimize a negation recursively. */
-static struct bfs_expr *optimize_not_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
-	struct opt_state rhs_state = *state;
-	expr->rhs = optimize_expr_recursive(&rhs_state, expr->rhs);
-	if (!expr->rhs) {
-		goto fail;
-	}
-
-	state->facts_when_true = rhs_state.facts_when_false;
-	state->facts_when_false = rhs_state.facts_when_true;
-
-	return optimize_not_expr(state, expr);
-
-fail:
-	bfs_expr_free(expr);
 	return NULL;
 }
 
-/** Optimize a conjunction. */
-static struct bfs_expr *optimize_and_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_and);
+struct visitor {
+	/** The name of this visitor. */
+	const char *name;
 
-	struct bfs_expr *lhs = expr->lhs;
-	struct bfs_expr *rhs = expr->rhs;
+	/** A function to call before visiting children. */
+	visit_fn *enter;
+	/** The default visitor. */
+	visit_fn *visit;
+	/** A function to call after visiting children. */
+	visit_fn *leave;
 
-	const struct bfs_ctx *ctx = state->ctx;
-	int optlevel = ctx->optlevel;
-	if (optlevel >= 1) {
-		if (lhs == &bfs_true) {
-			opt_debug(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, rhs);
-			return extract_child_expr(expr, &expr->rhs);
-		} else if (rhs == &bfs_true) {
-			opt_debug(state, 1, "conjunction elimination: %pe <==> %pe\n", expr, lhs);
-			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs->always_false) {
-			opt_debug(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
-			opt_warning(state, expr->rhs, "This expression is unreachable.\n\n");
-			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs->always_true && rhs == &bfs_false) {
-			bool debug = opt_debug(state, 1, "strength reduction: %pe <==> ", expr);
-			struct bfs_expr *ret = extract_child_expr(expr, &expr->lhs);
-			ret = negate_expr(ret, &fake_not_arg);
-			if (debug && ret) {
-				cfprintf(ctx->cerr, "%pe\n", ret);
-			}
-			return ret;
-		} else if (optlevel >= 2 && lhs->pure && rhs == &bfs_false) {
-			opt_debug(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
-			opt_warning(state, expr->lhs, "The result of this expression is ignored.\n\n");
-			return extract_child_expr(expr, &expr->rhs);
-		} else if (lhs->eval_fn == eval_not && rhs->eval_fn == eval_not) {
-			return de_morgan(state, expr, expr->lhs->argv);
-		}
+	/** A visitor lookup table. */
+	const struct visitor_table *table;
+};
+
+/** Recursive visitor implementation. */
+static struct bfs_expr *visit_deep(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor);
+
+/** Visit a negation. */
+static struct bfs_expr *visit_not(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_expr *rhs = foster_only_child(expr);
+
+	struct bfs_opt nested = *opt;
+	rhs = visit_deep(&nested, rhs, visitor);
+	if (!rhs) {
+		return NULL;
 	}
 
-	expr->pure = lhs->pure && rhs->pure;
-	expr->always_true = lhs->always_true && rhs->always_true;
-	expr->always_false = lhs->always_false || rhs->always_false;
-	expr->cost = lhs->cost + lhs->probability*rhs->cost;
-	expr->probability = lhs->probability*rhs->probability;
+	opt->after_true = nested.after_false;
+	opt->after_false = nested.after_true;
 
+	bfs_expr_append(expr, rhs);
 	return expr;
 }
 
-/** Optimize a conjunction recursively. */
-static struct bfs_expr *optimize_and_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
-	struct opt_state lhs_state = *state;
-	expr->lhs = optimize_expr_recursive(&lhs_state, expr->lhs);
-	if (!expr->lhs) {
-		goto fail;
-	}
+/** Visit a conjunction. */
+static struct bfs_expr *visit_and(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_exprs children;
+	foster_children(expr, &children);
 
-	struct opt_state rhs_state = *state;
-	rhs_state.facts = lhs_state.facts_when_true;
-	expr->rhs = optimize_expr_recursive(&rhs_state, expr->rhs);
-	if (!expr->rhs) {
-		goto fail;
-	}
+	// Base case (-and) == (-true)
+	df_init_bottom(&opt->after_false);
+	struct bfs_opt nested = *opt;
 
-	state->facts_when_true = rhs_state.facts_when_true;
-	facts_union(&state->facts_when_false, &lhs_state.facts_when_false, &rhs_state.facts_when_false);
+	while (!SLIST_EMPTY(&children)) {
+		struct bfs_expr *child = SLIST_POP(&children);
 
-	return optimize_and_expr(state, expr);
-
-fail:
-	bfs_expr_free(expr);
-	return NULL;
-}
-
-/** Optimize a disjunction. */
-static struct bfs_expr *optimize_or_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_or);
-
-	struct bfs_expr *lhs = expr->lhs;
-	struct bfs_expr *rhs = expr->rhs;
-
-	const struct bfs_ctx *ctx = state->ctx;
-	int optlevel = ctx->optlevel;
-	if (optlevel >= 1) {
-		if (lhs->always_true) {
-			opt_debug(state, 1, "short-circuit: %pe <==> %pe\n", expr, lhs);
-			opt_warning(state, expr->rhs, "This expression is unreachable.\n\n");
-			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs == &bfs_false) {
-			opt_debug(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, rhs);
-			return extract_child_expr(expr, &expr->rhs);
-		} else if (rhs == &bfs_false) {
-			opt_debug(state, 1, "disjunctive syllogism: %pe <==> %pe\n", expr, lhs);
-			return extract_child_expr(expr, &expr->lhs);
-		} else if (lhs->always_false && rhs == &bfs_true) {
-			bool debug = opt_debug(state, 1, "strength reduction: %pe <==> ", expr);
-			struct bfs_expr *ret = extract_child_expr(expr, &expr->lhs);
-			ret = negate_expr(ret, &fake_not_arg);
-			if (debug && ret) {
-				cfprintf(ctx->cerr, "%pe\n", ret);
-			}
-			return ret;
-		} else if (optlevel >= 2 && lhs->pure && rhs == &bfs_true) {
-			opt_debug(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
-			opt_warning(state, expr->lhs, "The result of this expression is ignored.\n\n");
-			return extract_child_expr(expr, &expr->rhs);
-		} else if (lhs->eval_fn == eval_not && rhs->eval_fn == eval_not) {
-			return de_morgan(state, expr, expr->lhs->argv);
-		}
-	}
-
-	expr->pure = lhs->pure && rhs->pure;
-	expr->always_true = lhs->always_true || rhs->always_true;
-	expr->always_false = lhs->always_false && rhs->always_false;
-	expr->cost = lhs->cost + (1 - lhs->probability)*rhs->cost;
-	expr->probability = lhs->probability + rhs->probability - lhs->probability*rhs->probability;
-
-	return expr;
-}
-
-/** Optimize a disjunction recursively. */
-static struct bfs_expr *optimize_or_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
-	struct opt_state lhs_state = *state;
-	expr->lhs = optimize_expr_recursive(&lhs_state, expr->lhs);
-	if (!expr->lhs) {
-		goto fail;
-	}
-
-	struct opt_state rhs_state = *state;
-	rhs_state.facts = lhs_state.facts_when_false;
-	expr->rhs = optimize_expr_recursive(&rhs_state, expr->rhs);
-	if (!expr->rhs) {
-		goto fail;
-	}
-
-	facts_union(&state->facts_when_true, &lhs_state.facts_when_true, &rhs_state.facts_when_true);
-	state->facts_when_false = rhs_state.facts_when_false;
-
-	return optimize_or_expr(state, expr);
-
-fail:
-	bfs_expr_free(expr);
-	return NULL;
-}
-
-/** Optimize an expression in an ignored-result context. */
-static struct bfs_expr *ignore_result(const struct opt_state *state, struct bfs_expr *expr) {
-	int optlevel = state->ctx->optlevel;
-
-	if (optlevel >= 1) {
-		while (true) {
-			if (expr->eval_fn == eval_not) {
-				opt_debug(state, 1, "ignored result: %pe --> %pe\n", expr, expr->rhs);
-				opt_warning(state, expr, "The result of this expression is ignored.\n\n");
-				expr = extract_child_expr(expr, &expr->rhs);
-			} else if (optlevel >= 2
-			           && (expr->eval_fn == eval_and || expr->eval_fn == eval_or || expr->eval_fn == eval_comma)
-			           && expr->rhs->pure) {
-				opt_debug(state, 2, "ignored result: %pe --> %pe\n", expr, expr->lhs);
-				opt_warning(state, expr->rhs, "The result of this expression is ignored.\n\n");
-				expr = extract_child_expr(expr, &expr->lhs);
-			} else {
-				break;
-			}
-		}
-
-		if (optlevel >= 2 && expr->pure && expr != &bfs_false) {
-			opt_debug(state, 2, "ignored result: %pe --> %pe\n", expr, &bfs_false);
-			opt_warning(state, expr, "The result of this expression is ignored.\n\n");
-			bfs_expr_free(expr);
-			expr = &bfs_false;
-		}
-	}
-
-	return expr;
-}
-
-/** Optimize a comma expression. */
-static struct bfs_expr *optimize_comma_expr(const struct opt_state *state, struct bfs_expr *expr) {
-	assert(expr->eval_fn == eval_comma);
-
-	struct bfs_expr *lhs = expr->lhs;
-	struct bfs_expr *rhs = expr->rhs;
-
-	int optlevel = state->ctx->optlevel;
-	if (optlevel >= 1) {
-		lhs = expr->lhs = ignore_result(state, lhs);
-
-		if (bfs_expr_never_returns(lhs)) {
-			opt_debug(state, 1, "reachability: %pe <==> %pe\n", expr, lhs);
-			opt_warning(state, expr->rhs, "This expression is unreachable.\n\n");
-			return extract_child_expr(expr, &expr->lhs);
-		} else if ((lhs->always_true && rhs == &bfs_true)
-			   || (lhs->always_false && rhs == &bfs_false)) {
-			opt_debug(state, 1, "redundancy elimination: %pe <==> %pe\n", expr, lhs);
-			return extract_child_expr(expr, &expr->lhs);
-		} else if (optlevel >= 2 && lhs->pure) {
-			opt_debug(state, 2, "purity: %pe <==> %pe\n", expr, rhs);
-			opt_warning(state, expr->lhs, "The result of this expression is ignored.\n\n");
-			return extract_child_expr(expr, &expr->rhs);
-		}
-	}
-
-	expr->pure = lhs->pure && rhs->pure;
-	expr->always_true = bfs_expr_never_returns(lhs) || rhs->always_true;
-	expr->always_false = bfs_expr_never_returns(lhs) || rhs->always_false;
-	expr->cost = lhs->cost + rhs->cost;
-	expr->probability = rhs->probability;
-
-	return expr;
-}
-
-/** Optimize a comma expression recursively. */
-static struct bfs_expr *optimize_comma_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
-	struct opt_state lhs_state = *state;
-	expr->lhs = optimize_expr_recursive(&lhs_state, expr->lhs);
-	if (!expr->lhs) {
-		goto fail;
-	}
-
-	struct opt_state rhs_state = *state;
-	facts_union(&rhs_state.facts, &lhs_state.facts_when_true, &lhs_state.facts_when_false);
-	expr->rhs = optimize_expr_recursive(&rhs_state, expr->rhs);
-	if (!expr->rhs) {
-		goto fail;
-	}
-
-	return optimize_comma_expr(state, expr);
-
-fail:
-	bfs_expr_free(expr);
-	return NULL;
-}
-
-/** Infer data flow facts about a predicate. */
-static void infer_pred_facts(struct opt_state *state, enum pred_type pred) {
-	constrain_pred(&state->facts_when_true.preds[pred], true);
-	constrain_pred(&state->facts_when_false.preds[pred], false);
-}
-
-/** Infer data flow facts about an -{execut,read,writ}able expression. */
-static void infer_access_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	if (expr->num & R_OK) {
-		infer_pred_facts(state, READABLE_PRED);
-	}
-	if (expr->num & W_OK) {
-		infer_pred_facts(state, WRITABLE_PRED);
-	}
-	if (expr->num & X_OK) {
-		infer_pred_facts(state, EXECUTABLE_PRED);
-	}
-}
-
-/** Infer data flow facts about an icmp-style ([+-]N) expression. */
-static void infer_icmp_facts(struct opt_state *state, const struct bfs_expr *expr, enum range_type type) {
-	struct range *range_when_true = &state->facts_when_true.ranges[type];
-	struct range *range_when_false = &state->facts_when_false.ranges[type];
-	long long value = expr->num;
-
-	switch (expr->int_cmp) {
-	case BFS_INT_EQUAL:
-		constrain_min(range_when_true, value);
-		constrain_max(range_when_true, value);
-		range_remove(range_when_false, value);
-		break;
-
-	case BFS_INT_LESS:
-		constrain_min(range_when_false, value);
-		constrain_max(range_when_true, value);
-		range_remove(range_when_true, value);
-		break;
-
-	case BFS_INT_GREATER:
-		constrain_max(range_when_false, value);
-		constrain_min(range_when_true, value);
-		range_remove(range_when_true, value);
-		break;
-	}
-}
-
-/** Infer data flow facts about a -gid expression. */
-static void infer_gid_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	infer_icmp_facts(state, expr, GID_RANGE);
-
-	struct range *range = &state->facts_when_true.ranges[GID_RANGE];
-	if (range->min == range->max) {
-		gid_t gid = range->min;
-		bool nogroup = !bfs_getgrgid(state->ctx->groups, gid);
-		if (errno == 0) {
-			constrain_pred(&state->facts_when_true.preds[NOGROUP_PRED], nogroup);
-		}
-	}
-}
-
-/** Infer data flow facts about a -uid expression. */
-static void infer_uid_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	infer_icmp_facts(state, expr, UID_RANGE);
-
-	struct range *range = &state->facts_when_true.ranges[UID_RANGE];
-	if (range->min == range->max) {
-		uid_t uid = range->min;
-		bool nouser = !bfs_getpwuid(state->ctx->users, uid);
-		if (errno == 0) {
-			constrain_pred(&state->facts_when_true.preds[NOUSER_PRED], nouser);
-		}
-	}
-}
-
-/** Infer data flow facts about a -samefile expression. */
-static void infer_samefile_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	struct range *range_when_true = &state->facts_when_true.ranges[INUM_RANGE];
-	constrain_min(range_when_true, expr->ino);
-	constrain_max(range_when_true, expr->ino);
-}
-
-/** Infer data flow facts about a -type expression. */
-static void infer_type_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	state->facts_when_true.types &= expr->num;
-	state->facts_when_false.types &= ~expr->num;
-}
-
-/** Infer data flow facts about an -xtype expression. */
-static void infer_xtype_facts(struct opt_state *state, const struct bfs_expr *expr) {
-	state->facts_when_true.xtypes &= expr->num;
-	state->facts_when_false.xtypes &= ~expr->num;
-}
-
-static struct bfs_expr *optimize_expr_recursive(struct opt_state *state, struct bfs_expr *expr) {
-	int optlevel = state->ctx->optlevel;
-
-	state->facts_when_true = state->facts;
-	state->facts_when_false = state->facts;
-
-	if (optlevel >= 2 && facts_are_impossible(&state->facts)) {
-		opt_debug(state, 2, "reachability: %pe --> %pe\n", expr, &bfs_false);
-		opt_warning(state, expr, "This expression is unreachable.\n\n");
-		bfs_expr_free(expr);
-		expr = &bfs_false;
-		goto done;
-	}
-
-	if (!bfs_expr_has_children(expr) && !expr->pure) {
-		facts_union(state->facts_when_impure, state->facts_when_impure, &state->facts);
-	}
-
-	if (expr->eval_fn == eval_access) {
-		infer_access_facts(state, expr);
-	} else if (expr->eval_fn == eval_acl) {
-		infer_pred_facts(state, ACL_PRED);
-	} else if (expr->eval_fn == eval_capable) {
-		infer_pred_facts(state, CAPABLE_PRED);
-	} else if (expr->eval_fn == eval_depth) {
-		infer_icmp_facts(state, expr, DEPTH_RANGE);
-	} else if (expr->eval_fn == eval_empty) {
-		infer_pred_facts(state, EMPTY_PRED);
-	} else if (expr->eval_fn == eval_gid) {
-		infer_gid_facts(state, expr);
-	} else if (expr->eval_fn == eval_hidden) {
-		infer_pred_facts(state, HIDDEN_PRED);
-	} else if (expr->eval_fn == eval_inum) {
-		infer_icmp_facts(state, expr, INUM_RANGE);
-	} else if (expr->eval_fn == eval_links) {
-		infer_icmp_facts(state, expr, LINKS_RANGE);
-	} else if (expr->eval_fn == eval_nogroup) {
-		infer_pred_facts(state, NOGROUP_PRED);
-	} else if (expr->eval_fn == eval_nouser) {
-		infer_pred_facts(state, NOUSER_PRED);
-	} else if (expr->eval_fn == eval_samefile) {
-		infer_samefile_facts(state, expr);
-	} else if (expr->eval_fn == eval_size) {
-		infer_icmp_facts(state, expr, SIZE_RANGE);
-	} else if (expr->eval_fn == eval_sparse) {
-		infer_pred_facts(state, SPARSE_PRED);
-	} else if (expr->eval_fn == eval_type) {
-		infer_type_facts(state, expr);
-	} else if (expr->eval_fn == eval_uid) {
-		infer_uid_facts(state, expr);
-	} else if (expr->eval_fn == eval_xattr) {
-		infer_pred_facts(state, XATTR_PRED);
-	} else if (expr->eval_fn == eval_xtype) {
-		infer_xtype_facts(state, expr);
-	} else if (expr->eval_fn == eval_not) {
-		expr = optimize_not_expr_recursive(state, expr);
-	} else if (expr->eval_fn == eval_and) {
-		expr = optimize_and_expr_recursive(state, expr);
-	} else if (expr->eval_fn == eval_or) {
-		expr = optimize_or_expr_recursive(state, expr);
-	} else if (expr->eval_fn == eval_comma) {
-		expr = optimize_comma_expr_recursive(state, expr);
-	}
-
-	if (!expr) {
-		goto done;
-	}
-
-	if (bfs_expr_has_children(expr)) {
-		struct bfs_expr *lhs = expr->lhs;
-		struct bfs_expr *rhs = expr->rhs;
-		if (rhs) {
-			expr->persistent_fds = rhs->persistent_fds;
-			expr->ephemeral_fds = rhs->ephemeral_fds;
-		}
-		if (lhs) {
-			expr->persistent_fds += lhs->persistent_fds;
-			if (lhs->ephemeral_fds > expr->ephemeral_fds) {
-				expr->ephemeral_fds = lhs->ephemeral_fds;
-			}
-		}
-	}
-
-	if (expr->always_true) {
-		set_facts_impossible(&state->facts_when_false);
-	}
-	if (expr->always_false) {
-		set_facts_impossible(&state->facts_when_true);
-	}
-
-	if (optlevel < 2 || expr == &bfs_true || expr == &bfs_false) {
-		goto done;
-	}
-
-	if (facts_are_impossible(&state->facts_when_true)) {
-		if (expr->pure) {
-			opt_debug(state, 2, "data flow: %pe --> %pe\n", expr, &bfs_false);
-			opt_warning(state, expr, "This expression is always false.\n\n");
-			bfs_expr_free(expr);
-			expr = &bfs_false;
+		if (SLIST_EMPTY(&children)) {
+			nested.ignore_result = opt->ignore_result;
 		} else {
-			expr->always_false = true;
-			expr->probability = 0.0;
+			nested.ignore_result = false;
 		}
-	} else if (facts_are_impossible(&state->facts_when_false)) {
-		if (expr->pure) {
-			opt_debug(state, 2, "data flow: %pe --> %pe\n", expr, &bfs_true);
-			opt_warning(state, expr, "This expression is always true.\n\n");
-			bfs_expr_free(expr);
-			expr = &bfs_true;
-		} else {
-			expr->always_true = true;
-			expr->probability = 1.0;
+
+		child = visit_deep(&nested, child, visitor);
+		if (!child) {
+			return NULL;
 		}
+
+		df_join(&opt->after_false, &nested.after_false);
+		nested.before = nested.after_true;
+
+		bfs_expr_append(expr, child);
 	}
 
-done:
+	opt->after_true = nested.after_true;
+
 	return expr;
 }
 
-/** Swap the children of a binary expression if it would reduce the cost. */
-static bool reorder_expr(const struct opt_state *state, struct bfs_expr *expr, float swapped_cost) {
-	if (swapped_cost < expr->cost) {
-		bool debug = opt_debug(state, 3, "cost: %pe <==> ", expr);
-		struct bfs_expr *lhs = expr->lhs;
-		expr->lhs = expr->rhs;
-		expr->rhs = lhs;
-		if (debug) {
-			cfprintf(state->ctx->cerr, "%pe (~${ylw}%g${rs} --> ~${ylw}%g${rs})\n", expr, expr->cost, swapped_cost);
+/** Visit a disjunction. */
+static struct bfs_expr *visit_or(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	// Base case (-or) == (-false)
+	df_init_bottom(&opt->after_true);
+	struct bfs_opt nested = *opt;
+
+	while (!SLIST_EMPTY(&children)) {
+		struct bfs_expr *child = SLIST_POP(&children);
+
+		if (SLIST_EMPTY(&children)) {
+			nested.ignore_result = opt->ignore_result;
+		} else {
+			nested.ignore_result = false;
 		}
-		expr->cost = swapped_cost;
-		return true;
-	} else {
-		return false;
+
+		child = visit_deep(&nested, child, visitor);
+		if (!child) {
+			return NULL;
+		}
+
+		df_join(&opt->after_true, &nested.after_true);
+		nested.before = nested.after_false;
+
+		bfs_expr_append(expr, child);
 	}
+
+	opt->after_false = nested.after_false;
+
+	return expr;
 }
 
-/**
- * Recursively reorder sub-expressions to reduce the overall cost.
- *
- * @param expr
- *         The expression to optimize.
- * @return
- *         Whether any subexpression was reordered.
- */
-static bool reorder_expr_recursive(const struct opt_state *state, struct bfs_expr *expr) {
-	if (!bfs_expr_has_children(expr)) {
-		return false;
-	}
+/** Visit a comma expression. */
+static struct bfs_expr *visit_comma(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_exprs children;
+	foster_children(expr, &children);
 
-	struct bfs_expr *lhs = expr->lhs;
-	struct bfs_expr *rhs = expr->rhs;
+	struct bfs_opt nested = *opt;
 
-	bool ret = false;
-	if (lhs) {
-		ret |= reorder_expr_recursive(state, lhs);
-	}
-	if (rhs) {
-		ret |= reorder_expr_recursive(state, rhs);
-	}
+	while (!SLIST_EMPTY(&children)) {
+		struct bfs_expr *child = SLIST_POP(&children);
 
-	if (expr->eval_fn == eval_and || expr->eval_fn == eval_or) {
-		if (lhs->pure && rhs->pure) {
-			float rhs_prob = expr->eval_fn == eval_and ? rhs->probability : 1.0 - rhs->probability;
-			float swapped_cost = rhs->cost + rhs_prob*lhs->cost;
-			ret |= reorder_expr(state, expr, swapped_cost);
+		if (SLIST_EMPTY(&children)) {
+			nested.ignore_result = opt->ignore_result;
+		} else {
+			nested.ignore_result = true;
 		}
+
+		child = visit_deep(&nested, child, visitor);
+		if (!child) {
+			return NULL;
+		}
+
+		nested.before = nested.after_true;
+		df_join(&nested.before, &nested.after_false);
+
+		bfs_expr_append(expr, child);
 	}
 
-	return ret;
+	opt->after_true = nested.after_true;
+	opt->after_false = nested.after_false;
+
+	return expr;
 }
 
-/**
- * Optimize a top-level expression.
- */
-static struct bfs_expr *optimize_expr(struct opt_state *state, struct bfs_expr *expr) {
-	struct opt_facts saved_impure = *state->facts_when_impure;
+/** Default enter() function. */
+static struct bfs_expr *visit_enter(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt_enter(opt, "%pe\n", expr);
+	opt->after_true = opt->before;
+	opt->after_false = opt->before;
+	return expr;
+}
 
-	expr = optimize_expr_recursive(state, expr);
-	if (!expr) {
-		return NULL;
-	}
+/** Default leave() function. */
+static struct bfs_expr *visit_leave(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt_leave(opt, "%pe\n", expr);
+	return expr;
+}
 
-	if (state->ctx->optlevel >= 3 && reorder_expr_recursive(state, expr)) {
-		// Re-do optimizations to account for the new ordering
-		*state->facts_when_impure = saved_impure;
-		expr = optimize_expr_recursive(state, expr);
+static struct bfs_expr *visit_deep(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	bool entered = false;
+
+	visit_fn *enter = visitor->enter ? visitor->enter : visit_enter;
+	visit_fn *leave = visitor->leave ? visitor->leave : visit_leave;
+
+	static const struct visitor_table table[] = {
+		{eval_not, visit_not},
+		{eval_and, visit_and},
+		{eval_or, visit_or},
+		{eval_comma, visit_comma},
+		{NULL, NULL},
+	};
+	visit_fn *recursive = look_up_visitor(expr, table);
+	if (recursive) {
+		if (!entered) {
+			expr = enter(opt, expr, visitor);
+			if (!expr) {
+				return NULL;
+			}
+			entered = true;
+		}
+
+		expr = recursive(opt, expr, visitor);
 		if (!expr) {
 			return NULL;
 		}
 	}
 
+	visit_fn *general = visitor->visit;
+	if (general) {
+		if (!entered) {
+			expr = enter(opt, expr, visitor);
+			if (!expr) {
+				return NULL;
+			}
+			entered = true;
+		}
+
+		expr = general(opt, expr, visitor);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
+	visit_fn *specific = look_up_visitor(expr, visitor->table);
+	if (specific) {
+		if (!entered) {
+			expr = enter(opt, expr, visitor);
+			if (!expr) {
+				return NULL;
+			}
+			entered = true;
+		}
+
+		expr = specific(opt, expr, visitor);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
+	if (entered) {
+		expr = leave(opt, expr, visitor);
+	} else {
+		opt_visit(opt, "%pe\n", expr);
+	}
+
 	return expr;
+}
+
+/** Visit an expression recursively. */
+static struct bfs_expr *visit(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt_enter(opt, "%s()\n", visitor->name);
+	expr = visit_deep(opt, expr, visitor);
+	opt_leave(opt, "\n");
+	return expr;
+}
+
+/** Visit an expression non-recursively. */
+static struct bfs_expr *visit_shallow(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	visit_fn *general = visitor->visit;
+	if (expr && general) {
+		expr = general(opt, expr, visitor);
+	}
+
+	if (!expr) {
+		return NULL;
+	}
+
+	visit_fn *specific = look_up_visitor(expr, visitor->table);
+	if (specific) {
+		expr = specific(opt, expr, visitor);
+	}
+
+	return expr;
+}
+
+/** Annotate -{execut,read,writ}able. */
+static struct bfs_expr *annotate_access(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	expr->probability = 1.0;
+	if (expr->num & R_OK) {
+		expr->probability *= 0.99;
+	}
+	if (expr->num & W_OK) {
+		expr->probability *= 0.8;
+	}
+	if (expr->num & X_OK) {
+		expr->probability *= 0.2;
+	}
+
+	return expr;
+}
+
+/** Annotate -empty. */
+static struct bfs_expr *annotate_empty(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (opt->level >= 4) {
+		// Since -empty attempts to open and read directories, it may
+		// have side effects such as reporting permission errors, and
+		// thus shouldn't be re-ordered without aggressive optimizations
+		expr->pure = true;
+	}
+
+	return expr;
+}
+
+/** Annotate -exec. */
+static struct bfs_expr *annotate_exec(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (expr->exec->flags & BFS_EXEC_MULTI) {
+		expr->always_true = true;
+	} else {
+		expr->cost = 1000000.0;
+	}
+
+	return expr;
+}
+
+/** Annotate -name/-lname/-path. */
+static struct bfs_expr *annotate_fnmatch(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (expr->literal) {
+		expr->probability = 0.1;
+	} else {
+		expr->probability = 0.5;
+	}
+
+	return expr;
+}
+
+/** Annotate -f?print. */
+static struct bfs_expr *annotate_fprint(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	const struct colors *colors = expr->cfile->colors;
+	expr->calls_stat = colors && colors_need_stat(colors);
+	return expr;
+}
+
+/** Estimate probability for -x?type. */
+static void estimate_type_probability(struct bfs_expr *expr) {
+	unsigned int types = expr->num;
+
+	expr->probability = 0.0;
+	if (types & (1 << BFS_BLK)) {
+		expr->probability += 0.00000721183;
+	}
+	if (types & (1 << BFS_CHR)) {
+		expr->probability += 0.0000499855;
+	}
+	if (types & (1 << BFS_DIR)) {
+		expr->probability += 0.114475;
+	}
+	if (types & (1 << BFS_DOOR)) {
+		expr->probability += 0.000001;
+	}
+	if (types & (1 << BFS_FIFO)) {
+		expr->probability += 0.00000248684;
+	}
+	if (types & (1 << BFS_REG)) {
+		expr->probability += 0.859772;
+	}
+	if (types & (1 << BFS_LNK)) {
+		expr->probability += 0.0256816;
+	}
+	if (types & (1 << BFS_SOCK)) {
+		expr->probability += 0.0000116881;
+	}
+	if (types & (1 << BFS_WHT)) {
+		expr->probability += 0.000001;
+	}
+}
+
+/** Annotate -type. */
+static struct bfs_expr *annotate_type(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	estimate_type_probability(expr);
+	return expr;
+}
+
+/** Annotate -xtype. */
+static struct bfs_expr *annotate_xtype(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (opt->level >= 4) {
+		// Since -xtype dereferences symbolic links, it may have side
+		// effects such as reporting permission errors, and thus
+		// shouldn't be re-ordered without aggressive optimizations
+		expr->pure = true;
+	}
+
+	estimate_type_probability(expr);
+	return expr;
+}
+
+/** Annotate a negation. */
+static struct bfs_expr *annotate_not(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_expr *rhs = only_child(expr);
+	expr->pure = rhs->pure;
+	expr->always_true = rhs->always_false;
+	expr->always_false = rhs->always_true;
+	expr->cost = rhs->cost;
+	expr->probability = 1.0 - rhs->probability;
+	return expr;
+}
+
+/** Annotate a conjunction. */
+static struct bfs_expr *annotate_and(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	expr->pure = true;
+	expr->always_true = true;
+	expr->always_false = false;
+	expr->cost = 0.0;
+	expr->probability = 1.0;
+
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		expr->pure &= child->pure;
+		expr->always_true &= child->always_true;
+		expr->always_false |= child->always_false;
+		expr->cost += expr->probability * child->cost;
+		expr->probability *= child->probability;
+	}
+
+	return expr;
+}
+
+/** Annotate a disjunction. */
+static struct bfs_expr *annotate_or(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	expr->pure = true;
+	expr->always_true = false;
+	expr->always_false = true;
+	expr->cost = 0.0;
+
+	float false_prob = 1.0;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		expr->pure &= child->pure;
+		expr->always_true |= child->always_true;
+		expr->always_false &= child->always_false;
+		expr->cost += false_prob * child->cost;
+		false_prob *= (1.0 - child->probability);
+	}
+	expr->probability = 1.0 - false_prob;
+
+	return expr;
+}
+
+/** Annotate a comma expression. */
+static struct bfs_expr *annotate_comma(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	expr->pure = true;
+	expr->cost = 0.0;
+
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		expr->pure &= child->pure;
+		expr->always_true = child->always_true;
+		expr->always_false = child->always_false;
+		expr->cost += child->cost;
+		expr->probability = child->probability;
+	}
+
+	return expr;
+}
+
+/** Annotate an arbitrary expression. */
+static struct bfs_expr *annotate_visit(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	/** Table of pure expressions. */
+	static bfs_eval_fn *const pure[] = {
+		eval_access,
+		eval_acl,
+		eval_capable,
+		eval_depth,
+		eval_false,
+		eval_flags,
+		eval_fstype,
+		eval_gid,
+		eval_hidden,
+		eval_inum,
+		eval_links,
+		eval_lname,
+		eval_name,
+		eval_newer,
+		eval_nogroup,
+		eval_nouser,
+		eval_path,
+		eval_perm,
+		eval_regex,
+		eval_samefile,
+		eval_size,
+		eval_sparse,
+		eval_time,
+		eval_true,
+		eval_type,
+		eval_uid,
+		eval_used,
+		eval_xattr,
+		eval_xattrname,
+	};
+
+	expr->pure = false;
+	for (size_t i = 0; i < countof(pure); ++i) {
+		if (expr->eval_fn == pure[i]) {
+			expr->pure = true;
+			break;
+		}
+	}
+
+	/** Table of always-true expressions. */
+	static bfs_eval_fn *const always_true[] = {
+		eval_fls,
+		eval_fprint,
+		eval_fprint0,
+		eval_fprintf,
+		eval_fprintx,
+		eval_limit,
+		eval_prune,
+		eval_true,
+		// Non-returning
+		eval_exit,
+		eval_quit,
+	};
+
+	expr->always_true = false;
+	for (size_t i = 0; i < countof(always_true); ++i) {
+		if (expr->eval_fn == always_true[i]) {
+			expr->always_true = true;
+			break;
+		}
+	}
+
+	/** Table of always-false expressions. */
+	static bfs_eval_fn *const always_false[] = {
+		eval_false,
+		// Non-returning
+		eval_exit,
+		eval_quit,
+	};
+
+	expr->always_false = false;
+	for (size_t i = 0; i < countof(always_false); ++i) {
+		if (expr->eval_fn == always_false[i]) {
+			expr->always_false = true;
+			break;
+		}
+	}
+
+	/** Table of stat-calling primaries. */
+	static bfs_eval_fn *const calls_stat[] = {
+		eval_empty,
+		eval_flags,
+		eval_fls,
+		eval_fprintf,
+		eval_fstype,
+		eval_gid,
+		eval_inum,
+		eval_links,
+		eval_newer,
+		eval_nogroup,
+		eval_nouser,
+		eval_perm,
+		eval_samefile,
+		eval_size,
+		eval_sparse,
+		eval_time,
+		eval_uid,
+		eval_used,
+		eval_xattr,
+		eval_xattrname,
+	};
+
+	expr->calls_stat = false;
+	for (size_t i = 0; i < countof(calls_stat); ++i) {
+		if (expr->eval_fn == calls_stat[i]) {
+			expr->calls_stat = true;
+			break;
+		}
+	}
+
+#define FAST_COST       40.0
+#define FNMATCH_COST   400.0
+#define STAT_COST     1000.0
+#define PRINT_COST   20000.0
+
+	/** Table of expression costs. */
+	static const struct {
+		bfs_eval_fn *eval_fn;
+		float cost;
+	} costs[] = {
+		{eval_access,    STAT_COST},
+		{eval_acl,       STAT_COST},
+		{eval_capable,   STAT_COST},
+		{eval_empty, 2 * STAT_COST}, // readdir() is worse than stat()
+		{eval_flags,     STAT_COST},
+		{eval_fls,      PRINT_COST},
+		{eval_fprint,   PRINT_COST},
+		{eval_fprint0,  PRINT_COST},
+		{eval_fprintf,  PRINT_COST},
+		{eval_fprintx,  PRINT_COST},
+		{eval_fstype,    STAT_COST},
+		{eval_gid,       STAT_COST},
+		{eval_inum,      STAT_COST},
+		{eval_links,     STAT_COST},
+		{eval_lname,  FNMATCH_COST},
+		{eval_name,   FNMATCH_COST},
+		{eval_newer,     STAT_COST},
+		{eval_nogroup,   STAT_COST},
+		{eval_nouser,    STAT_COST},
+		{eval_path,   FNMATCH_COST},
+		{eval_perm,      STAT_COST},
+		{eval_samefile,  STAT_COST},
+		{eval_size,      STAT_COST},
+		{eval_sparse,    STAT_COST},
+		{eval_time,      STAT_COST},
+		{eval_uid,       STAT_COST},
+		{eval_used,      STAT_COST},
+		{eval_xattr,     STAT_COST},
+		{eval_xattrname, STAT_COST},
+	};
+
+	expr->cost = FAST_COST;
+	for (size_t i = 0; i < countof(costs); ++i) {
+		if (expr->eval_fn == costs[i].eval_fn) {
+			expr->cost = costs[i].cost;
+			break;
+		}
+	}
+
+	/** Table of expression probabilities. */
+	static const struct {
+		/** The evaluation function with this cost. */
+		bfs_eval_fn *eval_fn;
+		/** The matching probability. */
+		float probability;
+	} probs[] = {
+		{eval_acl,       0.00002},
+		{eval_capable,   0.000002},
+		{eval_empty,     0.01},
+		{eval_false,     0.0},
+		{eval_hidden,    0.01},
+		{eval_nogroup,   0.01},
+		{eval_nouser,    0.01},
+		{eval_samefile,  0.01},
+		{eval_true,      1.0},
+		{eval_xattr,     0.01},
+		{eval_xattrname, 0.01},
+	};
+
+	expr->probability = 0.5;
+	for (size_t i = 0; i < countof(probs); ++i) {
+		if (expr->eval_fn == probs[i].eval_fn) {
+			expr->probability = probs[i].probability;
+			break;
+		}
+	}
+
+	return expr;
+}
+
+/**
+ * Annotating visitor.
+ */
+static const struct visitor annotate = {
+	.name = "annotate",
+	.visit = annotate_visit,
+	.table = (const struct visitor_table[]) {
+		{eval_access, annotate_access},
+		{eval_empty, annotate_empty},
+		{eval_exec, annotate_exec},
+		{eval_fprint, annotate_fprint},
+		{eval_lname, annotate_fnmatch},
+		{eval_name, annotate_fnmatch},
+		{eval_path, annotate_fnmatch},
+		{eval_type, annotate_type},
+		{eval_xtype, annotate_xtype},
+
+		{eval_not, annotate_not},
+		{eval_and, annotate_and},
+		{eval_or, annotate_or},
+		{eval_comma, annotate_comma},
+
+		{NULL, NULL},
+	},
+};
+
+/** Create a constant expression. */
+static struct bfs_expr *opt_const(struct bfs_opt *opt, bool value) {
+	static bfs_eval_fn *const fns[] = {eval_false, eval_true};
+	static char *fake_args[] = {"-false", "-true"};
+
+	struct bfs_expr *expr = bfs_expr_new(opt->ctx, fns[value], 1, &fake_args[value]);
+	return visit_shallow(opt, expr, &annotate);
+}
+
+/** Negate an expression, keeping it canonical. */
+static struct bfs_expr *negate_expr(struct bfs_opt *opt, struct bfs_expr *expr, char **argv) {
+	if (expr->eval_fn == eval_not) {
+		return only_child(expr);
+	} else if (expr->eval_fn == eval_true) {
+		return opt_const(opt, false);
+	} else if (expr->eval_fn == eval_false) {
+		return opt_const(opt, true);
+	}
+
+	struct bfs_expr *ret = bfs_expr_new(opt->ctx, eval_not, 1, argv);
+	if (!ret) {
+		return NULL;
+	}
+
+	bfs_expr_append(ret, expr);
+	return visit_shallow(opt, ret, &annotate);
+}
+
+/** Sink negations into a conjunction/disjunction using De Morgan's laws. */
+static struct bfs_expr *sink_not_andor(struct bfs_opt *opt, struct bfs_expr *expr) {
+	opt_debug(opt, "De Morgan's laws\n");
+
+	char **argv = expr->argv;
+	expr = only_child(expr);
+	opt_enter(opt, "%pe\n", expr);
+
+	if (expr->eval_fn == eval_and) {
+		expr->eval_fn = eval_or;
+		expr->argv = &fake_or_arg;
+	} else {
+		bfs_assert(expr->eval_fn == eval_or);
+		expr->eval_fn = eval_and;
+		expr->argv = &fake_and_arg;
+	}
+
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	struct bfs_expr *child;
+	while ((child = SLIST_POP(&children))) {
+		opt_enter(opt, "%pe\n", child);
+
+		child = negate_expr(opt, child, argv);
+		if (!child) {
+			return NULL;
+		}
+
+		opt_leave(opt, "%pe\n", child);
+		bfs_expr_append(expr, child);
+	}
+
+	opt_leave(opt, "%pe\n", expr);
+	return visit_shallow(opt, expr, &annotate);
+}
+
+/** Sink a negation into a comma expression. */
+static struct bfs_expr *sink_not_comma(struct bfs_opt *opt, struct bfs_expr *expr) {
+	bfs_assert(expr->eval_fn == eval_comma);
+
+	opt_enter(opt, "%pe\n", expr);
+
+	char **argv = expr->argv;
+	expr = only_child(expr);
+
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	struct bfs_expr *child;
+	while ((child = SLIST_POP(&children))) {
+		if (SLIST_EMPTY(&children)) {
+			opt_enter(opt, "%pe\n", child);
+			opt_debug(opt, "sink\n");
+
+			child = negate_expr(opt, child, argv);
+			if (!child) {
+				return NULL;
+			}
+
+			opt_leave(opt, "%pe\n", child);
+		} else {
+			opt_visit(opt, "%pe\n", child);
+		}
+
+		bfs_expr_append(expr, child);
+	}
+
+	opt_leave(opt, "%pe\n", expr);
+	return visit_shallow(opt, expr, &annotate);
+}
+
+/** Canonicalize a negation. */
+static struct bfs_expr *canonicalize_not(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_expr *rhs = only_child(expr);
+
+	if (rhs->eval_fn == eval_not) {
+		opt_debug(opt, "double negation\n");
+		rhs = only_child(expr);
+		return only_child(rhs);
+	} else if (rhs->eval_fn == eval_and || rhs->eval_fn == eval_or) {
+		return sink_not_andor(opt, expr);
+	} else if (rhs->eval_fn == eval_comma) {
+		return sink_not_comma(opt, expr);
+	} else if (is_const(rhs)) {
+		opt_debug(opt, "constant propagation\n");
+		return opt_const(opt, rhs->eval_fn == eval_false);
+	} else {
+		return expr;
+	}
+}
+
+/** Canonicalize an associative operator. */
+static struct bfs_expr *canonicalize_assoc(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	struct bfs_exprs flat;
+	SLIST_INIT(&flat);
+
+	struct bfs_expr *child;
+	while ((child = SLIST_POP(&children))) {
+		if (child->eval_fn == expr->eval_fn) {
+			struct bfs_expr *head = SLIST_HEAD(&child->children);
+			struct bfs_expr *tail = SLIST_TAIL(&child->children);
+
+			if (!head) {
+				opt_delete(opt, "%pe [empty]\n", child);
+			} else {
+				opt_enter(opt, "%pe\n", child);
+				opt_debug(opt, "associativity\n");
+				if (head == tail) {
+					opt_leave(opt, "%pe\n", head);
+				} else if (head->next == tail) {
+					opt_leave(opt, "%pe %pe\n", head, tail);
+				} else {
+					opt_leave(opt, "%pe ... %pe\n", head, tail);
+				}
+			}
+
+			SLIST_EXTEND(&flat, &child->children);
+		} else {
+			opt_visit(opt, "%pe\n", child);
+			SLIST_APPEND(&flat, child);
+		}
+	}
+
+	bfs_expr_extend(expr, &flat);
+
+	return visit_shallow(opt, expr, &annotate);
+}
+
+/**
+ * Canonicalizing visitor.
+ */
+static const struct visitor canonicalize = {
+	.name = "canonicalize",
+	.table = (const struct visitor_table[]) {
+		{eval_not, canonicalize_not},
+		{eval_and, canonicalize_assoc},
+		{eval_or, canonicalize_assoc},
+		{eval_comma, canonicalize_assoc},
+		{NULL, NULL},
+	},
+};
+
+/** Calculate the cost of an ordered pair of expressions. */
+static float expr_cost(const struct bfs_expr *parent, const struct bfs_expr *lhs, const struct bfs_expr *rhs) {
+	// https://cs.stackexchange.com/a/66921/21004
+	float prob = lhs->probability;
+	if (parent->eval_fn == eval_or) {
+		prob = 1.0 - prob;
+	}
+	return lhs->cost + prob * rhs->cost;
+}
+
+/** Sort a block of expressions. */
+static void sort_exprs(struct bfs_opt *opt, struct bfs_expr *parent, struct bfs_exprs *exprs) {
+	if (!exprs->head || !exprs->head->next) {
+		return;
+	}
+
+	struct bfs_exprs left, right;
+	SLIST_INIT(&left);
+	SLIST_INIT(&right);
+
+	// Split
+	for (struct bfs_expr *hare = exprs->head; hare && (hare = hare->next); hare = hare->next) {
+		struct bfs_expr *tortoise = SLIST_POP(exprs);
+		SLIST_APPEND(&left, tortoise);
+	}
+	SLIST_EXTEND(&right, exprs);
+
+	// Recurse
+	sort_exprs(opt, parent, &left);
+	sort_exprs(opt, parent, &right);
+
+	// Merge
+	while (!SLIST_EMPTY(&left) && !SLIST_EMPTY(&right)) {
+		struct bfs_expr *lhs = left.head;
+		struct bfs_expr *rhs = right.head;
+
+		float cost = expr_cost(parent, lhs, rhs);
+		float swapped = expr_cost(parent, rhs, lhs);
+
+		if (cost <= swapped) {
+			SLIST_POP(&left);
+			SLIST_APPEND(exprs, lhs);
+		} else {
+			opt_enter(opt, "%pe %pe [${ylw}%g${rs}]\n", lhs, rhs, cost);
+			SLIST_POP(&right);
+			SLIST_APPEND(exprs, rhs);
+			opt_leave(opt, "%pe %pe [${ylw}%g${rs}]\n", rhs, lhs, swapped);
+		}
+	}
+	SLIST_EXTEND(exprs, &left);
+	SLIST_EXTEND(exprs, &right);
+}
+
+/** Reorder children to reduce cost. */
+static struct bfs_expr *reorder_andor(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	// Split into blocks of consecutive pure/impure expressions, and sort
+	// the pure blocks
+	struct bfs_exprs pure;
+	SLIST_INIT(&pure);
+
+	struct bfs_expr *child;
+	while ((child = SLIST_POP(&children))) {
+		if (child->pure) {
+			SLIST_APPEND(&pure, child);
+		} else {
+			sort_exprs(opt, expr, &pure);
+			bfs_expr_extend(expr, &pure);
+			bfs_expr_append(expr, child);
+		}
+	}
+	sort_exprs(opt, expr, &pure);
+	bfs_expr_extend(expr, &pure);
+
+	return visit_shallow(opt, expr, &annotate);
+}
+
+/**
+ * Reordering visitor.
+ */
+static const struct visitor reorder = {
+	.name = "reorder",
+	.table = (const struct visitor_table[]) {
+		{eval_and, reorder_andor},
+		{eval_or, reorder_andor},
+		{NULL, NULL},
+	},
+};
+
+/** Transfer function for simple predicates. */
+static void data_flow_pred(struct bfs_opt *opt, enum pred_type pred, bool value) {
+	constrain_pred(&opt->after_true.preds[pred], value);
+	constrain_pred(&opt->after_false.preds[pred], !value);
+}
+
+/** Transfer function for icmp-style ([+-]N) expressions. */
+static void data_flow_icmp(struct bfs_opt *opt, const struct bfs_expr *expr, enum range_type type) {
+	struct df_range *true_range = &opt->after_true.ranges[type];
+	struct df_range *false_range = &opt->after_false.ranges[type];
+	long long value = expr->num;
+
+	switch (expr->int_cmp) {
+	case BFS_INT_EQUAL:
+		constrain_min(true_range, value);
+		constrain_max(true_range, value);
+		range_remove(false_range, value);
+		break;
+
+	case BFS_INT_LESS:
+		constrain_min(false_range, value);
+		constrain_max(true_range, value);
+		range_remove(true_range, value);
+		break;
+
+	case BFS_INT_GREATER:
+		constrain_max(false_range, value);
+		constrain_min(true_range, value);
+		range_remove(true_range, value);
+		break;
+	}
+}
+
+/** Transfer function for -{execut,read,writ}able. */
+static struct bfs_expr *data_flow_access(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (expr->num & R_OK) {
+		data_flow_pred(opt, READABLE_PRED, true);
+	}
+	if (expr->num & W_OK) {
+		data_flow_pred(opt, WRITABLE_PRED, true);
+	}
+	if (expr->num & X_OK) {
+		data_flow_pred(opt, EXECUTABLE_PRED, true);
+	}
+
+	return expr;
+}
+
+/** Transfer function for -gid. */
+static struct bfs_expr *data_flow_gid(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct df_range *range = &opt->after_true.ranges[GID_RANGE];
+	if (range->min == range->max) {
+		gid_t gid = range->min;
+		bool nogroup = !bfs_getgrgid(opt->ctx->groups, gid);
+		if (errno == 0) {
+			data_flow_pred(opt, NOGROUP_PRED, nogroup);
+		}
+	}
+
+	return expr;
+}
+
+/** Transfer function for -inum. */
+static struct bfs_expr *data_flow_inum(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct df_range *range = &opt->after_true.ranges[INUM_RANGE];
+	if (range->min == range->max) {
+		expr->probability = 0.01;
+	} else {
+		expr->probability = 0.5;
+	}
+
+	return expr;
+}
+
+/** Transfer function for -links. */
+static struct bfs_expr *data_flow_links(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct df_range *range = &opt->after_true.ranges[LINKS_RANGE];
+	if (1 >= range->min && 1 <= range->max) {
+		expr->probability = 0.99;
+	} else {
+		expr->probability = 0.5;
+	}
+
+	return expr;
+}
+
+/** Transfer function for -samefile. */
+static struct bfs_expr *data_flow_samefile(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct df_range *true_range = &opt->after_true.ranges[INUM_RANGE];
+	constrain_min(true_range, expr->ino);
+	constrain_max(true_range, expr->ino);
+
+	struct df_range *false_range = &opt->after_false.ranges[INUM_RANGE];
+	range_remove(false_range, expr->ino);
+
+	return expr;
+}
+
+/** Transfer function for -size. */
+static struct bfs_expr *data_flow_size(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct df_range *range = &opt->after_true.ranges[SIZE_RANGE];
+	if (range->min == range->max) {
+		expr->probability = 0.01;
+	} else {
+		expr->probability = 0.5;
+	}
+
+	return expr;
+}
+
+/** Transfer function for -type. */
+static struct bfs_expr *data_flow_type(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt->after_true.types &= expr->num;
+	opt->after_false.types &= ~expr->num;
+	return expr;
+}
+
+/** Transfer function for -uid. */
+static struct bfs_expr *data_flow_uid(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct df_range *range = &opt->after_true.ranges[UID_RANGE];
+	if (range->min == range->max) {
+		uid_t uid = range->min;
+		bool nouser = !bfs_getpwuid(opt->ctx->users, uid);
+		if (errno == 0) {
+			data_flow_pred(opt, NOUSER_PRED, nouser);
+		}
+	}
+
+	return expr;
+}
+
+/** Transfer function for -xtype. */
+static struct bfs_expr *data_flow_xtype(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt->after_true.xtypes &= expr->num;
+	opt->after_false.xtypes &= ~expr->num;
+	return expr;
+}
+
+/** Data flow visitor entry. */
+static struct bfs_expr *data_flow_enter(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	visit_enter(opt, expr, visitor);
+
+	df_dump(opt, "before", &opt->before);
+
+	if (!bfs_expr_is_parent(expr) && !expr->pure) {
+		df_join(opt->impure, &opt->before);
+		df_dump(opt, "impure", opt->impure);
+	}
+
+	return expr;
+}
+
+/** Data flow visitor exit. */
+static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (expr->always_true) {
+		expr->probability = 1.0;
+		df_init_bottom(&opt->after_false);
+	}
+
+	if (expr->always_false) {
+		expr->probability = 0.0;
+		df_init_bottom(&opt->after_true);
+	}
+
+	df_dump(opt, "after true", &opt->after_true);
+	df_dump(opt, "after false", &opt->after_false);
+
+	if (df_is_bottom(&opt->after_false)) {
+		if (!expr->pure) {
+			expr->always_true = true;
+			expr->probability = 0.0;
+		} else if (expr->eval_fn != eval_true) {
+			opt_warning(opt, expr, "This expression is always true.\n\n");
+			opt_debug(opt, "pure, always true\n");
+			expr = opt_const(opt, true);
+			if (!expr) {
+				return NULL;
+			}
+		}
+	}
+
+	if (df_is_bottom(&opt->after_true)) {
+		if (!expr->pure) {
+			expr->always_false = true;
+			expr->probability = 0.0;
+		} else if (expr->eval_fn != eval_false) {
+			opt_warning(opt, expr, "This expression is always false.\n\n");
+			opt_debug(opt, "pure, always false\n");
+			expr = opt_const(opt, false);
+			if (!expr) {
+				return NULL;
+			}
+		}
+	}
+
+	return visit_leave(opt, expr, visitor);
+}
+
+/** Data flow visitor function. */
+static struct bfs_expr *data_flow_visit(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (opt->ignore_result && expr->pure) {
+		opt_debug(opt, "ignored result\n");
+		opt_warning(opt, expr, "The result of this expression is ignored.\n\n");
+		expr = opt_const(opt, false);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
+	if (df_is_bottom(&opt->before)) {
+		opt_debug(opt, "unreachable\n");
+		opt_warning(opt, expr, "This expression is unreachable.\n\n");
+		expr = opt_const(opt, false);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
+	/** Table of simple predicates. */
+	static const struct {
+		bfs_eval_fn *eval_fn;
+		enum pred_type pred;
+	} preds[] = {
+		{eval_acl,         ACL_PRED},
+		{eval_capable, CAPABLE_PRED},
+		{eval_empty,     EMPTY_PRED},
+		{eval_hidden,   HIDDEN_PRED},
+		{eval_nogroup, NOGROUP_PRED},
+		{eval_nouser,   NOUSER_PRED},
+		{eval_sparse,   SPARSE_PRED},
+		{eval_xattr,     XATTR_PRED},
+	};
+
+	for (size_t i = 0; i < countof(preds); ++i) {
+		if (preds[i].eval_fn == expr->eval_fn) {
+			data_flow_pred(opt, preds[i].pred, true);
+			break;
+		}
+	}
+
+	/** Table of simple range comparisons. */
+	static const struct {
+		bfs_eval_fn *eval_fn;
+		enum range_type range;
+	} ranges[] = {
+		{eval_depth, DEPTH_RANGE},
+		{eval_gid,     GID_RANGE},
+		{eval_inum,   INUM_RANGE},
+		{eval_links, LINKS_RANGE},
+		{eval_size,   SIZE_RANGE},
+		{eval_uid,     UID_RANGE},
+	};
+
+	for (size_t i = 0; i < countof(ranges); ++i) {
+		if (ranges[i].eval_fn == expr->eval_fn) {
+			data_flow_icmp(opt, expr, ranges[i].range);
+			break;
+		}
+	}
+
+	return expr;
+}
+
+/**
+ * Data flow visitor.
+ */
+static const struct visitor data_flow = {
+	.name = "data_flow",
+	.enter = data_flow_enter,
+	.visit = data_flow_visit,
+	.leave = data_flow_leave,
+	.table = (const struct visitor_table[]) {
+		{eval_access, data_flow_access},
+		{eval_gid, data_flow_gid},
+		{eval_inum, data_flow_inum},
+		{eval_links, data_flow_links},
+		{eval_samefile, data_flow_samefile},
+		{eval_size, data_flow_size},
+		{eval_type, data_flow_type},
+		{eval_uid, data_flow_uid},
+		{eval_xtype, data_flow_xtype},
+		{NULL, NULL},
+	},
+};
+
+/** Simplify a negation. */
+static struct bfs_expr *simplify_not(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (opt->ignore_result) {
+		opt_debug(opt, "ignored result\n");
+		expr = only_child(expr);
+	}
+
+	return expr;
+}
+
+/** Lift negations out of a conjunction/disjunction using De Morgan's laws. */
+static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *expr) {
+	// Only lift negations if it would reduce the number of (-not) expressions
+	size_t added = 0, removed = 0;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		if (child->eval_fn == eval_not) {
+			++removed;
+		} else {
+			++added;
+		}
+	}
+	if (added >= removed) {
+		return visit_shallow(opt, expr, &annotate);
+	}
+
+	opt_debug(opt, "De Morgan's laws\n");
+
+	if (expr->eval_fn == eval_and) {
+		expr->eval_fn = eval_or;
+		expr->argv = &fake_or_arg;
+	} else {
+		bfs_assert(expr->eval_fn == eval_or);
+		expr->eval_fn = eval_and;
+		expr->argv = &fake_and_arg;
+	}
+
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	struct bfs_expr *child;
+	while ((child = SLIST_POP(&children))) {
+		opt_enter(opt, "%pe\n", child);
+
+		child = negate_expr(opt, child, &fake_not_arg);
+		if (!child) {
+			return NULL;
+		}
+
+		opt_leave(opt, "%pe\n", child);
+		bfs_expr_append(expr, child);
+	}
+
+	expr = visit_shallow(opt, expr, &annotate);
+	return negate_expr(opt, expr, &fake_not_arg);
+}
+
+/** Get the first ignorable expression in a conjunction/disjunction. */
+static struct bfs_expr *first_ignorable(struct bfs_opt *opt, struct bfs_expr *expr) {
+	if (opt->level < 2 || !opt->ignore_result) {
+		return NULL;
+	}
+
+	struct bfs_expr *ret = NULL;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		if (!child->pure) {
+			ret = NULL;
+		} else if (!ret) {
+			ret = child;
+		}
+	}
+
+	return ret;
+}
+
+/** Simplify a conjunction. */
+static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_expr *ignorable = first_ignorable(opt, expr);
+	bool ignore = false;
+
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	while (!SLIST_EMPTY(&children)) {
+		struct bfs_expr *child = SLIST_POP(&children);
+
+		if (child == ignorable) {
+			ignore = true;
+		}
+
+		if (ignore) {
+			opt_delete(opt, "%pe [ignored result]\n", child);
+			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			continue;
+		}
+
+		if (child->eval_fn == eval_true) {
+			opt_delete(opt, "%pe [conjunction elimination]\n", child);
+			continue;
+		}
+
+		opt_visit(opt, "%pe\n", child);
+		bfs_expr_append(expr, child);
+
+		if (child->always_false) {
+			while ((child = SLIST_POP(&children))) {
+				opt_delete(opt, "%pe [short-circuit]\n", child);
+			}
+		}
+	}
+
+	struct bfs_expr *child = bfs_expr_children(expr);
+	if (!child) {
+		opt_debug(opt, "nullary identity\n");
+		return opt_const(opt, true);
+	} else if (!child->next) {
+		opt_debug(opt, "unary identity\n");
+		return only_child(expr);
+	}
+
+	return lift_andor_not(opt, expr);
+}
+
+/** Simplify a disjunction. */
+static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_expr *ignorable = first_ignorable(opt, expr);
+	bool ignore = false;
+
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	while (!SLIST_EMPTY(&children)) {
+		struct bfs_expr *child = SLIST_POP(&children);
+
+		if (child == ignorable) {
+			ignore = true;
+		}
+
+		if (ignore) {
+			opt_delete(opt, "%pe [ignored result]\n", child);
+			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			continue;
+		}
+
+		if (child->eval_fn == eval_false) {
+			opt_delete(opt, "%pe [disjunctive syllogism]\n", child);
+			continue;
+		}
+
+		opt_visit(opt, "%pe\n", child);
+		bfs_expr_append(expr, child);
+
+		if (child->always_true) {
+			while ((child = SLIST_POP(&children))) {
+				opt_delete(opt, "%pe [short-circuit]\n", child);
+			}
+		}
+	}
+
+	struct bfs_expr *child = bfs_expr_children(expr);
+	if (!child) {
+		opt_debug(opt, "nullary identity\n");
+		return opt_const(opt, false);
+	} else if (!child->next) {
+		opt_debug(opt, "unary identity\n");
+		return only_child(expr);
+	}
+
+	return lift_andor_not(opt, expr);
+}
+
+/** Simplify a comma expression. */
+static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	struct bfs_exprs children;
+	foster_children(expr, &children);
+
+	while (!SLIST_EMPTY(&children)) {
+		struct bfs_expr *child = SLIST_POP(&children);
+
+		if (opt->level >= 2 && child->pure && !SLIST_EMPTY(&children)) {
+			opt_delete(opt, "%pe [ignored result]\n", child);
+			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			continue;
+		}
+
+		opt_visit(opt, "%pe\n", child);
+		bfs_expr_append(expr, child);
+	}
+
+	struct bfs_expr *child = bfs_expr_children(expr);
+	if (child && !child->next) {
+		opt_debug(opt, "unary identity\n");
+		return only_child(expr);
+	}
+
+	return expr;
+}
+
+/**
+ * Logical simplification visitor.
+ */
+static const struct visitor simplify = {
+	.name = "simplify",
+	.table = (const struct visitor_table[]) {
+		{eval_not, simplify_not},
+		{eval_and, simplify_and},
+		{eval_or, simplify_or},
+		{eval_comma, simplify_comma},
+		{NULL, NULL},
+	},
+};
+
+/** Optimize an expression. */
+static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
+	opt_enter(opt, "pass 0:\n");
+	expr = visit(opt, expr, &annotate);
+	opt_leave(opt, NULL);
+
+	/** Table of optimization passes. */
+	static const struct {
+		/** Minimum optlevel for this pass. */
+		int level;
+		/** The visitor for this pass. */
+		const struct visitor *visitor;
+	} passes[] = {
+		{1, &canonicalize},
+		{3, &reorder},
+		{2, &data_flow},
+		{1, &simplify},
+	};
+
+	struct df_domain impure;
+
+	for (int i = 0; i < 3; ++i) {
+		struct bfs_opt nested = *opt;
+		nested.impure = &impure;
+		impure = *opt->impure;
+
+		opt_enter(&nested, "pass %d:\n", i + 1);
+
+		for (size_t j = 0; j < countof(passes); ++j) {
+			if (opt->level < passes[j].level) {
+				continue;
+			}
+
+			// Skip reordering the first time through the passes, to
+			// make warnings more understandable
+			if (passes[j].visitor == &reorder) {
+				if (i == 0) {
+					continue;
+				} else {
+					nested.warn = false;
+				}
+			}
+
+			expr = visit(&nested, expr, passes[j].visitor);
+			if (!expr) {
+				return NULL;
+			}
+		}
+
+		opt_leave(&nested, NULL);
+
+		if (!bfs_expr_is_parent(expr)) {
+			break;
+		}
+	}
+
+	*opt->impure = impure;
+	return expr;
+}
+
+/** Estimate the odds of an expression calling stat(). */
+static float expr_stat_odds(struct bfs_expr *expr) {
+	if (expr->calls_stat) {
+		return 1.0;
+	}
+
+	float nostat_odds = 1.0;
+	float reached_odds = 1.0;
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+		float child_odds = expr_stat_odds(child);
+		nostat_odds *= 1.0 - reached_odds * child_odds;
+
+		if (expr->eval_fn == eval_and) {
+			reached_odds *= child->probability;
+		} else if (expr->eval_fn == eval_or) {
+			reached_odds *= 1.0 - child->probability;
+		}
+	}
+
+	return 1.0 - nostat_odds;
+}
+
+/** Estimate the odds of calling stat(). */
+static float estimate_stat_odds(struct bfs_ctx *ctx) {
+	if (ctx->unique) {
+		return 1.0;
+	}
+
+	float nostat_odds = 1.0 - expr_stat_odds(ctx->exclude);
+
+	float reached_odds = 1.0 - ctx->exclude->probability;
+	float expr_odds = expr_stat_odds(ctx->expr);
+	nostat_odds *= 1.0 - reached_odds * expr_odds;
+
+	return 1.0 - nostat_odds;
 }
 
 int bfs_optimize(struct bfs_ctx *ctx) {
 	bfs_ctx_dump(ctx, DEBUG_OPT);
 
-	struct opt_facts facts_when_impure;
-	set_facts_impossible(&facts_when_impure);
+	struct df_domain impure;
+	df_init_bottom(&impure);
 
-	struct opt_state state = {
+	struct bfs_opt opt = {
 		.ctx = ctx,
-		.facts_when_impure = &facts_when_impure,
+		.level = ctx->optlevel,
+		.depth = 0,
+		.warn = ctx->warn,
+		.ignore_result = false,
+		.impure = &impure,
 	};
-	facts_init(&state.facts);
+	df_init_top(&opt.before);
 
-	ctx->exclude = optimize_expr(&state, ctx->exclude);
+	ctx->exclude = optimize(&opt, ctx->exclude);
 	if (!ctx->exclude) {
 		return -1;
 	}
 
 	// Only non-excluded files are evaluated
-	state.facts = state.facts_when_false;
+	opt.before = opt.after_false;
+	opt.ignore_result = true;
 
-	struct range *depth = &state.facts.ranges[DEPTH_RANGE];
-	constrain_min(depth, ctx->mindepth);
-	constrain_max(depth, ctx->maxdepth);
+	struct df_range *depth = &opt.before.ranges[DEPTH_RANGE];
+	if (ctx->mindepth > 0) {
+		constrain_min(depth, ctx->mindepth);
+	}
+	if (ctx->maxdepth < INT_MAX) {
+		constrain_max(depth, ctx->maxdepth);
+	}
 
-	ctx->expr = optimize_expr(&state, ctx->expr);
+	ctx->expr = optimize(&opt, ctx->expr);
 	if (!ctx->expr) {
 		return -1;
 	}
 
-	ctx->expr = ignore_result(&state, ctx->expr);
-
-	if (facts_are_impossible(&facts_when_impure)) {
+	if (opt.level >= 2 && df_is_bottom(&impure)) {
 		bfs_warning(ctx, "This command won't do anything.\n\n");
 	}
 
-	const struct range *depth_when_impure = &facts_when_impure.ranges[DEPTH_RANGE];
-	long long mindepth = depth_when_impure->min;
-	long long maxdepth = depth_when_impure->max;
+	const struct df_range *impure_depth = &impure.ranges[DEPTH_RANGE];
+	long long mindepth = impure_depth->min;
+	long long maxdepth = impure_depth->max;
 
-	int optlevel = ctx->optlevel;
+	opt_enter(&opt, "post-process:\n");
 
-	if (optlevel >= 2 && mindepth > ctx->mindepth) {
+	if (opt.level >= 2 && mindepth > ctx->mindepth) {
 		if (mindepth > INT_MAX) {
 			mindepth = INT_MAX;
 		}
+		opt_enter(&opt, "${blu}-mindepth${rs} ${bld}%d${rs}\n", ctx->mindepth);
 		ctx->mindepth = mindepth;
-		opt_debug(&state, 2, "data flow: mindepth --> %d\n", ctx->mindepth);
+		opt_leave(&opt, "${blu}-mindepth${rs} ${bld}%d${rs}\n", ctx->mindepth);
 	}
 
-	if (optlevel >= 4 && maxdepth < ctx->maxdepth) {
+	if (opt.level >= 4 && maxdepth < ctx->maxdepth) {
 		if (maxdepth < INT_MIN) {
 			maxdepth = INT_MIN;
 		}
+		opt_enter(&opt, "${blu}-maxdepth${rs} ${bld}%d${rs}\n", ctx->maxdepth);
 		ctx->maxdepth = maxdepth;
-		opt_debug(&state, 4, "data flow: maxdepth --> %d\n", ctx->maxdepth);
+		opt_leave(&opt, "${blu}-maxdepth${rs} ${bld}%d${rs}\n", ctx->maxdepth);
 	}
+
+	if (opt.level >= 3) {
+		// bfs_eval() can do lazy stat() calls, but only on one thread.
+		float lazy_cost = estimate_stat_odds(ctx);
+		// bftw() can do eager stat() calls in parallel
+		float eager_cost = 1.0 / ctx->threads;
+
+		if (eager_cost <= lazy_cost) {
+			opt_enter(&opt, "lazy stat cost: ${ylw}%g${rs}\n", lazy_cost);
+			ctx->flags |= BFTW_STAT;
+			opt_leave(&opt, "eager stat cost: ${ylw}%g${rs}\n", eager_cost);
+		}
+
+	}
+
+	opt_leave(&opt, NULL);
 
 	return 0;
 }

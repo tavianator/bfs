@@ -1,3 +1,3 @@
-skip_unless invoke_bfs -regextype grep -quit
+invoke_bfs -regextype grep -quit || skip
 
 bfs_diff basic -regextype grep -regex '.*/f\+o\?o\?'

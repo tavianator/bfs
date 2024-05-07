@@ -1,7 +1,2 @@
-closefrom 4
-ulimit -n 16
-
-# -mindepth 18, but POSIX
-path="*/*/*/*/*/*"
-path="$path/$path/$path"
-bfs_diff deep -path "deep/$path" -nouser
+ulimit -n $((NOPENFD + 13))
+bfs_diff deep -type f -nouser

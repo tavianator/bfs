@@ -1,1 +1,1 @@
-fail invoke_bfs perms -perm a+r,
+! invoke_bfs perms -perm a+r,

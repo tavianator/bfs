@@ -1,21 +1,8 @@
-# bash completion script for bfs
+# Copyright © Benjamin Mundt <benMundt@ibm.com>
+# Copyright © Tavian Barnes <tavianator@tavianator.com>
+# SPDX-License-Identifier: 0BSD
 
-############################################################################
-# bfs                                                                      #
-# Copyright (C) 2020 Benjamin Mundt <benMundt@ibm.com>                     #
-# Copyright (C) 2021 Tavian Barnes <tavianator@tavianator.com>             #
-#                                                                          #
-# Permission to use, copy, modify, and/or distribute this software for any #
-# purpose with or without fee is hereby granted.                           #
-#                                                                          #
-# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES #
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         #
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  #
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   #
-# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    #
-# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  #
-# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           #
-############################################################################
+# bash completion script for bfs
 
 _bfs() {
     local cur prev words cword
@@ -31,6 +18,7 @@ _bfs() {
         -fstype
         -gid
         -group
+        -j
         -ok
         -okdir
         -regextype
@@ -44,12 +32,14 @@ _bfs() {
     # (e.g. because they are numeric, glob, regexp, time, etc.)
     local nocomp=(
         -{a,B,c,m}{min,since,time}
+        -context
         -ilname
         -iname
         -inum
         -ipath
         -iregex
         -iwholename
+        -limit
         -links
         -lname
         -maxdepth
@@ -107,8 +97,6 @@ _bfs() {
         -depth
         -follow
         -ignore_readdir_race
-        -maxdepth
-        -mindepth
         -mount
         -nocolor
         -noignore_readdir_race

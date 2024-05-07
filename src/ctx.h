@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * bfs execution context.
@@ -21,38 +8,17 @@
 #ifndef BFS_CTX_H
 #define BFS_CTX_H
 
+#include "prelude.h"
+#include "alloc.h"
 #include "bftw.h"
+#include "diag.h"
+#include "expr.h"
 #include "trie.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <sys/resource.h>
+#include <time.h>
 
-/**
- * Various debugging flags.
- */
-enum debug_flags {
-	/** Print cost estimates. */
-	DEBUG_COST   = 1 << 0,
-	/** Print executed command details. */
-	DEBUG_EXEC   = 1 << 1,
-	/** Print optimization details. */
-	DEBUG_OPT    = 1 << 2,
-	/** Print rate information. */
-	DEBUG_RATES  = 1 << 3,
-	/** Trace the filesystem traversal. */
-	DEBUG_SEARCH = 1 << 4,
-	/** Trace all stat() calls. */
-	DEBUG_STAT   = 1 << 5,
-	/** Print the parse tree. */
-	DEBUG_TREE   = 1 << 6,
-	/** All debug flags. */
-	DEBUG_ALL    = (1 << 7) - 1,
-};
-
-/**
- * Convert a debug flag to a string.
- */
-const char *debug_flag_name(enum debug_flags flag);
+struct CFILE;
 
 /**
  * The execution context for bfs.
@@ -65,10 +31,17 @@ struct bfs_ctx {
 
 	/** The root paths. */
 	const char **paths;
+	/** The number of root paths. */
+	size_t npaths;
+
 	/** The main command line expression. */
 	struct bfs_expr *expr;
 	/** An expression for files to filter out. */
 	struct bfs_expr *exclude;
+	/** A list of allocated expressions. */
+	struct bfs_exprs expr_list;
+	/** bfs_expr arena. */
+	struct arena expr_arena;
 
 	/** -mindepth option. */
 	int mindepth;
@@ -80,6 +53,8 @@ struct bfs_ctx {
 	/** bftw() search strategy. */
 	enum bftw_strategy strategy;
 
+	/** Threads (-j). */
+	int threads;
 	/** Optimization level (-O). */
 	int optlevel;
 	/** Debugging flags (-D). */
@@ -123,10 +98,13 @@ struct bfs_ctx {
 	/** The number of files owned by the context. */
 	int nfiles;
 
-	/** The initial RLIMIT_NOFILE soft limit. */
-	rlim_t nofile_soft;
-	/** The initial RLIMIT_NOFILE hard limit. */
-	rlim_t nofile_hard;
+	/** The initial RLIMIT_NOFILE limits. */
+	struct rlimit orig_nofile;
+	/** The current RLIMIT_NOFILE limits. */
+	struct rlimit cur_nofile;
+
+	/** The current time. */
+	struct timespec now;
 };
 
 /**

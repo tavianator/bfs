@@ -1,1 +1,1 @@
-fail invoke_bfs basic -mindepth
+! invoke_bfs basic -mindepth

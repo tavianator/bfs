@@ -1,1 +1,1 @@
-fail invoke_bfs times -newerqm times/a
+! invoke_bfs times -newerqm times/a

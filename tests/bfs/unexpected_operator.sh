@@ -1,1 +1,1 @@
-fail invoke_bfs \! -o -print
+! invoke_bfs \! -o -print

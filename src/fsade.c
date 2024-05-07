@@ -1,56 +1,47 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2019-2021 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
+#include "prelude.h"
 #include "fsade.h"
-#include "config.h"
+#include "atomic.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "dir.h"
 #include "dstring.h"
+#include "sanity.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <unistd.h>
 
 #if BFS_CAN_CHECK_ACL
-#	include <sys/acl.h>
+#  include <sys/acl.h>
 #endif
 
 #if BFS_CAN_CHECK_CAPABILITIES
-#	include <sys/capability.h>
+#  include <sys/capability.h>
+#endif
+
+#if BFS_CAN_CHECK_CONTEXT
+#  include <selinux/selinux.h>
 #endif
 
 #if BFS_USE_SYS_EXTATTR_H
-#	include <sys/extattr.h>
+#  include <sys/extattr.h>
 #elif BFS_USE_SYS_XATTR_H
-#	include <sys/xattr.h>
+#  include <sys/xattr.h>
 #endif
-
-#if BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS
 
 /**
  * Many of the APIs used here don't have *at() variants, but we can try to
  * emulate something similar if /proc/self/fd is available.
  */
+attr(maybe_unused)
 static const char *fake_at(const struct BFTW *ftwbuf) {
-	static bool proc_works = true;
-	static bool proc_checked = false;
+	static atomic int proc_works = -1;
 
-	char *path = NULL;
-	if (!proc_works || ftwbuf->at_fd == AT_FDCWD) {
+	dchar *path = NULL;
+	if (ftwbuf->at_fd == AT_FDCWD || load(&proc_works, relaxed) == 0) {
 		goto fail;
 	}
 
@@ -59,11 +50,12 @@ static const char *fake_at(const struct BFTW *ftwbuf) {
 		goto fail;
 	}
 
-	if (!proc_checked) {
-		proc_checked = true;
+	if (load(&proc_works, relaxed) < 0) {
 		if (xfaccessat(AT_FDCWD, path, F_OK) != 0) {
-			proc_works = false;
+			store(&proc_works, 0, relaxed);
 			goto fail;
+		} else {
+			store(&proc_works, 1, relaxed);
 		}
 	}
 
@@ -78,15 +70,17 @@ fail:
 	return ftwbuf->path;
 }
 
+attr(maybe_unused)
 static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 	if (path != ftwbuf->path) {
-		dstrfree((char *)path);
+		dstrfree((dchar *)path);
 	}
 }
 
 /**
  * Check if an error was caused by the absence of support or data for a feature.
  */
+attr(maybe_unused)
 static bool is_absence_error(int error) {
 	// If the OS doesn't support the feature, it's obviously not enabled for
 	// any files
@@ -125,28 +119,73 @@ static bool is_absence_error(int error) {
 	return false;
 }
 
-#endif // BFS_CAN_CHECK_ACL || BFS_CAN_CHECK_CAPABILITIES || BFS_CAN_CHECK_XATTRS
-
 #if BFS_CAN_CHECK_ACL
+
+#if BFS_HAS_ACL_GET_FILE
+
+/** Unified interface for incompatible acl_get_entry() implementations. */
+static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
+#if BFS_HAS_ACL_GET_ENTRY
+	int ret = acl_get_entry(acl, which, entry);
+#  if __APPLE__
+	// POSIX.1e specifies a return value of 1 for success, but macOS returns 0 instead
+	return !ret;
+#  else
+	return ret;
+#  endif
+#elif __DragonFly__
+#  if !defined(ACL_FIRST_ENTRY) && !defined(ACL_NEXT_ENTRY)
+#    define ACL_FIRST_ENTRY 0
+#    define ACL_NEXT_ENTRY  1
+#  endif
+
+	switch (which) {
+	case ACL_FIRST_ENTRY:
+		*entry = &acl->acl_entry[0];
+		break;
+	case ACL_NEXT_ENTRY:
+		++*entry;
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	acl_entry_t last = &acl->acl_entry[acl->acl_cnt];
+	return *entry == last;
+#else
+	errno = ENOTSUP;
+	return -1;
+#endif
+}
+
+/** Unified interface for acl_get_tag_type(). */
+attr(maybe_unused)
+static int bfs_acl_tag_type(acl_entry_t entry, acl_tag_t *tag) {
+#if BFS_HAS_ACL_GET_TAG_TYPE
+	return acl_get_tag_type(entry, tag);
+#elif __DragonFly__
+	*tag = entry->ae_tag;
+	return 0;
+#else
+	errno = ENOTSUP;
+	return -1;
+#endif
+}
 
 /** Check if a POSIX.1e ACL is non-trivial. */
 static int bfs_check_posix1e_acl(acl_t acl, bool ignore_required) {
 	int ret = 0;
 
 	acl_entry_t entry;
-	for (int status = acl_get_entry(acl, ACL_FIRST_ENTRY, &entry);
-#if __APPLE__
-	     // POSIX.1e specifies a return value of 1 for success, but macOS
-	     // returns 0 instead
-	     status == 0;
-#else
+	for (int status = bfs_acl_entry(acl, ACL_FIRST_ENTRY, &entry);
 	     status > 0;
-#endif
-	     status = acl_get_entry(acl, ACL_NEXT_ENTRY, &entry)) {
+	     status = bfs_acl_entry(acl, ACL_NEXT_ENTRY, &entry))
+	{
 #if defined(ACL_USER_OBJ) && defined(ACL_GROUP_OBJ) && defined(ACL_OTHER)
 		if (ignore_required) {
 			acl_tag_t tag;
-			if (acl_get_tag_type(entry, &tag) != 0) {
+			if (bfs_acl_tag_type(entry, &tag) != 0) {
 				ret = -1;
 				continue;
 			}
@@ -170,52 +209,56 @@ static int bfs_check_acl_type(acl_t acl, acl_type_t type) {
 		return bfs_check_posix1e_acl(acl, false);
 	}
 
-#if __FreeBSD__
+#if BFS_HAS_ACL_IS_TRIVIAL_NP
 	int trivial;
+	int ret = acl_is_trivial_np(acl, &trivial);
 
-#if __has_feature(memory_sanitizer)
-        // msan seems to be missing an interceptor for acl_is_trivial_np()
-        trivial = 0;
-#endif
+	// msan seems to be missing an interceptor for acl_is_trivial_np()
+	sanitize_init(&trivial);
 
-	if (acl_is_trivial_np(acl, &trivial) < 0) {
+	if (ret < 0) {
 		return -1;
 	} else if (trivial) {
 		return 0;
 	} else {
 		return 1;
 	}
-#else // !__FreeBSD__
+#else
 	return bfs_check_posix1e_acl(acl, true);
 #endif
 }
 
+#endif // BFS_HAS_ACL_GET_FILE
+
 int bfs_check_acl(const struct BFTW *ftwbuf) {
-	static const acl_type_t acl_types[] = {
-#if __APPLE__
-		// macOS gives EINVAL for either of the two standard ACL types,
-		// supporting only ACL_TYPE_EXTENDED
-		ACL_TYPE_EXTENDED,
-#else
-		// The two standard POSIX.1e ACL types
-		ACL_TYPE_ACCESS,
-		ACL_TYPE_DEFAULT,
-#endif
-
-#ifdef ACL_TYPE_NFS4
-		ACL_TYPE_NFS4,
-#endif
-	};
-	static const size_t n_acl_types = sizeof(acl_types)/sizeof(acl_types[0]);
-
 	if (ftwbuf->type == BFS_LNK) {
 		return 0;
 	}
 
 	const char *path = fake_at(ftwbuf);
 
+#if BFS_HAS_ACL_TRIVIAL
+	int ret = acl_trivial(path);
+	int error = errno;
+#elif BFS_HAS_ACL_GET_FILE
+	static const acl_type_t acl_types[] = {
+#  if __APPLE__
+		// macOS gives EINVAL for either of the two standard ACL types,
+		// supporting only ACL_TYPE_EXTENDED
+		ACL_TYPE_EXTENDED,
+#  else
+		// The two standard POSIX.1e ACL types
+		ACL_TYPE_ACCESS,
+		ACL_TYPE_DEFAULT,
+#  endif
+
+#  ifdef ACL_TYPE_NFS4
+		ACL_TYPE_NFS4,
+#  endif
+	};
+
 	int ret = -1, error = 0;
-	for (size_t i = 0; i < n_acl_types && ret <= 0; ++i) {
+	for (size_t i = 0; i < countof(acl_types) && ret <= 0; ++i) {
 		acl_type_t type = acl_types[i];
 
 		if (type == ACL_TYPE_DEFAULT && ftwbuf->type != BFS_DIR) {
@@ -237,6 +280,7 @@ int bfs_check_acl(const struct BFTW *ftwbuf) {
 		error = errno;
 		acl_free(acl);
 	}
+#endif
 
 	free_fake_at(ftwbuf, path);
 	errno = error;
@@ -300,17 +344,62 @@ int bfs_check_capabilities(const struct BFTW *ftwbuf) {
 
 #if BFS_CAN_CHECK_XATTRS
 
+#if BFS_USE_SYS_EXTATTR_H
+
+/** Wrapper for extattr_list_{file,link}. */
+static ssize_t bfs_extattr_list(const char *path, enum bfs_type type, int namespace) {
+	if (type == BFS_LNK) {
+#if BFS_HAS_EXTATTR_LIST_LINK
+		return extattr_list_link(path, namespace, NULL, 0);
+#elif BFS_HAS_EXTATTR_GET_LINK
+		return extattr_get_link(path, namespace, "", NULL, 0);
+#else
+		return 0;
+#endif
+	}
+
+#if BFS_HAS_EXTATTR_LIST_FILE
+	return extattr_list_file(path, namespace, NULL, 0);
+#elif BFS_HAS_EXTATTR_GET_FILE
+	// From man extattr(2):
+	//
+	//     In earlier versions of this API, passing an empty string for the
+	//     attribute name to extattr_get_file() would return the list of attributes
+	//     defined for the target object.  This interface has been deprecated in
+	//     preference to using the explicit list API, and should not be used.
+	return extattr_get_file(path, namespace, "", NULL, 0);
+#else
+	return 0;
+#endif
+}
+
+/** Wrapper for extattr_get_{file,link}. */
+static ssize_t bfs_extattr_get(const char *path, enum bfs_type type, int namespace, const char *name) {
+	if (type == BFS_LNK) {
+#if BFS_HAS_EXTATTR_GET_LINK
+		return extattr_get_link(path, namespace, name, NULL, 0);
+#else
+		return 0;
+#endif
+	}
+
+#if BFS_HAS_EXTATTR_GET_FILE
+	return extattr_get_file(path, namespace, name, NULL, 0);
+#else
+	return 0;
+#endif
+}
+
+#endif // BFS_USE_SYS_EXTATTR_H
+
 int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	const char *path = fake_at(ftwbuf);
 	ssize_t len;
 
 #if BFS_USE_SYS_EXTATTR_H
-	ssize_t (*extattr_list)(const char *, int, void*, size_t) =
-		ftwbuf->type == BFS_LNK ? extattr_list_link : extattr_list_file;
-
-	len = extattr_list(path, EXTATTR_NAMESPACE_SYSTEM, NULL, 0);
+	len = bfs_extattr_list(path, ftwbuf->type, EXTATTR_NAMESPACE_SYSTEM);
 	if (len <= 0) {
-		len = extattr_list(path, EXTATTR_NAMESPACE_USER, NULL, 0);
+		len = bfs_extattr_list(path, ftwbuf->type, EXTATTR_NAMESPACE_USER);
 	}
 #elif __APPLE__
 	int options = ftwbuf->type == BFS_LNK ? XATTR_NOFOLLOW : 0;
@@ -344,12 +433,9 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 	ssize_t len;
 
 #if BFS_USE_SYS_EXTATTR_H
-	ssize_t (*extattr_get)(const char *, int, const char *, void*, size_t) =
-		ftwbuf->type == BFS_LNK ? extattr_get_link : extattr_get_file;
-
-	len = extattr_get(path, EXTATTR_NAMESPACE_SYSTEM, name, NULL, 0);
+	len = bfs_extattr_get(path, ftwbuf->type, EXTATTR_NAMESPACE_SYSTEM, name);
 	if (len < 0) {
-		len = extattr_get(path, EXTATTR_NAMESPACE_USER, name, NULL, 0);
+		len = bfs_extattr_get(path, ftwbuf->type, EXTATTR_NAMESPACE_USER, name);
 	}
 #elif __APPLE__
 	int options = ftwbuf->type == BFS_LNK ? XATTR_NOFOLLOW : 0;
@@ -391,3 +477,32 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 }
 
 #endif
+
+char *bfs_getfilecon(const struct BFTW *ftwbuf) {
+#if BFS_CAN_CHECK_CONTEXT
+	const char *path = fake_at(ftwbuf);
+
+	char *con;
+	int ret;
+	if (ftwbuf->type == BFS_LNK) {
+		ret = lgetfilecon(path, &con);
+	} else {
+		ret = getfilecon(path, &con);
+	}
+
+	if (ret >= 0) {
+		return con;
+	} else {
+		return NULL;
+	}
+#else
+	errno = ENOTSUP;
+	return NULL;
+#endif
+}
+
+void bfs_freecon(char *con) {
+#if BFS_CAN_CHECK_CONTEXT
+	freecon(con);
+#endif
+}

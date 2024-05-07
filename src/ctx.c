@@ -1,103 +1,58 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2015-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 #include "ctx.h"
+#include "alloc.h"
 #include "color.h"
-#include "darray.h"
 #include "diag.h"
 #include "expr.h"
+#include "list.h"
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
 #include "trie.h"
-#include <assert.h>
+#include "xtime.h"
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-const char *debug_flag_name(enum debug_flags flag) {
-	switch (flag) {
-	case DEBUG_COST:
-		return "cost";
-	case DEBUG_EXEC:
-		return "exec";
-	case DEBUG_OPT:
-		return "opt";
-	case DEBUG_RATES:
-		return "rates";
-	case DEBUG_SEARCH:
-		return "search";
-	case DEBUG_STAT:
-		return "stat";
-	case DEBUG_TREE:
-		return "tree";
+/** Get the initial value for ctx->threads (-j). */
+static int bfs_nproc(void) {
+	long nproc = sysconf(_SC_NPROCESSORS_ONLN);
 
-	case DEBUG_ALL:
-		break;
+	if (nproc < 1) {
+		nproc = 1;
+	} else if (nproc > 8) {
+		// Not much speedup after 8 threads
+		nproc = 8;
 	}
 
-	assert(!"Unrecognized debug flag");
-	return "???";
+	return nproc;
 }
 
 struct bfs_ctx *bfs_ctx_new(void) {
-	struct bfs_ctx *ctx = malloc(sizeof(*ctx));
+	struct bfs_ctx *ctx = ZALLOC(struct bfs_ctx);
 	if (!ctx) {
 		return NULL;
 	}
 
-	ctx->argv = NULL;
-	ctx->paths = NULL;
-	ctx->expr = NULL;
-	ctx->exclude = NULL;
+	SLIST_INIT(&ctx->expr_list);
+	ARENA_INIT(&ctx->expr_arena, struct bfs_expr);
 
-	ctx->mindepth = 0;
 	ctx->maxdepth = INT_MAX;
 	ctx->flags = BFTW_RECOVER;
 	ctx->strategy = BFTW_BFS;
+	ctx->threads = bfs_nproc();
 	ctx->optlevel = 3;
-	ctx->debug = 0;
-	ctx->ignore_races = false;
-	ctx->posixly_correct = false;
-	ctx->status = false;
-	ctx->unique = false;
-	ctx->warn = false;
-	ctx->xargs_safe = false;
-
-	ctx->colors = NULL;
-	ctx->colors_error = 0;
-	ctx->cout = NULL;
-	ctx->cerr = NULL;
-
-	ctx->users = NULL;
-	ctx->groups = NULL;
-
-	ctx->mtab = NULL;
-	ctx->mtab_error = 0;
 
 	trie_init(&ctx->files);
-	ctx->nfiles = 0;
 
-	struct rlimit rl;
-	if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+	if (getrlimit(RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
 		goto fail;
 	}
-	ctx->nofile_soft = rl.rlim_cur;
-	ctx->nofile_hard = rl.rlim_max;
+	ctx->cur_nofile = ctx->orig_nofile;
 
 	ctx->users = bfs_users_new();
 	if (!ctx->users) {
@@ -106,6 +61,10 @@ struct bfs_ctx *bfs_ctx_new(void) {
 
 	ctx->groups = bfs_groups_new();
 	if (!ctx->groups) {
+		goto fail;
+	}
+
+	if (xgettime(&ctx->now) != 0) {
 		goto fail;
 	}
 
@@ -163,7 +122,7 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 		return ctx_file->cfile;
 	}
 
-	leaf->value = ctx_file = malloc(sizeof(*ctx_file));
+	leaf->value = ctx_file = ALLOC(struct bfs_ctx_file);
 	if (!ctx_file) {
 		trie_remove(&ctx->files, leaf);
 		return NULL;
@@ -185,7 +144,7 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 	// - the user sees everything relevant before an -ok[dir] prompt
 	// - output from commands is interleaved consistently with bfs
 	// - executed commands can rely on I/O from other bfs actions
-	TRIE_FOR_EACH(&ctx->files, leaf) {
+	for_trie (leaf, &ctx->files) {
 		struct bfs_ctx_file *ctx_file = leaf->value;
 		CFILE *cfile = ctx_file->cfile;
 		if (fflush(cfile->file) == 0) {
@@ -201,7 +160,6 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 		} else if (cfile == ctx->cout) {
 			bfs_error(ctx, "(standard output): %m.\n");
 		}
-
 	}
 
 	// Flush the user/group caches, in case the executed command edits the
@@ -264,15 +222,12 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		CFILE *cout = ctx->cout;
 		CFILE *cerr = ctx->cerr;
 
-		bfs_expr_free(ctx->exclude);
-		bfs_expr_free(ctx->expr);
-
 		bfs_mtab_free(ctx->mtab);
 
 		bfs_groups_free(ctx->groups);
 		bfs_users_free(ctx->users);
 
-		TRIE_FOR_EACH(&ctx->files, leaf) {
+		for_trie (leaf, &ctx->files) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
 
 			if (ctx_file->error) {
@@ -282,7 +237,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 			if (bfs_ctx_fclose(ctx, ctx_file) != 0) {
 				if (cerr) {
-					bfs_error(ctx, "'%s': %m.\n", ctx_file->path);
+					bfs_error(ctx, "%pq: %m.\n", ctx_file->path);
 				}
 				ret = -1;
 			}
@@ -303,10 +258,15 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		free_colors(ctx->colors);
 
-		for (size_t i = 0; i < darray_length(ctx->paths); ++i) {
+		for_slist (struct bfs_expr, expr, &ctx->expr_list, freelist) {
+			bfs_expr_clear(expr);
+		}
+		arena_destroy(&ctx->expr_arena);
+
+		for (size_t i = 0; i < ctx->npaths; ++i) {
 			free((char *)ctx->paths[i]);
 		}
-		darray_free(ctx->paths);
+		free(ctx->paths);
 
 		free(ctx->argv);
 		free(ctx);

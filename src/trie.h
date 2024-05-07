@@ -1,23 +1,11 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2019-2022 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 #ifndef BFS_TRIE_H
 #define BFS_TRIE_H
 
-#include <stdbool.h>
+#include "alloc.h"
+#include "list.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -25,24 +13,13 @@
  * A leaf of a trie.
  */
 struct trie_leaf {
-	/**
-	 * Linked list of leaves, in insertion order.
-	 */
+	/** Linked list of leaves, in insertion order. */
 	struct trie_leaf *prev, *next;
-
-	/**
-	 * An arbitrary value associated with this leaf.
-	 */
+	/** An arbitrary value associated with this leaf. */
 	void *value;
-
-	/**
-	 * The length of the key in bytes.
-	 */
+	/** The length of the key in bytes. */
 	size_t length;
-
-	/**
-	 * The key itself, stored inline.
-	 */
+	/** The key itself, stored inline. */
 	char key[];
 };
 
@@ -54,6 +31,10 @@ struct trie {
 	uintptr_t root;
 	/** Linked list of leaves. */
 	struct trie_leaf *head, *tail;
+	/** Node allocator. */
+	struct varena nodes;
+	/** Leaf allocator. */
+	struct varena leaves;
 };
 
 /**
@@ -148,6 +129,11 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 void trie_remove(struct trie *trie, struct trie_leaf *leaf);
 
 /**
+ * Remove all leaves from a trie.
+ */
+void trie_clear(struct trie *trie);
+
+/**
  * Destroy a trie and its contents.
  */
 void trie_destroy(struct trie *trie);
@@ -155,9 +141,7 @@ void trie_destroy(struct trie *trie);
 /**
  * Iterate over the leaves of a trie.
  */
-#define TRIE_FOR_EACH(trie, leaf)				\
-	for (struct trie_leaf *leaf = (trie)->head, *_next;	\
-	     leaf && (_next = leaf->next, true);		\
-	     leaf = _next)
+#define for_trie(leaf, trie) \
+	for_list (struct trie_leaf, leaf, trie)
 
 #endif // BFS_TRIE_H

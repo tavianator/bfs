@@ -1,18 +1,5 @@
-/****************************************************************************
- * bfs                                                                      *
- * Copyright (C) 2018-2019 Tavian Barnes <tavianator@tavianator.com>        *
- *                                                                          *
- * Permission to use, copy, modify, and/or distribute this software for any *
- * purpose with or without fee is hereby granted.                           *
- *                                                                          *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
- ****************************************************************************/
+// Copyright © Tavian Barnes <tavianator@tavianator.com>
+// SPDX-License-Identifier: 0BSD
 
 /**
  * A facade over the stat() API that unifies some details that diverge between
@@ -25,33 +12,49 @@
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
 
-#include "config.h"
+#include "prelude.h"
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
 
+#if !BFS_HAS_STATX && BFS_HAS_STATX_SYSCALL
+#  include <linux/stat.h>
+#endif
+
+#ifndef BFS_USE_STATX
+#  define BFS_USE_STATX (BFS_HAS_STATX || BFS_HAS_STATX_SYSCALL)
+#endif
+
 #if BFS_USE_SYS_PARAM_H
-#	include <sys/param.h>
+#  include <sys/param.h>
+#endif
+
+#ifdef DEV_BSIZE
+#  define BFS_STAT_BLKSIZE DEV_BSIZE
+#elif defined(S_BLKSIZE)
+#  define BFS_STAT_BLKSIZE S_BLKSIZE
+#else
+#  define BFS_STAT_BLKSIZE 512
 #endif
 
 /**
  * bfs_stat field bitmask.
  */
 enum bfs_stat_field {
-	BFS_STAT_DEV    = 1 << 0,
-	BFS_STAT_INO    = 1 << 1,
-	BFS_STAT_TYPE   = 1 << 2,
-	BFS_STAT_MODE   = 1 << 3,
-	BFS_STAT_NLINK  = 1 << 4,
-	BFS_STAT_GID    = 1 << 5,
-	BFS_STAT_UID    = 1 << 6,
-	BFS_STAT_SIZE   = 1 << 7,
-	BFS_STAT_BLOCKS = 1 << 8,
-	BFS_STAT_RDEV   = 1 << 9,
-	BFS_STAT_ATTRS  = 1 << 10,
-	BFS_STAT_ATIME  = 1 << 11,
-	BFS_STAT_BTIME  = 1 << 12,
-	BFS_STAT_CTIME  = 1 << 13,
-	BFS_STAT_MTIME  = 1 << 14,
+	BFS_STAT_MODE   = 1 << 0,
+	BFS_STAT_DEV    = 1 << 1,
+	BFS_STAT_INO    = 1 << 2,
+	BFS_STAT_NLINK  = 1 << 3,
+	BFS_STAT_GID    = 1 << 4,
+	BFS_STAT_UID    = 1 << 5,
+	BFS_STAT_SIZE   = 1 << 6,
+	BFS_STAT_BLOCKS = 1 << 7,
+	BFS_STAT_RDEV   = 1 << 8,
+	BFS_STAT_ATTRS  = 1 << 9,
+	BFS_STAT_ATIME  = 1 << 10,
+	BFS_STAT_BTIME  = 1 << 11,
+	BFS_STAT_CTIME  = 1 << 12,
+	BFS_STAT_MTIME  = 1 << 13,
 };
 
 /**
@@ -73,14 +76,6 @@ enum bfs_stat_flags {
 	BFS_STAT_NOSYNC = 1 << 2,
 };
 
-#ifdef DEV_BSIZE
-#	define BFS_STAT_BLKSIZE DEV_BSIZE
-#elif defined(S_BLKSIZE)
-#	define BFS_STAT_BLKSIZE S_BLKSIZE
-#else
-#	define BFS_STAT_BLKSIZE 512
-#endif
-
 /**
  * Facade over struct stat.
  */
@@ -88,12 +83,12 @@ struct bfs_stat {
 	/** Bitmask indicating filled fields. */
 	enum bfs_stat_field mask;
 
+	/** File type and access mode. */
+	mode_t mode;
 	/** Device ID containing the file. */
 	dev_t dev;
 	/** Inode number. */
 	ino_t ino;
-	/** File type and access mode. */
-	mode_t mode;
 	/** Number of hard links. */
 	nlink_t nlink;
 	/** Owner group ID. */
@@ -136,6 +131,28 @@ struct bfs_stat {
  *         0 on success, -1 on error.
  */
 int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct bfs_stat *buf);
+
+/**
+ * Convert bfs_stat_flags to fstatat() flags.
+ */
+int bfs_fstatat_flags(enum bfs_stat_flags flags);
+
+/**
+ * Convert struct stat to struct bfs_stat.
+ */
+void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src);
+
+#if BFS_USE_STATX
+/**
+ * Convert bfs_stat_flags to statx() flags.
+ */
+int bfs_statx_flags(enum bfs_stat_flags flags);
+
+/**
+ * Convert struct statx to struct bfs_stat.
+ */
+int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src);
+#endif
 
 /**
  * Get a particular time field from a bfs_stat() buffer.

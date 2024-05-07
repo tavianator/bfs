@@ -1,22 +1,21 @@
 <div align="center">
 
-`bfs`
-=====
-
+<h1>
+<code>bfs</code>
+<br clear="all">
 <a href="https://github.com/tavianator/bfs/releases"><img src="https://img.shields.io/github/v/tag/tavianator/bfs?label=version" alt="Version" align="left"></a>
 <a href="/LICENSE"><img src="https://img.shields.io/badge/license-0BSD-blue.svg" alt="License" align="left"></a>
-<a href="https://github.com/tavianator/bfs/actions/workflows/ci.yml"><img src="https://img.shields.io/github/workflow/status/tavianator/bfs/CI?label=CI" alt="CI Status" align="right"></a>
+<a href="https://github.com/tavianator/bfs/actions/workflows/ci.yml"><img src="https://github.com/tavianator/bfs/actions/workflows/ci.yml/badge.svg" alt="CI Status" align="right"></a>
 <a href="https://codecov.io/gh/tavianator/bfs"><img src="https://img.shields.io/codecov/c/github/tavianator/bfs?token=PpBVuozOVC" alt="Code coverage" align="right"/></a>
+</h1>
 
-***Breadth-first search for your files.***
-
-**[Features]   •   [Installation]   •   [Usage]   •   [Building]   •   [Hacking]   •   [Changelog]**
+**[Features]   •   [Installation]   •   [Usage]   •   [Building]   •   [Contributing]   •   [Changelog]**
 
 [Features]: #features
 [Installation]: #installation
 [Usage]: /docs/USAGE.md
 [Building]: /docs/BUILDING.md
-[Hacking]: /docs/HACKING.md
+[Contributing]: /docs/CONTRIBUTING.md
 [Changelog]: /docs/CHANGELOG.md
 
 <picture>
@@ -71,34 +70,44 @@ haystack
 </pre>
 
 `find` will explore the entire `deep` directory tree before it ever gets to the `shallow` one that contains what you're looking for.
-
-<pre>
-$ <strong>find</strong> haystack
-haystack
-haystack/deep
-haystack/deep/1
-haystack/deep/1/2
-haystack/deep/1/2/3
-haystack/deep/1/2/3/4
-...
-haystack/shallow
-<strong>haystack/shallow/needle</strong>
-</pre>
-
 On the other hand, `bfs` lists files from shallowest to deepest, so you never have to wait for it to explore an entire unrelated subtree.
 
-<pre>
-$ <strong>bfs</strong> haystack
+<table>
+<tbody>
+<tr><th><code>bfs</code></th><th><code>find</code></th></tr>
+<tr>
+<td width="506" valign="top">
+
+```console
+$ bfs haystack
 haystack
 haystack/deep
 haystack/shallow
 haystack/deep/1
-<strong>haystack/shallow/needle</strong>
+haystack/shallow/needle
+...
+```
+
+</td>
+<td width="506" valign="top">
+
+```console
+$ find haystack
+haystack
+haystack/deep
+haystack/deep/1
 haystack/deep/1/2
 haystack/deep/1/2/3
 haystack/deep/1/2/3/4
 ...
-</pre>
+haystack/shallow
+haystack/shallow/needle
+```
+
+</td>
+</tr>
+</tbody>
+</table>
 </details>
 
 <details>
@@ -154,21 +163,22 @@ haystack/needle
 
 For example, `bfs` will detect and suggest corrections for typos:
 
-<pre>
+```console
 $ bfs -nam needle
-<strong>bfs: error:</strong> bfs <strong>-nam</strong> needle
-<strong>bfs: error:</strong>     <strong>~~~~</strong>
-<strong>bfs: error:</strong> Unknown argument; did you mean <strong>-name</strong>?
-</pre>
+bfs: error: bfs -nam needle
+bfs: error:     ~~~~
+bfs: error: Unknown argument; did you mean -name?
+```
 
 `bfs` also includes a powerful static analysis to help catch mistakes:
 
-<pre>
+```console
 $ bfs -print -name 'needle'
-<strong>bfs: warning:</strong> bfs -print <strong>-name needle</strong>
-<strong>bfs: warning:</strong>            <strong>~~~~~~~~~~~~</strong>
-<strong>bfs: warning:</strong> The result of this expression is ignored.
-</pre>
+bfs: warning: bfs -print -name needle
+bfs: warning:            ~~~~~~~~~~~~
+bfs: warning: The result of this expression is ignored.
+```
+
 </details>
 
 <details>
@@ -204,12 +214,19 @@ Installation
 </summary>
 <p></p>
 
+<table>
+<tbody>
+<tr><th>Linux</th><th>macOS</th></tr>
+
+<tr>
+<td width="506" valign="top" rowspan="3">
+
 <pre>
 <strong><a href="https://pkgs.alpinelinux.org/packages?name=bfs">Alpine Linux</a></strong>
 # apk add bfs
 
-<strong><a href="https://aur.archlinux.org/packages/bfs">Arch Linux</a></strong>
-(Available in the AUR)
+<strong><a href="https://archlinux.org/packages/extra/x86_64/bfs/">Arch Linux</a></strong>
+# pacman -S bfs
 
 <strong><a href="https://packages.debian.org/sid/bfs">Debian</a>/<a href="https://packages.ubuntu.com/kinetic/bfs">Ubuntu</a></strong>
 # apt install bfs
@@ -217,21 +234,48 @@ Installation
 <strong><a href="https://src.fedoraproject.org/rpms/bfs">Fedora Linux</a></strong>
 # dnf install bfs
 
+<strong><a href="https://packages.gentoo.org/packages/sys-apps/bfs">Gentoo</a></strong>
+# emerge sys-apps/bfs
+
+<strong><a href="https://packages.guix.gnu.org/packages/bfs/">GNU Guix</a></strong>
+# guix install bfs
+
 <strong><a href="https://search.nixos.org/packages?channel=unstable&show=bfs&from=0&size=1&sort=relevance&type=packages&query=bfs">NixOS</a></strong>
 # nix-env -i bfs
 
 <strong><a href="https://voidlinux.org/packages/?arch=x86_64&q=bfs">Void Linux</a></strong>
 # xbps-install -S bfs
+</pre>
 
-<strong><a href="https://www.freshports.org/sysutils/bfs">FreeBSD</a></strong>
-# pkg install bfs
+</td>
+<td width="506" valign="top">
+
+<pre>
+<strong><a href="https://formulae.brew.sh/formula/bfs">Homebrew</a></strong>
+$ brew install bfs
 
 <strong><a href="https://ports.macports.org/port/bfs/">MacPorts</a></strong>
 # port install bfs
-
-<strong><a href="https://github.com/tavianator/homebrew-tap/blob/master/Formula/bfs.rb">Homebrew</a></strong>
-$ brew install tavianator/tap/bfs
 </pre>
+
+</td>
+</tr>
+<tr><th height="1">BSD</th></tr>
+<tr>
+<td width="506" valign="top">
+
+<pre>
+<strong><a href="https://www.freshports.org/sysutils/bfs">FreeBSD</a></strong>
+# pkg install bfs
+
+<strong><a href="https://openports.pl/path/sysutils/bfs">OpenBSD</a></strong>
+# pkg_add bfs
+</pre>
+
+</td>
+</tr>
+</tbody>
+</table>
 </details>
 
 <details>
@@ -249,31 +293,31 @@ Here's how to install them on some common platforms:
 
 <pre>
 <strong>Alpine Linux</strong>
-# apk add acl{,-dev} attr{,-dev} libcap{,-dev} oniguruma-dev
+# apk add acl{,-dev} attr libcap{,-dev} liburing-dev oniguruma-dev
 
 <strong>Arch Linux</strong>
-# pacman -S acl attr libcap oniguruma
+# pacman -S acl attr libcap liburing oniguruma
 
 <strong>Debian/Ubuntu</strong>
-# apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev libonig-dev
+# apt install acl libacl1-dev attr libattr1-dev libcap2-bin libcap-dev liburing-dev libonig-dev
 
 <strong>Fedora</strong>
-# dnf install libacl-devel libattr-devel libcap-devel oniguruma-devel
+# dnf install acl libacl-devel attr libcap-devel liburing-devel oniguruma-devel
 
 <strong>NixOS</strong>
-# nix-env -i acl attr libcap oniguruma
+# nix-env -i acl attr libcap liburing oniguruma
 
 <strong>Void Linux</strong>
-# xbps-install -S acl-{devel,progs} attr-{devel,progs} libcap-{devel,progs} oniguruma-devel
+# xbps-install -S acl-{devel,progs} attr-progs libcap-{devel,progs} liburing-devel oniguruma-devel
 
-<strong>FreeBSD</strong>
-# pkg install oniguruma
+<strong>Homebrew</strong>
+$ brew install oniguruma
 
 <strong>MacPorts</strong>
 # port install oniguruma6
 
-<strong>Homebrew</strong>
-$ brew install oniguruma
+<strong>FreeBSD</strong>
+# pkg install oniguruma
 </pre>
 
 These dependencies are technically optional, though strongly recommended.
@@ -289,6 +333,7 @@ Once you have the dependencies, you can build <code>bfs</code>.
 Download one of the [releases](https://github.com/tavianator/bfs/releases) or clone the [git repo](https://github.com/tavianator/bfs).
 Then run
 
+    $ ./configure
     $ make
 
 This will build the `./bin/bfs` binary.
@@ -298,7 +343,8 @@ Run the test suite to make sure it works correctly:
 
 If you're interested in speed, you may want to build the release version instead:
 
-    $ make release
+    $ ./configure --enable-release
+    $ make
 
 Finally, if you want to install it globally, run
 

@@ -1,0 +1,10 @@
+.
+./lower
+./lower/bar
+./lower/baz
+./lower/foo
+./upper
+./upper/bar
+./upper/baz
+./upper/baz/qux
+./upper/foo
