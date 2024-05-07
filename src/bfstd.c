@@ -637,8 +637,14 @@ error:
 	return NULL;
 }
 
+#if BFS_HAS_STRTOFFLAGS
+#  define BFS_STRTOFFLAGS strtofflags
+#elif BFS_HAS_STRING_TO_FLAGS
+#  define BFS_STRTOFFLAGS string_to_flags
+#endif
+
 int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear) {
-#if BSD && !__GNU__
+#ifdef BFS_STRTOFFLAGS
 	char *str_arg = (char *)*str;
 
 #if __OpenBSD__
@@ -649,11 +655,7 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 	bfs_fflags_t set_arg = 0;
 	bfs_fflags_t clear_arg = 0;
 
-#if __NetBSD__
-	int ret = string_to_flags(&str_arg, &set_arg, &clear_arg);
-#else
-	int ret = strtofflags(&str_arg, &set_arg, &clear_arg);
-#endif
+	int ret = BFS_STRTOFFLAGS(&str_arg, &set_arg, &clear_arg);
 
 	*str = str_arg;
 	*set = set_arg;
@@ -663,7 +665,7 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 		errno = EINVAL;
 	}
 	return ret;
-#else // !BSD
+#else // !BFS_STRTOFFLAGS
 	errno = ENOTSUP;
 	return -1;
 #endif
