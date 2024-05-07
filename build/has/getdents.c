@@ -4,7 +4,6 @@
 #include <dirent.h>
 
 int main(void) {
-	struct dirent de;
-	getdents(3, &de, 1024);
-	return 0;
+	char buf[1024];
+	return getdents(3, (void *)buf, sizeof(buf));
 }

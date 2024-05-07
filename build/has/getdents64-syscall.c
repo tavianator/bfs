@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 int main(void) {
-	struct dirent64 de;
-	syscall(SYS_getdents64, 3, &de, 1024);
-	return 0;
+	char buf[1024];
+	return syscall(SYS_getdents64, 3, (void *)buf, sizeof(buf));
 }
