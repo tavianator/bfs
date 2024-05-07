@@ -41,6 +41,11 @@ jobs:
         run: |
           make -j$(nproc) distcheck
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-config.log
+          path: distcheck-*/gen/config.log
+
   macos:
     name: macOS
 
@@ -73,7 +78,6 @@ jobs:
         with:
           operating_system: freebsd
           version: "14.0"
-          sync_files: runner-to-vm
 
           run: |
             sudo pkg install -y \
@@ -84,6 +88,11 @@ jobs:
                 tcl-wrapper
             sudo mount -t fdescfs none /dev/fd
             make -j$(nproc) distcheck
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-config.log
+          path: distcheck-*/gen/config.log
 
   openbsd:
     name: OpenBSD
@@ -98,7 +107,6 @@ jobs:
         with:
           operating_system: openbsd
           version: "7.5"
-          sync_files: runner-to-vm
 
           run: |
             sudo pkg_add \
@@ -109,6 +117,11 @@ jobs:
             jobs=$(sysctl -n hw.ncpu)
             ./configure MAKE=gmake
             gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openbsd-config.log
+          path: gen/config.log
 
   netbsd:
     name: NetBSD
@@ -123,7 +136,6 @@ jobs:
         with:
           operating_system: netbsd
           version: "10.0"
-          sync_files: runner-to-vm
 
           run: |
             PATH="/sbin:/usr/sbin:$PATH"
@@ -135,6 +147,11 @@ jobs:
             jobs=$(sysctl -n hw.ncpu)
             ./configure
             make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: netbsd-config.log
+          path: gen/config.log
 
   dragonflybsd:
     name: DragonFly BSD
@@ -149,7 +166,6 @@ jobs:
         with:
           release: "6.4.0"
           usesh: true
-          copyback: false
 
           prepare: |
             pkg install -y \
@@ -168,6 +184,11 @@ jobs:
             sudo -u action ./configure
             sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragonfly-config.log
+          path: gen/config.log
+
   omnios:
     name: OmniOS
 
@@ -181,7 +202,6 @@ jobs:
         with:
           release: "r151048"
           usesh: true
-          copyback: false
 
           prepare: |
             pkg install \
@@ -200,3 +220,8 @@ jobs:
             jobs=$(getconf NPROCESSORS_ONLN)
             sudo -u action ./configure MAKE=gmake
             sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omnios-config.log
+          path: gen/config.log
