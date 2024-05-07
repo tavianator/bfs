@@ -62,7 +62,7 @@ int bfs_fstatat_flags(enum bfs_stat_flags flags) {
 		ret |= AT_SYMLINK_NOFOLLOW;
 	}
 
-#if defined(AT_NO_AUTOMOUNT) && (!__GNU__ || __GLIBC_PREREQ(2, 35))
+#ifdef AT_NO_AUTOMOUNT
 	ret |= AT_NO_AUTOMOUNT;
 #endif
 
