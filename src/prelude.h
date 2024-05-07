@@ -127,13 +127,6 @@ extern const char bfs_version[];
 #  define __has_attribute(attr) false
 #endif
 
-// Platform detection
-
-// Get the definition of BSD if available
-#if BFS_USE_SYS_PARAM_H
-#  include <sys/param.h>
-#endif
-
 // Fundamental utilities
 
 /**
