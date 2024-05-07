@@ -156,11 +156,11 @@ DISTCHECKS := \
 
 # Test multiple configurations
 distcheck:
-	@+${MAKE} -s distcheck-asan
-	@+test "$$(uname)" = Darwin || ${MAKE} -s distcheck-msan
-	@+${MAKE} -s distcheck-tsan
-	@+test "$$(uname)-$$(uname -m)" != Linux-x86_64 || ${MAKE} -s distcheck-m32
-	@+${MAKE} -s distcheck-release
+	@+${MAKE} distcheck-asan
+	@+test "$$(uname)" = Darwin || ${MAKE} distcheck-msan
+	@+${MAKE} distcheck-tsan
+	@+test "$$(uname)-$$(uname -m)" != Linux-x86_64 || ${MAKE} distcheck-m32
+	@+${MAKE} distcheck-release
 .PHONY: distcheck
 
 # Per-distcheck configuration
@@ -174,7 +174,7 @@ ${DISTCHECKS}::
 	@${MKDIR} $@
 	@+cd $@ \
 	    && ../configure ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
-	    && ${MAKE} -s check TEST_FLAGS="--sudo --verbose=skipped"
+	    && ${MAKE} check TEST_FLAGS="--sudo --verbose=skipped"
 
 ## Packaging (`make install`)
 
