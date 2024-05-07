@@ -134,10 +134,6 @@ extern const char bfs_version[];
 #  include <sys/param.h>
 #endif
 
-#ifndef __GLIBC_PREREQ
-#  define __GLIBC_PREREQ(maj, min) false
-#endif
-
 // Fundamental utilities
 
 /**
