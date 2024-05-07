@@ -15,7 +15,7 @@
 
 #if !defined(BFS_USE_MNTENT) && BFS_USE_MNTENT_H
 #  define BFS_USE_MNTENT true
-#elif !defined(BFS_USE_MNTINFO) && BSD
+#elif !defined(BFS_USE_MNTINFO) && BFS_HAS_GETMNTINFO
 #  define BFS_USE_MNTINFO true
 #elif !defined(BFS_USE_MNTTAB) && __SVR4
 #  define BFS_USE_MNTTAB true
@@ -27,7 +27,6 @@
 #  include <stdio.h>
 #elif BFS_USE_MNTINFO
 #  include <sys/mount.h>
-#  include <sys/ucred.h>
 #elif BFS_USE_MNTTAB
 #  include <stdio.h>
 #  include <sys/mnttab.h>

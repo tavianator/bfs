@@ -24,6 +24,7 @@ HEADERS := \
     gen/has/getdents.h \
     gen/has/getdents64.h \
     gen/has/getdents64-syscall.h \
+    gen/has/getmntinfo.h \
     gen/has/getprogname.h \
     gen/has/getprogname-gnu.h \
     gen/has/max-align-t.h \
