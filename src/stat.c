@@ -297,27 +297,21 @@ int bfs_stat(int at_fd, const char *at_path, enum bfs_stat_flags flags, struct b
 		return bfs_stat_tryfollow(at_fd, at_path, at_flags, flags, buf);
 	}
 
-	// Check __GNU__ to work around https://lists.gnu.org/archive/html/bug-hurd/2021-12/msg00001.html
-#if defined(AT_EMPTY_PATH) && !__GNU__
-	static atomic bool has_at_ep = true;
-	if (load(&has_at_ep, relaxed)) {
-		at_flags |= AT_EMPTY_PATH;
-		int ret = bfs_stat_explicit(at_fd, "", at_flags, buf);
-		if (ret != 0 && errno == EINVAL) {
-			store(&has_at_ep, false, relaxed);
-		} else {
-			return ret;
-		}
-	}
-#endif
-
-	struct stat statbuf;
-	if (fstat(at_fd, &statbuf) == 0) {
-		bfs_stat_convert(buf, &statbuf);
-		return 0;
-	} else {
+#if BFS_USE_STATX
+	// If we have statx(), use it with AT_EMPTY_PATH for its extra features
+	at_flags |= AT_EMPTY_PATH;
+	return bfs_stat_explicit(at_fd, "", at_flags, buf);
+#else
+	// Otherwise, just use fstat() rather than fstatat(at_fd, ""), to save
+	// the kernel the trouble of copying in the empty string
+	struct stat sb;
+	if (fstat(at_fd, &sb) != 0) {
 		return -1;
 	}
+
+	bfs_stat_convert(buf, &sb);
+	return 0;
+#endif
 }
 
 const struct timespec *bfs_stat_time(const struct bfs_stat *buf, enum bfs_stat_field field) {
