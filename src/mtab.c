@@ -148,7 +148,7 @@ struct bfs_mtab *bfs_mtab_parse(void) {
 
 	bfs_statfs *mntbuf;
 	int size = getmntinfo(&mntbuf, MNT_WAIT);
-	if (size < 0) {
+	if (size <= 0) {
 		error = errno;
 		goto fail;
 	}
