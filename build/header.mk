@@ -24,6 +24,8 @@ HEADERS := \
     gen/has/getdents.h \
     gen/has/getdents64.h \
     gen/has/getdents64-syscall.h \
+    gen/has/getmntent-1.h \
+    gen/has/getmntent-2.h \
     gen/has/getmntinfo.h \
     gen/has/getprogname.h \
     gen/has/getprogname-gnu.h \

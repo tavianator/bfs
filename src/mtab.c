@@ -13,11 +13,11 @@
 #include <string.h>
 #include <sys/types.h>
 
-#if !defined(BFS_USE_MNTENT) && BFS_USE_MNTENT_H
+#if !defined(BFS_USE_MNTENT) && BFS_HAS_GETMNTENT_1
 #  define BFS_USE_MNTENT true
 #elif !defined(BFS_USE_MNTINFO) && BFS_HAS_GETMNTINFO
 #  define BFS_USE_MNTINFO true
-#elif !defined(BFS_USE_MNTTAB) && __SVR4
+#elif !defined(BFS_USE_MNTTAB) && BFS_HAS_GETMNTENT_2
 #  define BFS_USE_MNTTAB true
 #endif
 
