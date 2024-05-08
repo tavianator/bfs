@@ -244,7 +244,7 @@ int dstrxcpy(dchar **dest, const char *str, size_t len);
  *         The created string, or NULL on failure.
  */
 attr(printf(1, 2))
-char *dstrprintf(const char *format, ...);
+dchar *dstrprintf(const char *format, ...);
 
 /**
  * Create a dynamic string from a format string and a va_list.
@@ -257,7 +257,7 @@ char *dstrprintf(const char *format, ...);
  *         The created string, or NULL on failure.
  */
 attr(printf(1, 0))
-char *dstrvprintf(const char *format, va_list args);
+dchar *dstrvprintf(const char *format, va_list args);
 
 /**
  * Format some text onto the end of a dynamic string.

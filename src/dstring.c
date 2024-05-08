@@ -174,7 +174,7 @@ int dstrxcpy(dchar **dest, const char *src, size_t len) {
 	return 0;
 }
 
-char *dstrprintf(const char *format, ...) {
+dchar *dstrprintf(const char *format, ...) {
 	va_list args;
 
 	va_start(args, format);
@@ -184,7 +184,7 @@ char *dstrprintf(const char *format, ...) {
 	return str;
 }
 
-char *dstrvprintf(const char *format, va_list args) {
+dchar *dstrvprintf(const char *format, va_list args) {
 	// Guess a capacity to try to avoid reallocating
 	dchar *str = dstralloc(2 * strlen(format));
 	if (!str) {
