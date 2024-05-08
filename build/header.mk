@@ -22,24 +22,24 @@ HEADERS := \
     gen/has/extattr-list-link.h \
     gen/has/fdclosedir.h \
     gen/has/getdents.h \
-    gen/has/getdents64.h \
     gen/has/getdents64-syscall.h \
+    gen/has/getdents64.h \
     gen/has/getmntent-1.h \
     gen/has/getmntent-2.h \
     gen/has/getmntinfo.h \
-    gen/has/getprogname.h \
     gen/has/getprogname-gnu.h \
+    gen/has/getprogname.h \
     gen/has/max-align-t.h \
     gen/has/pipe2.h \
-    gen/has/posix-spawn-addfchdir.h \
     gen/has/posix-spawn-addfchdir-np.h \
+    gen/has/posix-spawn-addfchdir.h \
     gen/has/st-acmtim.h \
     gen/has/st-acmtimespec.h \
     gen/has/st-birthtim.h \
     gen/has/st-birthtimespec.h \
     gen/has/st-flags.h \
-    gen/has/statx.h \
     gen/has/statx-syscall.h \
+    gen/has/statx.h \
     gen/has/strerror-l.h \
     gen/has/strerror-r-gnu.h \
     gen/has/strerror-r-posix.h \
