@@ -6,6 +6,7 @@
 #include "atomic.h"
 #include "bfstd.h"
 #include "bit.h"
+#include "diag.h"
 #include "dstring.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -15,9 +16,30 @@
 #include <string.h>
 #include <sys/ioctl.h>
 
+/**
+ * Sentinel values for bfs_bar::refcount.
+ */
+enum {
+	/** The bar is currently uninitialized. */
+	BFS_BAR_UNINIT = 0,
+	/** The bar is being initialized/destroyed. */
+	BFS_BAR_BUSY   = 1,
+	/** Values >= this are valid refcounts. */
+	BFS_BAR_READY  = 2,
+};
+
 struct bfs_bar {
-	int fd;
+	/**
+	 * A file descriptor to the TTY.  Must be atomic because signal handlers
+	 * can race with bfs_bar_hide().
+	 */
+	atomic int fd;
+	/** A reference count protecting `fd`. */
+	atomic unsigned int refcount;
+
+	/** The width of the TTY. */
 	atomic unsigned int width;
+	/** The height of the TTY. */
 	atomic unsigned int height;
 };
 
@@ -26,27 +48,71 @@ static struct bfs_bar the_bar = {
 	.fd = -1,
 };
 
+/** Try to acquire a reference to bar->fd. */
+static int bfs_bar_getfd(struct bfs_bar *bar) {
+	unsigned int refs = load(&bar->refcount, relaxed);
+	do {
+		if (refs < BFS_BAR_READY) {
+			errno = EAGAIN;
+			return -1;
+		}
+	} while (!compare_exchange_weak(&bar->refcount, &refs, refs + 1, acquire, relaxed));
+
+	return load(&bar->fd, relaxed);
+}
+
+/** Release a reference to bar->fd. */
+static void bfs_bar_putfd(struct bfs_bar *bar) {
+	int fd = load(&bar->fd, relaxed);
+
+	unsigned int refs = fetch_sub(&bar->refcount, 1, release);
+	bfs_assert(refs >= BFS_BAR_READY);
+
+	if (refs == 2) {
+		close_quietly(fd);
+		store(&bar->fd, -1, relaxed);
+		store(&bar->refcount, BFS_BAR_UNINIT, release);
+	}
+}
+
 /** Get the terminal size, if possible. */
 static int bfs_bar_getsize(struct bfs_bar *bar) {
 #ifdef TIOCGWINSZ
-	struct winsize ws;
-	if (ioctl(bar->fd, TIOCGWINSZ, &ws) != 0) {
+	int fd = bfs_bar_getfd(bar);
+	if (fd < 0) {
 		return -1;
 	}
 
-	store(&bar->width, ws.ws_col, relaxed);
-	store(&bar->height, ws.ws_row, relaxed);
-	return 0;
+	struct winsize ws;
+	int ret = ioctl(fd, TIOCGWINSZ, &ws);
+	if (ret == 0) {
+		store(&bar->width, ws.ws_col, relaxed);
+		store(&bar->height, ws.ws_row, relaxed);
+	}
+
+	bfs_bar_putfd(bar);
+	return ret;
 #else
 	errno = ENOTSUP;
 	return -1;
 #endif
 }
 
-/** Async Signal Safe puts(). */
-static int ass_puts(int fd, const char *str) {
-	size_t len = strlen(str);
-	return xwrite(fd, str, len) == len ? 0 : -1;
+/** Write a string to the status bar (async-signal-safe). */
+static int bfs_bar_write(struct bfs_bar *bar, const char *str, size_t len) {
+	int fd = bfs_bar_getfd(bar);
+	if (fd < 0) {
+		return -1;
+	}
+
+	int ret = xwrite(fd, str, len) == len ? 0 : -1;
+	bfs_bar_putfd(bar);
+	return ret;
+}
+
+/** Write a string to the status bar (async-signal-safe). */
+static int bfs_bar_puts(struct bfs_bar *bar, const char *str) {
+	return bfs_bar_write(bar, str, strlen(str));
 }
 
 /** Number of decimal digits needed for terminal sizes. */
@@ -70,22 +136,24 @@ static char *ass_itoa(char *str, unsigned int n) {
 
 /** Update the size of the scrollable region. */
 static int bfs_bar_resize(struct bfs_bar *bar) {
-	char esc_seq[12 + ITOA_DIGITS] =
-		"\0337"   // DECSC: Save cursor
-		"\033[;"; // DECSTBM: Set scrollable region
+	char esc_seq[12 + ITOA_DIGITS];
+
+	char *cur = stpcpy(esc_seq,
+		"\0337"  // DECSC: Save cursor
+		"\033[;" // DECSTBM: Set scrollable region
+	);
 
 	// DECSTBM takes the height as the second argument
 	unsigned int height = load(&bar->height, relaxed);
-	char *ptr = esc_seq + strlen(esc_seq);
-	ptr = ass_itoa(ptr, height - 1);
+	cur = ass_itoa(cur, height - 1);
 
-	strcpy(ptr,
+	cur = stpcpy(cur,
 		"r"      // DECSTBM
 		"\0338"  // DECRC: Restore the cursor
 		"\033[J" // ED: Erase display from cursor to end
 	);
 
-	return ass_puts(bar->fd, esc_seq);
+	return bfs_bar_write(bar, esc_seq, cur - esc_seq);
 }
 
 #ifdef SIGWINCH
@@ -102,7 +170,7 @@ static void sighand_winch(int sig) {
 
 /** Reset the scrollable region and hide the bar. */
 static int bfs_bar_reset(struct bfs_bar *bar) {
-	return ass_puts(bar->fd,
+	return bfs_bar_puts(bar,
 		"\0337"  // DECSC: Save cursor
 		"\033[r" // DECSTBM: Reset scrollable region
 		"\0338"  // DECRC: Restore cursor
@@ -138,13 +206,14 @@ static int bfs_bar_printf(struct bfs_bar *bar, const char *format, ...) {
 		return -1;
 	}
 
-	int ret = ass_puts(bar->fd, str);
+	int ret = bfs_bar_write(bar, str, dstrlen(str));
 	dstrfree(str);
 	return ret;
 }
 
 struct bfs_bar *bfs_bar_show(void) {
-	if (the_bar.fd >= 0) {
+	unsigned int refs = BFS_BAR_UNINIT;
+	if (!compare_exchange_strong(&the_bar.refcount, &refs, BFS_BAR_BUSY, acq_rel, relaxed)) {
 		errno = EBUSY;
 		goto fail;
 	}
@@ -153,16 +222,18 @@ struct bfs_bar *bfs_bar_show(void) {
 	ctermid(term);
 	if (strlen(term) == 0) {
 		errno = ENOTTY;
-		goto fail;
+		goto unref;
 	}
 
-	the_bar.fd = open(term, O_RDWR | O_CLOEXEC);
-	if (the_bar.fd < 0) {
-		goto fail;
+	int fd = open(term, O_RDWR | O_CLOEXEC);
+	if (fd < 0) {
+		goto unref;
 	}
+	store(&the_bar.fd, fd, relaxed);
+	store(&the_bar.refcount, BFS_BAR_READY, release);
 
 	if (bfs_bar_getsize(&the_bar) != 0) {
-		goto fail_close;
+		goto put;
 	}
 
 	reset_before_death_by(SIGABRT);
@@ -192,9 +263,11 @@ struct bfs_bar *bfs_bar_show(void) {
 
 	return &the_bar;
 
-fail_close:
-	close_quietly(the_bar.fd);
-	the_bar.fd = -1;
+put:
+	bfs_bar_putfd(&the_bar);
+	return NULL;
+unref:
+	store(&the_bar.refcount, 0, release);
 fail:
 	return NULL;
 }
@@ -233,7 +306,5 @@ void bfs_bar_hide(struct bfs_bar *bar) {
 #endif
 
 	bfs_bar_reset(bar);
-
-	xclose(bar->fd);
-	bar->fd = -1;
+	bfs_bar_putfd(bar);
 }
