@@ -5,9 +5,11 @@
 #include "xspawn.h"
 #include "alloc.h"
 #include "bfstd.h"
+#include "diag.h"
 #include "list.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
@@ -590,30 +592,49 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 		return -1;
 	}
 
+	// Block signals before fork() so handlers don't run in the child
+	sigset_t new_mask;
+	if (sigfillset(&new_mask) != 0) {
+		goto fail;
+	}
+	sigset_t old_mask;
+	errno = pthread_sigmask(SIG_BLOCK, &new_mask, &old_mask);
+	if (errno != 0) {
+		goto fail;
+	}
+
 	pid_t pid = fork();
-	if (pid < 0) {
-		close_quietly(pipefd[1]);
-		close_quietly(pipefd[0]);
-		return -1;
-	} else if (pid == 0) {
+	if (pid == 0) {
 		// Child
 		bfs_spawn_exec(res, ctx, argv, envp, pipefd);
 	}
 
-	// Parent
+	// Restore the original signal mask
+	int ret = pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+	bfs_verify(ret == 0, "pthread_sigmask(): %s", xstrerror(ret));
+
+	if (pid < 0) {
+		// fork() failed
+		goto fail;
+	}
+
 	xclose(pipefd[1]);
 
 	int error;
 	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
 	xclose(pipefd[0]);
 	if (nbytes == sizeof(error)) {
-		int wstatus;
-		xwaitpid(pid, &wstatus, 0);
+		xwaitpid(pid, NULL, 0);
 		errno = error;
 		return -1;
 	}
 
 	return pid;
+
+fail:
+	close_quietly(pipefd[1]);
+	close_quietly(pipefd[0]);
+	return -1;
 }
 
 /** Call the right bfs_spawn() implementation. */
