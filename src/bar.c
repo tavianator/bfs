@@ -136,22 +136,24 @@ static char *ass_itoa(char *str, unsigned int n) {
 
 /** Update the size of the scrollable region. */
 static int bfs_bar_resize(struct bfs_bar *bar) {
-	char esc_seq[12 + ITOA_DIGITS];
+	static const char PREFIX[] =
+		"\033D"   // IND: Line feed, possibly scrolling
+		"\033[1A" // CUU: Move cursor up 1 row
+		"\0337"   // DECSC: Save cursor
+		"\033[;"; // DECSTBM: Set scrollable region
+	static const char SUFFIX[] =
+		"r"       // (end of DECSTBM)
+		"\0338"   // DECRC: Restore the cursor
+		"\033[J"; // ED: Erase display from cursor to end
 
-	char *cur = stpcpy(esc_seq,
-		"\0337"  // DECSC: Save cursor
-		"\033[;" // DECSTBM: Set scrollable region
-	);
+	char esc_seq[sizeof(PREFIX) + ITOA_DIGITS + sizeof(SUFFIX)];
 
 	// DECSTBM takes the height as the second argument
-	unsigned int height = load(&bar->height, relaxed);
-	cur = ass_itoa(cur, height - 1);
+	unsigned int height = load(&bar->height, relaxed) - 1;
 
-	cur = stpcpy(cur,
-		"r"      // DECSTBM
-		"\0338"  // DECRC: Restore the cursor
-		"\033[J" // ED: Erase display from cursor to end
-	);
+	char *cur = stpcpy(esc_seq, PREFIX);
+	cur = ass_itoa(cur, height);
+	cur = stpcpy(cur, SUFFIX);
 
 	return bfs_bar_write(bar, esc_seq, cur - esc_seq);
 }
@@ -251,16 +253,7 @@ struct bfs_bar *bfs_bar_show(void) {
 	sigaction(SIGWINCH, &sa, NULL);
 #endif
 
-	unsigned int height = load(&the_bar.height, relaxed);
-	bfs_bar_printf(&the_bar,
-		"\n"        // Make space for the bar
-		"\0337"     // DECSC: Save cursor
-		"\033[;%ur" // DECSTBM: Set scrollable region
-		"\0338"     // DECRC: Restore cursor
-		"\033[1A",  // CUU: Move cursor up 1 row
-		height - 1
-	);
-
+	bfs_bar_resize(&the_bar);
 	return &the_bar;
 
 put:
