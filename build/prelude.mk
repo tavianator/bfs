@@ -92,6 +92,7 @@ LIBBFS := \
     obj/src/parse.o \
     obj/src/printf.o \
     obj/src/pwcache.o \
+    obj/src/sighook.o \
     obj/src/stat.o \
     obj/src/thread.o \
     obj/src/trie.o \
@@ -108,6 +109,7 @@ UNIT_OBJS := \
     obj/tests/bit.o \
     obj/tests/ioq.o \
     obj/tests/main.o \
+    obj/tests/sighook.o \
     obj/tests/trie.o \
     obj/tests/xspawn.o \
     obj/tests/xtime.o

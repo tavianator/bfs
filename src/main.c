@@ -36,6 +36,7 @@
  *     - mtab.[ch]     (parses the system's mount table)
  *     - pwcache.[ch]  (a cache for the user/group tables)
  *     - sanity.h      (sanitizer interfaces)
+ *     - sighook.[ch]  (signal hooks)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
  *     - thread.h      (multi-threading)
  *     - trie.[ch]     (a trie set/map implementation)
