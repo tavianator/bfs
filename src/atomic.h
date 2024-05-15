@@ -8,6 +8,7 @@
 #ifndef BFS_ATOMIC_H
 #define BFS_ATOMIC_H
 
+#include "prelude.h"
 #include "sanity.h"
 #include <stdatomic.h>
 
@@ -100,5 +101,18 @@
  */
 #define signal_fence(order) \
 	atomic_signal_fence(memory_order_##order)
+
+/**
+ * A hint to the CPU to relax while it spins.
+ */
+#if __has_builtin(__builtin_ia32_pause)
+#  define spin_loop() __builtin_ia32_pause()
+#elif __has_builtin(__builtin_arm_yield)
+#  define spin_loop() __builtin_arm_yield()
+#elif __has_builtin(__builtin_riscv_pause)
+#  define spin_loop() __builtin_riscv_pause()
+#else
+#  define spin_loop() ((void)0)
+#endif
 
 #endif // BFS_ATOMIC_H
