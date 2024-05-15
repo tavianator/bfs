@@ -8,6 +8,7 @@
 #ifndef BFS_ATOMIC_H
 #define BFS_ATOMIC_H
 
+#include "sanity.h"
 #include <stdatomic.h>
 
 /**
@@ -81,5 +82,23 @@
  */
 #define fetch_and(obj, arg, order) \
 	atomic_fetch_and_explicit(obj, arg, memory_order_##order)
+
+/**
+ * Shorthand for atomic_thread_fence().
+ */
+#if SANITIZE_THREAD
+// TSan doesn't support fences: https://github.com/google/sanitizers/issues/1415
+#  define thread_fence(obj, order) \
+	fetch_add(obj, 0, order)
+#else
+#  define thread_fence(obj, order) \
+	atomic_thread_fence(memory_order_##order)
+#endif
+
+/**
+ * Shorthand for atomic_signal_fence().
+ */
+#define signal_fence(order) \
+	atomic_signal_fence(memory_order_##order)
 
 #endif // BFS_ATOMIC_H
