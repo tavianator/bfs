@@ -3,6 +3,7 @@
 
 #include "ctx.h"
 #include "alloc.h"
+#include "bfstd.h"
 #include "color.h"
 #include "diag.h"
 #include "expr.h"
@@ -22,7 +23,7 @@
 
 /** Get the initial value for ctx->threads (-j). */
 static int bfs_nproc(void) {
-	long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+	long nproc = xsysconf(_SC_NPROCESSORS_ONLN);
 
 	if (nproc < 1) {
 		nproc = 1;

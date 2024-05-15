@@ -56,7 +56,7 @@ static size_t bfs_exec_arg_size(const char *arg) {
 
 /** Determine the maximum argv size. */
 static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
-	long arg_max = sysconf(_SC_ARG_MAX);
+	long arg_max = xsysconf(_SC_ARG_MAX);
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld according to sysconf()\n", arg_max);
 	if (arg_max < 0) {
 		arg_max = BFS_EXEC_ARG_MAX;
@@ -82,7 +82,7 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 
 	// Assume arguments are counted with the granularity of a single page,
 	// so allow a one page cushion to account for rounding up
-	long page_size = sysconf(_SC_PAGESIZE);
+	long page_size = xsysconf(_SC_PAGESIZE);
 	if (page_size < 4096) {
 		page_size = 4096;
 	}

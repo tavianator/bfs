@@ -410,6 +410,11 @@ char *xconfstr(int name);
  */
 int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *clear);
 
+/**
+ * Wrapper for sysconf() that works around an MSan bug.
+ */
+long xsysconf(int name);
+
 #include <wchar.h>
 
 /**

@@ -671,6 +671,21 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 #endif
 }
 
+long xsysconf(int name) {
+#if __FreeBSD__ && SANITIZE_MEMORY
+	// Work around https://github.com/llvm/llvm-project/issues/88163
+	__msan_scoped_disable_interceptor_checks();
+#endif
+
+	long ret = sysconf(name);
+
+#if __FreeBSD__ && SANITIZE_MEMORY
+	__msan_scoped_enable_interceptor_checks();
+#endif
+
+	return ret;
+}
+
 size_t asciilen(const char *str) {
 	return asciinlen(str, strlen(str));
 }
