@@ -42,6 +42,8 @@ typedef struct CFILE {
 	const struct colors *colors;
 	/** A buffer for colored formatting. */
 	dchar *buffer;
+	/** Cached file descriptor number. */
+	int fd;
 	/** Whether the next ${rs} is actually necessary. */
 	bool need_reset;
 	/** Whether to close the underlying stream. */
@@ -107,5 +109,10 @@ int cfprintf(CFILE *cfile, const char *format, ...);
  */
 attr(printf(2, 0))
 int cvfprintf(CFILE *cfile, const char *format, va_list args);
+
+/**
+ * Reset the TTY state when terminating abnormally (async-signal-safe).
+ */
+int cfreset(CFILE *cfile);
 
 #endif // BFS_COLOR_H

@@ -9,11 +9,13 @@
 #include "list.h"
 #include "mtab.h"
 #include "pwcache.h"
+#include "sighook.h"
 #include "stat.h"
 #include "trie.h"
 #include "xtime.h"
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -98,13 +100,20 @@ struct bfs_ctx_file {
 	CFILE *cfile;
 	/** The path to the file (for diagnostics). */
 	const char *path;
+	/** Signal hook to send a reset escape sequence. */
+	struct sighook *hook;
 	/** Remembers I/O errors, to propagate them to the exit status. */
 	int error;
 };
 
+/** Call cfreset() on a tracked file. */
+static void cfreset_hook(int sig, siginfo_t *info, void *arg) {
+	cfreset(arg);
+}
+
 CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 	struct bfs_stat sb;
-	if (bfs_stat(fileno(cfile->file), NULL, 0, &sb) != 0) {
+	if (bfs_stat(cfile->fd, NULL, 0, &sb) != 0) {
 		return NULL;
 	}
 
@@ -124,19 +133,31 @@ CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, CFILE *cfile, const char *path) {
 
 	leaf->value = ctx_file = ALLOC(struct bfs_ctx_file);
 	if (!ctx_file) {
-		trie_remove(&ctx->files, leaf);
-		return NULL;
+		goto fail;
 	}
 
 	ctx_file->cfile = cfile;
 	ctx_file->path = path;
 	ctx_file->error = 0;
+	ctx_file->hook = NULL;
+
+	if (cfile->colors) {
+		ctx_file->hook = atsigexit(cfreset_hook, cfile);
+		if (!ctx_file->hook) {
+			goto fail;
+		}
+	}
 
 	if (cfile != ctx->cout && cfile != ctx->cerr) {
 		++ctx->nfiles;
 	}
 
 	return cfile;
+
+fail:
+	trie_remove(&ctx->files, leaf);
+	free(ctx_file);
+	return NULL;
 }
 
 void bfs_ctx_flush(const struct bfs_ctx *ctx) {
@@ -156,7 +177,7 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 
 		const char *path = ctx_file->path;
 		if (path) {
-			bfs_error(ctx, "'%s': %m.\n", path);
+			bfs_error(ctx, "%pq: %m.\n", path);
 		} else if (cfile == ctx->cout) {
 			bfs_error(ctx, "(standard output): %m.\n");
 		}
@@ -188,30 +209,49 @@ static int bfs_ctx_fflush(CFILE *cfile) {
 static int bfs_ctx_fclose(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 	CFILE *cfile = ctx_file->cfile;
 
-	if (cfile == ctx->cout) {
-		// Will be checked later
-		return 0;
-	} else if (cfile == ctx->cerr) {
-		// Writes to stderr are allowed to fail silently, unless the same file was used by
-		// -fprint, -fls, etc.
-		if (ctx_file->path) {
-			return bfs_ctx_fflush(cfile);
-		} else {
-			return 0;
-		}
+	// Writes to stderr are allowed to fail silently, unless the same file
+	// was used by -fprint, -fls, etc.
+	bool silent = cfile == ctx->cerr && !ctx_file->path;
+	int ret = 0, error = 0;
+
+	if (ctx_file->error) {
+		// An error was previously reported during bfs_ctx_flush()
+		ret = -1;
+		error = ctx_file->error;
 	}
 
-	int ret = 0, error = 0;
-	if (ferror(cfile->file)) {
-		ret = -1;
-		error = EIO;
-	}
-	if (cfclose(cfile) != 0) {
+	// Flush the file just before we remove the hook, to maximize the chance
+	// we leave the TTY in a good state
+	if (bfs_ctx_fflush(cfile) != 0) {
 		ret = -1;
 		error = errno;
 	}
 
-	errno = error;
+	if (ctx_file->hook) {
+		sigunhook(ctx_file->hook);
+	}
+
+	// Close the CFILE, except for stdio streams, which are closed later
+	if (cfile != ctx->cout && cfile != ctx->cerr) {
+		if (cfclose(cfile) != 0) {
+			ret = -1;
+			error = errno;
+		}
+	}
+
+	if (silent) {
+		ret = 0;
+	}
+
+	if (ret != 0 && ctx->cerr) {
+		if (ctx_file->path) {
+			bfs_error(ctx, "%pq: %s.\n", ctx_file->path, xstrerror(error));
+		} else if (cfile == ctx->cout) {
+			bfs_error(ctx, "(standard output): %s.\n", xstrerror(error));
+		}
+	}
+
+	free(ctx_file);
 	return ret;
 }
 
@@ -229,33 +269,14 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		for_trie (leaf, &ctx->files) {
 			struct bfs_ctx_file *ctx_file = leaf->value;
-
-			if (ctx_file->error) {
-				// An error was previously reported during bfs_ctx_flush()
-				ret = -1;
-			}
-
 			if (bfs_ctx_fclose(ctx, ctx_file) != 0) {
-				if (cerr) {
-					bfs_error(ctx, "%pq: %m.\n", ctx_file->path);
-				}
 				ret = -1;
 			}
-
-			free(ctx_file);
 		}
 		trie_destroy(&ctx->files);
 
-		if (cout && bfs_ctx_fflush(cout) != 0) {
-			if (cerr) {
-				bfs_error(ctx, "(standard output): %m.\n");
-			}
-			ret = -1;
-		}
-
 		cfclose(cout);
 		cfclose(cerr);
-
 		free_colors(ctx->colors);
 
 		for_slist (struct bfs_expr, expr, &ctx->expr_list, freelist) {

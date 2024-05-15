@@ -161,8 +161,13 @@ static struct esc_seq **get_esc(const struct colors *colors, const char *name) {
 	return leaf ? leaf->value : NULL;
 }
 
+/** Append an escape sequence to a string. */
+static int cat_esc(dchar **dstr, const struct esc_seq *seq) {
+	return dstrxcat(dstr, seq->seq, seq->len);
+}
+
 /** Set a named escape sequence. */
-static int set_esc(struct colors *colors, const char *name, char *value) {
+static int set_esc(struct colors *colors, const char *name, dchar *value) {
 	struct esc_seq **field = get_esc(colors, name);
 	if (!field) {
 		return 0;
@@ -587,8 +592,8 @@ static int parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
 
 			// All-zero values should be treated like NULL, to fall
 			// back on any other relevant coloring for that file
-			char *esc = value;
-			if (strspn(value, "0") == strlen(value)
+			dchar *esc = value;
+			if (strspn(value, "0") == dstrlen(value)
 			    && strcmp(key, "rs") != 0
 			    && strcmp(key, "lc") != 0
 			    && strcmp(key, "rc") != 0
@@ -693,6 +698,20 @@ struct colors *parse_colors(void) {
 		colors->link->len = 0;
 	}
 
+	// Pre-compute the reset escape sequence
+	if (!colors->endcode) {
+		dchar *ec = dstralloc(0);
+		if (!ec
+		    || cat_esc(&ec, colors->leftcode) != 0
+		    || cat_esc(&ec, colors->reset) != 0
+		    || cat_esc(&ec, colors->rightcode) != 0
+		    || set_esc(colors, "ec", ec) != 0) {
+			dstrfree(ec);
+			goto fail;
+		}
+		dstrfree(ec);
+	}
+
 	return colors;
 
 fail:
@@ -727,10 +746,11 @@ CFILE *cfwrap(FILE *file, const struct colors *colors, bool close) {
 	}
 
 	cfile->file = file;
+	cfile->fd = fileno(file);
 	cfile->need_reset = false;
 	cfile->close = close;
 
-	if (isatty(fileno(file))) {
+	if (isatty(cfile->fd)) {
 		cfile->colors = colors;
 	} else {
 		cfile->colors = NULL;
@@ -874,7 +894,7 @@ error:
 
 /** Print an escape sequence chunk. */
 static int print_esc_chunk(CFILE *cfile, const struct esc_seq *esc) {
-	return dstrxcat(&cfile->buffer, esc->seq, esc->len);
+	return cat_esc(&cfile->buffer, esc);
 }
 
 /** Print an ANSI escape sequence. */
@@ -908,12 +928,7 @@ static int print_reset(CFILE *cfile) {
 	}
 	cfile->need_reset = false;
 
-	const struct colors *colors = cfile->colors;
-	if (colors->endcode) {
-		return print_esc_chunk(cfile, colors->endcode);
-	} else {
-		return print_esc(cfile, colors->reset);
-	}
+	return print_esc_chunk(cfile, cfile->colors->endcode);
 }
 
 /** Print a shell-escaped string. */
@@ -1389,4 +1404,15 @@ int cfprintf(CFILE *cfile, const char *format, ...) {
 	int ret = cvfprintf(cfile, format, args);
 	va_end(args);
 	return ret;
+}
+
+int cfreset(CFILE *cfile) {
+	const struct colors *colors = cfile->colors;
+	if (!colors) {
+		return 0;
+	}
+
+	const struct esc_seq *esc = colors->endcode;
+	size_t ret = xwrite(cfile->fd, esc->seq, esc->len);
+	return ret == esc->len ? 0 : -1;
 }
