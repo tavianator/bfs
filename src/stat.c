@@ -116,6 +116,9 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 #if BFS_HAS_ST_BIRTHTIM
 	dest->btime = src->st_birthtim;
 	dest->mask |= BFS_STAT_BTIME;
+#elif BFS_HAS___ST_BIRTHTIM
+	dest->btime = src->__st_birthtim;
+	dest->mask |= BFS_STAT_BTIME;
 #elif BFS_HAS_ST_BIRTHTIMESPEC
 	dest->btime = src->st_birthtimespec;
 	dest->mask |= BFS_STAT_BTIME;

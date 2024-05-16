@@ -9,6 +9,7 @@ include build/exports.mk
 
 # All header fragments we generate
 HEADERS := \
+    gen/has/--st-birthtim.h \
     gen/has/acl-get-entry.h \
     gen/has/acl-get-file.h \
     gen/has/acl-get-tag-type.h \
