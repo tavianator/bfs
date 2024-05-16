@@ -158,7 +158,7 @@ DISTCHECKS := \
 distcheck:
 	@+${MAKE} distcheck-asan
 	@+test "$$(uname)" = Darwin || ${MAKE} distcheck-msan
-	@+${MAKE} distcheck-tsan
+	@+test "$$(uname)" = FreeBSD || ${MAKE} distcheck-tsan
 	@+test "$$(uname)-$$(uname -m)" != Linux-x86_64 || ${MAKE} distcheck-m32
 	@+${MAKE} distcheck-release
 .PHONY: distcheck
