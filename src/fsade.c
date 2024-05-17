@@ -41,7 +41,7 @@ static const char *fake_at(const struct BFTW *ftwbuf) {
 	static atomic int proc_works = -1;
 
 	dchar *path = NULL;
-	if (ftwbuf->at_fd == AT_FDCWD || load(&proc_works, relaxed) == 0) {
+	if (ftwbuf->at_fd == (int)AT_FDCWD || load(&proc_works, relaxed) == 0) {
 		goto fail;
 	}
 

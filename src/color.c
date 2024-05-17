@@ -976,7 +976,7 @@ static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, 
 	} else {
 		// We're in print_link_target(), so resolve relative to the link's parent directory
 		at_fd = ftwbuf->at_fd;
-		if (at_fd == AT_FDCWD && path[0] != '/') {
+		if (at_fd == (int)AT_FDCWD && path[0] != '/') {
 			at_path = dstrndup(ftwbuf->path, ftwbuf->nameoff);
 			if (at_path && dstrncat(&at_path, path, max) != 0) {
 				ret = -1;

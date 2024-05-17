@@ -1281,7 +1281,7 @@ static int bftw_pin_parent(struct bftw_state *state, struct bftw_file *file) {
 
 	int fd = parent->fd;
 	if (fd < 0) {
-		bfs_static_assert(AT_FDCWD != -1);
+		bfs_static_assert((int)AT_FDCWD != -1);
 		return -1;
 	}
 
@@ -1298,7 +1298,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 	}
 
 	int dfd = bftw_pin_parent(state, file);
-	if (dfd < 0 && dfd != AT_FDCWD) {
+	if (dfd < 0 && dfd != (int)AT_FDCWD) {
 		goto fail;
 	}
 
@@ -1450,7 +1450,7 @@ static int bftw_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
 	}
 
 	int dfd = bftw_pin_parent(state, file);
-	if (dfd < 0 && dfd != AT_FDCWD) {
+	if (dfd < 0 && dfd != (int)AT_FDCWD) {
 		goto fail;
 	}
 

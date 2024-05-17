@@ -1270,7 +1270,7 @@ static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, enu
 	bfs_debug_prefix(ctx, DEBUG_STAT);
 
 	fprintf(stderr, "bfs_stat(");
-	if (ftwbuf->at_fd == AT_FDCWD) {
+	if (ftwbuf->at_fd == (int)AT_FDCWD) {
 		fprintf(stderr, "AT_FDCWD");
 	} else {
 		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);

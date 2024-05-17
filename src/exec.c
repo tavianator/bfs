@@ -268,7 +268,7 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 	bfs_assert(execbuf->wd_fd < 0);
 	bfs_assert(!execbuf->wd_path);
 
-	if (ftwbuf->at_fd != AT_FDCWD) {
+	if (ftwbuf->at_fd != (int)AT_FDCWD) {
 		// Rely on at_fd being the immediate parent
 		bfs_assert(xbaseoff(ftwbuf->at_path) == 0);
 

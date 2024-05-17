@@ -120,7 +120,7 @@ static int at_flags(const struct args *args) {
 /** Touch one path. */
 static int xtouch(const struct args *args, const char *path) {
 	int dfd = open_parent(args, &path);
-	if (dfd < 0 && dfd != AT_FDCWD) {
+	if (dfd < 0 && dfd != (int)AT_FDCWD) {
 		return -1;
 	}
 
