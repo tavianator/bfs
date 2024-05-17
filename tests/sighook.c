@@ -20,7 +20,7 @@ static void alrm_hook(int sig, siginfo_t *info, void *arg) {
 /** Swap out an old hook for a new hook. */
 static int swap_hooks(struct sighook **hook) {
 	struct sighook *next = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
-	if (!bfs_pcheck(next, "sighook(SIGALRM)")) {
+	if (!bfs_echeck(next, "sighook(SIGALRM)")) {
 		return -1;
 	}
 
@@ -32,7 +32,7 @@ static int swap_hooks(struct sighook **hook) {
 /** Background thread that rapidly (un)registers signal hooks. */
 static void *hook_thread(void *ptr) {
 	struct sighook *hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
-	if (!bfs_pcheck(hook, "sighook(SIGALRM)")) {
+	if (!bfs_echeck(hook, "sighook(SIGALRM)")) {
 		return NULL;
 	}
 
@@ -51,7 +51,7 @@ bool check_sighook(void) {
 	bool ret = true;
 
 	struct sighook *hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
-	ret &= bfs_pcheck(hook, "sighook(SIGALRM)");
+	ret &= bfs_echeck(hook, "sighook(SIGALRM)");
 	if (!ret) {
 		goto done;
 	}
@@ -64,13 +64,13 @@ bool check_sighook(void) {
 			.tv_usec = 100,
 		},
 	};
-	ret &= bfs_pcheck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
+	ret &= bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
 	if (!ret) {
 		goto unhook;
 	}
 
 	pthread_t thread;
-	ret &= bfs_pcheck(thread_create(&thread, NULL, hook_thread, NULL) == 0);
+	ret &= bfs_echeck(thread_create(&thread, NULL, hook_thread, NULL) == 0);
 	if (!ret) {
 		goto untime;
 	}
@@ -85,7 +85,7 @@ bool check_sighook(void) {
 
 untime:
 	ival.it_value.tv_usec = 0;
-	ret &= bfs_pcheck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
+	ret &= bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
 	if (!ret) {
 		goto unhook;
 	}

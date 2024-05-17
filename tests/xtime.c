@@ -29,9 +29,9 @@ static bool check_one_xgetdate(const char *str, int error, time_t expected) {
 	int ret = xgetdate(str, &ts);
 
 	if (error) {
-		return bfs_pcheck(ret == -1 && errno == error, "xgetdate('%s')", str);
+		return bfs_echeck(ret == -1 && errno == error, "xgetdate('%s')", str);
 	} else {
-		return bfs_pcheck(ret == 0, "xgetdate('%s')", str)
+		return bfs_echeck(ret == 0, "xgetdate('%s')", str)
 			&& bfs_check(ts.tv_sec == expected && ts.tv_nsec == 0,
 				"xgetdate('%s'): %jd.%09jd != %jd",
 				str, (intmax_t)ts.tv_sec, (intmax_t)ts.tv_nsec, (intmax_t)expected);
@@ -82,12 +82,12 @@ static bool check_xgetdate(void) {
 static bool check_one_xmktime(time_t expected) {
 	struct tm tm;
 	if (!localtime_r(&expected, &tm)) {
-		bfs_diag("localtime_r(%jd): %s", (intmax_t)expected, xstrerror(errno));
+		bfs_ediag("localtime_r(%jd)", (intmax_t)expected);
 		return false;
 	}
 
 	time_t actual;
-	return bfs_pcheck(xmktime(&tm, &actual) == 0, "xmktime(" TM_FORMAT ")", TM_PRINTF(tm))
+	return bfs_echeck(xmktime(&tm, &actual) == 0, "xmktime(" TM_FORMAT ")", TM_PRINTF(tm))
 		&& bfs_check(actual == expected, "xmktime(" TM_FORMAT "): %jd != %jd", TM_PRINTF(tm), (intmax_t)actual, (intmax_t)expected);
 }
 

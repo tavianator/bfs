@@ -20,7 +20,7 @@ int xmktime(struct tm *tm, time_t *timep) {
 
 		struct tm tmp;
 		if (!localtime_r(&time, &tmp)) {
-			bfs_bug("localtime_r(-1): %s", xstrerror(errno));
+			bfs_ebug("localtime_r(-1)");
 			return -1;
 		}
 
@@ -46,7 +46,7 @@ int xtimegm(struct tm *tm, time_t *timep) {
 
 		struct tm tmp;
 		if (!gmtime_r(&time, &tmp)) {
-			bfs_bug("gmtime_r(-1): %s", xstrerror(errno));
+			bfs_ebug("gmtime_r(-1)");
 			return -1;
 		}
 

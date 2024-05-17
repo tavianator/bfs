@@ -55,6 +55,20 @@ void bfs_diagf(const struct bfs_loc *loc, const char *format, ...);
 #define bfs_diag(...) bfs_diagf(bfs_location(), __VA_ARGS__)
 
 /**
+ * Get the last error message.
+ */
+const char *bfs_errstr(void);
+
+/**
+ * Print a diagnostic message including the last error.
+ */
+#define bfs_ediag(...) \
+	bfs_ediag_("" __VA_ARGS__, bfs_errstr())
+
+#define bfs_ediag_(format, ...) \
+	bfs_diag(sizeof(format) > 1 ? format ": %s" : "%s", __VA_ARGS__)
+
+/**
  * Print a message to standard error and abort.
  */
 attr(cold, printf(2, 3))
@@ -63,15 +77,27 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 /**
  * Unconditional abort with a message.
  */
-#define bfs_abort(...) bfs_abortf(bfs_location(), __VA_ARGS__)
+#define bfs_abort(...) \
+	bfs_abortf(bfs_location(), __VA_ARGS__)
+
+/**
+ * Abort with a message including the last error.
+ */
+#define bfs_eabort(...) \
+	bfs_eabort_("" __VA_ARGS__, bfs_errstr())
+
+#define bfs_eabort_(format, ...) \
+	bfs_abort(sizeof(format) > 1 ? format ": %s" : "%s", __VA_ARGS__)
 
 /**
  * Abort in debug builds; no-op in release builds.
  */
 #ifdef NDEBUG
 #  define bfs_bug(...) ((void)0)
+#  define bfs_ebug(...) ((void)0)
 #else
 #  define bfs_bug bfs_abort
+#  define bfs_ebug bfs_eabort
 #endif
 
 /**
@@ -88,12 +114,27 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 		str, __VA_ARGS__))
 
 /**
+ * Unconditional assert, including the last error.
+ */
+#define bfs_everify(...) \
+	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", bfs_errstr())
+
+#define bfs_everify_(str, cond, format, ...) \
+	((cond) ? (void)0 : bfs_abort( \
+		sizeof(format) > 1 \
+			? "%.0s" format "%s: %s" \
+			: "Assertion failed: `%s`: %s", \
+		str, __VA_ARGS__))
+
+/**
  * Assert in debug builds; no-op in release builds.
  */
 #ifdef NDEBUG
 #  define bfs_assert(...) ((void)0)
+#  define bfs_eassert(...) ((void)0)
 #else
 #  define bfs_assert bfs_verify
+#  define bfs_eassert bfs_everify
 #endif
 
 struct bfs_ctx;

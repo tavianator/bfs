@@ -54,7 +54,7 @@ static bool check_use_path(bool use_posix) {
 	bool ret = true;
 
 	struct bfs_spawn spawn;
-	ret &= bfs_pcheck(bfs_spawn_init(&spawn) == 0);
+	ret &= bfs_echeck(bfs_spawn_init(&spawn) == 0);
 	if (!ret) {
 		goto out;
 	}
@@ -64,18 +64,18 @@ static bool check_use_path(bool use_posix) {
 		spawn.flags &= ~BFS_SPAWN_USE_POSIX;
 	}
 
-	ret &= bfs_pcheck(bfs_spawn_addopen(&spawn, 10, "bin", O_RDONLY | O_DIRECTORY, 0) == 0);
-	ret &= bfs_pcheck(bfs_spawn_adddup2(&spawn, 10, 11) == 0);
-	ret &= bfs_pcheck(bfs_spawn_addclose(&spawn, 10) == 0);
-	ret &= bfs_pcheck(bfs_spawn_addfchdir(&spawn, 11) == 0);
-	ret &= bfs_pcheck(bfs_spawn_addclose(&spawn, 11) == 0);
+	ret &= bfs_echeck(bfs_spawn_addopen(&spawn, 10, "bin", O_RDONLY | O_DIRECTORY, 0) == 0);
+	ret &= bfs_echeck(bfs_spawn_adddup2(&spawn, 10, 11) == 0);
+	ret &= bfs_echeck(bfs_spawn_addclose(&spawn, 10) == 0);
+	ret &= bfs_echeck(bfs_spawn_addfchdir(&spawn, 11) == 0);
+	ret &= bfs_echeck(bfs_spawn_addclose(&spawn, 11) == 0);
 	if (!ret) {
 		goto destroy;
 	}
 
 	// Check that $PATH is resolved in the parent's environment
 	char **envp;
-	ret &= bfs_pcheck(envp = envdup());
+	ret &= bfs_echeck(envp = envdup());
 	if (!ret) {
 		goto destroy;
 	}
@@ -84,7 +84,7 @@ static bool check_use_path(bool use_posix) {
 	char *old_path = getenv("PATH");
 	dchar *new_path = NULL;
 	if (old_path) {
-		ret &= bfs_pcheck(old_path = strdup(old_path));
+		ret &= bfs_echeck(old_path = strdup(old_path));
 		if (!ret) {
 			goto env;
 		}
@@ -97,20 +97,20 @@ static bool check_use_path(bool use_posix) {
 		goto path;
 	}
 
-	ret &= bfs_pcheck(setenv("PATH", new_path, true) == 0);
+	ret &= bfs_echeck(setenv("PATH", new_path, true) == 0);
 	if (!ret) {
 		goto path;
 	}
 
 	char *argv[] = {"xspawnee", old_path, NULL};
 	pid_t pid = bfs_spawn("xspawnee", &spawn, argv, envp);
-	ret &= bfs_pcheck(pid >= 0, "bfs_spawn()");
+	ret &= bfs_echeck(pid >= 0, "bfs_spawn()");
 	if (!ret) {
 		goto unset;
 	}
 
 	int wstatus;
-	ret &= bfs_pcheck(xwaitpid(pid, &wstatus, 0) == pid)
+	ret &= bfs_echeck(xwaitpid(pid, &wstatus, 0) == pid)
 		&& bfs_check(WIFEXITED(wstatus));
 	if (ret) {
 		int wexit = WEXITSTATUS(wstatus);
@@ -119,9 +119,9 @@ static bool check_use_path(bool use_posix) {
 
 unset:
 	if (old_path) {
-		ret &= bfs_pcheck(setenv("PATH", old_path, true) == 0);
+		ret &= bfs_echeck(setenv("PATH", old_path, true) == 0);
 	} else {
-		ret &= bfs_pcheck(unsetenv("PATH") == 0);
+		ret &= bfs_echeck(unsetenv("PATH") == 0);
 	}
 path:
 	dstrfree(new_path);
@@ -132,7 +132,7 @@ env:
 	}
 	free(envp);
 destroy:
-	ret &= bfs_pcheck(bfs_spawn_destroy(&spawn) == 0);
+	ret &= bfs_echeck(bfs_spawn_destroy(&spawn) == 0);
 out:
 	return ret;
 }
@@ -142,7 +142,7 @@ static bool check_enoent(bool use_posix) {
 	bool ret = true;
 
 	struct bfs_spawn spawn;
-	ret &= bfs_pcheck(bfs_spawn_init(&spawn) == 0);
+	ret &= bfs_echeck(bfs_spawn_init(&spawn) == 0);
 	if (!ret) {
 		goto out;
 	}
@@ -154,9 +154,9 @@ static bool check_enoent(bool use_posix) {
 
 	char *argv[] = {"eW6f5RM9Qi", NULL};
 	pid_t pid = bfs_spawn("eW6f5RM9Qi", &spawn, argv, NULL);
-	ret &= bfs_pcheck(pid < 0 && errno == ENOENT, "bfs_spawn()");
+	ret &= bfs_echeck(pid < 0 && errno == ENOENT, "bfs_spawn()");
 
-	ret &= bfs_pcheck(bfs_spawn_destroy(&spawn) == 0);
+	ret &= bfs_echeck(bfs_spawn_destroy(&spawn) == 0);
 out:
 	return ret;
 }
@@ -166,18 +166,18 @@ static bool check_resolve(void) {
 	char *exe;
 
 	exe = bfs_spawn_resolve("sh");
-	ret &= bfs_pcheck(exe, "bfs_spawn_resolve('sh')");
+	ret &= bfs_echeck(exe, "bfs_spawn_resolve('sh')");
 	free(exe);
 
 	exe = bfs_spawn_resolve("/bin/sh");
-	ret &= bfs_pcheck(exe && strcmp(exe, "/bin/sh") == 0);
+	ret &= bfs_echeck(exe && strcmp(exe, "/bin/sh") == 0);
 	free(exe);
 
 	exe = bfs_spawn_resolve("bin/tests/xspawnee");
-	ret &= bfs_pcheck(exe && strcmp(exe, "bin/tests/xspawnee") == 0);
+	ret &= bfs_echeck(exe && strcmp(exe, "bin/tests/xspawnee") == 0);
 	free(exe);
 
-	ret &= bfs_pcheck(!bfs_spawn_resolve("eW6f5RM9Qi") && errno == ENOENT);
+	ret &= bfs_echeck(!bfs_spawn_resolve("eW6f5RM9Qi") && errno == ENOENT);
 
 	return ret;
 }

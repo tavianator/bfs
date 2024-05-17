@@ -104,7 +104,7 @@ static int arc_sem_wait(struct arc *arc) {
 #if _POSIX_SEMAPHORES > 0
 	if (arc->sem_status == 0) {
 		while (sem_wait(&arc->sem) != 0) {
-			bfs_verify(errno == EINTR, "sem_wait(): %s", xstrerror(errno));
+			bfs_everify(errno == EINTR, "sem_wait()");
 		}
 		return 0;
 	}
@@ -146,7 +146,7 @@ static void arc_destroy(struct arc *arc) {
 
 #if _POSIX_SEMAPHORES > 0
 	if (arc->sem_status == 0) {
-		bfs_verify(sem_destroy(&arc->sem) == 0, "sem_destroy(): %s", xstrerror(errno));
+		bfs_everify(sem_destroy(&arc->sem) == 0, "sem_destroy()");
 	}
 #endif
 }

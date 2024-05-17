@@ -15,12 +15,12 @@ static bool check_base_dir(const char *path, const char *dir, const char *base) 
 	bool ret = true;
 
 	char *xdir = xdirname(path);
-	bfs_verify(xdir, "xdirname(): %s", xstrerror(errno));
+	bfs_everify(xdir, "xdirname()");
 	ret &= bfs_check(strcmp(xdir, dir) == 0, "xdirname('%s') == '%s' (!= '%s')", path, xdir, dir);
 	free(xdir);
 
 	char *xbase = xbasename(path);
-	bfs_verify(xbase, "xbasename(): %s", xstrerror(errno));
+	bfs_everify(xbase, "xbasename()");
 	ret &= bfs_check(strcmp(xbase, base) == 0, "xbasename('%s') == '%s' (!= '%s')", path, xbase, base);
 	free(xbase);
 

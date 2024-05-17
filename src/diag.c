@@ -38,6 +38,10 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
 	abort();
 }
 
+const char *bfs_errstr(void) {
+	return xstrerror(errno);
+}
+
 const char *debug_flag_name(enum debug_flags flag) {
 	switch (flag) {
 	case DEBUG_COST:

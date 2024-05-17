@@ -611,7 +611,7 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 
 	// Restore the original signal mask
 	int ret = pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-	bfs_verify(ret == 0, "pthread_sigmask(): %s", xstrerror(ret));
+	bfs_everify(ret == 0, "pthread_sigmask()");
 
 	if (pid < 0) {
 		// fork() failed
