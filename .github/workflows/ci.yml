@@ -39,7 +39,7 @@ jobs:
 
       - name: Run tests
         run: |
-          make -j$(nproc) distcheck
+          .github/diag.sh make -j$(nproc) distcheck
 
       - uses: actions/upload-artifact@v4
         with:
@@ -63,7 +63,7 @@ jobs:
       - name: Run tests
         run: |
           jobs=$(sysctl -n hw.ncpu)
-          make -j$jobs distcheck
+          .github/diag.sh make -j$jobs distcheck
 
   freebsd:
     name: FreeBSD
@@ -87,7 +87,7 @@ jobs:
                 pkgconf \
                 tcl-wrapper
             sudo mount -t fdescfs none /dev/fd
-            make -j$(nproc) distcheck
+            .github/diag.sh make -j$(nproc) distcheck
 
       - uses: actions/upload-artifact@v4
         with:
@@ -116,7 +116,7 @@ jobs:
                 oniguruma
             jobs=$(sysctl -n hw.ncpu)
             ./configure MAKE=gmake
-            gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -146,7 +146,7 @@ jobs:
                 tcl-expect
             jobs=$(sysctl -n hw.ncpu)
             ./configure
-            make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -182,7 +182,7 @@ jobs:
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
             sudo -u action ./configure
-            sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            sudo -u action .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -219,7 +219,7 @@ jobs:
             chown -R action:staff .
             jobs=$(getconf NPROCESSORS_ONLN)
             sudo -u action ./configure MAKE=gmake
-            sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            sudo -u action .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@v4
         with:
