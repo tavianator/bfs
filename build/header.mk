@@ -32,6 +32,7 @@ HEADERS := \
     gen/has/getprogname.h \
     gen/has/max-align-t.h \
     gen/has/pipe2.h \
+    gen/has/posix-getdents.h \
     gen/has/posix-spawn-addfchdir-np.h \
     gen/has/posix-spawn-addfchdir.h \
     gen/has/st-acmtim.h \

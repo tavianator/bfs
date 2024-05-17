@@ -25,7 +25,13 @@
 static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 	sanitize_uninit(buf, size);
 
-#if BFS_HAS_GETDENTS
+#if BFS_HAS_POSIX_GETDENTS
+	int flags = 0;
+#  ifdef DT_FORCE_TYPE
+	flags |= DT_FORCE_TYPE;
+#  endif
+	ssize_t ret = posix_getdents(fd, buf, size, flags);
+#elif BFS_HAS_GETDENTS
 	ssize_t ret = getdents(fd, buf, size);
 #elif BFS_HAS_GETDENTS64
 	ssize_t ret = getdents64(fd, buf, size);
@@ -44,11 +50,13 @@ static ssize_t bfs_getdents(int fd, void *buf, size_t size) {
 
 #endif // BFS_USE_GETDENTS
 
-#if BFS_USE_GETDENTS && !BFS_HAS_GETDENTS
 /** Directory entry type for bfs_getdents() */
-typedef struct dirent64 sys_dirent;
-#else
+#if !BFS_USE_GETDENTS || BFS_HAS_GETDENTS
 typedef struct dirent sys_dirent;
+#elif BFS_HAS_POSIX_GETDENTS
+typedef struct posix_dent sys_dirent;
+#else
+typedef struct dirent64 sys_dirent;
 #endif
 
 enum bfs_type bfs_mode_to_type(mode_t mode) {
