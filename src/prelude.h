@@ -16,7 +16,8 @@
 #define C17 201710L
 #define C23 202311L
 
-#include <stddef.h>
+// Get the static_assert() definition as well as __GLIBC__
+#include <assert.h>
 
 #if __STDC_VERSION__ < C23
 #  include <stdalign.h>
