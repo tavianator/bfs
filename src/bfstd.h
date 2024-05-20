@@ -248,6 +248,11 @@ char *xstpencpy(char *dest, char *end, const char *src, size_t n);
 const char *xstrerror(int errnum);
 
 /**
+ * Shorthand for xstrerror(errno).
+ */
+const char *errstr(void);
+
+/**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
  * @param mode

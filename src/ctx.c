@@ -178,9 +178,9 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx) {
 
 		const char *path = ctx_file->path;
 		if (path) {
-			bfs_error(ctx, "%pq: %m.\n", path);
+			bfs_error(ctx, "%pq: %s.\n", path, errstr());
 		} else if (cfile == ctx->cout) {
-			bfs_error(ctx, "(standard output): %m.\n");
+			bfs_error(ctx, "(standard output): %s.\n", errstr());
 		}
 	}
 

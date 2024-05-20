@@ -381,7 +381,7 @@ static int expr_open(struct bfs_parser *parser, struct bfs_expr *expr, const cha
 	return 0;
 
 fail:
-	parse_expr_error(parser, expr, "%m.\n");
+	parse_expr_error(parser, expr, "%s.\n", errstr());
 	if (cfile) {
 		cfclose(cfile);
 	} else if (file) {
@@ -401,7 +401,7 @@ static int stat_arg(const struct bfs_parser *parser, char **arg, struct bfs_stat
 
 	int ret = bfs_stat(AT_FDCWD, *arg, flags, sb);
 	if (ret != 0) {
-		parse_argv_error(parser, arg, 1, "%m.\n");
+		parse_argv_error(parser, arg, 1, "%s.\n", errstr());
 	}
 	return ret;
 }
@@ -1344,7 +1344,7 @@ static struct bfs_expr *parse_files0_from(struct bfs_parser *parser, int arg1, i
 		file = xfopen(from, O_RDONLY | O_CLOEXEC);
 	}
 	if (!file) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return NULL;
 	}
 
@@ -1509,7 +1509,7 @@ static struct bfs_expr *parse_fstype(struct bfs_parser *parser, int arg1, int ar
 	}
 
 	if (!bfs_ctx_mtab(parser->ctx)) {
-		parse_expr_error(parser, expr, "Couldn't parse the mount table: %m.\n");
+		parse_expr_error(parser, expr, "Couldn't parse the mount table: %s.\n", errstr());
 		return NULL;
 	}
 
@@ -1534,7 +1534,7 @@ static struct bfs_expr *parse_group(struct bfs_parser *parser, int arg1, int arg
 			return NULL;
 		}
 	} else if (errno) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return NULL;
 	} else {
 		parse_expr_error(parser, expr, "No such group.\n");
@@ -1577,7 +1577,7 @@ static struct bfs_expr *parse_user(struct bfs_parser *parser, int arg1, int arg2
 			return NULL;
 		}
 	} else if (errno) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return NULL;
 	} else {
 		parse_expr_error(parser, expr, "No such user.\n");
@@ -1737,7 +1737,7 @@ static int parse_reftime(const struct bfs_parser *parser, struct bfs_expr *expr)
 	if (xgetdate(expr->argv[1], &expr->reftime) == 0) {
 		return 0;
 	} else if (errno != EINVAL) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return -1;
 	}
 

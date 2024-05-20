@@ -38,10 +38,6 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
 	abort();
 }
 
-const char *bfs_errstr(void) {
-	return xstrerror(errno);
-}
-
 const char *debug_flag_name(enum debug_flags flag) {
 	switch (flag) {
 	case DEBUG_COST:
@@ -68,7 +64,7 @@ const char *debug_flag_name(enum debug_flags flag) {
 }
 
 void bfs_perror(const struct bfs_ctx *ctx, const char *str) {
-	bfs_error(ctx, "%s: %m.\n", str);
+	bfs_error(ctx, "%s: %s.\n", str, errstr());
 }
 
 void bfs_error(const struct bfs_ctx *ctx, const char *format, ...) {
@@ -95,19 +91,12 @@ bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *for
 }
 
 void bfs_verror(const struct bfs_ctx *ctx, const char *format, va_list args) {
-	int error = errno;
-
 	bfs_error_prefix(ctx);
-
-	errno = error;
 	cvfprintf(ctx->cerr, format, args);
 }
 
 bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args) {
-	int error = errno;
-
 	if (bfs_warning_prefix(ctx)) {
-		errno = error;
 		cvfprintf(ctx->cerr, format, args);
 		return true;
 	} else {
@@ -116,10 +105,7 @@ bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args) {
 }
 
 bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, va_list args) {
-	int error = errno;
-
 	if (bfs_debug_prefix(ctx, flag)) {
-		errno = error;
 		cvfprintf(ctx->cerr, format, args);
 		return true;
 	} else {

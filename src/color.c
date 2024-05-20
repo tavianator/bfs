@@ -1197,7 +1197,6 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, i
 attr(printf(2, 0))
 static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	const struct colors *colors = cfile->colors;
-	int error = errno;
 
 	// Color specifier (e.g. ${blu}) state
 	struct esc_seq **esc;
@@ -1251,12 +1250,6 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 					goto invalid;
 				}
 				if (dstrcatf(&cfile->buffer, "%zu", va_arg(args, size_t)) != 0) {
-					return -1;
-				}
-				break;
-
-			case 'm':
-				if (dstrcat(&cfile->buffer, xstrerror(error)) != 0) {
 					return -1;
 				}
 				break;

@@ -9,6 +9,7 @@
 #define BFS_TESTS_H
 
 #include "prelude.h"
+#include "bfstd.h"
 #include "diag.h"
 
 /** Unit test function type. */
@@ -61,7 +62,7 @@ static inline bool bfs_check(bool ret) {
  * Check a condition, logging the current error string on failure.
  */
 #define bfs_echeck(...) \
-	bfs_echeck_(#__VA_ARGS__, __VA_ARGS__, "", bfs_errstr())
+	bfs_echeck_(#__VA_ARGS__, __VA_ARGS__, "", errstr())
 
 #define bfs_echeck_(str, cond, format, ...) \
 	((cond) ? true : (bfs_diag( \

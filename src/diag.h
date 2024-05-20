@@ -9,6 +9,7 @@
 #define BFS_DIAG_H
 
 #include "prelude.h"
+#include "bfstd.h"
 #include <stdarg.h>
 
 /**
@@ -55,15 +56,10 @@ void bfs_diagf(const struct bfs_loc *loc, const char *format, ...);
 #define bfs_diag(...) bfs_diagf(bfs_location(), __VA_ARGS__)
 
 /**
- * Get the last error message.
- */
-const char *bfs_errstr(void);
-
-/**
  * Print a diagnostic message including the last error.
  */
 #define bfs_ediag(...) \
-	bfs_ediag_("" __VA_ARGS__, bfs_errstr())
+	bfs_ediag_("" __VA_ARGS__, errstr())
 
 #define bfs_ediag_(format, ...) \
 	bfs_diag(sizeof(format) > 1 ? format ": %s" : "%s", __VA_ARGS__)
@@ -84,7 +80,7 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
  * Abort with a message including the last error.
  */
 #define bfs_eabort(...) \
-	bfs_eabort_("" __VA_ARGS__, bfs_errstr())
+	bfs_eabort_("" __VA_ARGS__, errstr())
 
 #define bfs_eabort_(format, ...) \
 	bfs_abort(sizeof(format) > 1 ? format ": %s" : "%s", __VA_ARGS__)
@@ -117,7 +113,7 @@ noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
  * Unconditional assert, including the last error.
  */
 #define bfs_everify(...) \
-	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", bfs_errstr())
+	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", errstr())
 
 #define bfs_everify_(str, cond, format, ...) \
 	((cond) ? (void)0 : bfs_abort( \

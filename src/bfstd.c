@@ -322,6 +322,10 @@ const char *xstrerror(int errnum) {
 	return ret;
 }
 
+const char *errstr(void) {
+	return xstrerror(errno);
+}
+
 /** Get the single character describing the given file type. */
 static char type_char(mode_t mode) {
 	switch (mode & S_IFMT) {

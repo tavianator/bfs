@@ -63,7 +63,6 @@ static void eval_error(struct bfs_eval *state, const char *format, ...) {
 	// By POSIX, any errors should be accompanied by a non-zero exit status
 	*state->ret = EXIT_FAILURE;
 
-	int error = errno;
 	const struct bfs_ctx *ctx = state->ctx;
 	CFILE *cerr = ctx->cerr;
 
@@ -71,7 +70,6 @@ static void eval_error(struct bfs_eval *state, const char *format, ...) {
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	cvfprintf(cerr, format, args);
 	va_end(args);
 }
@@ -90,7 +88,7 @@ static bool eval_should_ignore(const struct bfs_eval *state, int error) {
  */
 static void eval_report_error(struct bfs_eval *state) {
 	if (!eval_should_ignore(state, errno)) {
-		eval_error(state, "%m.\n");
+		eval_error(state, "%s.\n", errstr());
 	}
 }
 
@@ -99,9 +97,9 @@ static void eval_report_error(struct bfs_eval *state) {
  */
 static void eval_io_error(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (expr->path) {
-		eval_error(state, "'%s': %m.\n", expr->path);
+		eval_error(state, "'%s': %s.\n", expr->path, errstr());
 	} else {
-		eval_error(state, "(standard output): %m.\n");
+		eval_error(state, "(standard output): %s.\n", errstr());
 	}
 
 	// Don't report the error again in bfs_ctx_free()
@@ -228,7 +226,7 @@ bool eval_context(const struct bfs_expr *expr, struct bfs_eval *state) {
 static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, struct bfs_eval *state) {
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
 	if (!ret) {
-		eval_error(state, "Couldn't get file %s: %m.\n", bfs_stat_field_name(field));
+		eval_error(state, "Couldn't get file %s: %s.\n", bfs_stat_field_name(field), errstr());
 	}
 	return ret;
 }
@@ -398,7 +396,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 	if (expr->eval_fn == eval_exec) {
 		if (bfs_exec_finish(expr->exec) != 0) {
 			if (errno != 0) {
-				bfs_error(ctx, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+				bfs_error(ctx, "%s %s: %s.\n", expr->argv[0], expr->argv[1], errstr());
 			}
 			ret = -1;
 		}
@@ -419,7 +417,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 bool eval_exec(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret = bfs_exec(expr->exec, state->ftwbuf) == 0;
 	if (errno != 0) {
-		eval_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+		eval_error(state, "%s %s: %s.\n", expr->argv[0], expr->argv[1], errstr());
 	}
 	return ret;
 }
@@ -902,7 +900,7 @@ bool eval_regex(const struct bfs_expr *expr, struct bfs_eval *state) {
 			eval_error(state, "%s.\n", str);
 			free(str);
 		} else {
-			eval_error(state, "bfs_regerror(): %m.\n");
+			eval_error(state, "bfs_regerror(): %s.\n", errstr());
 		}
 	}
 
@@ -1020,7 +1018,7 @@ static int eval_gettime(struct bfs_eval *state, struct timespec *ts) {
 #ifdef BFS_CLOCK
 	int ret = clock_gettime(BFS_CLOCK, ts);
 	if (ret != 0) {
-		bfs_warning(state->ctx, "%pP: clock_gettime(): %m.\n", state->ftwbuf);
+		bfs_warning(state->ctx, "%pP: clock_gettime(): %s.\n", state->ftwbuf, errstr());
 	}
 	return ret;
 #else
@@ -1619,7 +1617,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	if (ctx->status) {
 		args.bar = bfs_bar_show();
 		if (!args.bar) {
-			bfs_warning(ctx, "Couldn't show status bar: %m.\n\n");
+			bfs_warning(ctx, "Couldn't show status bar: %s.\n\n", errstr());
 		}
 	}
 
