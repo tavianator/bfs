@@ -30,7 +30,6 @@ HEADERS := \
     gen/has/getmntinfo.h \
     gen/has/getprogname-gnu.h \
     gen/has/getprogname.h \
-    gen/has/max-align-t.h \
     gen/has/pipe2.h \
     gen/has/posix-getdents.h \
     gen/has/posix-spawn-addfchdir-np.h \
