@@ -221,7 +221,8 @@ struct trie_leaf *trie_find_str(const struct trie *trie, const char *key) {
 	return trie_find_mem(trie, key, strlen(key) + 1);
 }
 
-struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t length) {
+trie_clones
+static struct trie_leaf *trie_find_mem_impl(const struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	if (rep && rep->length == length && memcmp(rep->key, key, length) == 0) {
 		return rep;
@@ -230,7 +231,12 @@ struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t
 	}
 }
 
-struct trie_leaf *trie_find_postfix(const struct trie *trie, const char *key) {
+struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t length) {
+	return trie_find_mem_impl(trie, key, length);
+}
+
+trie_clones
+static struct trie_leaf *trie_find_postfix_impl(const struct trie *trie, const char *key) {
 	size_t length = strlen(key);
 	struct trie_leaf *rep = trie_representative(trie, key, length + 1);
 	if (rep && rep->length >= length && memcmp(rep->key, key, length) == 0) {
@@ -238,6 +244,10 @@ struct trie_leaf *trie_find_postfix(const struct trie *trie, const char *key) {
 	} else {
 		return NULL;
 	}
+}
+
+struct trie_leaf *trie_find_postfix(const struct trie *trie, const char *key) {
+	return trie_find_postfix_impl(trie, key);
 }
 
 /**
