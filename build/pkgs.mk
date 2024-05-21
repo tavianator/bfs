@@ -15,9 +15,9 @@ gen/pkgs.mk: ${HEADERS}
 	@printf '# %s\n' "$@" >$@
 	@gen() { \
 	    printf 'PKGS := %s\n' "$$*"; \
-	    printf 'CFLAGS += %s\n' "$$(build/pkgconf.sh --cflags "$$@")"; \
-	    printf 'LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
-	    printf 'LDLIBS := %s $${LDLIBS}\n' "$$(build/pkgconf.sh --ldlibs "$$@")"; \
+	    printf '_CFLAGS += %s\n' "$$(build/pkgconf.sh --cflags "$$@")"; \
+	    printf '_LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
+	    printf '_LDLIBS := %s $${_LDLIBS}\n' "$$(build/pkgconf.sh --ldlibs "$$@")"; \
 	}; \
 	gen $$(grep -l ' true$$' ${.ALLSRC} | sed 's|.*/\(.*\)\.h|\1|') >>$@
 	${VCAT} $@

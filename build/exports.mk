@@ -12,9 +12,9 @@ export XMKDIR=${MKDIR}
 export XPKG_CONFIG=${PKG_CONFIG}
 export XRM=${RM}
 
-export XCPPFLAGS=${CPPFLAGS}
-export XCFLAGS=${CFLAGS}
-export XLDFLAGS=${LDFLAGS}
-export XLDLIBS=${LDLIBS}
+export XCPPFLAGS=${_CPPFLAGS}
+export XCFLAGS=${_CFLAGS}
+export XLDFLAGS=${_LDFLAGS}
+export XLDLIBS=${_LDLIBS}
 
 export XNOLIBS=${NOLIBS}
