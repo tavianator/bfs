@@ -66,7 +66,7 @@ ASAN_CFLAGS,y := -fsanitize=address
 LSAN_CFLAGS,y := -fsanitize=leak
 MSAN_CFLAGS,y := -fsanitize=memory -fsanitize-memory-track-origins
 TSAN_CFLAGS,y := -fsanitize=thread
-UBSAN_CFLAGS.y := -fsanitize=undefined
+UBSAN_CFLAGS,y := -fsanitize=undefined
 
 export ASAN_CFLAGS=${ASAN_CFLAGS,${_ASAN}}
 export LSAN_CFLAGS=${LSAN_CFLAGS,${_LSAN}}
