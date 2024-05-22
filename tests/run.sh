@@ -112,12 +112,21 @@ reap_test() {
 # Wait for a background test to finish
 wait_test() {
     local pid
-    wait -n -ppid
-    ret=$?
-    if [ -z "${pid:-}" ]; then
-        debug "${BASH_SOURCE[0]}" $((LINENO - 3)) "${RED}error $ret${RST}" >&$DUPERR
-        exit 1
-    fi
+
+    while true; do
+        wait -n -ppid
+        ret=$?
+
+        if [ "${pid:-}" ]; then
+            break
+        elif ((ret > 128)); then
+            # Interrupted by signal
+            continue
+        else
+            debug "${BASH_SOURCE[0]}" $((LINENO - 3)) "${RED}error $ret${RST}" >&$DUPERR
+            exit 1
+        fi
+    done
 
     reap_test $ret
 }
