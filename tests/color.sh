@@ -70,6 +70,7 @@ print_bar() {
 
 # Hide the terminal status bar
 hide_bar() {
+    printf 'HIDE:%d:\0' $$ >&$BAR
     exec {BAR}>&-
     unset BAR
 }
@@ -110,6 +111,20 @@ bar_proc() {
         case "$op" in
             PRINT)
                 printf '\e7\e[%d;0f\e[K%s\e8' $((TTY_HEIGHT - bar)) "$str"
+                ;;
+            HIDE)
+                bar="${pid2bar[$pid]}"
+                # Delete this status bar
+                unset 'pid2bar[$pid]'
+                # Shift all higher status bars down
+                for i in "${!pid2bar[@]}"; do
+                    ibar="${pid2bar[$i]}"
+                    if ((ibar > bar)); then
+                        pid2bar["$i"]=$((ibar - 1))
+                    fi
+                done
+                ((BAR_HEIGHT--))
+                resize_bar
                 ;;
         esac
     done

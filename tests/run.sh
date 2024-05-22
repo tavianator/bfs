@@ -207,7 +207,6 @@ run_tests() {
     done
 
     if [ "${BAR:-}" ]; then
-        progress "${YLW}[100%%]${RST} ${BLD}%3d${RST} / ${BLD}%d${RST}\n" $ran $total
         hide_bar
     fi
 
