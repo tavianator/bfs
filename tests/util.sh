@@ -59,6 +59,15 @@ stdenv() {
     # Close stdin so bfs doesn't think we're interactive
     # dup() the standard fds for logging even when redirected
     exec </dev/null {DUPOUT}>&1 {DUPERR}>&2
+
+    # Get the ttyname
+    if [ -t $DUPOUT ]; then
+        TTY=$(tty <&$DUPOUT)
+    elif [ -t $DUPERR ]; then
+        TTY=$(tty <&$DUPERR)
+    else
+        TTY=
+    fi
 }
 
 # Drop root priviliges or bail
