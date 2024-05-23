@@ -1790,7 +1790,7 @@ static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *ex
 	if (df_is_bottom(&opt->after_false)) {
 		if (!expr->pure) {
 			expr->always_true = true;
-			expr->probability = 0.0;
+			expr->probability = 1.0;
 		} else if (expr->eval_fn != eval_true) {
 			opt_warning(opt, expr, "This expression is always true.\n\n");
 			opt_debug(opt, "pure, always true\n");
