@@ -56,6 +56,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 		goto fail;
 	}
 	ctx->cur_nofile = ctx->orig_nofile;
+	ctx->raise_nofile = true;
 
 	ctx->users = bfs_users_new();
 	if (!ctx->users) {

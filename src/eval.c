@@ -1466,6 +1466,9 @@ done:
 static int raise_fdlimit(struct bfs_ctx *ctx) {
 	rlim_t cur = ctx->orig_nofile.rlim_cur;
 	rlim_t max = ctx->orig_nofile.rlim_max;
+	if (!ctx->raise_nofile) {
+		max = cur;
+	}
 
 	rlim_t target = 64 << 10;
 	if (rlim_cmp(target, max) > 0) {

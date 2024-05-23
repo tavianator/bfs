@@ -102,6 +102,8 @@ struct bfs_ctx {
 	struct rlimit orig_nofile;
 	/** The current RLIMIT_NOFILE limits. */
 	struct rlimit cur_nofile;
+	/** Whether the fd limit should be raised. */
+	bool raise_nofile;
 
 	/** The current time. */
 	struct timespec now;

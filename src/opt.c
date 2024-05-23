@@ -2221,6 +2221,11 @@ static float estimate_stat_odds(struct bfs_ctx *ctx) {
 	return 1.0 - nostat_odds;
 }
 
+/** Matches -(exec|ok) ... \; */
+static bool single_exec(const struct bfs_expr *expr) {
+	return expr->eval_fn == eval_exec && !(expr->exec->flags & BFS_EXEC_MULTI);
+}
+
 int bfs_optimize(struct bfs_ctx *ctx) {
 	bfs_ctx_dump(ctx, DEBUG_OPT);
 
@@ -2299,6 +2304,17 @@ int bfs_optimize(struct bfs_ctx *ctx) {
 			opt_leave(&opt, "eager stat cost: ${ylw}%g${rs}\n", eager_cost);
 		}
 
+#ifndef POSIX_SPAWN_SETRLIMIT
+		// If bfs_spawn_setrlimit() would force us to use fork() over
+		// posix_spawn(), the extra cost may outweigh the benefit of a
+		// higher RLIMIT_NOFILE
+		float single_exec_odds = estimate_odds(ctx->expr, single_exec);
+		if (single_exec_odds >= 0.5) {
+			opt_enter(&opt, "single ${blu}-exec${rs} odds: ${ylw}%g${rs}\n", single_exec_odds);
+			ctx->raise_nofile = false;
+			opt_leave(&opt, "not raising RLIMIT_NOFILE\n");
+		}
+#endif
 	}
 
 	opt_leave(&opt, NULL);
