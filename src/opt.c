@@ -2176,17 +2176,20 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 	return expr;
 }
 
-/** Estimate the odds of an expression calling stat(). */
-static float expr_stat_odds(struct bfs_expr *expr) {
-	if (expr->calls_stat) {
+/** An expression predicate. */
+typedef bool expr_pred(const struct bfs_expr *expr);
+
+/** Estimate the odds that a matching expression will be evaluated. */
+static float estimate_odds(const struct bfs_expr *expr, expr_pred *pred) {
+	if (pred(expr)) {
 		return 1.0;
 	}
 
-	float nostat_odds = 1.0;
+	float nonmatch_odds = 1.0;
 	float reached_odds = 1.0;
 	for_expr (child, expr) {
-		float child_odds = expr_stat_odds(child);
-		nostat_odds *= 1.0 - reached_odds * child_odds;
+		float child_odds = estimate_odds(child, pred);
+		nonmatch_odds *= 1.0 - reached_odds * child_odds;
 
 		if (expr->eval_fn == eval_and) {
 			reached_odds *= child->probability;
@@ -2195,7 +2198,12 @@ static float expr_stat_odds(struct bfs_expr *expr) {
 		}
 	}
 
-	return 1.0 - nostat_odds;
+	return 1.0 - nonmatch_odds;
+}
+
+/** Whether an expression calls stat(). */
+static bool calls_stat(const struct bfs_expr *expr) {
+	return expr->calls_stat;
 }
 
 /** Estimate the odds of calling stat(). */
@@ -2204,10 +2212,10 @@ static float estimate_stat_odds(struct bfs_ctx *ctx) {
 		return 1.0;
 	}
 
-	float nostat_odds = 1.0 - expr_stat_odds(ctx->exclude);
+	float nostat_odds = 1.0 - estimate_odds(ctx->exclude, calls_stat);
 
 	float reached_odds = 1.0 - ctx->exclude->probability;
-	float expr_odds = expr_stat_odds(ctx->expr);
+	float expr_odds = estimate_odds(ctx->expr, calls_stat);
 	nostat_odds *= 1.0 - reached_odds * expr_odds;
 
 	return 1.0 - nostat_odds;
