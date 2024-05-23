@@ -3458,7 +3458,7 @@ static void dump_expr_multiline(const struct bfs_ctx *ctx, enum debug_flags flag
 			++rparens;
 		} else {
 			cfprintf(ctx->cerr, "(${red}%s${rs}\n", expr->argv[0]);
-			for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+			for_expr (child, expr) {
 				int parens = child->next ? 0 : rparens + 1;
 				dump_expr_multiline(ctx, flag, child, indent + 1, parens);
 			}

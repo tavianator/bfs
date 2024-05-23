@@ -244,4 +244,10 @@ bool bfs_expr_cmp(const struct bfs_expr *expr, long long n);
  */
 void bfs_expr_clear(struct bfs_expr *expr);
 
+/**
+ * Iterate over the children of an expression.
+ */
+#define for_expr(child, expr) \
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next)
+
 #endif // BFS_EXPR_H

@@ -1088,7 +1088,7 @@ static struct bfs_expr *annotate_and(struct bfs_opt *opt, struct bfs_expr *expr,
 	expr->cost = 0.0;
 	expr->probability = 1.0;
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		expr->pure &= child->pure;
 		expr->always_true &= child->always_true;
 		expr->always_false |= child->always_false;
@@ -1107,7 +1107,7 @@ static struct bfs_expr *annotate_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 	expr->cost = 0.0;
 
 	float false_prob = 1.0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		expr->pure &= child->pure;
 		expr->always_true |= child->always_true;
 		expr->always_false &= child->always_false;
@@ -1124,7 +1124,7 @@ static struct bfs_expr *annotate_comma(struct bfs_opt *opt, struct bfs_expr *exp
 	expr->pure = true;
 	expr->cost = 0.0;
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		expr->pure &= child->pure;
 		expr->always_true = child->always_true;
 		expr->always_false = child->always_false;
@@ -1919,7 +1919,7 @@ static struct bfs_expr *simplify_not(struct bfs_opt *opt, struct bfs_expr *expr,
 static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *expr) {
 	// Only lift negations if it would reduce the number of (-not) expressions
 	size_t added = 0, removed = 0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (child->eval_fn == eval_not) {
 			++removed;
 		} else {
@@ -1968,7 +1968,7 @@ static struct bfs_expr *first_ignorable(struct bfs_opt *opt, struct bfs_expr *ex
 	}
 
 	struct bfs_expr *ret = NULL;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (!child->pure) {
 			ret = NULL;
 		} else if (!ret) {
@@ -2184,7 +2184,7 @@ static float expr_stat_odds(struct bfs_expr *expr) {
 
 	float nostat_odds = 1.0;
 	float reached_odds = 1.0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		float child_odds = expr_stat_odds(child);
 		nostat_odds *= 1.0 - reached_odds * child_odds;
 

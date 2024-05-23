@@ -159,7 +159,7 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 		}
 	}
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		ret |= highlight_expr_recursive(ctx, child, args);
 	}
 

@@ -402,7 +402,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 		}
 	}
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (eval_exec_finish(child, ctx) != 0) {
 			ret = -1;
 		}
@@ -1089,7 +1089,7 @@ bool eval_not(const struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate a conjunction.
  */
 bool eval_and(const struct bfs_expr *expr, struct bfs_eval *state) {
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (!eval_expr(child, state) || state->quit) {
 			return false;
 		}
@@ -1102,7 +1102,7 @@ bool eval_and(const struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate a disjunction.
  */
 bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (eval_expr(child, state) || state->quit) {
 			return true;
 		}
@@ -1117,7 +1117,7 @@ bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
 bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret uninit(false);
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		ret = eval_expr(child, state);
 		if (state->quit) {
 			break;
@@ -1594,7 +1594,7 @@ static bool eval_must_buffer(const struct bfs_expr *expr) {
 		return true;
 	}
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (eval_must_buffer(child)) {
 			return true;
 		}

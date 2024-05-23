@@ -1171,7 +1171,7 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, i
 	}
 
 	int count = 0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (dstrcat(&cfile->buffer, " ") != 0) {
 			return -1;
 		}
