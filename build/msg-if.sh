@@ -14,8 +14,18 @@ set -eu
 MSG="$1"
 shift
 
-if "$@"; then
-    build/msg.sh "$(printf '%-37s  ✔' "$MSG")"
+if [ -z "${NO_COLOR:-}" ] && [ -t 1 ]; then
+    Y='\033[1;32m✔\033[0m'
+    N='\033[1;31m✘\033[0m'
 else
-    build/msg.sh "$(printf '%-37s  ✘' "$MSG")"
+    Y='✔'
+    N='✘'
 fi
+
+if "$@"; then
+    YN="$Y"
+else
+    YN="$N"
+fi
+
+build/msg.sh "$(printf "%-37s  $YN" "$MSG")"
