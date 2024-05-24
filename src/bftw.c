@@ -913,7 +913,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	size_t qdepth = 4096;
 	size_t nthreads = args->nthreads;
 
-#if BFS_USE_LIBURING
+#if BFS_WITH_LIBURING
 	// io_uring uses one fd per ring, ioq uses one ring per thread
 	if (nthreads >= nopenfd - 1) {
 		nthreads = nopenfd - 2;

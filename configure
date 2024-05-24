@@ -17,13 +17,70 @@ else
     j="-j$({ nproc || sysctl -n hw.ncpu || getconf _NPROCESSORS_ONLN || echo 1; } 2>/dev/null)"
 fi
 
+# Convert kebab-case to UPPER_CASE
+toupper() {
+    printf '%s' "$1" | tr 'a-z-' 'A-Z_'
+}
+
+# Report an argument parsing error
+invalid() {
+    printf 'error: Unrecognized option "%s"\n\n' "$1" >&2
+    printf 'Run %s --help for more information.\n' "$0" >&2
+    exit 1
+}
+
 for arg; do
+    # --[(enable|disable|with|without)-]$name[=$value]
+    value="${arg#*=}"
+    name="${arg%%=*}"
+    name="${name#--}"
+    case "$arg" in
+        --enable-*|--disable-*|--with-*|--without-*)
+            name="${name#*-}"
+            ;;
+    esac
+    NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
+
+    # y/n modality
+    case "$arg" in
+        --enable-*|--with-*)
+            case "$arg" in
+                *=y|*=yes) yn=y ;;
+                *=n|*=no) yn=n ;;
+                *=*) invalid "$arg" ;;
+                *) yn=y ;;
+            esac
+            ;;
+        --disable-*|--without-*)
+            case "$arg" in
+                *=*) invalid "arg" ;;
+                *) yn=n ;;
+            esac
+            ;;
+    esac
+
+    # Fix up --enable-lib* to --with-lib*
+    case "$arg" in
+        --enable-*|--disable-*)
+            case "$name" in
+                libacl|libcap|libselinux|liburing|oniguruma)
+                    old="$arg"
+                    case "$arg" in
+                        --enable-*) arg="--with-${arg#--*-}" ;;
+                        --disable-*) arg="--without-${arg#--*-}" ;;
+                    esac
+                    printf 'warning: Treating "%s" like "%s"\n' "$old" "$arg" >&2
+                    ;;
+            esac
+        ;;
+    esac
+
     case "$arg" in
         -h|--help)
             cat <<EOF
 Usage:
 
-  \$ $0 [--enable-*|--disable-*] [CC=...] [CFLAGS=...] [...]
+  \$ $0 [--enable-*|--disable-*] [--with-*|--without-*] [CC=...] [...]
   \$ $MAKE $j
 
 Variables set in the environment or on the command line will be picked up:
@@ -53,14 +110,14 @@ The default flags result in a plain debug build.  Other build profiles include:
   --enable-gcov
       Enable code coverage instrumentation
 
-External dependencies are auto-detected by default, but you can --enable or
---disable them manually:
+External dependencies are auto-detected by default, but you can build --with or
+--without them explicitly:
 
-  --enable-libacl      --disable-libacl
-  --enable-libcap      --disable-libcap
-  --enable-libselinux  --disable-libselinux
-  --enable-liburing    --disable-liburing
-  --enable-oniguruma   --disable-oniguruma
+  --with-libacl      --without-libacl
+  --with-libcap      --without-libcap
+  --with-libselinux  --without-libselinux
+  --with-liburing    --without-liburing
+  --with-oniguruma   --without-oniguruma
 
 Packaging:
 
@@ -78,46 +135,42 @@ EOF
             ;;
 
         --enable-*|--disable-*)
-            case "$arg" in
-                --enable-*) yn=y ;;
-                --disable-*) yn=n ;;
-            esac
-
-            name="${arg#--*able-}"
-            NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
             case "$name" in
-                libacl|libcap|libselinux|liburing|oniguruma)
-                    shift
-                    set -- "$@" "USE_$NAME=$yn"
-                    ;;
                 release|asan|lsan|msan|tsan|ubsan|lint|gcov)
                     shift
                     set -- "$@" "$NAME=$yn"
                     ;;
                 *)
-                    printf 'error: Unrecognized option "%s"\n\n' "$arg" >&2
-                    printf 'Run %s --help for more information.\n' "$0" >&2
-                    exit 1
+                    invalid "$arg"
+                    ;;
+            esac
+            ;;
+
+        --with-*|--without-*)
+            case "$name" in
+                libacl|libcap|libselinux|liburing|oniguruma)
+                    shift
+                    set -- "$@" "WITH_$NAME=$yn"
+                    ;;
+                *)
+                    invalid "$arg"
                     ;;
             esac
             ;;
 
         --prefix=*|--mandir=*)
             shift
-            name="${arg#--}"
-            name="${name%%=*}"
-            NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
-            set -- "$@" "$NAME=${arg#*=}"
+            set -- "$@" "$NAME=$value"
             ;;
 
         --infodir=*|--build=*|--host=*|--target=*)
             shift
-            printf 'warning: Ignoring option "%s"\n' "${arg%%=*}" >&2
+            printf 'warning: Ignoring option "%s"\n' "$arg" >&2
             ;;
 
         MAKE=*)
-            MAKE="${arg#*=}"
             shift
+            MAKE="$value"
             ;;
 
         # make flag (-j2) or variable (CC=clang)
@@ -126,9 +179,7 @@ EOF
             ;;
 
         *)
-            printf 'error: Unrecognized option "%s"\n\n' "$arg" >&2
-            printf 'Run %s --help for more information.\n' "$0" >&2
-            exit 1
+            invalid "$arg"
             ;;
     esac
 done

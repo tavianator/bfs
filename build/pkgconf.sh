@@ -26,22 +26,18 @@ esac
 if [ -z "$MODE" ]; then
     # Check whether the libraries exist at all
     for LIB; do
-        # Check ${USE_$LIB}
-        USE_LIB="USE_$(printf '%s' "$LIB" | tr 'a-z-' 'A-Z_')"
-        eval "USE=\"\${$USE_LIB:-}\""
-        case "$USE" in
-            y|1)
-                continue
-                ;;
-            n|0)
-                exit 1
-                ;;
+        # Check ${WITH_$LIB}
+        WITH_LIB="WITH_$(printf '%s' "$LIB" | tr 'a-z-' 'A-Z_')"
+        eval "WITH=\"\${$WITH_LIB:-}\""
+        case "$WITH" in
+            y|1) continue ;;
+            n|0) exit 1 ;;
         esac
 
         CFLAGS=$("$0" --cflags "$LIB") || exit 1
         LDFLAGS=$("$0" --ldflags "$LIB") || exit 1
         LDLIBS=$("$0" --ldlibs "$LIB") || exit 1
-        build/cc.sh $CFLAGS $LDFLAGS build/use/$LIB.c $LDLIBS || exit 1
+        build/cc.sh $CFLAGS $LDFLAGS build/with/$LIB.c $LDLIBS || exit 1
     done
 fi
 

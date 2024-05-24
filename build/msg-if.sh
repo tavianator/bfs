@@ -6,8 +6,8 @@
 # Print a success/failure indicator from a makefile:
 #
 #     $ ./configure
-#     [ CC ] use/liburing.c                  ✘
-#     [ CC ] use/oniguruma.c                 ✔
+#     [ CC ] with/liburing.c                 ✘
+#     [ CC ] with/oniguruma.c                ✔
 
 set -eu
 

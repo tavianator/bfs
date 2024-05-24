@@ -8,7 +8,7 @@ include gen/vars.mk
 include gen/flags.mk
 include build/exports.mk
 
-HEADERS := ${ALL_PKGS:%=gen/use/%.h}
+HEADERS := ${ALL_PKGS:%=gen/with/%.h}
 
 gen/pkgs.mk: ${HEADERS}
 	${MSG} "[ GEN] $@"
@@ -24,10 +24,10 @@ gen/pkgs.mk: ${HEADERS}
 
 .PHONY: gen/pkgs.mk
 
-# Convert gen/use/foo.h to foo
-PKG = ${@:gen/use/%.h=%}
+# Convert gen/with/foo.h to foo
+PKG = ${@:gen/with/%.h=%}
 
 ${HEADERS}::
 	@${MKDIR} ${@D}
-	@build/define-if.sh use/${PKG} build/pkgconf.sh ${PKG} >$@ 2>$@.log; \
-	    build/msg-if.sh "[ CC ] use/${PKG}.c" test $$? -eq 0;
+	@build/define-if.sh with/${PKG} build/pkgconf.sh ${PKG} >$@ 2>$@.log; \
+	    build/msg-if.sh "[ CC ] with/${PKG}.c" test $$? -eq 0;
