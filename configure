@@ -66,6 +66,8 @@ Packaging:
 
   --prefix=/path
       Set the installation prefix (default: /usr)
+  --mandir=/path
+      Set the man page directory (default: \$PREFIX/share/man)
 
 This script is a thin wrapper around a makefile-based configuration system.
 Any other arguments will be passed directly to the $MAKE invocation, e.g.
@@ -100,9 +102,17 @@ EOF
             esac
             ;;
 
-        --prefix=*)
+        --prefix=*|--mandir=*)
             shift
-            set -- "$@" "PREFIX=${arg#*=}"
+            name="${arg#--}"
+            name="${name%%=*}"
+            NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
+            set -- "$@" "$NAME=${arg#*=}"
+            ;;
+
+        --infodir=*|--build=*|--host=*|--target=*)
+            shift
+            printf 'warning: Ignoring option "%s"\n' "${arg%%=*}" >&2
             ;;
 
         MAKE=*)
