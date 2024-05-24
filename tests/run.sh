@@ -416,8 +416,8 @@ make_xattrs() {
 EX_DIFF=20
 
 # Detect colored diff support
-if diff --color /dev/null /dev/null &>/dev/null; then
-    DIFF="diff --color"
+if ((COLOR_STDERR)) && diff --color=always /dev/null /dev/null &>/dev/null; then
+    DIFF="diff --color=always"
 else
     DIFF="diff"
 fi
