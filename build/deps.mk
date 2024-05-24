@@ -12,7 +12,7 @@ gen/deps.mk::
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
 	@if build/cc.sh -MD -MP -MF /dev/null build/empty.c; then \
-	    printf 'CPPFLAGS += -MD -MP\n'; \
+	    printf '_CPPFLAGS += -MD -MP\n'; \
 	fi >>$@ 2>$@.log
 	${VCAT} $@
 	@printf -- '-include %s\n' ${OBJS:.o=.d} >>$@
