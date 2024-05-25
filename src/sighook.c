@@ -584,6 +584,10 @@ done:
 }
 
 void sigunhook(struct sighook *hook) {
+	if (!hook) {
+		return;
+	}
+
 	mutex_lock(&sigmutex);
 
 	struct rcu *rcu = hook->sig ? &rcu_sighooks : &rcu_exithooks;

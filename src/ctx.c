@@ -229,9 +229,7 @@ static int bfs_ctx_fclose(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 		error = errno;
 	}
 
-	if (ctx_file->hook) {
-		sigunhook(ctx_file->hook);
-	}
+	sigunhook(ctx_file->hook);
 
 	// Close the CFILE, except for stdio streams, which are closed later
 	if (cfile != ctx->cout && cfile != ctx->cerr) {
