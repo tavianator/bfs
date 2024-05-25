@@ -184,6 +184,16 @@ char *xgetdelim(FILE *file, char delim) {
 	}
 }
 
+int open_cterm(int flags) {
+	char path[L_ctermid];
+	if (ctermid(path) == NULL || strlen(path) == 0) {
+		errno = ENOTTY;
+		return -1;
+	}
+
+	return open(path, flags);
+}
+
 const char *xgetprogname(void) {
 	const char *cmd = NULL;
 #if BFS_HAS_GETPROGNAME

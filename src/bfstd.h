@@ -158,6 +158,16 @@ FILE *xfopen(const char *path, int flags);
  */
 char *xgetdelim(FILE *file, char delim);
 
+/**
+ * Open the controlling terminal.
+ *
+ * @param flags
+ *         The open() flags.
+ * @return
+ *         An open file descriptor, or -1 on failure.
+ */
+int open_cterm(int flags);
+
 // #include <stdlib.h>
 
 /**

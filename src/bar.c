@@ -144,14 +144,7 @@ struct bfs_bar *bfs_bar_show(void) {
 		return NULL;
 	}
 
-	char term[L_ctermid];
-	ctermid(term);
-	if (strlen(term) == 0) {
-		errno = ENOTTY;
-		goto fail;
-	}
-
-	bar->fd = open(term, O_RDWR | O_CLOEXEC);
+	bar->fd = open_cterm(O_RDWR | O_CLOEXEC);
 	if (bar->fd < 0) {
 		goto fail;
 	}
