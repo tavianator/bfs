@@ -7,6 +7,7 @@
 
 #include "prelude.h"
 #include "eval.h"
+#include "atomic.h"
 #include "bar.h"
 #include "bfstd.h"
 #include "bftw.h"
@@ -22,6 +23,7 @@
 #include "printf.h"
 #include "pwcache.h"
 #include "sanity.h"
+#include "sighook.h"
 #include "stat.h"
 #include "trie.h"
 #include "xregex.h"
@@ -38,6 +40,7 @@
 #include <strings.h>
 #include <sys/resource.h>
 #include <sys/types.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>
@@ -1373,6 +1376,18 @@ struct callback_args {
 	struct bfs_bar *bar;
 	/** The time of the last status update. */
 	struct timespec last_status;
+	/** SIGINFO hook. */
+	struct sighook *info_hook;
+	/** Number of times SIGINFO was caught (even: hide; odd: show). */
+	atomic size_t info_count;
+
+#ifdef NOKERNINFO
+	/** atsigexit() hook. */
+	struct sighook *exit_hook;
+	/** Whether to unset NOKERNINFO later. */
+	bool clear_nokerninfo;
+#endif
+
 	/** The number of files visited so far. */
 	size_t count;
 
@@ -1398,6 +1413,20 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
 	state.quit = false;
+
+	// Check whether SIGINFO was delivered and show/hide the bar
+	bool status = load(&args->info_count, relaxed) % 2;
+	if (status && !args->bar) {
+		args->bar = bfs_bar_show();
+		if (!args->bar) {
+			// Don't keep trying
+			fetch_sub(&args->info_count, 1, relaxed);
+			bfs_warning(ctx, "Couldn't show status bar: %s.\n", errstr());
+		}
+	} else if (!status && args->bar) {
+		bfs_bar_hide(args->bar);
+		args->bar = NULL;
+	}
 
 	if (args->bar) {
 		eval_status(&state, args->bar, &args->last_status, args->count);
@@ -1460,6 +1489,97 @@ done:
 	}
 
 	return state.action;
+}
+
+/** Show/hide the bar in response to SIGINFO. */
+static void eval_siginfo(int sig, siginfo_t *info, void *ptr) {
+	struct callback_args *args = ptr;
+	fetch_add(&args->info_count, 1, relaxed);
+}
+
+#ifdef NOKERNINFO
+
+/** Reset NOKERNINFO. */
+static void eval_clear_nokerninfo(void) {
+	int tty = open_cterm(O_RDWR | O_CLOEXEC);
+	if (tty < 0) {
+		return;
+	}
+
+	// Re-read the tty attributes, in case they changed due to -exec stty
+	struct termios tc;
+	if (tcgetattr(tty, &tc) != 0) {
+		goto done;
+	}
+
+	if (tc.c_lflag & NOKERNINFO) {
+		tc.c_lflag &= ~NOKERNINFO;
+		tcsetattr(tty, TCSANOW, &tc);
+	}
+
+done:
+	xclose(tty);
+}
+
+/** atsigexit() hook. */
+static void eval_sigexit(int sig, siginfo_t *info, void *ptr) {
+	struct callback_args *args = ptr;
+	if (args->clear_nokerninfo) {
+		eval_clear_nokerninfo();
+	}
+}
+
+#endif // NOKERNINFO
+
+/** Install the SIGINFO hook. */
+static void eval_hook_siginfo(struct callback_args *args) {
+#ifdef SIGINFO
+	int sig = SIGINFO;
+#else
+	int sig = SIGUSR1;
+#endif
+	args->info_hook = sighook(sig, eval_siginfo, args, SH_CONTINUE);
+	if (!args->info_hook) {
+		return;
+	}
+
+#ifdef NOKERNINFO
+	// Disable the kernel's own SIGINFO message
+	int tty = open_cterm(O_RDWR | O_CLOEXEC);
+	if (tty < 0) {
+		return;
+	}
+
+	struct termios tc;
+	if (tcgetattr(tty, &tc) != 0) {
+		goto done;
+	}
+
+	if (tc.c_lflag & NOKERNINFO) {
+		goto done;
+	}
+
+	tc.c_lflag |= NOKERNINFO;
+	if (tcsetattr(tty, TCSANOW, &tc) == 0) {
+		args->clear_nokerninfo = true;
+		args->exit_hook = atsigexit(eval_sigexit, args);
+	}
+
+done:
+	xclose(tty);
+#endif
+}
+
+/** Uninstall the SIGINFO hook. */
+static void eval_unhook_siginfo(struct callback_args *args) {
+	sigunhook(args->info_hook);
+
+#ifdef NOKERNINFO
+	if (args->clear_nokerninfo) {
+		eval_clear_nokerninfo();
+	}
+	sigunhook(args->exit_hook);
+#endif
 }
 
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
@@ -1619,10 +1739,13 @@ int bfs_eval(struct bfs_ctx *ctx) {
 
 	if (ctx->status) {
 		args.bar = bfs_bar_show();
-		if (!args.bar) {
+		if (args.bar) {
+			atomic_init(&args.info_count, 1);
+		} else {
 			bfs_warning(ctx, "Couldn't show status bar: %s.\n\n", errstr());
 		}
 	}
+	eval_hook_siginfo(&args);
 
 	struct trie seen;
 	if (ctx->unique) {
@@ -1691,6 +1814,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 		trie_destroy(&seen);
 	}
 
+	eval_unhook_siginfo(&args);
 	bfs_bar_hide(args.bar);
 
 	return args.ret;
