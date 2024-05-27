@@ -71,6 +71,9 @@ make_weirdnames() {
     "$XTOUCH" -p "$1/\\/i"
     "$XTOUCH" -p "$1/ /j"
     "$XTOUCH" -p "$1/[/k"
+    "$XTOUCH" -p "$1/{/l"
+    "$XTOUCH" -p "$1/*/m"
+    "$XTOUCH" -p "$1/"$'\n/n'
 }
 
 # Creates a very deep directory structure for testing PATH_MAX handling
