@@ -1676,6 +1676,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	ftwbuf->visit = visit;
 	ftwbuf->type = BFS_UNKNOWN;
 	ftwbuf->error = state->direrror;
+	ftwbuf->loopoff = 0;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
 	bftw_stat_init(&ftwbuf->stat_bufs, &state->stat_buf, &state->lstat_buf);
@@ -1733,6 +1734,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 			if (ancestor->dev == statbuf->dev && ancestor->ino == statbuf->ino) {
 				ftwbuf->type = BFS_ERROR;
 				ftwbuf->error = ELOOP;
+				ftwbuf->loopoff = ancestor->nameoff + ancestor->namelen;
 				return;
 			}
 		}

@@ -56,6 +56,8 @@ struct BFTW {
 	enum bfs_type type;
 	/** The errno that occurred, if type == BFS_ERROR. */
 	int error;
+	/** For filesystem loops, the length of the loop prefix. */
+	size_t loopoff;
 
 	/** A parent file descriptor for the *at() family of calls. */
 	int at_fd;

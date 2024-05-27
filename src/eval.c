@@ -1433,10 +1433,20 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	}
 
 	if (ftwbuf->type == BFS_ERROR) {
-		if (!eval_should_ignore(&state, ftwbuf->error)) {
-			eval_error(&state, "%s.\n", xstrerror(ftwbuf->error));
-		}
 		state.action = BFTW_PRUNE;
+
+		if (ftwbuf->error == ELOOP && ftwbuf->loopoff > 0) {
+			char *loop = strndup(ftwbuf->path, ftwbuf->loopoff);
+			if (loop) {
+				eval_error(&state, "Filesystem loop back to ${di}%pq${rs}\n", loop);
+				free(loop);
+				goto done;
+			}
+		} else if (eval_should_ignore(&state, ftwbuf->error)) {
+			goto done;
+		}
+
+		eval_error(&state, "%s.\n", xstrerror(ftwbuf->error));
 		goto done;
 	}
 
