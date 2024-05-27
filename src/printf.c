@@ -544,7 +544,7 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 
 	int error = 0;
 	if (type == BFS_ERROR) {
-		if (errno_is_like(ELOOP)) {
+		if (errno == ELOOP) {
 			str = "L";
 		} else if (errno_is_like(ENOENT)) {
 			str = "N";

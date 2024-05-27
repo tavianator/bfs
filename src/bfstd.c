@@ -44,7 +44,7 @@ bool error_is_like(int error, int category) {
 
 	switch (category) {
 	case ENOENT:
-		return error == ENOTDIR;
+		return error == ENOTDIR || error == ELOOP;
 
 	case ENOSYS:
 		// https://github.com/opencontainers/runc/issues/2151
