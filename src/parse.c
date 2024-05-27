@@ -2253,16 +2253,27 @@ static struct bfs_expr *parse_regextype(struct bfs_parser *parser, int arg1, int
 	// See https://www.gnu.org/software/gnulib/manual/html_node/Predefined-Syntaxes.html
 	const char *type = expr->argv[1];
 	if (strcmp(type, "posix-basic") == 0
+	    || strcmp(type, "posix-minimal-basic") == 0
 	    || strcmp(type, "ed") == 0
 	    || strcmp(type, "sed") == 0) {
 		parser->regex_type = BFS_REGEX_POSIX_BASIC;
 	} else if (strcmp(type, "posix-extended") == 0) {
 		parser->regex_type = BFS_REGEX_POSIX_EXTENDED;
 #if BFS_WITH_ONIGURUMA
+	} else if (strcmp(type, "awk") == 0
+	           || strcmp(type, "posix-awk") == 0) {
+		parser->regex_type = BFS_REGEX_AWK;
+	} else if (strcmp(type, "gnu-awk") == 0) {
+		parser->regex_type = BFS_REGEX_GNU_AWK;
 	} else if (strcmp(type, "emacs") == 0) {
 		parser->regex_type = BFS_REGEX_EMACS;
 	} else if (strcmp(type, "grep") == 0) {
 		parser->regex_type = BFS_REGEX_GREP;
+	} else if (strcmp(type, "egrep") == 0
+	           || strcmp(type, "posix-egrep") == 0) {
+		parser->regex_type = BFS_REGEX_EGREP;
+	} else if (strcmp(type, "findutils-default") == 0) {
+		parser->regex_type = BFS_REGEX_GNU_FIND;
 #endif
 	} else if (strcmp(type, "help") == 0) {
 		parser->just_info = true;
@@ -2277,14 +2288,23 @@ static struct bfs_expr *parse_regextype(struct bfs_parser *parser, int arg1, int
 
 list_types:
 	cfprintf(cfile, "Supported types are:\n\n");
-	cfprintf(cfile, "  ${bld}posix-basic${rs}:    POSIX basic regular expressions (BRE)\n");
-	cfprintf(cfile, "  ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n");
-	cfprintf(cfile, "  ${bld}ed${rs}:             Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
+	cfprintf(cfile, "        ${bld}posix-basic${rs}: POSIX basic regular expressions (BRE)\n");
+	cfprintf(cfile, "                 ${bld}ed${rs}: Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
+	cfprintf(cfile, "                ${bld}sed${rs}: Like ${grn}sed${rs} (same as ${bld}posix-basic${rs})\n\n");
+
+	cfprintf(cfile, "     ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n\n");
+
 #if BFS_WITH_ONIGURUMA
-	cfprintf(cfile, "  ${bld}emacs${rs}:          Like ${grn}emacs${rs}\n");
-	cfprintf(cfile, "  ${bld}grep${rs}:           Like ${grn}grep${rs}\n");
+	cfprintf(cfile, "        [${bld}posix-${rs}]${bld}awk${rs}: Like ${grn}awk${rs}\n");
+	cfprintf(cfile, "            ${bld}gnu-awk${rs}: Like GNU ${grn}awk${rs}\n\n");
+
+	cfprintf(cfile, "              ${bld}emacs${rs}: Like ${grn}emacs${rs}\n\n");
+
+	cfprintf(cfile, "               ${bld}grep${rs}: Like ${grn}grep${rs}\n");
+	cfprintf(cfile, "      [${bld}posix-${rs}]${bld}egrep${rs}: Like ${grn}grep${rs} ${cyn}-E${rs}\n\n");
+
+	cfprintf(cfile, "  ${bld}findutils-default${rs}: Like GNU ${grn}find${rs}\n");
 #endif
-	cfprintf(cfile, "  ${bld}sed${rs}:            Like ${grn}sed${rs} (same as ${bld}posix-basic${rs})\n");
 	return NULL;
 }
 

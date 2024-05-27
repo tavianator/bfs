@@ -37,7 +37,11 @@ struct bfs_regex {
 static int bfs_onig_status;
 static OnigEncoding bfs_onig_enc;
 
+static OnigSyntaxType bfs_onig_syntax_awk;
+static OnigSyntaxType bfs_onig_syntax_gnu_awk;
 static OnigSyntaxType bfs_onig_syntax_emacs;
+static OnigSyntaxType bfs_onig_syntax_egrep;
+static OnigSyntaxType bfs_onig_syntax_gnu_find;
 
 /** pthread_once() callback. */
 static void bfs_onig_once(void) {
@@ -106,9 +110,34 @@ static void bfs_onig_once(void) {
 		bfs_onig_enc = NULL;
 	}
 
+	// Compute the GNU extensions
+	OnigSyntaxType *ere = ONIG_SYNTAX_POSIX_EXTENDED;
+	OnigSyntaxType *gnu = ONIG_SYNTAX_GNU_REGEX;
+	unsigned int gnu_op = gnu->op & ~ere->op;
+	unsigned int gnu_op2 = gnu->op2 & ~ere->op2;
+	unsigned int gnu_behavior = gnu->behavior & ~ere->behavior;
+
+	onig_copy_syntax(&bfs_onig_syntax_awk, ONIG_SYNTAX_POSIX_EXTENDED);
+	bfs_onig_syntax_awk.behavior |= ONIG_SYN_ALLOW_INVALID_INTERVAL;
+	bfs_onig_syntax_awk.behavior |= ONIG_SYN_BACKSLASH_ESCAPE_IN_CC;
+
+	onig_copy_syntax(&bfs_onig_syntax_gnu_awk, &bfs_onig_syntax_awk);
+	bfs_onig_syntax_gnu_awk.op |= gnu_op;
+	bfs_onig_syntax_gnu_awk.op2 |= gnu_op2;
+	bfs_onig_syntax_gnu_awk.behavior |= gnu_behavior;
+	bfs_onig_syntax_gnu_awk.behavior &= ~ONIG_SYN_CONTEXT_INDEP_REPEAT_OPS;
+	bfs_onig_syntax_gnu_awk.behavior &= ~ONIG_SYN_CONTEXT_INVALID_REPEAT_OPS;
+
 	// https://github.com/kkos/oniguruma/issues/296
 	onig_copy_syntax(&bfs_onig_syntax_emacs, ONIG_SYNTAX_EMACS);
 	bfs_onig_syntax_emacs.op2 |= ONIG_SYN_OP2_QMARK_GROUP_EFFECT;
+
+	onig_copy_syntax(&bfs_onig_syntax_egrep, ONIG_SYNTAX_POSIX_EXTENDED);
+	bfs_onig_syntax_egrep.behavior |= ONIG_SYN_ALLOW_INVALID_INTERVAL;
+	bfs_onig_syntax_egrep.behavior &= ~ONIG_SYN_CONTEXT_INVALID_REPEAT_OPS;
+
+	onig_copy_syntax(&bfs_onig_syntax_gnu_find, &bfs_onig_syntax_emacs);
+	bfs_onig_syntax_gnu_find.options |= ONIG_OPTION_MULTILINE;
 }
 
 /** Initialize Oniguruma. */
@@ -149,11 +178,23 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 	case BFS_REGEX_POSIX_EXTENDED:
 		syntax = ONIG_SYNTAX_POSIX_EXTENDED;
 		break;
+	case BFS_REGEX_AWK:
+		syntax = &bfs_onig_syntax_awk;
+		break;
+	case BFS_REGEX_GNU_AWK:
+		syntax = &bfs_onig_syntax_gnu_awk;
+		break;
 	case BFS_REGEX_EMACS:
 		syntax = &bfs_onig_syntax_emacs;
 		break;
 	case BFS_REGEX_GREP:
 		syntax = ONIG_SYNTAX_GREP;
+		break;
+	case BFS_REGEX_EGREP:
+		syntax = &bfs_onig_syntax_egrep;
+		break;
+	case BFS_REGEX_GNU_FIND:
+		syntax = &bfs_onig_syntax_gnu_find;
 		break;
 	}
 	bfs_assert(syntax, "Invalid regex type");
