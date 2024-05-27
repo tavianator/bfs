@@ -40,7 +40,6 @@
 #include <strings.h>
 #include <sys/resource.h>
 #include <sys/types.h>
-#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>
@@ -1381,13 +1380,6 @@ struct callback_args {
 	/** Flag set by SIGINFO hook. */
 	atomic bool info_flag;
 
-#ifdef NOKERNINFO
-	/** atsigexit() hook. */
-	struct sighook *exit_hook;
-	/** Whether to unset NOKERNINFO later. */
-	bool clear_nokerninfo;
-#endif
-
 	/** The number of files visited so far. */
 	size_t count;
 
@@ -1504,91 +1496,6 @@ done:
 static void eval_siginfo(int sig, siginfo_t *info, void *ptr) {
 	struct callback_args *args = ptr;
 	store(&args->info_flag, true, relaxed);
-}
-
-#ifdef NOKERNINFO
-
-/** Reset NOKERNINFO. */
-static void eval_clear_nokerninfo(void) {
-	int tty = open_cterm(O_RDWR | O_CLOEXEC);
-	if (tty < 0) {
-		return;
-	}
-
-	// Re-read the tty attributes, in case they changed due to -exec stty
-	struct termios tc;
-	if (tcgetattr(tty, &tc) != 0) {
-		goto done;
-	}
-
-	if (tc.c_lflag & NOKERNINFO) {
-		tc.c_lflag &= ~NOKERNINFO;
-		tcsetattr(tty, TCSANOW, &tc);
-	}
-
-done:
-	xclose(tty);
-}
-
-/** atsigexit() hook. */
-static void eval_sigexit(int sig, siginfo_t *info, void *ptr) {
-	struct callback_args *args = ptr;
-	if (args->clear_nokerninfo) {
-		eval_clear_nokerninfo();
-	}
-}
-
-#endif // NOKERNINFO
-
-/** Install the SIGINFO hook. */
-static void eval_hook_siginfo(struct callback_args *args) {
-#ifdef SIGINFO
-	int sig = SIGINFO;
-#else
-	int sig = SIGUSR1;
-#endif
-	args->info_hook = sighook(sig, eval_siginfo, args, SH_CONTINUE);
-	if (!args->info_hook) {
-		return;
-	}
-
-#ifdef NOKERNINFO
-	// Disable the kernel's own SIGINFO message
-	int tty = open_cterm(O_RDWR | O_CLOEXEC);
-	if (tty < 0) {
-		return;
-	}
-
-	struct termios tc;
-	if (tcgetattr(tty, &tc) != 0) {
-		goto done;
-	}
-
-	if (tc.c_lflag & NOKERNINFO) {
-		goto done;
-	}
-
-	tc.c_lflag |= NOKERNINFO;
-	if (tcsetattr(tty, TCSANOW, &tc) == 0) {
-		args->clear_nokerninfo = true;
-		args->exit_hook = atsigexit(eval_sigexit, args);
-	}
-
-done:
-	xclose(tty);
-#endif
-}
-
-/** Uninstall the SIGINFO hook. */
-static void eval_unhook_siginfo(struct callback_args *args) {
-	sigunhook(args->info_hook);
-
-#ifdef NOKERNINFO
-	if (args->clear_nokerninfo) {
-		eval_clear_nokerninfo();
-	}
-	sigunhook(args->exit_hook);
-#endif
 }
 
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
@@ -1752,7 +1659,13 @@ int bfs_eval(struct bfs_ctx *ctx) {
 			bfs_warning(ctx, "Couldn't show status bar: %s.\n\n", errstr());
 		}
 	}
-	eval_hook_siginfo(&args);
+
+#ifdef SIGINFO
+	int siginfo = SIGINFO;
+#else
+	int siginfo = SIGUSR1;
+#endif
+	args.info_hook = sighook(siginfo, eval_siginfo, &args, SH_CONTINUE);
 
 	struct trie seen;
 	if (ctx->unique) {
@@ -1821,7 +1734,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 		trie_destroy(&seen);
 	}
 
-	eval_unhook_siginfo(&args);
+	sigunhook(args.info_hook);
 	bfs_bar_hide(args.bar);
 
 	return args.ret;
