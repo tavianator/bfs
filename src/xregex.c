@@ -37,6 +37,8 @@ struct bfs_regex {
 static int bfs_onig_status;
 static OnigEncoding bfs_onig_enc;
 
+static OnigSyntaxType bfs_onig_syntax_emacs;
+
 /** pthread_once() callback. */
 static void bfs_onig_once(void) {
 	// Fall back to ASCII by default
@@ -103,6 +105,10 @@ static void bfs_onig_once(void) {
 	if (bfs_onig_status != ONIG_NORMAL) {
 		bfs_onig_enc = NULL;
 	}
+
+	// https://github.com/kkos/oniguruma/issues/296
+	onig_copy_syntax(&bfs_onig_syntax_emacs, ONIG_SYNTAX_EMACS);
+	bfs_onig_syntax_emacs.op2 |= ONIG_SYN_OP2_QMARK_GROUP_EFFECT;
 }
 
 /** Initialize Oniguruma. */
@@ -144,7 +150,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		syntax = ONIG_SYNTAX_POSIX_EXTENDED;
 		break;
 	case BFS_REGEX_EMACS:
-		syntax = ONIG_SYNTAX_EMACS;
+		syntax = &bfs_onig_syntax_emacs;
 		break;
 	case BFS_REGEX_GREP:
 		syntax = ONIG_SYNTAX_GREP;
