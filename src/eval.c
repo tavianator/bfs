@@ -1378,8 +1378,8 @@ struct callback_args {
 	struct timespec last_status;
 	/** SIGINFO hook. */
 	struct sighook *info_hook;
-	/** Number of times SIGINFO was caught (even: hide; odd: show). */
-	atomic size_t info_count;
+	/** Flag set by SIGINFO hook. */
+	atomic bool info_flag;
 
 #ifdef NOKERNINFO
 	/** atsigexit() hook. */
@@ -1415,17 +1415,16 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	state.quit = false;
 
 	// Check whether SIGINFO was delivered and show/hide the bar
-	bool status = load(&args->info_count, relaxed) % 2;
-	if (status && !args->bar) {
-		args->bar = bfs_bar_show();
-		if (!args->bar) {
-			// Don't keep trying
-			fetch_sub(&args->info_count, 1, relaxed);
-			bfs_warning(ctx, "Couldn't show status bar: %s.\n", errstr());
+	if (exchange(&args->info_flag, false, relaxed)) {
+		if (args->bar) {
+			bfs_bar_hide(args->bar);
+			args->bar = NULL;
+		} else {
+			args->bar = bfs_bar_show();
+			if (!args->bar) {
+				bfs_warning(ctx, "Couldn't show status bar: %s.\n", errstr());
+			}
 		}
-	} else if (!status && args->bar) {
-		bfs_bar_hide(args->bar);
-		args->bar = NULL;
 	}
 
 	if (args->bar) {
@@ -1504,7 +1503,7 @@ done:
 /** Show/hide the bar in response to SIGINFO. */
 static void eval_siginfo(int sig, siginfo_t *info, void *ptr) {
 	struct callback_args *args = ptr;
-	fetch_add(&args->info_count, 1, relaxed);
+	store(&args->info_flag, true, relaxed);
 }
 
 #ifdef NOKERNINFO
@@ -1749,9 +1748,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 
 	if (ctx->status) {
 		args.bar = bfs_bar_show();
-		if (args.bar) {
-			atomic_init(&args.info_count, 1);
-		} else {
+		if (!args.bar) {
 			bfs_warning(ctx, "Couldn't show status bar: %s.\n\n", errstr());
 		}
 	}
