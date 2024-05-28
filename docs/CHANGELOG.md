@@ -1,6 +1,38 @@
 3.*
 ===
 
+3.3
+---
+
+**May 28, 2024**
+
+### New features
+
+- The `-status` bar can now be toggled by `SIGINFO` (<kbd>Ctrl</kbd>+<kbd>T</kbd>) on systems that support it, and `SIGUSR1` on other systems
+
+- `-regextype` now supports all regex types from GNU find ([#21](https://github.com/tavianator/bfs/issues/21))
+
+- File birth times are now supported on OpenBSD
+
+### Changes
+
+- Symbolic link loops are now treated like other broken links, rather than an error
+
+- `./configure` now expects `--with-libacl`, `--without-libcap`, etc. rather than `--enable-`/`--disable-`
+
+- The ` ` (space) flag is now restricted to numeric `-printf` specifiers
+
+### Bug fixes
+
+- `-regextype emacs` now supports [shy](https://www.gnu.org/software/emacs/manual/html_node/elisp/Regexp-Backslash.html#index-shy-groups) (non-capturing) groups
+
+- Fixed `-status` bar visual corruption when the terminal is resized
+
+- `bfs` now prints a reset escape sequence when terminated by a signal in the middle of colored output ([#138](https://github.com/tavianator/bfs/issues/138))
+
+- `./configure CFLAGS=...` no longer overrides flags from `pkg-config` during configuration
+
+
 3.2
 ---
 

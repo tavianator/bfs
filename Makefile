@@ -74,7 +74,7 @@ gen/version.c.new::
 	elif test -e src/../.git && command -v git >/dev/null 2>&1; then \
 	    git -C src/.. describe --always --dirty; \
 	else \
-	    echo "3.2"; \
+	    echo "3.3"; \
 	fi | tr -d '\n' >>$@
 	@printf '";\n' >>$@
 
