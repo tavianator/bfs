@@ -76,15 +76,15 @@ bool check_bit(void) {
 	ret &= check_eq(bswap((uint32_t)0x12345678), 0x78563412);
 	ret &= check_eq(bswap((uint64_t)0x1234567812345678), 0x7856341278563412);
 
-	ret &= check_eq(count_ones(0x0), 0);
-	ret &= check_eq(count_ones(0x1), 1);
-	ret &= check_eq(count_ones(0x2), 1);
-	ret &= check_eq(count_ones(0x3), 2);
-	ret &= check_eq(count_ones(0x137F), 10);
+	ret &= check_eq(count_ones(0x0U), 0);
+	ret &= check_eq(count_ones(0x1U), 1);
+	ret &= check_eq(count_ones(0x2U), 1);
+	ret &= check_eq(count_ones(0x3U), 2);
+	ret &= check_eq(count_ones(0x137FU), 10);
 
-	ret &= check_eq(count_zeros(0), INT_WIDTH);
-	ret &= check_eq(count_zeros(0L), LONG_WIDTH);
-	ret &= check_eq(count_zeros(0LL), LLONG_WIDTH);
+	ret &= check_eq(count_zeros(0U), UINT_WIDTH);
+	ret &= check_eq(count_zeros(0UL), ULONG_WIDTH);
+	ret &= check_eq(count_zeros(0ULL), ULLONG_WIDTH);
 	ret &= check_eq(count_zeros((uint8_t)0), 8);
 	ret &= check_eq(count_zeros((uint16_t)0), 16);
 	ret &= check_eq(count_zeros((uint32_t)0), 32);
@@ -100,16 +100,16 @@ bool check_bit(void) {
 	ret &= check_eq(rotate_right((uint32_t)0x12345678, 20), 0x45678123);
 	ret &= check_eq(rotate_right((uint32_t)0x12345678, 0), 0x12345678);
 
-	for (int i = 0; i < 16; ++i) {
+	for (unsigned int i = 0; i < 16; ++i) {
 		uint16_t n = (uint16_t)1 << i;
-		for (int j = i; j < 16; ++j) {
+		for (unsigned int j = i; j < 16; ++j) {
 			uint16_t m = (uint16_t)1 << j;
 			uint16_t nm = n | m;
 			ret &= check_eq(count_ones(nm), 1 + (n != m));
 			ret &= check_eq(count_zeros(nm), 15 - (n != m));
 			ret &= check_eq(leading_zeros(nm), 15 - j);
 			ret &= check_eq(trailing_zeros(nm), i);
-			ret &= check_eq(first_leading_one(nm), j + 1);
+			ret &= check_eq(first_leading_one(nm), 16 - j);
 			ret &= check_eq(first_trailing_one(nm), i + 1);
 			ret &= check_eq(bit_width(nm), j + 1);
 			ret &= check_eq(bit_floor(nm), m);
@@ -127,13 +127,13 @@ bool check_bit(void) {
 
 	ret &= check_eq(leading_zeros((uint16_t)0), 16);
 	ret &= check_eq(trailing_zeros((uint16_t)0), 16);
-	ret &= check_eq(first_leading_one(0), 0);
-	ret &= check_eq(first_trailing_one(0), 0);
-	ret &= check_eq(bit_width(0), 0);
-	ret &= check_eq(bit_floor(0), 0);
-	ret &= check_eq(bit_ceil(0), 1);
+	ret &= check_eq(first_leading_one(0U), 0);
+	ret &= check_eq(first_trailing_one(0U), 0);
+	ret &= check_eq(bit_width(0U), 0);
+	ret &= check_eq(bit_floor(0U), 0);
+	ret &= check_eq(bit_ceil(0U), 1);
 
-	ret &= bfs_check(!has_single_bit(0));
+	ret &= bfs_check(!has_single_bit(0U));
 	ret &= bfs_check(!has_single_bit(UINT32_MAX));
 	ret &= bfs_check(has_single_bit((uint32_t)1 << (UINT_WIDTH - 1)));
 
