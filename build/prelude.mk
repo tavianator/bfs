@@ -97,10 +97,10 @@ LIBBFS := \
     obj/src/thread.o \
     obj/src/trie.o \
     obj/src/typo.o \
+    obj/src/version.o \
     obj/src/xregex.o \
     obj/src/xspawn.o \
     obj/src/xtime.o \
-    obj/gen/version.o
 
 # Unit test objects
 UNIT_OBJS := \

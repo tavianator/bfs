@@ -63,6 +63,11 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	@printf '#endif // BFS_CONFIG_H\n' >>$@
 	@cat ${.ALLSRC:%=%.log} >gen/config.log
 	${VCAT} $@
+	@printf '%s' "$$CONFIG" | build/embed.sh >gen/config.i
+	@printf '%s' "$$XCPPFLAGS" | build/embed.sh >gen/cppflags.i
+	@printf '%s' "$$XCFLAGS" | build/embed.sh >gen/cflags.i
+	@printf '%s' "$$XLDFLAGS" | build/embed.sh >gen/ldflags.i
+	@printf '%s' "$$XLDLIBS" | build/embed.sh >gen/ldlibs.i
 .PHONY: gen/config.h
 
 # The short name of the config test

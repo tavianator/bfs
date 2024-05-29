@@ -7,6 +7,9 @@
 
 set -eu
 
+# Save the ./configure command line for bfs --version
+export CONFIG="$0 $*"
+
 # Default to `make`
 MAKE="${MAKE:-make}"
 

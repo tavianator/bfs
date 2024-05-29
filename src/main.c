@@ -41,6 +41,7 @@
  *     - thread.h      (multi-threading)
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
+ *     - version.c     (embeds version information)
  *     - xregex.[ch]   (regular expression support)
  *     - xspawn.[ch]   (spawns processes)
  *     - xtime.[ch]    (date/time handling utilities)

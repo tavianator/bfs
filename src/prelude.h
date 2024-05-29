@@ -40,6 +40,12 @@
 // when the version number changes
 extern const char bfs_version[];
 
+extern const char bfs_config[];
+extern const char bfs_cppflags[];
+extern const char bfs_cflags[];
+extern const char bfs_ldflags[];
+extern const char bfs_ldlibs[];
+
 // Check for system headers
 
 #ifdef __has_include

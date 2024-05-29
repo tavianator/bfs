@@ -2958,7 +2958,16 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int arg2) {
 	cfprintf(parser->ctx->cout, "${ex}%s${rs} ${bld}%s${rs}\n\n", BFS_COMMAND, bfs_version);
 
-	printf("%s\n", BFS_HOMEPAGE);
+	printf("Copyright © Tavian Barnes and the bfs contributors\n");
+	printf("No rights reserved (https://opensource.org/license/0BSD)\n\n");
+
+	printf("CONFIG   := %s\n", bfs_config);
+	printf("CPPFLAGS := %s\n", bfs_cppflags);
+	printf("CFLAGS   := %s\n", bfs_cflags);
+	printf("LDFLAGS  := %s\n", bfs_ldflags);
+	printf("LDLIBS   := %s\n", bfs_ldlibs);
+
+	printf("\n%s\n", BFS_HOMEPAGE);
 
 	parser->just_info = true;
 	return NULL;

@@ -66,22 +66,20 @@ ${OBJS}: gen/config.mk
 	${MSG} "[ CC ] ${CSRC}" ${CC} ${_CPPFLAGS} ${_CFLAGS} -c ${CSRC} -o $@
 
 # Save the version number to this file, but only update version.c if it changes
-gen/version.c.new::
+gen/version.i.new::
 	@${MKDIR} ${@D}
-	@printf 'const char bfs_version[] = "' >$@
 	@if [ "$$VERSION" ]; then \
 	    printf '%s' "$$VERSION"; \
 	elif test -e src/../.git && command -v git >/dev/null 2>&1; then \
 	    git -C src/.. describe --always --dirty; \
 	else \
 	    echo "3.3.1"; \
-	fi | tr -d '\n' >>$@
-	@printf '";\n' >>$@
+	fi | tr -d '\n' | build/embed.sh >$@
 
-gen/version.c: gen/version.c.new
-	@test -e $@ && cmp -s $@ ${.ALLSRC} && rm ${.ALLSRC} || mv ${.ALLSRC} $@
+gen/version.i: gen/version.i.new
+	@test -e $@ && cmp -s $@ ${.ALLSRC} && ${RM} ${.ALLSRC} || mv ${.ALLSRC} $@
 
-obj/gen/version.o: gen/version.c
+obj/src/version.o: gen/version.i
 
 ## Test phase (`make check`)
 
