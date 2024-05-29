@@ -12,7 +12,7 @@
 #include <limits.h>
 #include <stdint.h>
 
-#if __STDC_VERSION__ >= C23
+#if BFS_HAS_STDBIT_H
 #  include <stdbit.h>
 #endif
 
@@ -226,7 +226,7 @@ static inline uint8_t bswap_u8(uint8_t n) {
 
 // C23 polyfill: bit utilities
 
-#if __STDC_VERSION__ >= C23
+#if __STDC_VERSION_STDBIT_H__ >= C23
 #  define count_ones stdc_count_ones
 #  define count_zeros stdc_count_zeros
 #  define leading_zeros stdc_leading_zeros
@@ -374,7 +374,7 @@ UINT_OVERLOADS(BIT_CEIL)
 #define bit_floor(n) UINT_SELECT(n, bit_floor)(n)
 #define bit_ceil(n) UINT_SELECT(n, bit_ceil)(n)
 
-#endif // __STDC_VERSION__ < C23
+#endif // __STDC_VERSION_STDBIT_H__ < C23
 
 #define ROTATE_LEFT(type, suffix, width) \
 	static inline type rotate_left##suffix(type n, int c) { \

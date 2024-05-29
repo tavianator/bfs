@@ -50,6 +50,9 @@ extern const char bfs_version[];
 #if __has_include(<paths.h>)
 #  define BFS_HAS_PATHS_H true
 #endif
+#if __has_include(<stdbit.h>)
+#  define BFS_HAS_STDBIT_H true
+#endif
 #if __has_include(<sys/extattr.h>)
 #  define BFS_HAS_SYS_EXTATTR_H true
 #endif
@@ -76,6 +79,7 @@ extern const char bfs_version[];
 
 #define BFS_HAS_MNTENT_H __GLIBC__
 #define BFS_HAS_PATHS_H true
+#define BFS_HAS_STDBIT_H (__STDC_VERSION__ >= C23)
 #define BFS_HAS_SYS_EXTATTR_H __FreeBSD__
 #define BFS_HAS_SYS_MKDEV_H false
 #define BFS_HAS_SYS_PARAM_H true
