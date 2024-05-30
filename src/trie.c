@@ -621,7 +621,7 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
 		struct trie_node *node = trie_decode_node(ptr);
 
 		// Make sure the bitmap is a power of two, i.e. it has just one child
-		bfs_assert(has_single_bit(node->bitmap));
+		bfs_assert(has_single_bit((size_t)node->bitmap));
 
 		ptr = node->children[0];
 		trie_node_free(trie, node, 1);
