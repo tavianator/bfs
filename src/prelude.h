@@ -137,7 +137,7 @@ extern const char bfs_version[];
 /**
  * Get the length of an array.
  */
-#define countof(array) (sizeof(array) / sizeof(0[array]))
+#define countof(...) (sizeof(__VA_ARGS__) / sizeof(0[__VA_ARGS__]))
 
 /**
  * False sharing/destructive interference/largest cache line size.

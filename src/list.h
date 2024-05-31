@@ -324,6 +324,25 @@
 	LIST_VOID_(SLIST_INSERT_(list, &(list)->head, item, __VA_ARGS__))
 
 /**
+ * Splice a singly-linked list into another.
+ *
+ * @param dest
+ *         The destination list.
+ * @param cursor
+ *         A pointer to the item to splice after, e.g. &list->head or list->tail.
+ * @param src
+ *         The source list.
+ */
+#define SLIST_SPLICE(dest, cursor, src) \
+	LIST_VOID_(SLIST_SPLICE_((dest), (cursor), (src)))
+
+#define SLIST_SPLICE_(dest, cursor, src) \
+	*src->tail = *cursor, \
+	*cursor = src->head, \
+	dest->tail = *dest->tail ? src->tail : dest->tail, \
+	SLIST_INIT(src)
+
+/**
  * Add an entire singly-linked list to the tail of another.
  *
  * @param dest
@@ -332,10 +351,7 @@
  *         The source list.
  */
 #define SLIST_EXTEND(dest, src) \
-	SLIST_EXTEND_((dest), (src))
-
-#define SLIST_EXTEND_(dest, src) \
-	(src->head ? (*dest->tail = src->head, dest->tail = src->tail, SLIST_INIT(src)) : (void)0)
+	SLIST_SPLICE(dest, (dest)->tail, src)
 
 /**
  * Remove an item from a singly-linked list.

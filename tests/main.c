@@ -111,6 +111,7 @@ int main(int argc, char *argv[]) {
 	run_test(&ctx, "bfstd", check_bfstd);
 	run_test(&ctx, "bit", check_bit);
 	run_test(&ctx, "ioq", check_ioq);
+	run_test(&ctx, "list", check_list);
 	run_test(&ctx, "sighook", check_sighook);
 	run_test(&ctx, "trie", check_trie);
 	run_test(&ctx, "xspawn", check_xspawn);

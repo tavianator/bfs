@@ -27,6 +27,9 @@ bool check_bit(void);
 /** I/O queue tests. */
 bool check_ioq(void);
 
+/** Linked list tests. */
+bool check_list(void);
+
 /** Signal hook tests. */
 bool check_sighook(void);
 

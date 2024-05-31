@@ -108,6 +108,7 @@ UNIT_OBJS := \
     obj/tests/bfstd.o \
     obj/tests/bit.o \
     obj/tests/ioq.o \
+    obj/tests/list.o \
     obj/tests/main.o \
     obj/tests/sighook.o \
     obj/tests/trie.o \
