@@ -680,17 +680,24 @@ static struct bfs_expr *parse_unary_flag(struct bfs_parser *parser) {
 /**
  * Parse a prefix flag like -O3, -j8, etc.
  */
-static struct bfs_expr *parse_prefix_flag(struct bfs_parser *parser, char flag, const char **value) {
+static struct bfs_expr *parse_prefix_flag(struct bfs_parser *parser, char flag, bool allow_separate, const char **value) {
 	const char *arg = parser->argv[0];
 
 	const char *suffix = strchr(arg, flag) + 1;
-	if (!*suffix) {
+	if (*suffix) {
+		*value = suffix;
+		return parse_nullary_flag(parser);
+	}
+
+	suffix = parser->argv[1];
+	if (allow_separate && suffix) {
+		*value = suffix;
+	} else {
 		parse_error(parser, "${cyn}-%c${rs} needs a value.\n", flag);
 		return NULL;
 	}
 
-	*value = suffix;
-	return parse_nullary_flag(parser);
+	return parse_unary_flag(parser);
 }
 
 /**
@@ -838,7 +845,8 @@ static bool parse_debug_flag(const char *flag, size_t len, const char *expected)
 static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg2) {
 	struct bfs_ctx *ctx = parser->ctx;
 
-	struct bfs_expr *expr = parse_unary_flag(parser);
+	const char *flags;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'D', true, &flags);
 	if (!expr) {
 		cfprintf(ctx->cerr, "\n");
 		debug_help(ctx->cerr);
@@ -847,7 +855,7 @@ static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg
 
 	bool unrecognized = false;
 
-	for (const char *flag = expr->argv[1], *next; flag; flag = next) {
+	for (const char *flag = flags, *next; flag; flag = next) {
 		size_t len = strcspn(flag, ",");
 		if (flag[len]) {
 			next = flag + len + 1;
@@ -896,7 +904,7 @@ static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg
  */
 static struct bfs_expr *parse_optlevel(struct bfs_parser *parser, int arg1, int arg2) {
 	const char *arg;
-	struct bfs_expr *expr = parse_prefix_flag(parser, 'O', &arg);
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'O', false, &arg);
 	if (!expr) {
 		return NULL;
 	}
@@ -1642,7 +1650,7 @@ static struct bfs_expr *parse_inum(struct bfs_parser *parser, int arg1, int arg2
  */
 static struct bfs_expr *parse_jobs(struct bfs_parser *parser, int arg1, int arg2) {
 	const char *arg;
-	struct bfs_expr *expr = parse_prefix_flag(parser, 'j', &arg);
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'j', false, &arg);
 	if (!expr) {
 		return NULL;
 	}
@@ -2371,13 +2379,13 @@ static struct bfs_expr *parse_search_strategy(struct bfs_parser *parser, int arg
 	struct bfs_ctx *ctx = parser->ctx;
 	CFILE *cfile = ctx->cerr;
 
-	struct bfs_expr *expr = parse_unary_flag(parser);
+	const char *arg;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'S', true, &arg);
 	if (!expr) {
 		cfprintf(cfile, "\n");
 		goto list_strategies;
 	}
 
-	const char *arg = expr->argv[1];
 	if (strcmp(arg, "bfs") == 0) {
 		ctx->strategy = BFTW_BFS;
 	} else if (strcmp(arg, "dfs") == 0) {
@@ -3008,13 +3016,13 @@ static const struct table_entry parse_table[] = {
 	{"-Bnewer", T_TEST, parse_newer, BFS_STAT_BTIME},
 	{"-Bsince", T_TEST, parse_since, BFS_STAT_BTIME},
 	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME},
-	{"-D", T_FLAG | T_NEEDS_ARG, parse_debug},
+	{"-D", T_FLAG | T_PREFIX, parse_debug},
 	{"-E", T_FLAG, parse_regex_extended},
 	{"-H", T_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
 	{"-L", T_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
 	{"-O", T_FLAG | T_PREFIX, parse_optlevel},
 	{"-P", T_FLAG, parse_follow, 0, false},
-	{"-S", T_FLAG | T_NEEDS_ARG, parse_search_strategy},
+	{"-S", T_FLAG | T_PREFIX, parse_search_strategy},
 	{"-X", T_FLAG, parse_xargs_safe},
 	{"-a", T_OPERATOR},
 	{"-acl", T_TEST, parse_acl},
