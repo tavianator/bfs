@@ -1286,7 +1286,7 @@ static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, enu
 	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
 	DEBUG_FLAG(flags, BFS_STAT_NOSYNC);
 
-	fprintf(stderr, ") == %d", err ? 0 : -1);
+	fprintf(stderr, ") == %d", err == 0 ? 0 : -1);
 
 	if (err) {
 		fprintf(stderr, " [%d]", err);
