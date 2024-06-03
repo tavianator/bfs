@@ -115,21 +115,28 @@ struct bfs_parser {
 };
 
 /**
- * Possible token types.
+ * Token types and flags.
  */
-enum token_type {
+enum token_info {
 	/** A flag. */
-	T_FLAG,
+	T_FLAG      = 1,
 	/** A root path. */
-	T_PATH,
+	T_PATH      = 2,
 	/** An option. */
-	T_OPTION,
+	T_OPTION    = 3,
 	/** A test. */
-	T_TEST,
+	T_TEST      = 4,
 	/** An action. */
-	T_ACTION,
+	T_ACTION    = 5,
 	/** An operator. */
-	T_OPERATOR,
+	T_OPERATOR  = 6,
+	/** Mask for token types. */
+	T_TYPE      = (1 << 3) - 1,
+
+	/** A token can match a prefix of an argument, like -On, -newerXY, etc. */
+	T_PREFIX    = 1 << 3,
+	/** A flag that takes an argument. */
+	T_NEEDS_ARG = 1 << 4,
 };
 
 /**
@@ -414,7 +421,9 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser);
 /**
  * Advance by a single token.
  */
-static char **parser_advance(struct bfs_parser *parser, enum token_type type, size_t argc) {
+static char **parser_advance(struct bfs_parser *parser, enum token_info type, size_t argc) {
+	bfs_assert(type == (type & T_TYPE));
+
 	if (type != T_FLAG && type != T_PATH) {
 		parser->expr_started = true;
 	}
@@ -657,13 +666,31 @@ static struct bfs_expr *parse_nullary_flag(struct bfs_parser *parser) {
  */
 static struct bfs_expr *parse_unary_flag(struct bfs_parser *parser) {
 	const char *arg = parser->argv[0];
+	char flag = arg[strlen(arg) - 1];
+
 	const char *value = parser->argv[1];
 	if (!value) {
-		parse_error(parser, "${cyn}%s${rs} needs a value.\n", arg);
+		parse_error(parser, "${cyn}-%c${rs} needs a value.\n", flag);
 		return NULL;
 	}
 
 	return parse_flag(parser, 2);
+}
+
+/**
+ * Parse a prefix flag like -O3, -j8, etc.
+ */
+static struct bfs_expr *parse_prefix_flag(struct bfs_parser *parser, char flag, const char **value) {
+	const char *arg = parser->argv[0];
+
+	const char *suffix = strchr(arg, flag) + 1;
+	if (!*suffix) {
+		parse_error(parser, "${cyn}-%c${rs} needs a value.\n", flag);
+		return NULL;
+	}
+
+	*value = suffix;
+	return parse_nullary_flag(parser);
 }
 
 /**
@@ -868,21 +895,22 @@ static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg
  * Parse -On.
  */
 static struct bfs_expr *parse_optlevel(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_flag(parser);
+	const char *arg;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'O', &arg);
 	if (!expr) {
 		return NULL;
 	}
 
 	int *optlevel = &parser->ctx->optlevel;
 
-	if (strcmp(expr->argv[0], "-Ofast") == 0) {
+	if (strcmp(arg, "fast") == 0) {
 		*optlevel = 4;
-	} else if (!parse_int(parser, expr->argv, expr->argv[0] + 2, optlevel, IF_INT | IF_UNSIGNED)) {
+	} else if (!parse_int(parser, expr->argv, arg, optlevel, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
 
 	if (*optlevel > 4) {
-		parse_expr_warning(parser, expr, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", expr->argv[0] + 2);
+		parse_expr_warning(parser, expr, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", arg);
 	}
 
 	return expr;
@@ -1613,13 +1641,14 @@ static struct bfs_expr *parse_inum(struct bfs_parser *parser, int arg1, int arg2
  * Parse -j<n>.
  */
 static struct bfs_expr *parse_jobs(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_flag(parser);
+	const char *arg;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'j', &arg);
 	if (!expr) {
 		return NULL;
 	}
 
 	unsigned int n;
-	if (!parse_int(parser, expr->argv, expr->argv[0] + 2, &n, IF_INT | IF_UNSIGNED)) {
+	if (!parse_int(parser, expr->argv, arg, &n, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
 
@@ -2954,6 +2983,7 @@ static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int a
 	return NULL;
 }
 
+/** Parser callback function type. */
 typedef struct bfs_expr *parse_fn(struct bfs_parser *parser, int arg1, int arg2);
 
 /**
@@ -2961,11 +2991,10 @@ typedef struct bfs_expr *parse_fn(struct bfs_parser *parser, int arg1, int arg2)
  */
 struct table_entry {
 	char *arg;
-	enum token_type type;
+	enum token_info info;
 	parse_fn *parse;
 	int arg1;
 	int arg2;
-	bool prefix;
 };
 
 /**
@@ -2979,13 +3008,13 @@ static const struct table_entry parse_table[] = {
 	{"-Bnewer", T_TEST, parse_newer, BFS_STAT_BTIME},
 	{"-Bsince", T_TEST, parse_since, BFS_STAT_BTIME},
 	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME},
-	{"-D", T_FLAG, parse_debug},
+	{"-D", T_FLAG | T_NEEDS_ARG, parse_debug},
 	{"-E", T_FLAG, parse_regex_extended},
 	{"-H", T_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
 	{"-L", T_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
-	{"-O", T_FLAG, parse_optlevel, 0, 0, true},
+	{"-O", T_FLAG | T_PREFIX, parse_optlevel},
 	{"-P", T_FLAG, parse_follow, 0, false},
-	{"-S", T_FLAG, parse_search_strategy},
+	{"-S", T_FLAG | T_NEEDS_ARG, parse_search_strategy},
 	{"-X", T_FLAG, parse_xargs_safe},
 	{"-a", T_OPERATOR},
 	{"-acl", T_TEST, parse_acl},
@@ -3011,7 +3040,7 @@ static const struct table_entry parse_table[] = {
 	{"-execdir", T_ACTION, parse_exec, BFS_EXEC_CHDIR},
 	{"-executable", T_TEST, parse_access, X_OK},
 	{"-exit", T_ACTION, parse_exit},
-	{"-f", T_FLAG, parse_f},
+	{"-f", T_FLAG | T_NEEDS_ARG, parse_f},
 	{"-false", T_TEST, parse_const, false},
 	{"-files0-from", T_OPTION, parse_files0_from},
 	{"-flags", T_TEST, parse_flags},
@@ -3032,7 +3061,7 @@ static const struct table_entry parse_table[] = {
 	{"-ipath", T_TEST, parse_path, true},
 	{"-iregex", T_TEST, parse_regex, BFS_REGEX_ICASE},
 	{"-iwholename", T_TEST, parse_path, true},
-	{"-j", T_FLAG, parse_jobs, 0, 0, true},
+	{"-j", T_FLAG | T_PREFIX, parse_jobs},
 	{"-limit", T_ACTION, parse_limit},
 	{"-links", T_TEST, parse_links},
 	{"-lname", T_TEST, parse_lname, false},
@@ -3046,7 +3075,7 @@ static const struct table_entry parse_table[] = {
 	{"-mtime", T_TEST, parse_time, BFS_STAT_MTIME},
 	{"-name", T_TEST, parse_name, false},
 	{"-newer", T_TEST, parse_newer, BFS_STAT_MTIME},
-	{"-newer", T_TEST, parse_newerxy, 0, 0, true},
+	{"-newer", T_TEST | T_PREFIX, parse_newerxy},
 	{"-nocolor", T_OPTION, parse_color, false},
 	{"-nogroup", T_TEST, parse_nogroup},
 	{"-nohidden", T_TEST, parse_nohidden},
@@ -3099,7 +3128,7 @@ static const struct table_entry parse_table[] = {
 static const struct table_entry *table_lookup(const char *arg) {
 	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
 		bool match;
-		if (entry->prefix) {
+		if (entry->info & T_PREFIX) {
 			match = strncmp(arg, entry->arg, strlen(entry->arg)) == 0;
 		} else {
 			match = strcmp(arg, entry->arg) == 0;
@@ -3110,6 +3139,85 @@ static const struct table_entry *table_lookup(const char *arg) {
 	}
 
 	return NULL;
+}
+
+/** Look up a single-character flag in the parse table. */
+static const struct table_entry *flag_lookup(char flag) {
+	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
+		enum token_info type = entry->info & T_TYPE;
+		if (type == T_FLAG && entry->arg[1] == flag && !entry->arg[2]) {
+			return entry;
+		}
+	}
+
+	return NULL;
+}
+
+/** Check for a multi-flag argument like -LEXO2. */
+static bool is_flag_group(const char *arg) {
+	// We enforce that at least one flag in a flag group must be a capital
+	// letter, to avoid ambiguity with primary expressions
+	bool has_upper = false;
+
+	// Flags that take an argument must appear last
+	bool needs_arg = false;
+
+	for (size_t i = 1; arg[i]; ++i) {
+		char c = arg[i];
+		if (c >= 'A' && c <= 'Z') {
+			has_upper = true;
+		}
+
+		if (needs_arg) {
+			return false;
+		}
+
+		const struct table_entry *entry = flag_lookup(c);
+		if (!entry || !entry->parse) {
+			return false;
+		}
+
+		if (entry->info & T_PREFIX) {
+			// The rest is the flag's argument
+			break;
+		}
+
+		if (entry->info & T_NEEDS_ARG) {
+			needs_arg = true;
+		}
+	}
+
+	return has_upper;
+}
+
+/** Parse a multi-flag argument. */
+static struct bfs_expr *parse_flag_group(struct bfs_parser *parser) {
+	struct bfs_expr *expr = NULL;
+
+	char **start = parser->argv;
+	char **end = start;
+	const char *arg = start[0];
+
+	for (size_t i = 1; arg[i]; ++i) {
+		parser->argv = start;
+
+		const struct table_entry *entry = flag_lookup(arg[i]);
+		expr = entry->parse(parser, entry->arg1, entry->arg2);
+
+		if (parser->argv > end) {
+			end = parser->argv;
+		}
+
+		if (!expr || entry->info & T_PREFIX) {
+			break;
+		}
+	}
+
+	if (expr) {
+		bfs_assert(parser->argv == end, "Didn't eat enough tokens");
+	}
+
+	return expr;
 }
 
 /** Search for a fuzzy match in the parse table. */
@@ -3150,11 +3258,15 @@ static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
 		}
 	}
 
+	if (is_flag_group(arg)) {
+		return parse_flag_group(parser);
+	}
+
 	match = table_lookup_fuzzy(arg);
 
 	CFILE *cerr = parser->ctx->cerr;
 	parse_error(parser, "Unknown argument; did you mean ");
-	switch (match->type) {
+	switch (match->info & T_TYPE) {
 	case T_FLAG:
 		cfprintf(cerr, "${cyn}%s${rs}?", match->arg);
 		break;
