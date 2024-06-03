@@ -52,6 +52,8 @@ struct arc {
 
 /** Initialize an arc. */
 static void arc_init(struct arc *arc) {
+	bfs_verify(atomic_is_lock_free(&arc->refs));
+
 	atomic_init(&arc->refs, 0);
 	arc->ptr = NULL;
 
@@ -166,6 +168,8 @@ static void *RCU_NULL = &RCU_NULL;
 
 /** Initialize an RCU block. */
 static void rcu_init(struct rcu *rcu) {
+	bfs_verify(atomic_is_lock_free(&rcu->active));
+
 	atomic_init(&rcu->active, 0);
 	arc_init(&rcu->slots[0]);
 	arc_init(&rcu->slots[1]);
