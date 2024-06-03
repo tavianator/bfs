@@ -4,7 +4,6 @@ loops/deeply
 loops/deeply/nested
 loops/deeply/nested/dir
 loops/file
-loops/loop
 loops/notdir
 loops/skip
 loops/skip/dir

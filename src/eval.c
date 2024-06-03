@@ -999,6 +999,13 @@ bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	enum bfs_stat_flags flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
 	enum bfs_type type = bftw_type(ftwbuf, flags);
+
+	// GNU find treats ELOOP as a broken symbolic link for -xtype l
+	// (but not -L -type l)
+	if ((flags & BFS_STAT_TRYFOLLOW) && type == BFS_ERROR && errno == ELOOP) {
+		type = BFS_LNK;
+	}
+
 	if (type == BFS_ERROR) {
 		eval_report_error(state);
 		return false;
