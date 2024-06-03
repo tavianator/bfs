@@ -1,6 +1,18 @@
 3.*
 ===
 
+3.3.1
+-----
+
+**June 3, 2024**
+
+### Bug fixes
+
+- Reduced the scope of the symbolic link loop change in version 3.3.
+  `-xtype l` remains true for symbolic link loops, matching a change in GNU findutils 4.10.0.
+  However, `-L` will report an error, just like `bfs` prior to 3.3 and other `find` implementations, as required by POSIX.
+
+
 3.3
 ---
 
