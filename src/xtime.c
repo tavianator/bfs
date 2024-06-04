@@ -206,6 +206,23 @@ static int xgetpart(const char **str, size_t n, int *result) {
 }
 
 int xgetdate(const char *str, struct timespec *result) {
+	// Handle @epochseconds
+	if (str[0] == '@') {
+		long long value;
+		if (xstrtoll(str + 1, NULL, 10, &value) != 0) {
+			goto error;
+		}
+
+		time_t time = (time_t)value;
+		if ((long long)time != value) {
+			errno = ERANGE;
+			goto error;
+		}
+
+		result->tv_sec = time;
+		goto done;
+	}
+
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
@@ -324,6 +341,7 @@ end:
 		}
 	}
 
+done:
 	result->tv_nsec = 0;
 	return 0;
 

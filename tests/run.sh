@@ -410,6 +410,12 @@ make_xattrs() {
     esac
 }
 
+# Get the Unix epoch time in seconds
+epoch_time() {
+    # https://stackoverflow.com/a/12746260/502399
+    awk 'BEGIN { srand(); print srand(); }'
+}
+
 ## Snapshot testing
 
 # Return value when a difference is detected
