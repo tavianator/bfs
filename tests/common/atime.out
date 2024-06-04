@@ -1,0 +1,6 @@
+-atime  1: ./yesterday
+-atime +1: ./last_week
+-atime +1: ./two_days_ago
+-atime -1: ./now
+-atime -1: ./one_hour_ago
+-atime -1: ./tomorrow

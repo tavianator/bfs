@@ -1,0 +1,6 @@
+-amin  1: ./one_minute_ago
+-amin +1: ./one_hour_ago
+-amin +1: ./two_minutes_ago
+-amin -1: ./in_one_hour
+-amin -1: ./in_one_minute
+-amin -1: ./thirty_seconds_ago
