@@ -179,6 +179,23 @@ int open_cterm(int flags);
 const char *xgetprogname(void);
 
 /**
+ * Wrapper for strtoll() that forbids leading spaces.
+ *
+ * @param str
+ *         The string to parse.
+ * @param end
+ *         If non-NULL, will hold a pointer to the first invalid character.
+ *         If NULL, the entire string must be valid.
+ * @param base
+ *         The base for the conversion, or 0 to auto-detect.
+ * @param value
+ *         Will hold the parsed integer value, on success.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int xstrtoll(const char *str, char **end, int base, long long *value);
+
+/**
  * Process a yes/no prompt.
  *
  * @return 1 for yes, 0 for no, and -1 for unknown.

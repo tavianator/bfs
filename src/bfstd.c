@@ -209,6 +209,35 @@ const char *xgetprogname(void) {
 	return cmd;
 }
 
+int xstrtoll(const char *str, char **end, int base, long long *value) {
+	// strtoll() skips leading spaces, but we want to reject them
+	if (xisspace(str[0])) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	// If end is NULL, make sure the entire string is valid
+	bool entire = !end;
+	char *endp;
+	if (!end) {
+		end = &endp;
+	}
+
+	errno = 0;
+	long long result = strtoll(str, end, base);
+	if (errno != 0) {
+		return -1;
+	}
+
+	if (*end == str || (entire && **end != '\0')) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	*value = result;
+	return 0;
+}
+
 /** Compile and execute a regular expression for xrpmatch(). */
 static int xrpregex(nl_item item, const char *response) {
 	const char *pattern = nl_langinfo(item);
