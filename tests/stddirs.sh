@@ -48,6 +48,12 @@ make_loops() {
     ln -s deeply/nested/loop/nested "$1/skip"
 }
 
+# Creates a file+directory structure with inaccessible files
+make_inaccessible() {
+    "$XTOUCH" -p -M000 "$1/file" "$1/dir/"
+    ln -s dir/file "$1/link"
+}
+
 # Creates a file+directory structure with varying timestamps
 make_times() {
     "$XTOUCH" -p -t "1991-12-14 00:00" "$1/a"
@@ -136,6 +142,7 @@ make_stddirs() {
     make_perms "$TMP/perms"
     make_links "$TMP/links"
     make_loops "$TMP/loops"
+    make_inaccessible "$TMP/inaccessible"
     make_times "$TMP/times"
     make_weirdnames "$TMP/weirdnames"
     make_deep "$TMP/deep"
