@@ -1,4 +1,6 @@
 perms
-perms/rwx
-perms/rx
-perms/wx
+perms/dr-x
+perms/drwx
+perms/f-wx
+perms/fr-x
+perms/frwx

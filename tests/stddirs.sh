@@ -14,13 +14,13 @@ make_basic() {
 
 # Creates a file+directory structure with various permissions for tests
 make_perms() {
-    "$XTOUCH" -p -M000 "$1/0"
-    "$XTOUCH" -p -M444 "$1/r"
-    "$XTOUCH" -p -M222 "$1/w"
-    "$XTOUCH" -p -M644 "$1/rw"
-    "$XTOUCH" -p -M555 "$1/rx"
-    "$XTOUCH" -p -M311 "$1/wx"
-    "$XTOUCH" -p -M755 "$1/rwx"
+    "$XTOUCH" -p -M000 "$1/f---"
+    "$XTOUCH" -p -M444 "$1/fr--"
+    "$XTOUCH" -p -M222 "$1/f-w-"
+    "$XTOUCH" -p -M644 "$1/frw-"
+    "$XTOUCH" -p -M311 "$1/f-wx"
+    "$XTOUCH" -p -M555 "$1/fr-x" "$1/dr-x/"
+    "$XTOUCH" -p -M755 "$1/frwx" "$1/drwx/"
 }
 
 # Creates a file+directory structure with various symbolic and hard links
