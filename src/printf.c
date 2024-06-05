@@ -505,30 +505,25 @@ static int bfs_printf_u(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 }
 
 static const char *bfs_printf_type(enum bfs_type type) {
-	switch (type) {
-	case BFS_BLK:
-		return "b";
-	case BFS_CHR:
-		return "c";
-	case BFS_DIR:
-		return "d";
-	case BFS_DOOR:
-		return "D";
-	case BFS_FIFO:
-		return "p";
-	case BFS_LNK:
-		return "l";
-	case BFS_PORT:
-		return "P";
-	case BFS_REG:
-		return "f";
-	case BFS_SOCK:
-		return "s";
-	case BFS_WHT:
-		return "w";
-	default:
-		return "U";
+	const char *const names[] = {
+		[BFS_BLK] = "b",
+		[BFS_CHR] = "c",
+		[BFS_DIR] = "d",
+		[BFS_DOOR] = "D",
+		[BFS_FIFO] = "p",
+		[BFS_LNK] = "l",
+		[BFS_PORT] = "P",
+		[BFS_REG] = "f",
+		[BFS_SOCK] = "s",
+		[BFS_WHT] = "w",
+	};
+
+	const char *name = NULL;
+	if ((size_t)type < countof(names)) {
+		name = names[type];
 	}
+
+	return name ? name : "U";
 }
 
 /** %y: type */

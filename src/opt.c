@@ -102,39 +102,20 @@ enum pred_type {
 	PRED_TYPES,
 };
 
-/** Get the name of a predicate type. */
-static const char *pred_type_name(enum pred_type type) {
-	switch (type) {
-	case READABLE_PRED:
-		return "-readable";
-	case WRITABLE_PRED:
-		return "-writable";
-	case EXECUTABLE_PRED:
-		return "-executable";
-	case ACL_PRED:
-		return "-acl";
-	case CAPABLE_PRED:
-		return "-capable";
-	case EMPTY_PRED:
-		return "-empty";
-	case HIDDEN_PRED:
-		return "-hidden";
-	case NOGROUP_PRED:
-		return "-nogroup";
-	case NOUSER_PRED:
-		return "-nouser";
-	case SPARSE_PRED:
-		return "-sparse";
-	case XATTR_PRED:
-		return "-xattr";
-
-	case PRED_TYPES:
-		break;
-	}
-
-	bfs_bug("Unknown predicate %d", (int)type);
-	return "???";
-}
+/** Predicate type names. */
+static const char *const pred_names[] = {
+	[READABLE_PRED] = "-readable",
+	[WRITABLE_PRED] = "-writable",
+	[EXECUTABLE_PRED] = "-executable",
+	[ACL_PRED] = "-acl",
+	[CAPABLE_PRED] = "-capable",
+	[EMPTY_PRED] = "-empty",
+	[HIDDEN_PRED] = "-hidden",
+	[NOGROUP_PRED] = "-nogroup",
+	[NOUSER_PRED] = "-nouser",
+	[SPARSE_PRED] = "-sparse",
+	[XATTR_PRED] = "-xattr",
+};
 
 /**
  * A contrained integer range.
@@ -242,29 +223,15 @@ enum range_type {
 	RANGE_TYPES,
 };
 
-/** Get the name of a range type. */
-static const char *range_type_name(enum range_type type) {
-	switch (type) {
-	case DEPTH_RANGE:
-		return "-depth";
-	case GID_RANGE:
-		return "-gid";
-	case INUM_RANGE:
-		return "-inum";
-	case LINKS_RANGE:
-		return "-links";
-	case SIZE_RANGE:
-		return "-size";
-	case UID_RANGE:
-		return "-uid";
-
-	case RANGE_TYPES:
-		break;
-	}
-
-	bfs_bug("Unknown range %d", (int)type);
-	return "???";
-}
+/** Range type names. */
+static const char *const range_names[] = {
+	[DEPTH_RANGE] = "-depth",
+	[GID_RANGE] = "-gid",
+	[INUM_RANGE] = "-inum",
+	[LINKS_RANGE] = "-links",
+	[SIZE_RANGE] = "-size",
+	[UID_RANGE] = "-uid",
+};
 
 /**
  * The data flow analysis domain.
@@ -503,7 +470,7 @@ typedef bool dump_fn(struct bfs_opt *opt, const char *format, ...);
 
 /** Print a df_pred. */
 static void pred_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain *value, enum pred_type type) {
-	dump(opt, "${blu}%s${rs}: ", pred_type_name(type));
+	dump(opt, "${blu}%s${rs}: ", pred_names[type]);
 
 	FILE *file = opt->ctx->cerr->file;
 	switch (value->preds[type]) {
@@ -524,7 +491,7 @@ static void pred_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain
 
 /** Print a df_range. */
 static void range_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain *value, enum range_type type) {
-	dump(opt, "${blu}%s${rs}: ", range_type_name(type));
+	dump(opt, "${blu}%s${rs}: ", range_names[type]);
 
 	FILE *file = opt->ctx->cerr->file;
 	const struct df_range *range = &value->ranges[type];

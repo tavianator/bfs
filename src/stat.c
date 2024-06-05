@@ -51,7 +51,7 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 		return "modification time";
 	}
 
-	bfs_bug("Unrecognized stat field");
+	bfs_bug("Unrecognized stat field %d", (int)field);
 	return "???";
 }
 
