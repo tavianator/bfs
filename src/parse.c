@@ -167,7 +167,6 @@ static void highlight_args(const struct bfs_ctx *ctx, char **argv, size_t argc, 
  */
 attr(printf(2, 3))
 static void parse_error(const struct bfs_parser *parser, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -177,7 +176,6 @@ static void parse_error(const struct bfs_parser *parser, const char *format, ...
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(parser->ctx, format, args);
 	va_end(args);
 }
@@ -187,7 +185,6 @@ static void parse_error(const struct bfs_parser *parser, const char *format, ...
  */
 attr(printf(4, 5))
 static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_t argc, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -197,7 +194,6 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
@@ -207,7 +203,6 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
  */
 attr(printf(6, 7))
 static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -218,7 +213,6 @@ static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, 
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
@@ -228,14 +222,12 @@ static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, 
  */
 attr(printf(3, 4))
 static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bfs_expr_error(ctx, expr);
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
@@ -245,7 +237,6 @@ static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_e
  */
 attr(printf(2, 3))
 static bool parse_warning(const struct bfs_parser *parser, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -257,7 +248,6 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bool ret = bfs_vwarning(parser->ctx, format, args);
 	va_end(args);
 	return ret;
@@ -268,7 +258,6 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
  */
 attr(printf(6, 7))
 static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -281,7 +270,6 @@ static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bool ret = bfs_vwarning(ctx, format, args);
 	va_end(args);
 	return ret;
@@ -292,7 +280,6 @@ static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1
  */
 attr(printf(3, 4))
 static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	if (!bfs_expr_warning(ctx, expr)) {
@@ -301,7 +288,6 @@ static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bool ret = bfs_vwarning(ctx, format, args);
 	va_end(args);
 	return ret;
