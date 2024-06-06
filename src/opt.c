@@ -300,27 +300,27 @@ static void df_init_top(struct df_domain *value) {
 
 /** Check for the top element. */
 static bool df_is_top(const struct df_domain *value) {
-        for (int i = 0; i < PRED_TYPES; ++i) {
-                if (value->preds[i] != PRED_TOP) {
-                        return false;
-                }
-        }
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		if (value->preds[i] != PRED_TOP) {
+			return false;
+		}
+	}
 
-        for (int i = 0; i < RANGE_TYPES; ++i) {
-                if (!range_is_top(&value->ranges[i])) {
-                        return false;
-                }
-        }
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		if (!range_is_top(&value->ranges[i])) {
+			return false;
+		}
+	}
 
-        if (value->types != ~0U) {
-                return false;
-        }
+	if (value->types != ~0U) {
+		return false;
+	}
 
-        if (value->xtypes != ~0U) {
-                return false;
-        }
+	if (value->xtypes != ~0U) {
+		return false;
+	}
 
-        return true;
+	return true;
 }
 
 /** Compute the union of two fact sets. */

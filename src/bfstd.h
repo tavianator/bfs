@@ -376,7 +376,7 @@ size_t xread(int fd, void *buf, size_t nbytes);
  * writes.
  *
  * @return
-           The number of bytes written.  A value != nbytes indicates an error.
+ *         The number of bytes written.  A value != nbytes indicates an error.
  */
 size_t xwrite(int fd, const void *buf, size_t nbytes);
 
