@@ -109,7 +109,7 @@
 #  define spin_loop() __builtin_ia32_pause()
 #elif __has_builtin(__builtin_arm_yield)
 #  define spin_loop() __builtin_arm_yield()
-#elif __has_builtin(__builtin_riscv_pause)
+#elif BFS_HAS_BUILTIN_RISCV_PAUSE
 #  define spin_loop() __builtin_riscv_pause()
 #else
 #  define spin_loop() ((void)0)
