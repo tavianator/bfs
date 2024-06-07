@@ -327,10 +327,15 @@ static int rcu_sigtable_add(struct rcu *rcu, struct sighook *hook) {
 	return 0;
 }
 
-/** The global table of signal hooks. */
-static struct rcu rcu_sighooks;
-/** The global table of atsigexit() hooks. */
+/** The sharded table of signal hooks. */
+static struct rcu rcu_sighooks[64];
+/** The table of atsigexit() hooks. */
 static struct rcu rcu_exithooks;
+
+/** Get the table for a particular signal. */
+static struct rcu *sigshard(int sig) {
+	return &rcu_sighooks[sig % countof(rcu_sighooks)];
+}
 
 /** Mutex for initialization and RCU writer exclusion. */
 static pthread_mutex_t sigmutex = PTHREAD_MUTEX_INITIALIZER;
@@ -479,7 +484,8 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	int error = errno;
 
 	// Run the normal hooks
-	enum sigflags flags = run_hooks(&rcu_sighooks, sig, info);
+	struct rcu *shard = sigshard(sig);
+	enum sigflags flags = run_hooks(shard, sig, info);
 
 	// Run the atsigexit() hooks, if we're exiting
 	if (!(flags & SH_CONTINUE) && is_fatal(sig)) {
@@ -505,8 +511,12 @@ static int siginit(int sig) {
 		    || sigemptyset(&action.sa_mask) != 0) {
 			return -1;
 		}
-		rcu_init(&rcu_sighooks);
+
+		for (size_t i = 0; i < countof(rcu_sighooks); ++i) {
+			rcu_init(&rcu_sighooks[i]);
+		}
 		rcu_init(&rcu_exithooks);
+
 		initialized = true;
 	}
 
@@ -556,7 +566,8 @@ struct sighook *sighook(int sig, sighook_fn *fn, void *arg, enum sigflags flags)
 		goto done;
 	}
 
-	ret = sighook_impl(&rcu_sighooks, sig, fn, arg, flags);
+	struct rcu *shard = sigshard(sig);
+	ret = sighook_impl(shard, sig, fn, arg, flags);
 done:
 	mutex_unlock(&sigmutex);
 	return ret;
@@ -590,7 +601,13 @@ void sigunhook(struct sighook *hook) {
 
 	mutex_lock(&sigmutex);
 
-	struct rcu *rcu = hook->sig ? &rcu_sighooks : &rcu_exithooks;
+	struct rcu *rcu;
+	if (hook->sig) {
+		rcu = sigshard(hook->sig);
+	} else {
+		rcu = &rcu_exithooks;
+	}
+
 	struct sigtable *table = rcu_peek(rcu);
 	bfs_verify(sigtable_del(table, hook) == 0);
 
