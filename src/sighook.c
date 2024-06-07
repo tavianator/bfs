@@ -565,24 +565,20 @@ done:
 struct sighook *atsigexit(sighook_fn *fn, void *arg) {
 	mutex_lock(&sigmutex);
 
-	struct sighook *ret = NULL;
-
 	for (size_t i = 0; i < countof(FATAL_SIGNALS); ++i) {
-		if (siginit(FATAL_SIGNALS[i]) != 0) {
-			goto done;
-		}
+		// Ignore errors; atsigexit() is best-effort anyway and things
+		// like sanitizer runtimes or valgrind may reserve signals for
+		// their own use
+		siginit(FATAL_SIGNALS[i]);
 	}
 
 #ifdef SIGRTMIN
 	for (int i = SIGRTMIN; i <= SIGRTMAX; ++i) {
-		if (siginit(i) != 0) {
-			goto done;
-		}
+		siginit(i);
 	}
 #endif
 
-	ret = sighook_impl(&rcu_exithooks, 0, fn, arg, 0);
-done:
+	struct sighook *ret = sighook_impl(&rcu_exithooks, 0, fn, arg, 0);
 	mutex_unlock(&sigmutex);
 	return ret;
 }
