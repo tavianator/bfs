@@ -2,6 +2,8 @@ query-filters:
   - exclude:
       id: cpp/commented-out-code
   - exclude:
+      id: cpp/include-non-header
+  - exclude:
       id: cpp/long-switch
   - exclude:
       id: cpp/loop-variable-changed
