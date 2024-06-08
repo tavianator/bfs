@@ -426,8 +426,17 @@ static int bfs_resolve_early(struct bfs_resolver *res, const char *exe, const st
 	};
 
 	if (bfs_can_skip_resolve(res, ctx)) {
-		res->done = true;
-		return 0;
+		// Do this check eagerly, even though posix_spawn()/execv() also
+		// would, because:
+		//
+		//     - faccessat() is faster than fork()/clone() + execv()
+		//     - posix_spawn() is not guaranteed to report ENOENT
+		if (xfaccessat(AT_FDCWD, exe, X_OK) == 0) {
+			res->done = true;
+			return 0;
+		} else {
+			return -1;
+		}
 	}
 
 	res->path = getenv("PATH");

@@ -179,6 +179,8 @@ static bool check_resolve(void) {
 
 	ret &= bfs_echeck(!bfs_spawn_resolve("eW6f5RM9Qi") && errno == ENOENT);
 
+	ret &= bfs_echeck(!bfs_spawn_resolve("bin/eW6f5RM9Qi") && errno == ENOENT);
+
 	return ret;
 }
 
