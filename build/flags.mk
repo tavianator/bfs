@@ -90,6 +90,7 @@ CFLAGS ?= \
     -Werror=implicit \
     -Wimplicit-fallthrough \
     -Wmissing-declarations \
+    -Wmissing-variable-declarations \
     -Wshadow \
     -Wsign-compare \
     -Wstrict-prototypes

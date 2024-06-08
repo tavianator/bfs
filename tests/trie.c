@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *keys[] = {
+static const char *keys[] = {
 	"foo",
 	"bar",
 	"baz",
@@ -37,7 +37,7 @@ const char *keys[] = {
 	">>>",
 };
 
-const size_t nkeys = countof(keys);
+static const size_t nkeys = countof(keys);
 
 bool check_trie(void) {
 	bool ret = true;
