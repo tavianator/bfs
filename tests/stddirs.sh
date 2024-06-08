@@ -158,5 +158,6 @@ clean_stddirs() {
         fi
     done
 
+    chmod -R +rwX "$TMP"
     rm -rf "$TMP"
 }
