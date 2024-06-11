@@ -13,4 +13,4 @@ filter() {
 \1/'
 }
 
-"$@" > >(filter) 2> >(filter >&2)
+exec "$@" > >(filter) 2> >(filter >&2)
