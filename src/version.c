@@ -11,6 +11,10 @@ const char bfs_config[] = {
 #include "config.i"
 };
 
+const char bfs_cc[] = {
+#include "cc.i"
+};
+
 const char bfs_cppflags[] = {
 #include "cppflags.i"
 };
