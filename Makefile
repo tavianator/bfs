@@ -215,6 +215,11 @@ check-install::
 	bin/bfs pkg -not -type d -print -exit 1
 	${RM} -r pkg
 
+# Check man page markup
+check-man::
+	${MSG} "[LINT] docs/bfs.1" \
+	    groff -man -rCHECKSTYLE=3 -ww -b -z docs/bfs.1
+
 ## Cleanup (`make clean`)
 
 # Clean all build products
