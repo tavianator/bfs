@@ -83,7 +83,7 @@ nproc() {
 }
 
 # Save the ./configure command line for bfs --version
-export CONFIG="$0 $*"
+export CONFFLAGS="$*"
 
 # Default to `make`
 MAKE="${MAKE-make}"

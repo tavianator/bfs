@@ -7,8 +7,8 @@ const char bfs_version[] = {
 #include "version.i"
 };
 
-const char bfs_config[] = {
-#include "config.i"
+const char bfs_confflags[] = {
+#include "confflags.i"
 };
 
 const char bfs_cc[] = {

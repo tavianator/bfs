@@ -2961,12 +2961,12 @@ static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int a
 	printf("Copyright © Tavian Barnes and the bfs contributors\n");
 	printf("No rights reserved (https://opensource.org/license/0BSD)\n\n");
 
-	printf("CONFIG   := %s\n", bfs_config);
-	printf("CC       := %s\n", bfs_cc);
-	printf("CPPFLAGS := %s\n", bfs_cppflags);
-	printf("CFLAGS   := %s\n", bfs_cflags);
-	printf("LDFLAGS  := %s\n", bfs_ldflags);
-	printf("LDLIBS   := %s\n", bfs_ldlibs);
+	printf("CONFFLAGS := %s\n", bfs_confflags);
+	printf("CC        := %s\n", bfs_cc);
+	printf("CPPFLAGS  := %s\n", bfs_cppflags);
+	printf("CFLAGS    := %s\n", bfs_cflags);
+	printf("LDFLAGS   := %s\n", bfs_ldflags);
+	printf("LDLIBS    := %s\n", bfs_ldlibs);
 
 	printf("\n%s\n", BFS_HOMEPAGE);
 

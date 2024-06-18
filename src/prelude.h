@@ -40,7 +40,7 @@
 // when the version number changes
 extern const char bfs_version[];
 
-extern const char bfs_config[];
+extern const char bfs_confflags[];
 extern const char bfs_cc[];
 extern const char bfs_cppflags[];
 extern const char bfs_cflags[];
