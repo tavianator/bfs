@@ -7,80 +7,9 @@
 
 set -eu
 
-# Save the ./configure command line for bfs --version
-export CONFIG="$0 $*"
-
-# Default to `make`
-MAKE="${MAKE:-make}"
-
-# Pass -j$(nproc) unless MAKEFLAGS is set
-if [ "${MAKEFLAGS+y}" ]; then
-    j=""
-else
-    j="-j$({ nproc || sysctl -n hw.ncpu || getconf _NPROCESSORS_ONLN || echo 1; } 2>/dev/null)"
-fi
-
-# Convert kebab-case to UPPER_CASE
-toupper() {
-    printf '%s' "$1" | tr 'a-z-' 'A-Z_'
-}
-
-# Report an argument parsing error
-invalid() {
-    printf 'error: Unrecognized option "%s"\n\n' "$1" >&2
-    printf 'Run %s --help for more information.\n' "$0" >&2
-    exit 1
-}
-
-for arg; do
-    # --[(enable|disable|with|without)-]$name[=$value]
-    value="${arg#*=}"
-    name="${arg%%=*}"
-    name="${name#--}"
-    case "$arg" in
-        --enable-*|--disable-*|--with-*|--without-*)
-            name="${name#*-}"
-            ;;
-    esac
-    NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
-
-    # y/n modality
-    case "$arg" in
-        --enable-*|--with-*)
-            case "$arg" in
-                *=y|*=yes) yn=y ;;
-                *=n|*=no) yn=n ;;
-                *=*) invalid "$arg" ;;
-                *) yn=y ;;
-            esac
-            ;;
-        --disable-*|--without-*)
-            case "$arg" in
-                *=*) invalid "arg" ;;
-                *) yn=n ;;
-            esac
-            ;;
-    esac
-
-    # Fix up --enable-lib* to --with-lib*
-    case "$arg" in
-        --enable-*|--disable-*)
-            case "$name" in
-                libacl|libcap|libselinux|liburing|oniguruma)
-                    old="$arg"
-                    case "$arg" in
-                        --enable-*) arg="--with-${arg#--*-}" ;;
-                        --disable-*) arg="--without-${arg#--*-}" ;;
-                    esac
-                    printf 'warning: Treating "%s" like "%s"\n' "$old" "$arg" >&2
-                    ;;
-            esac
-        ;;
-    esac
-
-    case "$arg" in
-        -h|--help)
-            cat <<EOF
+# Print the help message()
+help() {
+    cat <<EOF
 Usage:
 
   \$ $0 [--enable-*|--disable-*] [--with-*|--without-*] [CC=...] [...]
@@ -134,13 +63,89 @@ Any other arguments will be passed directly to the $MAKE invocation, e.g.
 
   \$ $0 $j V=1
 EOF
+}
+
+# Report an argument parsing error
+invalid() {
+    printf 'error: Unrecognized option "%s"\n\n' "$1" >&2
+    printf 'Run %s --help for more information.\n' "$0" >&2
+    exit 1
+}
+
+# Get the number of cores to use
+nproc() {
+    {
+        command nproc \
+            || sysctl -n hw.ncpu \
+            || getconf _NPROCESSORS_ONLN \
+            || echo 1
+    } 2>/dev/null
+}
+
+# Save the ./configure command line for bfs --version
+export CONFIG="$0 $*"
+
+# Default to `make`
+MAKE="${MAKE-make}"
+
+# Parse the command-line arguments
+for arg; do
+    shift
+
+    # --[(enable|disable|with|without)-]$name[=$value]
+    value="${arg#*=}"
+    name="${arg%%=*}"
+    name="${name#--}"
+    case "$arg" in
+        --enable-*|--disable-*|--with-*|--without-*)
+            name="${name#*-}"
+            ;;
+    esac
+    NAME=$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
+
+    # y/n modality
+    case "$arg" in
+        --enable-*|--with-*)
+            case "$arg" in
+                *=y|*=yes) yn=y ;;
+                *=n|*=no) yn=n ;;
+                *=*) invalid "$arg" ;;
+                *) yn=y ;;
+            esac
+            ;;
+        --disable-*|--without-*)
+            case "$arg" in
+                *=*) invalid "arg" ;;
+                *) yn=n ;;
+            esac
+            ;;
+    esac
+
+    # Fix up --enable-lib* to --with-lib*
+    case "$arg" in
+        --enable-*|--disable-*)
+            case "$name" in
+                libacl|libcap|libselinux|liburing|oniguruma)
+                    old="$arg"
+                    case "$arg" in
+                        --enable-*) arg="--with-${arg#--*-}" ;;
+                        --disable-*) arg="--without-${arg#--*-}" ;;
+                    esac
+                    printf 'warning: Treating "%s" like "%s"\n' "$old" "$arg" >&2
+                    ;;
+            esac
+        ;;
+    esac
+
+    case "$arg" in
+        -h|--help)
+            help
             exit 0
             ;;
 
         --enable-*|--disable-*)
             case "$name" in
                 release|asan|lsan|msan|tsan|ubsan|lint|gcov)
-                    shift
                     set -- "$@" "$NAME=$yn"
                     ;;
                 *)
@@ -152,7 +157,6 @@ EOF
         --with-*|--without-*)
             case "$name" in
                 libacl|libcap|libselinux|liburing|oniguruma)
-                    shift
                     set -- "$@" "WITH_$NAME=$yn"
                     ;;
                 *)
@@ -162,23 +166,20 @@ EOF
             ;;
 
         --prefix=*|--mandir=*)
-            shift
             set -- "$@" "$NAME=$value"
             ;;
 
         --infodir=*|--build=*|--host=*|--target=*)
-            shift
             printf 'warning: Ignoring option "%s"\n' "$arg" >&2
             ;;
 
         MAKE=*)
-            shift
             MAKE="$value"
             ;;
 
         # make flag (-j2) or variable (CC=clang)
         -*|*=*)
-            continue
+            set -- "$@" "$arg"
             ;;
 
         *)
@@ -196,6 +197,6 @@ for f in Makefile build completions docs src tests; do
 done
 
 # Set MAKEFLAGS to -j$(nproc) if it's unset
-export MAKEFLAGS="${MAKEFLAGS-$j}"
+export MAKEFLAGS="${MAKEFLAGS--j$(nproc)}"
 
 $MAKE -rf build/config.mk "$@"
