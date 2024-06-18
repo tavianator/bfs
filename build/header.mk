@@ -61,7 +61,7 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	@printf '#define BFS_CONFIG_H\n' >>$@
 	@cat ${.ALLSRC} >>$@
 	@printf '#endif // BFS_CONFIG_H\n' >>$@
-	@cat ${.ALLSRC:%=%.log} >gen/config.log
+	@cat gen/cc.log ${.ALLSRC:%=%.log} >gen/config.log
 	${VCAT} $@
 	@printf '%s' "$$CONFFLAGS" | build/embed.sh >gen/confflags.i
 	@printf '%s' "$$XCC" | build/embed.sh >gen/cc.i
@@ -74,7 +74,15 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 # The short name of the config test
 SLUG = ${@:gen/%.h=%}
 
-${HEADERS}::
+${HEADERS}: cc
 	@${MKDIR} ${@D}
 	@build/define-if.sh ${SLUG} build/cc.sh build/${SLUG}.c >$@ 2>$@.log; \
 	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
+.PHONY: ${HEADERS}
+
+# Check that the C compiler works at all
+cc::
+	@build/cc.sh build/empty.c 2>gen/cc.log; \
+	    ret=$$?; \
+	    build/msg-if.sh "[ CC ] build/empty.c" test $$ret -eq 0; \
+	    exit $$ret
