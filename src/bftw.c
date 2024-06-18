@@ -1529,11 +1529,28 @@ static bool bftw_pop_file(struct bftw_state *state) {
 	return bftw_pop(state, &state->fileq);
 }
 
+/** Add a path component to the path. */
+static void bftw_prepend_path(char *path, size_t nameoff, size_t namelen, const char *name) {
+	if (nameoff > 0) {
+		path[nameoff - 1] = '/';
+	}
+	memcpy(path + nameoff, name, namelen);
+}
+
 /** Build the path to the current file. */
 static int bftw_build_path(struct bftw_state *state, const char *name) {
 	const struct bftw_file *file = state->file;
 
-	size_t pathlen = file ? file->nameoff + file->namelen : 0;
+	size_t nameoff, namelen;
+	if (name) {
+		nameoff = file ? bftw_child_nameoff(file) : 0;
+		namelen = strlen(name);
+	} else {
+		nameoff = file->nameoff;
+		namelen = file->namelen;
+	}
+
+	size_t pathlen = nameoff + namelen;
 	if (dstresize(&state->path, pathlen) != 0) {
 		state->error = errno;
 		return -1;
@@ -1546,11 +1563,11 @@ static int bftw_build_path(struct bftw_state *state, const char *name) {
 	}
 
 	// Build the path backwards
+	if (name) {
+		bftw_prepend_path(state->path, nameoff, namelen, name);
+	}
 	while (file && file != ancestor) {
-		if (file->nameoff > 0) {
-			state->path[file->nameoff - 1] = '/';
-		}
-		memcpy(state->path + file->nameoff, file->name, file->namelen);
+		bftw_prepend_path(state->path, file->nameoff, file->namelen, file->name);
 
 		if (ancestor && ancestor->depth == file->depth) {
 			ancestor = ancestor->parent;
@@ -1559,20 +1576,6 @@ static int bftw_build_path(struct bftw_state *state, const char *name) {
 	}
 
 	state->previous = state->file;
-
-	if (name) {
-		if (pathlen > 0 && state->path[pathlen - 1] != '/') {
-			if (dstrapp(&state->path, '/') != 0) {
-				state->error = errno;
-				return -1;
-			}
-		}
-		if (dstrcat(&state->path, name) != 0) {
-			state->error = errno;
-			return -1;
-		}
-	}
-
 	return 0;
 }
 
