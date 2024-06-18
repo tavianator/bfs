@@ -234,7 +234,7 @@ static char *bfs_exec_format_arg(char *arg, const char *path) {
 
 	char *last = arg;
 	do {
-		if (dstrncat(&ret, last, match - last) != 0) {
+		if (dstrxcat(&ret, last, match - last) != 0) {
 			goto err;
 		}
 		if (dstrcat(&ret, path) != 0) {

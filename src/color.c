@@ -583,7 +583,7 @@ static int parse_gnu_ls_colors(struct colors *colors, const char *ls_colors) {
 				break;
 			}
 
-			if (dstrncpy(&key, chunk, equals - chunk) != 0) {
+			if (dstrxcpy(&key, chunk, equals - chunk) != 0) {
 				goto fail;
 			}
 			if (unescape(&value, equals + 1, ':', &next) != 0) {
@@ -968,7 +968,7 @@ static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, 
 	if (path == ftwbuf->path) {
 		if (ftwbuf->depth == 0) {
 			at_fd = AT_FDCWD;
-			at_path = dstrndup(path, max);
+			at_path = dstrxdup(path, max);
 		} else {
 			// The parent must have existed to get here
 			goto out;
@@ -977,13 +977,13 @@ static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, 
 		// We're in print_link_target(), so resolve relative to the link's parent directory
 		at_fd = ftwbuf->at_fd;
 		if (at_fd == (int)AT_FDCWD && path[0] != '/') {
-			at_path = dstrndup(ftwbuf->path, ftwbuf->nameoff);
-			if (at_path && dstrncat(&at_path, path, max) != 0) {
+			at_path = dstrxdup(ftwbuf->path, ftwbuf->nameoff);
+			if (at_path && dstrxcat(&at_path, path, max) != 0) {
 				ret = -1;
 				goto out_path;
 			}
 		} else {
-			at_path = dstrndup(path, max);
+			at_path = dstrxdup(path, max);
 		}
 	}
 
@@ -1206,7 +1206,7 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 
 	for (const char *i = format; *i; ++i) {
 		size_t verbatim = strcspn(i, "%$");
-		if (dstrncat(&cfile->buffer, i, verbatim) != 0) {
+		if (dstrxcat(&cfile->buffer, i, verbatim) != 0) {
 			return -1;
 		}
 		i += verbatim;
