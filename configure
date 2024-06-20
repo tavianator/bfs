@@ -7,7 +7,7 @@
 
 set -eu
 
-# Print the help message()
+# Print the help message
 help() {
     cat <<EOF
 Usage:
