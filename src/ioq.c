@@ -313,9 +313,11 @@ static void ioq_slot_wake(struct ioqq *ioqq, ioq_slot *slot) {
 	cond_broadcast(&monitor->cond);
 }
 
-/** Branch-free (slot & IOQ_SKIP) ? ~IOQ_BLOCKED : 0 */
-static uintptr_t ioq_skip_mask(uintptr_t slot) {
-	return -(slot >> IOQ_SKIP_BIT) << 1;
+/** Branch-free ((slot & IOQ_SKIP) ? skip : full) & ~IOQ_BLOCKED */
+static uintptr_t ioq_slot_blend(uintptr_t slot, uintptr_t skip, uintptr_t full) {
+	uintptr_t mask = -(slot >> IOQ_SKIP_BIT);
+	uintptr_t ret = (skip & mask) | (full & ~mask);
+	return ret & ~IOQ_BLOCKED;
 }
 
 /** Push an entry into a slot. */
@@ -323,19 +325,18 @@ static bool ioq_slot_push(struct ioqq *ioqq, ioq_slot *slot, struct ioq_ent *ent
 	uintptr_t prev = load(slot, relaxed);
 
 	while (true) {
-		size_t skip_mask = ioq_skip_mask(prev);
-		size_t full_mask = ~skip_mask & ~IOQ_BLOCKED;
-		if (prev & full_mask) {
+		uintptr_t full = ioq_slot_blend(prev, 0, prev);
+		if (full) {
 			// full(ptr) → wait
 			prev = ioq_slot_wait(ioqq, slot, prev);
 			continue;
 		}
 
 		// empty   → full(ptr)
-		uintptr_t next = ((uintptr_t)ent >> 1) & full_mask;
+		uintptr_t next = (uintptr_t)ent >> 1;
 		// skip(1) → empty
 		// skip(n) → skip(n - 1)
-		next |= (prev - IOQ_SKIP_ONE) & skip_mask;
+		next = ioq_slot_blend(prev, prev - IOQ_SKIP_ONE, next);
 
 		if (compare_exchange_weak(slot, &prev, next, release, relaxed)) {
 			break;
@@ -357,9 +358,8 @@ static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool bloc
 		// skip(n)   → skip(n + 1)
 		// full(ptr) → full(ptr - 1)
 		uintptr_t next = prev + IOQ_SKIP_ONE;
-		// skip(n)   → ~IOQ_BLOCKED
 		// full(ptr) → 0
-		next &= ioq_skip_mask(next);
+		next = ioq_slot_blend(next, next, 0);
 
 		if (block && next) {
 			prev = ioq_slot_wait(ioqq, slot, prev);
@@ -378,7 +378,7 @@ static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool bloc
 	// empty     → 0
 	// skip(n)   → 0
 	// full(ptr) → ptr
-	prev &= ioq_skip_mask(~prev);
+	prev = ioq_slot_blend(prev, 0, prev);
 	return (struct ioq_ent *)(prev << 1);
 }
 
