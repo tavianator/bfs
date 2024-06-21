@@ -46,8 +46,8 @@ jobs:
           name: linux-config.log
           path: distcheck-*/gen/config.log
 
-  macos:
-    name: macOS
+  macos-asan:
+    name: macOS (AddressSanitizer)
 
     runs-on: macos-14
 
@@ -63,7 +63,45 @@ jobs:
       - name: Run tests
         run: |
           jobs=$(sysctl -n hw.ncpu)
-          .github/diag.sh make -j$jobs distcheck
+          .github/diag.sh make -j$jobs distcheck-asan
+
+  macos-tsan:
+    name: macOS (ThreadSanitizer)
+
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install \
+              bash \
+              expect
+
+      - name: Run tests
+        run: |
+          jobs=$(sysctl -n hw.ncpu)
+          .github/diag.sh make -j$jobs distcheck-tsan
+
+  macos-release:
+    name: macOS (release)
+
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install \
+              bash \
+              expect
+
+      - name: Run tests
+        run: |
+          jobs=$(sysctl -n hw.ncpu)
+          .github/diag.sh make -j$jobs distcheck-release
 
   freebsd:
     name: FreeBSD
