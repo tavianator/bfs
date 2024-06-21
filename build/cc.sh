@@ -5,12 +5,5 @@
 
 # Run the compiler and check if it succeeded
 
-set -eu
-
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
-
-(
-    set -x
-    $XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS "$@" $XLDLIBS -o "$TMP"
-)
+set -eux
+$XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS "$@" $XLDLIBS

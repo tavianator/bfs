@@ -11,7 +11,7 @@ include build/exports.mk
 gen/deps.mk::
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
-	@if build/cc.sh -MD -MP -MF /dev/null build/empty.c; then \
+	@if build/cc.sh -MD -MP build/empty.c -o gen/.deps.out; then \
 	    printf '_CPPFLAGS += -MD -MP\n'; \
 	fi >>$@ 2>$@.log
 	${VCAT} $@

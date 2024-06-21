@@ -76,16 +76,18 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 
 # The short name of the config test
 SLUG = ${@:gen/%.h=%}
+# The hidden output file name
+OUT = ${SLUG:has/%=gen/has/.%.out}
 
 ${HEADERS}: cc
 	@${MKDIR} ${@D}
-	@build/define-if.sh ${SLUG} build/cc.sh build/${SLUG}.c >$@ 2>$@.log; \
+	@build/define-if.sh ${SLUG} build/cc.sh build/${SLUG}.c -o ${OUT} >$@ 2>$@.log; \
 	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
 .PHONY: ${HEADERS}
 
 # Check that the C compiler works at all
 cc::
-	@build/cc.sh build/empty.c 2>gen/cc.log; \
+	@build/cc.sh build/empty.c -o gen/.cc.out 2>gen/cc.log; \
 	    ret=$$?; \
 	    build/msg-if.sh "[ CC ] build/empty.c" test $$ret -eq 0; \
 	    exit $$ret
