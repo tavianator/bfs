@@ -4,7 +4,10 @@
 # Makefile that generates gen/config.h
 
 include build/prelude.mk
-include gen/config.mk
+include gen/vars.mk
+include gen/flags.mk
+include gen/deps.mk
+include gen/pkgs.mk
 include build/exports.mk
 
 # All header fragments we generate
