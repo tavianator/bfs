@@ -214,57 +214,26 @@ static void ext_tolower(char *ext, size_t len) {
 	}
 }
 
-/**
- * The "smart case" algorithm.
- *
- * @param ext
- *         The current extension being added.
- * @param prev
- *         The previous case-sensitive match, if any, for the same extension.
- * @param iprev
- *         The previous case-insensitive match, if any, for the same extension.
- * @return
- *         Whether this extension should become case-sensitive.
- */
-static bool ext_case_sensitive(struct ext_color *ext, struct ext_color *prev, struct ext_color *iprev) {
-	// This is the first case-insensitive occurrence of this extension, e.g.
-	//
-	//     *.gz=01;31:*.tar.gz=01;33
-	if (!iprev) {
-		bfs_assert(!prev);
-		return false;
+/** Insert an extension into a trie. */
+static int insert_ext(struct trie *trie, struct ext_color *ext) {
+	// A later *.x should override any earlier *.x, *.y.x, etc.
+	struct trie_leaf *leaf;
+	while ((leaf = trie_find_postfix(trie, ext->ext))) {
+		trie_remove(trie, leaf);
 	}
 
-	// If the last version of this extension is already case-sensitive,
-	// this one should be too, e.g.
-	//
-	//     *.tar.gz=01;31:*.TAR.GZ=01;32:*.TAR.GZ=01;33
-	if (iprev->case_sensitive) {
-		return true;
+	size_t len = ext->len + 1;
+	leaf = trie_insert_mem(trie, ext->ext, len);
+	if (!leaf) {
+		return -1;
 	}
 
-	// The case matches the last occurrence exactly, e.g.
-	//
-	//     *.tar.gz=01;31:*.tar.gz=01;33
-	if (iprev == prev) {
-		return false;
-	}
-
-	// Different case, but same value, e.g.
-	//
-	//     *.tar.gz=01;31:*.TAR.GZ=01;31
-	if (esc_eq(iprev->esc, ext->esc->seq, ext->esc->len)) {
-		return false;
-	}
-
-	// Different case, different value, e.g.
-	//
-	//     *.tar.gz=01;31:*.TAR.GZ=01;33
-	return true;
+	leaf->value = ext;
+	return 0;
 }
 
 /** Set the color for an extension. */
-static int set_ext(struct colors *colors, char *key, char *value) {
+static int set_ext(struct colors *colors, dchar *key, dchar *value) {
 	size_t len = dstrlen(key);
 	struct ext_color *ext = varena_alloc(&colors->ext_arena, len + 1);
 	if (!ext) {
@@ -279,45 +248,19 @@ static int set_ext(struct colors *colors, char *key, char *value) {
 		goto fail;
 	}
 
-	key = memcpy(ext->ext, key, len + 1);
+	memcpy(ext->ext, key, len + 1);
 
 	// Reverse the extension (`*.y.x` -> `x.y.*`) so we can use trie_find_prefix()
-	ext_reverse(key, len);
-
-	// Find any pre-existing exact match
-	struct ext_color *prev = NULL;
-	struct trie_leaf *leaf = trie_find_str(&colors->ext_trie, key);
-	if (leaf) {
-		prev = leaf->value;
-		trie_remove(&colors->ext_trie, leaf);
-	}
-
-	// A later *.x should override any earlier *.x, *.y.x, etc.
-	while ((leaf = trie_find_postfix(&colors->ext_trie, key))) {
-		trie_remove(&colors->ext_trie, leaf);
-	}
+	ext_reverse(ext->ext, len);
 
 	// Insert the extension into the case-sensitive trie
-	leaf = trie_insert_str(&colors->ext_trie, key);
-	if (!leaf) {
-		goto fail;
-	}
-	leaf->value = ext;
-
-	// "Smart case": if the same extension is given with two different
-	// capitalizations (e.g. `*.y.x=31:*.Y.Z=32:`), make it case-sensitive
-	ext_tolower(key, len);
-	leaf = trie_insert_str(&colors->iext_trie, key);
-	if (!leaf) {
+	if (insert_ext(&colors->ext_trie, ext) != 0) {
 		goto fail;
 	}
 
-	struct ext_color *iprev = leaf->value;
-	if (ext_case_sensitive(ext, prev, iprev)) {
-		iprev->case_sensitive = true;
-		ext->case_sensitive = true;
+	if (colors->ext_len < len) {
+		colors->ext_len = len;
 	}
-	leaf->value = ext;
 
 	return 0;
 
@@ -329,32 +272,83 @@ fail:
 	return -1;
 }
 
-/** Rebuild the case-insensitive trie after all extensions have been parsed. */
+/**
+ * The "smart case" algorithm.
+ *
+ * @param ext
+ *         The current extension being added.
+ * @param iext
+ *         The previous case-insensitive match, if any, for the same extension.
+ * @return
+ *         Whether this extension should become case-sensitive.
+ */
+static bool ext_case_sensitive(struct ext_color *ext, struct ext_color *iext) {
+	// This is the first case-insensitive occurrence of this extension, e.g.
+	//
+	//     *.gz=01;31:*.tar.gz=01;33
+	if (!iext) {
+		return false;
+	}
+
+	// If the last version of this extension is already case-sensitive,
+	// this one should be too, e.g.
+	//
+	//     *.tar.gz=01;31:*.TAR.GZ=01;32:*.TAR.GZ=01;33
+	if (iext->case_sensitive) {
+		return true;
+	}
+
+	// Different case, but same value, e.g.
+	//
+	//     *.tar.gz=01;31:*.TAR.GZ=01;31
+	if (esc_eq(iext->esc, ext->esc->seq, ext->esc->len)) {
+		return false;
+	}
+
+	// Different case, different value, e.g.
+	//
+	//     *.tar.gz=01;31:*.TAR.GZ=01;33
+	return true;
+}
+
+/** Build the case-insensitive trie, after all extensions have been parsed. */
 static int build_iext_trie(struct colors *colors) {
+	// Find which extensions should be case-sensitive
+	for_trie (leaf, &colors->ext_trie) {
+		struct ext_color *ext = leaf->value;
+
+		// "Smart case": if the same extension is given with two different
+		// capitalizations (e.g. `*.y.x=31:*.Y.Z=32:`), make it case-sensitive
+		ext_tolower(ext->ext, ext->len);
+
+		size_t len = ext->len + 1;
+		struct trie_leaf *ileaf = trie_insert_mem(&colors->iext_trie, ext->ext, len);
+		if (!ileaf) {
+			return -1;
+		}
+
+		struct ext_color *iext = ileaf->value;
+		if (ext_case_sensitive(ext, iext)) {
+			ext->case_sensitive = true;
+			iext->case_sensitive = true;
+		}
+
+		ileaf->value = ext;
+	}
+
+	// Rebuild the trie with only the case-insensitive ones
 	trie_clear(&colors->iext_trie);
 
 	for_trie (leaf, &colors->ext_trie) {
-		size_t len = leaf->length - 1;
-		if (colors->ext_len < len) {
-			colors->ext_len = len;
-		}
-
 		struct ext_color *ext = leaf->value;
 		if (ext->case_sensitive) {
 			continue;
 		}
 
-		// set_ext() already reversed and lowercased the extension
-		struct trie_leaf *ileaf;
-		while ((ileaf = trie_find_postfix(&colors->iext_trie, ext->ext))) {
-			trie_remove(&colors->iext_trie, ileaf);
-		}
-
-		ileaf = trie_insert_str(&colors->iext_trie, ext->ext);
-		if (!ileaf) {
+		// We already lowercased the extension above
+		if (insert_ext(&colors->iext_trie, ext) != 0) {
 			return -1;
 		}
-		ileaf->value = ext;
 	}
 
 	return 0;
