@@ -68,10 +68,15 @@ struct bfs_ctx {
 	bool status;
 	/** Whether to only return unique files (-unique). */
 	bool unique;
-	/** Whether to print warnings (-warn/-nowarn). */
-	bool warn;
 	/** Whether to only handle paths with xargs-safe characters (-X). */
 	bool xargs_safe;
+
+	/** Whether bfs was run interactively. */
+	bool interactive;
+	/** Whether to print warnings (-warn/-nowarn). */
+	bool warn;
+	/** Whether any dangerous actions (-delete/-exec) are present. */
+	bool dangerous;
 
 	/** Color data. */
 	struct colors *colors;

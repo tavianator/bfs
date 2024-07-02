@@ -615,21 +615,25 @@ static bool is_const(const struct bfs_expr *expr) {
 
 /** Warn about an expression. */
 _printf(3, 4)
-static void opt_warning(const struct bfs_opt *opt, const struct bfs_expr *expr, const char *format, ...) {
+static bool opt_warning(const struct bfs_opt *opt, const struct bfs_expr *expr, const char *format, ...) {
 	if (!opt->warn) {
-		return;
+		return false;
 	}
 
 	if (bfs_expr_is_parent(expr) || is_const(expr)) {
-		return;
+		return false;
 	}
 
-	if (bfs_expr_warning(opt->ctx, expr)) {
-		va_list args;
-		va_start(args, format);
-		bfs_vwarning(opt->ctx, format, args);
-		va_end(args);
+	if (!bfs_expr_warning(opt->ctx, expr)) {
+		return false;
 	}
+
+	va_list args;
+	va_start(args, format);
+	bfs_vwarning(opt->ctx, format, args);
+	va_end(args);
+
+	return true;
 }
 
 /** Remove and return an expression's children. */
@@ -1807,11 +1811,38 @@ static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *ex
 	return visit_leave(opt, expr, visitor);
 }
 
+/**
+ * Warn about an ignored expression.
+ *
+ * @return
+ *         True to continue optimizing, false to cancel.
+ */
+static bool opt_ignore(struct bfs_opt *opt, struct bfs_expr *expr) {
+	struct bfs_ctx *ctx = opt->ctx;
+
+	if (opt_warning(opt, expr, "The result of this expression is ignored.\n")) {
+		if (ctx->interactive && ctx->dangerous) {
+			bfs_warning(ctx, "Do you want to continue? ");
+			if (ynprompt() == 0) {
+				errno = 0;
+				return false;
+			}
+		}
+
+		fprintf(stderr, "\n");
+	}
+
+	return true;
+}
+
 /** Data flow visitor function. */
 static struct bfs_expr *data_flow_visit(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
 	if (opt->ignore_result && expr->pure) {
 		opt_debug(opt, "ignored result\n");
-		opt_warning(opt, expr, "The result of this expression is ignored.\n\n");
+		if (!opt_ignore(opt, expr)) {
+			return NULL;
+		}
+
 		expr = opt_const(opt, false);
 		if (!expr) {
 			return NULL;
@@ -1987,7 +2018,9 @@ static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr,
 
 		if (ignore) {
 			opt_delete(opt, "%pe [ignored result]\n", child);
-			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			if (!opt_ignore(opt, child)) {
+				return NULL;
+			}
 			continue;
 		}
 
@@ -2035,7 +2068,9 @@ static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 
 		if (ignore) {
 			opt_delete(opt, "%pe [ignored result]\n", child);
-			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			if (!opt_ignore(opt, child)) {
+				return NULL;
+			}
 			continue;
 		}
 
@@ -2076,7 +2111,9 @@ static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *exp
 
 		if (opt->level >= 2 && child->pure && !SLIST_EMPTY(&children)) {
 			opt_delete(opt, "%pe [ignored result]\n", child);
-			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			if (!opt_ignore(opt, child)) {
+				return NULL;
+			}
 			continue;
 		}
 

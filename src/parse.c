@@ -78,8 +78,6 @@ struct bfs_parser {
 
 	/** Whether stdout is a terminal. */
 	bool stdout_tty;
-	/** Whether this session is interactive (stdin and stderr are each a terminal). */
-	bool interactive;
 	/** Whether -color or -nocolor has been passed. */
 	enum use_color use_color;
 	/** Whether a -print action is implied. */
@@ -1185,8 +1183,12 @@ static struct bfs_expr *parse_daystart(struct bfs_parser *parser, int arg1, int 
  * Parse -delete.
  */
 static struct bfs_expr *parse_delete(struct bfs_parser *parser, int arg1, int arg2) {
-	parser->ctx->flags |= BFTW_POST_ORDER;
+	struct bfs_ctx *ctx = parser->ctx;
+	ctx->flags |= BFTW_POST_ORDER;
+	ctx->dangerous = true;
+
 	parser->depth_arg = parser->argv;
+
 	return parse_nullary_action(parser, eval_delete);
 }
 
@@ -1246,7 +1248,9 @@ static struct bfs_expr *parse_empty(struct bfs_parser *parser, int arg1, int arg
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg2) {
-	struct bfs_exec *execbuf = bfs_exec_parse(parser->ctx, parser->argv, flags);
+	struct bfs_ctx *ctx = parser->ctx;
+
+	struct bfs_exec *execbuf = bfs_exec_parse(ctx, parser->argv, flags);
 	if (!execbuf) {
 		return NULL;
 	}
@@ -1295,6 +1299,8 @@ static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg
 
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
 		parser->ok_expr = expr;
+	} else {
+		ctx->dangerous = true;
 	}
 
 	return expr;
@@ -3237,6 +3243,8 @@ static const struct table_entry *table_lookup_fuzzy(const char *arg) {
  *         | ACTION
  */
 static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	// Paths are already skipped at this point
 	const char *arg = parser->argv[0];
 
@@ -3259,7 +3267,7 @@ static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
 
 	match = table_lookup_fuzzy(arg);
 
-	CFILE *cerr = parser->ctx->cerr;
+	CFILE *cerr = ctx->cerr;
 	parse_error(parser, "Unknown argument; did you mean ");
 	switch (match->info & T_TYPE) {
 	case T_FLAG:
@@ -3273,7 +3281,7 @@ static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
 		break;
 	}
 
-	if (!parser->interactive || !match->parse) {
+	if (!ctx->interactive || !match->parse) {
 		fprintf(stderr, "\n");
 		goto unmatched;
 	}
@@ -3483,6 +3491,8 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser) {
  * Parse the top-level expression.
  */
 static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	if (skip_paths(parser) != 0) {
 		return NULL;
 	}
@@ -3529,13 +3539,13 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 			parser->xdev_arg[0], parser->mount_arg[0]);
 	}
 
-	if (parser->ctx->warn && parser->depth_arg && parser->prune_arg) {
+	if (ctx->warn && parser->depth_arg && parser->prune_arg) {
 		parse_conflict_warning(parser, parser->depth_arg, 1, parser->prune_arg, 1,
 			"${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n",
 			parser->prune_arg[0], parser->depth_arg[0]);
 
-		if (parser->interactive) {
-			bfs_warning(parser->ctx, "Do you want to continue? ");
+		if (ctx->interactive) {
+			bfs_warning(ctx, "Do you want to continue? ");
 			if (ynprompt() == 0) {
 				return NULL;
 			}
@@ -3770,6 +3780,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	} else {
 		ctx->warn = stdin_tty;
 	}
+	ctx->interactive = stdin_tty && stderr_tty;
 
 	struct bfs_parser parser = {
 		.ctx = ctx,
@@ -3777,7 +3788,6 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.command = ctx->argv[0],
 		.regex_type = BFS_REGEX_POSIX_BASIC,
 		.stdout_tty = stdout_tty,
-		.interactive = stdin_tty && stderr_tty,
 		.use_color = use_color,
 		.implicit_print = true,
 		.implicit_root = true,
@@ -3812,7 +3822,9 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (bfs_optimize(ctx) != 0) {
-		bfs_perror(ctx, "bfs_optimize()");
+		if (errno != 0) {
+			bfs_perror(ctx, "bfs_optimize()");
+		}
 		goto fail;
 	}
 
