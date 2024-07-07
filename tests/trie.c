@@ -39,14 +39,12 @@ static const char *keys[] = {
 
 static const size_t nkeys = countof(keys);
 
-bool check_trie(void) {
-	bool ret = true;
-
+void check_trie(void) {
 	struct trie trie;
 	trie_init(&trie);
 
 	for (size_t i = 0; i < nkeys; ++i) {
-		ret &= bfs_check(!trie_find_str(&trie, keys[i]));
+		bfs_check(!trie_find_str(&trie, keys[i]));
 
 		const char *prefix = NULL;
 		for (size_t j = 0; j < i; ++j) {
@@ -60,37 +58,37 @@ bool check_trie(void) {
 		struct trie_leaf *leaf = trie_find_prefix(&trie, keys[i]);
 		if (prefix) {
 			bfs_verify(leaf);
-			ret &= bfs_check(strcmp(prefix, leaf->key) == 0);
+			bfs_check(strcmp(prefix, leaf->key) == 0);
 		} else {
-			ret &= bfs_check(!leaf);
+			bfs_check(!leaf);
 		}
 
 		leaf = trie_insert_str(&trie, keys[i]);
 		bfs_verify(leaf);
-		ret &= bfs_check(strcmp(keys[i], leaf->key) == 0);
-		ret &= bfs_check(leaf->length == strlen(keys[i]) + 1);
+		bfs_check(strcmp(keys[i], leaf->key) == 0);
+		bfs_check(leaf->length == strlen(keys[i]) + 1);
 	}
 
 	{
 		size_t i = 0;
 		for_trie (leaf, &trie) {
-			ret &= bfs_check(leaf == trie_find_str(&trie, keys[i]));
-			ret &= bfs_check(!leaf->prev || leaf->prev->next == leaf);
-			ret &= bfs_check(!leaf->next || leaf->next->prev == leaf);
+			bfs_check(leaf == trie_find_str(&trie, keys[i]));
+			bfs_check(!leaf->prev || leaf->prev->next == leaf);
+			bfs_check(!leaf->next || leaf->next->prev == leaf);
 			++i;
 		}
-		ret &= bfs_check(i == nkeys);
+		bfs_check(i == nkeys);
 	}
 
 	for (size_t i = 0; i < nkeys; ++i) {
 		struct trie_leaf *leaf = trie_find_str(&trie, keys[i]);
 		bfs_verify(leaf);
-		ret &= bfs_check(strcmp(keys[i], leaf->key) == 0);
-		ret &= bfs_check(leaf->length == strlen(keys[i]) + 1);
+		bfs_check(strcmp(keys[i], leaf->key) == 0);
+		bfs_check(leaf->length == strlen(keys[i]) + 1);
 
 		trie_remove(&trie, leaf);
 		leaf = trie_find_str(&trie, keys[i]);
-		ret &= bfs_check(!leaf);
+		bfs_check(!leaf);
 
 		const char *postfix = NULL;
 		for (size_t j = i + 1; j < nkeys; ++j) {
@@ -104,14 +102,14 @@ bool check_trie(void) {
 		leaf = trie_find_postfix(&trie, keys[i]);
 		if (postfix) {
 			bfs_verify(leaf);
-			ret &= bfs_check(strcmp(postfix, leaf->key) == 0);
+			bfs_check(strcmp(postfix, leaf->key) == 0);
 		} else {
-			ret &= bfs_check(!leaf);
+			bfs_check(!leaf);
 		}
 	}
 
 	for_trie (leaf, &trie) {
-		ret &= bfs_check(false, "trie should be empty");
+		bfs_check(false, "trie should be empty");
 	}
 
 	// This tests the "jump" node handling on 32-bit platforms
@@ -120,18 +118,17 @@ bool check_trie(void) {
 	bfs_verify(longstr);
 
 	memset(longstr, 0xAC, longsize);
-	ret &= bfs_check(!trie_find_mem(&trie, longstr, longsize));
-	ret &= bfs_check(trie_insert_mem(&trie, longstr, longsize));
+	bfs_check(!trie_find_mem(&trie, longstr, longsize));
+	bfs_check(trie_insert_mem(&trie, longstr, longsize));
 
 	memset(longstr + longsize / 2, 0xAB, longsize / 2);
-	ret &= bfs_check(!trie_find_mem(&trie, longstr, longsize));
-	ret &= bfs_check(trie_insert_mem(&trie, longstr, longsize));
+	bfs_check(!trie_find_mem(&trie, longstr, longsize));
+	bfs_check(trie_insert_mem(&trie, longstr, longsize));
 
 	memset(longstr, 0xAA, longsize / 2);
-	ret &= bfs_check(!trie_find_mem(&trie, longstr, longsize));
-	ret &= bfs_check(trie_insert_mem(&trie, longstr, longsize));
+	bfs_check(!trie_find_mem(&trie, longstr, longsize));
+	bfs_check(trie_insert_mem(&trie, longstr, longsize));
 
 	free(longstr);
 	trie_destroy(&trie);
-	return ret;
 }

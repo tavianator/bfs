@@ -71,7 +71,6 @@ static void check_ioq_push_block(void) {
 	ioq_destroy(ioq);
 }
 
-bool check_ioq(void) {
+void check_ioq(void) {
 	check_ioq_push_block();
-	return true;
 }

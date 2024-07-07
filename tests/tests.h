@@ -12,47 +12,41 @@
 #include "bfstd.h"
 #include "diag.h"
 
-/** Unit test function type. */
-typedef bool test_fn(void);
-
 /** Memory allocation tests. */
-bool check_alloc(void);
+void check_alloc(void);
 
 /** Standard library wrapper tests. */
-bool check_bfstd(void);
+void check_bfstd(void);
 
 /** Bit manipulation tests. */
-bool check_bit(void);
+void check_bit(void);
 
 /** I/O queue tests. */
-bool check_ioq(void);
+void check_ioq(void);
 
 /** Linked list tests. */
-bool check_list(void);
+void check_list(void);
 
 /** Signal hook tests. */
-bool check_sighook(void);
+void check_sighook(void);
 
 /** Trie tests. */
-bool check_trie(void);
+void check_trie(void);
 
 /** Process spawning tests. */
-bool check_xspawn(void);
+void check_xspawn(void);
 
 /** Time tests. */
-bool check_xtime(void);
+void check_xtime(void);
 
-/** Don't ignore the bfs_check() return value. */
-attr(nodiscard)
-static inline bool bfs_check(bool ret) {
-	return ret;
-}
+/** Record a single check and return the result. */
+bool bfs_check_impl(bool result);
 
 /**
  * Check a condition, logging a message on failure but continuing.
  */
 #define bfs_check(...) \
-	bfs_check(bfs_check_(#__VA_ARGS__, __VA_ARGS__, "", ""))
+	bfs_check_impl(bfs_check_(#__VA_ARGS__, __VA_ARGS__, "", ""))
 
 #define bfs_check_(str, cond, format, ...) \
 	((cond) ? true : (bfs_diag( \
@@ -65,7 +59,7 @@ static inline bool bfs_check(bool ret) {
  * Check a condition, logging the current error string on failure.
  */
 #define bfs_echeck(...) \
-	bfs_echeck_(#__VA_ARGS__, __VA_ARGS__, "", errstr())
+	bfs_check_impl(bfs_echeck_(#__VA_ARGS__, __VA_ARGS__, "", errstr()))
 
 #define bfs_echeck_(str, cond, format, ...) \
 	((cond) ? true : (bfs_diag( \

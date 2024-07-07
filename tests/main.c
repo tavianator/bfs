@@ -9,14 +9,26 @@
 #include "tests.h"
 #include "bfstd.h"
 #include "color.h"
+#include "thread.h"
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+/** Result of the current test. */
+static thread_local bool pass;
+
+bool bfs_check_impl(bool result) {
+	pass &= result;
+	return result;
+}
+
+/** Unit test function type. */
+typedef void test_fn(void);
+
 /**
- * Test context.
+ * Global test context.
  */
 struct test_ctx {
 	/** Number of command line arguments. */
@@ -80,7 +92,10 @@ static bool should_run(const struct test_ctx *ctx, const char *test) {
 /** Run a test if it's enabled. */
 static void run_test(struct test_ctx *ctx, const char *test, test_fn *fn) {
 	if (should_run(ctx, test)) {
-		if (fn()) {
+		pass = true;
+		fn();
+
+		if (pass) {
 			cfprintf(ctx->cout, "${grn}[PASS]${rs} ${bld}%s${rs}\n", test);
 		} else {
 			cfprintf(ctx->cout, "${red}[FAIL]${rs} ${bld}%s${rs}\n", test);

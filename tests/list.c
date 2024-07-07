@@ -41,7 +41,7 @@ static bool check_list_items(struct list *list, int *array, size_t size) {
 #define ARRAY(...) (int[]){ __VA_ARGS__ }, countof((int[]){ __VA_ARGS__ })
 #define EMPTY() NULL, 0
 
-bool check_list(void) {
+void check_list(void) {
 	struct list l1;
 	SLIST_INIT(&l1);
 	bfs_verify(check_list_items(&l1, EMPTY()));
@@ -92,6 +92,4 @@ bool check_list(void) {
 	SLIST_APPEND(&l2, &i12);
 	SLIST_SPLICE(&l1, &l1.head->next, &l2);
 	bfs_verify(check_list_items(&l1, ARRAY(10, 11, 12, 15, 20)));
-
-	return true;
 }

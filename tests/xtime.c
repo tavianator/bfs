@@ -39,35 +39,31 @@ static bool check_one_xgetdate(const char *str, int error, time_t expected) {
 }
 
 /** xgetdate() tests. */
-static bool check_xgetdate(void) {
-	bool ret = true;
-
-	ret &= check_one_xgetdate("", EINVAL, 0);
-	ret &= check_one_xgetdate("????", EINVAL, 0);
-	ret &= check_one_xgetdate("1991", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-??", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-??", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14", 0, 692668800);
-	ret &= check_one_xgetdate("1991-12-14-", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14T", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14T??", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14T10", 0, 692704800);
-	ret &= check_one_xgetdate("1991-12-14T10:??", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14T10:11", 0, 692705460);
-	ret &= check_one_xgetdate("1991-12-14T10:11:??", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14T10:11:12", 0, 692705472);
-	ret &= check_one_xgetdate("1991-12-14T10Z", 0, 692704800);
-	ret &= check_one_xgetdate("1991-12-14T10:11Z", 0, 692705460);
-	ret &= check_one_xgetdate("1991-12-14T10:11:12Z", 0, 692705472);
-	ret &= check_one_xgetdate("1991-12-14T10:11:12?", EINVAL, 0);
-	ret &= check_one_xgetdate("1991-12-14T03-07", 0, 692704800);
-	ret &= check_one_xgetdate("1991-12-14T06:41-03:30", 0, 692705460);
-	ret &= check_one_xgetdate("1991-12-14T03:11:12-07:00", 0, 692705472);
-	ret &= check_one_xgetdate("19911214 031112-0700", 0, 692705472);;
-
-	return ret;
+static void check_xgetdate(void) {
+	check_one_xgetdate("", EINVAL, 0);
+	check_one_xgetdate("????", EINVAL, 0);
+	check_one_xgetdate("1991", EINVAL, 0);
+	check_one_xgetdate("1991-??", EINVAL, 0);
+	check_one_xgetdate("1991-12", EINVAL, 0);
+	check_one_xgetdate("1991-12-", EINVAL, 0);
+	check_one_xgetdate("1991-12-??", EINVAL, 0);
+	check_one_xgetdate("1991-12-14", 0, 692668800);
+	check_one_xgetdate("1991-12-14-", EINVAL, 0);
+	check_one_xgetdate("1991-12-14T", EINVAL, 0);
+	check_one_xgetdate("1991-12-14T??", EINVAL, 0);
+	check_one_xgetdate("1991-12-14T10", 0, 692704800);
+	check_one_xgetdate("1991-12-14T10:??", EINVAL, 0);
+	check_one_xgetdate("1991-12-14T10:11", 0, 692705460);
+	check_one_xgetdate("1991-12-14T10:11:??", EINVAL, 0);
+	check_one_xgetdate("1991-12-14T10:11:12", 0, 692705472);
+	check_one_xgetdate("1991-12-14T10Z", 0, 692704800);
+	check_one_xgetdate("1991-12-14T10:11Z", 0, 692705460);
+	check_one_xgetdate("1991-12-14T10:11:12Z", 0, 692705472);
+	check_one_xgetdate("1991-12-14T10:11:12?", EINVAL, 0);
+	check_one_xgetdate("1991-12-14T03-07", 0, 692704800);
+	check_one_xgetdate("1991-12-14T06:41-03:30", 0, 692705460);
+	check_one_xgetdate("1991-12-14T03:11:12-07:00", 0, 692705472);
+	check_one_xgetdate("19911214 031112-0700", 0, 692705472);;
 }
 
 #define TM_FORMAT "%04d-%02d-%02d %02d:%02d:%02d (%d/7, %d/365%s)"
@@ -92,11 +88,9 @@ static bool check_one_xmktime(time_t expected) {
 }
 
 /** xmktime() tests. */
-static bool check_xmktime(void) {
-	bool ret = true;
-
+static void check_xmktime(void) {
 	for (time_t time = -10; time <= 10; ++time) {
-		ret &= check_one_xmktime(time);
+		check_one_xmktime(time);
 	}
 
 	// Attempt to trigger overflow (but don't test for it, since it's not mandatory)
@@ -111,12 +105,10 @@ static bool check_xmktime(void) {
 	};
 	time_t time;
 	xmktime(&tm, &time);
-
-	return ret;
 }
 
 /** Check one xtimegm() result. */
-static bool check_one_xtimegm(const struct tm *tm) {
+static void check_one_xtimegm(const struct tm *tm) {
 	struct tm tma = *tm, tmb = *tm;
 	time_t ta, tb;
 	ta = mktime(&tma);
@@ -124,43 +116,39 @@ static bool check_one_xtimegm(const struct tm *tm) {
 		tb = -1;
 	}
 
-	bool ret = true;
-	ret &= bfs_check(ta == tb, "%jd != %jd", (intmax_t)ta, (intmax_t)tb);
-	ret &= bfs_check(ta == -1 || tm_equal(&tma, &tmb));
+	bool pass = true;
+	pass &= bfs_check(ta == tb, "%jd != %jd", (intmax_t)ta, (intmax_t)tb);
+	if (ta != -1) {
+		pass &= bfs_check(tm_equal(&tma, &tmb));
+	}
 
-	if (!ret) {
+	if (!pass) {
 		bfs_diag("mktime():  " TM_FORMAT, TM_PRINTF(tma));
 		bfs_diag("xtimegm(): " TM_FORMAT, TM_PRINTF(tmb));
 		bfs_diag("(input):   " TM_FORMAT, TM_PRINTF(*tm));
 	}
-
-	return ret;
 }
 
 #if !BFS_HAS_TIMEGM
 /** Check an overflowing xtimegm() call. */
-static bool check_xtimegm_overflow(const struct tm *tm) {
+static void check_xtimegm_overflow(const struct tm *tm) {
 	struct tm copy = *tm;
 	time_t time = 123;
 
-	bool ret = true;
-	ret &= bfs_check(xtimegm(&copy, &time) == -1 && errno == EOVERFLOW);
-	ret &= bfs_check(tm_equal(&copy, tm));
-	ret &= bfs_check(time == 123);
+	bool pass = true;
+	pass &= bfs_check(xtimegm(&copy, &time) == -1 && errno == EOVERFLOW);
+	pass &= bfs_check(tm_equal(&copy, tm));
+	pass &= bfs_check(time == 123);
 
-	if (!ret) {
+	if (!pass) {
 		bfs_diag("xtimegm(): " TM_FORMAT, TM_PRINTF(copy));
 		bfs_diag("(input):   " TM_FORMAT, TM_PRINTF(*tm));
 	}
-
-	return ret;
 }
 #endif
 
 /** xtimegm() tests. */
-static bool check_xtimegm(void) {
-	bool ret = true;
-
+static void check_xtimegm(void) {
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
@@ -172,24 +160,20 @@ static bool check_xtimegm(void) {
 	for (tm.tm_hour =  -1; tm.tm_hour <=  24; tm.tm_hour +=  5)
 	for (tm.tm_min  =  -1; tm.tm_min  <=  60; tm.tm_min  += 31)
 	for (tm.tm_sec  = -60; tm.tm_sec  <= 120; tm.tm_sec  +=  5) {
-		ret &= check_one_xtimegm(&tm);
+		check_one_xtimegm(&tm);
 	}
 
 #if !BFS_HAS_TIMEGM
 	// Check integer overflow cases
-	ret &= check_xtimegm_overflow(&(struct tm) { .tm_sec = INT_MAX, .tm_min = INT_MAX });
-	ret &= check_xtimegm_overflow(&(struct tm) { .tm_min = INT_MAX, .tm_hour = INT_MAX });
-	ret &= check_xtimegm_overflow(&(struct tm) { .tm_hour = INT_MAX, .tm_mday = INT_MAX });
-	ret &= check_xtimegm_overflow(&(struct tm) { .tm_mon = INT_MAX, .tm_year = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_sec = INT_MAX, .tm_min = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_min = INT_MAX, .tm_hour = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_hour = INT_MAX, .tm_mday = INT_MAX });
+	check_xtimegm_overflow(&(struct tm) { .tm_mon = INT_MAX, .tm_year = INT_MAX });
 #endif
-
-	return ret;
 }
 
-bool check_xtime(void) {
-	bool ret = true;
-	ret &= check_xgetdate();
-	ret &= check_xmktime();
-	ret &= check_xtimegm();
-	return ret;
+void check_xtime(void) {
+	check_xgetdate();
+	check_xmktime();
+	check_xtimegm();
 }

@@ -52,44 +52,37 @@ static int block_signal(int sig, sigset_t *old) {
 	return 0;
 }
 
-bool check_sighook(void) {
-	bool ret = true;
-
+void check_sighook(void) {
 	struct sighook *hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
-	ret &= bfs_echeck(hook, "sighook(SIGALRM)");
-	if (!ret) {
-		goto done;
+	if (!bfs_echeck(hook, "sighook(SIGALRM)")) {
+		return;
 	}
 
 	// Create a timer that sends SIGALRM every 100 microseconds
 	struct itimerval ival = {0};
 	ival.it_value.tv_usec = 100;
 	ival.it_interval.tv_usec = 100;
-	ret &= bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
-	if (!ret) {
+	if (!bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0)) {
 		goto unhook;
 	}
 
 	// Create a background thread to receive signals
 	pthread_t thread;
-	ret &= bfs_echeck(thread_create(&thread, NULL, hook_thread, NULL) == 0);
-	if (!ret) {
+	if (!bfs_echeck(thread_create(&thread, NULL, hook_thread, NULL) == 0)) {
 		goto untime;
 	}
 
 	// Block SIGALRM in this thread so the handler runs concurrently with
 	// sighook()/sigunhook()
 	sigset_t mask;
-	ret &= bfs_echeck(block_signal(SIGALRM, &mask) == 0);
-	if (!ret) {
+	if (!bfs_echeck(block_signal(SIGALRM, &mask) == 0)) {
 		goto untime;
 	}
 
 	// Rapidly register/unregister SIGALRM hooks
 	while (load(&count, relaxed) < 1000) {
 		struct sighook *next = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
-		ret &= bfs_echeck(next, "sighook(SIGALRM)");
-		if (!ret) {
+		if (!bfs_echeck(next, "sighook(SIGALRM)")) {
 			break;
 		}
 
@@ -106,18 +99,12 @@ bool check_sighook(void) {
 
 	// Restore the old signal mask
 	errno = pthread_sigmask(SIG_SETMASK, &mask, NULL);
-	ret &= bfs_echeck(errno == 0, "pthread_sigmask()");
+	bfs_echeck(errno == 0, "pthread_sigmask()");
 untime:
 	// Stop the timer
 	ival.it_value.tv_usec = 0;
-	ret &= bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
-	if (!ret) {
-		goto unhook;
-	}
-
+	bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
 unhook:
 	// Unregister the SIGALRM hook
 	sigunhook(hook);
-done:
-	return ret;
 }
