@@ -144,7 +144,7 @@ done:;
 
 /** Destroy an arc. */
 static void arc_destroy(struct arc *arc) {
-	bfs_assert(arc_refs(arc) <= 1);
+	bfs_assert(arc_refs(arc) == 0);
 
 #if _POSIX_SEMAPHORES > 0
 	if (arc->sem_status == 0) {
@@ -166,14 +166,25 @@ struct rcu {
 /** Sentinel value for RCU, since arc uses NULL already. */
 static void *RCU_NULL = &RCU_NULL;
 
+/** Map NULL -> RCU_NULL. */
+static void *rcu_encode(void *ptr) {
+	return ptr ? ptr : RCU_NULL;
+}
+
+/** Map RCU_NULL -> NULL. */
+static void *rcu_decode(void *ptr) {
+	bfs_assert(ptr != NULL);
+	return ptr == RCU_NULL ? NULL : ptr;
+}
+
 /** Initialize an RCU block. */
-static void rcu_init(struct rcu *rcu) {
+static void rcu_init(struct rcu *rcu, void *ptr) {
 	bfs_verify(atomic_is_lock_free(&rcu->active));
 
 	atomic_init(&rcu->active, 0);
 	arc_init(&rcu->slots[0]);
 	arc_init(&rcu->slots[1]);
-	arc_set(&rcu->slots[0], RCU_NULL);
+	arc_set(&rcu->slots[0], rcu_encode(ptr));
 }
 
 /** Get the active slot. */
@@ -182,15 +193,20 @@ static struct arc *rcu_active(struct rcu *rcu) {
 	return &rcu->slots[i];
 }
 
+/** Destroy an RCU block. */
+static void rcu_destroy(struct rcu *rcu) {
+	arc_wait(rcu_active(rcu));
+	arc_destroy(&rcu->slots[1]);
+	arc_destroy(&rcu->slots[0]);
+}
+
 /** Read an RCU-protected pointer. */
 static void *rcu_read(struct rcu *rcu, struct arc **slot) {
 	while (true) {
 		*slot = rcu_active(rcu);
 		void *ptr = arc_get(*slot);
-		if (ptr == RCU_NULL) {
-			return NULL;
-		} else if (ptr) {
-			return ptr;
+		if (ptr) {
+			return rcu_decode(ptr);
 		}
 		// Otherwise, the other slot became active; retry
 	}
@@ -199,12 +215,7 @@ static void *rcu_read(struct rcu *rcu, struct arc **slot) {
 /** Get the RCU-protected pointer without acquiring a reference. */
 static void *rcu_peek(struct rcu *rcu) {
 	struct arc *arc = rcu_active(rcu);
-	void *ptr = arc->ptr;
-	if (ptr == RCU_NULL) {
-		return NULL;
-	} else {
-		return ptr;
-	}
+	return rcu_decode(arc->ptr);
 }
 
 /** Update an RCU-protected pointer, and return the old one. */
@@ -215,125 +226,44 @@ static void *rcu_update(struct rcu *rcu, void *ptr) {
 	size_t j = i ^ 1;
 	struct arc *next = &rcu->slots[j];
 
-	arc_set(next, ptr ? ptr : RCU_NULL);
+	arc_set(next, rcu_encode(ptr));
 	store(&rcu->active, j, relaxed);
-	return arc_wait(prev);
+	return rcu_decode(arc_wait(prev));
 }
 
 struct sighook {
+	/** The signal being hooked, or 0 for atsigexit(). */
 	int sig;
-	sighook_fn *fn;
-	void *arg;
+	/** Signal hook flags. */
 	enum sigflags flags;
+	/** The function to call. */
+	sighook_fn *fn;
+	/** An argument to pass to the function. */
+	void *arg;
+	/** The next hook in the list. */
+	struct rcu next;
 };
 
-/**
- * A table of signal hooks.
- */
-struct sigtable {
-	/** The number of filled slots. */
-	size_t filled;
-	/** The length of the array. */
-	size_t size;
-	/** An array of signal hooks. */
-	struct arc hooks[];
-};
-
-/** Add a hook to a table. */
-static int sigtable_add(struct sigtable *table, struct sighook *hook) {
-	if (!table || table->filled == table->size) {
-		return -1;
-	}
-
-	for (size_t i = 0; i < table->size; ++i) {
-		struct arc *arc = &table->hooks[i];
-		if (arc_refs(arc) == 0) {
-			arc_set(arc, hook);
-			++table->filled;
-			return 0;
-		}
-	}
-
-	return -1;
+/** Add a hook to a linked list. */
+static void sigpush(struct rcu *rcu, struct sighook *hook) {
+	struct sighook *next = rcu_peek(rcu);
+	rcu_init(&hook->next, next);
+	rcu_update(rcu, hook);
 }
 
-/** Delete a hook from a table. */
-static int sigtable_del(struct sigtable *table, struct sighook *hook) {
-	for (size_t i = 0; i < table->size; ++i) {
-		struct arc *arc = &table->hooks[i];
-		if (arc->ptr == hook) {
-			arc_wait(arc);
-			--table->filled;
-			return 0;
-		}
-	}
-
-	return -1;
-}
-
-/** Create a bigger copy of a signal table. */
-static struct sigtable *sigtable_grow(struct sigtable *prev) {
-	size_t old_size = prev ? prev->size : 0;
-	size_t new_size = old_size ? 2 * old_size : 1;
-	struct sigtable *table = ALLOC_FLEX(struct sigtable, hooks, new_size);
-	if (!table) {
-		return NULL;
-	}
-
-	table->filled = 0;
-	table->size = new_size;
-	for (size_t i = 0; i < new_size; ++i) {
-		arc_init(&table->hooks[i]);
-	}
-
-	for (size_t i = 0; i < old_size; ++i) {
-		struct sighook *hook = prev->hooks[i].ptr;
-		if (hook) {
-			bfs_verify(sigtable_add(table, hook) == 0);
-		}
-	}
-
-	return table;
-}
-
-/** Free a signal table. */
-static void sigtable_free(struct sigtable *table) {
-	if (!table) {
-		return;
-	}
-
-	for (size_t i = 0; i < table->size; ++i) {
-		struct arc *arc = &table->hooks[i];
-		arc_destroy(arc);
-	}
-	free(table);
-}
-
-/** Add a hook to a signal table, growing it if necessary. */
-static int rcu_sigtable_add(struct rcu *rcu, struct sighook *hook) {
-	struct sigtable *prev = rcu_peek(rcu);
-	if (sigtable_add(prev, hook) == 0) {
-		return 0;
-	}
-
-	struct sigtable *next = sigtable_grow(prev);
-	if (!next) {
-		return -1;
-	}
-
-	bfs_verify(sigtable_add(next, hook) == 0);
+/** Remove a hook from the linked list. */
+static void sigpop(struct rcu *rcu, struct sighook *hook) {
+	struct sighook *next = rcu_peek(&hook->next);
 	rcu_update(rcu, next);
-	sigtable_free(prev);
-	return 0;
 }
 
-/** The sharded table of signal hooks. */
+/** The lists of signal hooks. */
 static struct rcu rcu_sighooks[64];
-/** The table of atsigexit() hooks. */
+/** The list of atsigexit() hooks. */
 static struct rcu rcu_exithooks;
 
-/** Get the table for a particular signal. */
-static struct rcu *sigshard(int sig) {
+/** Get the hook list for a particular signal. */
+static struct rcu *siglist(int sig) {
 	return &rcu_sighooks[sig % countof(rcu_sighooks)];
 }
 
@@ -437,27 +367,20 @@ fail:
 /** Find any matching hooks and run them. */
 static enum sigflags run_hooks(struct rcu *rcu, int sig, siginfo_t *info) {
 	enum sigflags ret = 0;
-	struct arc *slot;
-	struct sigtable *table = rcu_read(rcu, &slot);
-	if (!table) {
-		goto done;
-	}
 
-	for (size_t i = 0; i < table->size; ++i) {
-		struct arc *arc = &table->hooks[i];
-		struct sighook *hook = arc_get(arc);
-		if (!hook) {
-			continue;
-		}
-
+	struct arc *slot = NULL;
+	struct sighook *hook = rcu_read(rcu, &slot);
+	while (hook) {
 		if (hook->sig == sig || hook->sig == 0) {
 			hook->fn(sig, info, hook->arg);
 			ret |= hook->flags;
 		}
-		arc_put(arc);
+
+		struct arc *prev = slot;
+		hook = rcu_read(&hook->next, &slot);
+		arc_put(prev);
 	}
 
-done:
 	arc_put(slot);
 	return ret;
 }
@@ -484,8 +407,8 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	int error = errno;
 
 	// Run the normal hooks
-	struct rcu *shard = sigshard(sig);
-	enum sigflags flags = run_hooks(shard, sig, info);
+	struct rcu *rcu = siglist(sig);
+	enum sigflags flags = run_hooks(rcu, sig, info);
 
 	// Run the atsigexit() hooks, if we're exiting
 	if (!(flags & SH_CONTINUE) && is_fatal(sig)) {
@@ -513,9 +436,9 @@ static int siginit(int sig) {
 		}
 
 		for (size_t i = 0; i < countof(rcu_sighooks); ++i) {
-			rcu_init(&rcu_sighooks[i]);
+			rcu_init(&rcu_sighooks[i], NULL);
 		}
-		rcu_init(&rcu_exithooks);
+		rcu_init(&rcu_exithooks, NULL);
 
 		initialized = true;
 	}
@@ -546,15 +469,11 @@ static struct sighook *sighook_impl(struct rcu *rcu, int sig, sighook_fn *fn, vo
 	}
 
 	hook->sig = sig;
+	hook->flags = flags;
 	hook->fn = fn;
 	hook->arg = arg;
-	hook->flags = flags;
 
-	if (rcu_sigtable_add(rcu, hook) != 0) {
-		free(hook);
-		return NULL;
-	}
-
+	sigpush(rcu, hook);
 	return hook;
 }
 
@@ -566,8 +485,8 @@ struct sighook *sighook(int sig, sighook_fn *fn, void *arg, enum sigflags flags)
 		goto done;
 	}
 
-	struct rcu *shard = sigshard(sig);
-	ret = sighook_impl(shard, sig, fn, arg, flags);
+	struct rcu *rcu = siglist(sig);
+	ret = sighook_impl(rcu, sig, fn, arg, flags);
 done:
 	mutex_unlock(&sigmutex);
 	return ret;
@@ -603,19 +522,20 @@ void sigunhook(struct sighook *hook) {
 
 	struct rcu *rcu;
 	if (hook->sig) {
-		rcu = sigshard(hook->sig);
+		rcu = siglist(hook->sig);
 	} else {
 		rcu = &rcu_exithooks;
 	}
 
-	struct sigtable *table = rcu_peek(rcu);
-	bfs_verify(sigtable_del(table, hook) == 0);
-
-	if (table->filled == 0) {
-		rcu_update(rcu, NULL);
-		sigtable_free(table);
+	struct sighook *node = rcu_peek(rcu);
+	while (node != hook) {
+		rcu = &node->next;
+		node = rcu_peek(rcu);
 	}
+	sigpop(rcu, hook);
 
 	mutex_unlock(&sigmutex);
+
+	rcu_destroy(&hook->next);
 	free(hook);
 }
