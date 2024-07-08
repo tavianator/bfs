@@ -1694,10 +1694,7 @@ static struct bfs_expr *parse_mount(struct bfs_parser *parser, int arg1, int arg
 		return NULL;
 	}
 
-	parse_expr_warning(parser, expr, "In the future, ${blu}%s${rs} will skip mount points entirely, unlike\n", expr->argv[0]);
-	bfs_warning(parser->ctx, "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n");
-
-	parser->ctx->flags |= BFTW_PRUNE_MOUNTS;
+	parser->ctx->flags |= BFTW_SKIP_MOUNTS;
 	parser->mount_arg = expr->argv;
 	return expr;
 }
