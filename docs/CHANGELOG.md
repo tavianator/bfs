@@ -1,3 +1,46 @@
+4.*
+===
+
+**Unreleased**
+
+4.0
+---
+
+### New features
+
+- To match BSD `find` (and the POSIX Utility Syntax Guidelines), multiple flags can now be given in a single argument like `-LEXO2`.
+  Previously, you would have had to write `-L -E -X -O2`.
+  ([`c0fd33a`](https://github.com/tavianator/bfs/commit/c0fd33aaef5f345566a41c7c2558f27adf05558b))
+
+- Explicit timestamps can now be written as `@SECONDS_SINCE_EPOCH`.
+  For example, `bfs -newermt @946684800` will print files modified since January 1, 2000 (UTC).
+  ([`c6bb003`](https://github.com/tavianator/bfs/commit/c6bb003b8882e9a16941f5803d072ec1cb728318))
+
+### Changes
+
+- `-mount` now excludes mount points entirely, to comply with the recently published POSIX 2024 standard.
+  Use `-xdev` to include the mount point itself, but not its contents.
+  `bfs` has been warning about this change since version 1.5.1 (September 2019).
+  ([`33b85e1`](https://github.com/tavianator/bfs/commit/33b85e1f8769e7f75721887638ae454d109a034f))
+
+### Bug fixes
+
+- Fixed commands like `./configure CC=clang --enable-release` that set variables before other options
+  ([`49a5d48`](https://github.com/tavianator/bfs/commit/49a5d48d0a43bac313c8b8d1b167e60da9eaadf6))
+
+- Fixed the build on RISC-V with GCC versions older than 14
+  ([`e93a1dc`](https://github.com/tavianator/bfs/commit/e93a1dccd82f831a2f0d2cc382d8af5e1fda55ed))
+
+- Fixed running `bfs` under Valgrind
+  ([`a01cfac`](https://github.com/tavianator/bfs/commit/a01cfacd423af28af6b7c13ba51e2395f3a52ee7))
+
+- Fixed the exit code when failing to execute a non-existent command with `-exec`/`-ok` on some platforms including OpenBSD and HPPA
+  ([`8c130ca`](https://github.com/tavianator/bfs/commit/8c130ca0117fd225c24569be2ec16c7dc2150a13))
+
+- Fixed `$LS_COLORS` case-sensitivity to match GNU ls more closely when the same extension is specified multiple times
+  ([`08030ae`](https://github.com/tavianator/bfs/commit/08030aea919039165c02805e8c637a9ec1ad0d70))
+
+
 3.*
 ===
 

@@ -73,7 +73,7 @@ gen/version.i.new::
 	elif test -e src/../.git && command -v git >/dev/null 2>&1; then \
 	    git -C src/.. describe --always --dirty; \
 	else \
-	    echo "3.3.1"; \
+	    echo "4.0"; \
 	fi | tr -d '\n' | build/embed.sh >$@
 
 gen/version.i: gen/version.i.new
