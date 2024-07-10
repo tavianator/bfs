@@ -116,7 +116,7 @@ Supported versions
 `bfs` comes with [no warranty](/LICENSE), and is maintained by [me](https://tavianator.com/) and [other volunteers](https://github.com/tavianator/bfs/graphs/contributors) in our spare time.
 In that sense, there are no *supported* versions.
 However, as long as I maintain `bfs` I will attempt to address any security issues swiftly.
-In general, security fixes will we part of the latest release, though for significant issues I may backport fixes to older release series.
+In general, security fixes will be part of the latest release, though for significant issues I may backport fixes to older release series.
 
 
 Reporting a vulnerability
