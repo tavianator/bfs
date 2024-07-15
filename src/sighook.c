@@ -240,31 +240,52 @@ struct sighook {
 	sighook_fn *fn;
 	/** An argument to pass to the function. */
 	void *arg;
+
+	/** The RCU pointer to this hook. */
+	struct rcu *self;
 	/** The next hook in the list. */
 	struct rcu next;
 };
 
-/** Add a hook to a linked list. */
-static void sigpush(struct rcu *rcu, struct sighook *hook) {
-	struct sighook *next = rcu_peek(rcu);
-	rcu_init(&hook->next, next);
-	rcu_update(rcu, hook);
+/**
+ * An RCU-protected linked list of signal hooks.
+ */
+struct siglist {
+	/** The first hook in the list. */
+	struct rcu head;
+	/** &last->next */
+	struct rcu *tail;
+};
+
+/** Initialize a siglist. */
+static void siglist_init(struct siglist *list) {
+	rcu_init(&list->head, NULL);
+	list->tail = &list->head;
+}
+
+/** Append a hook to a linked list. */
+static void sigpush(struct siglist *list, struct sighook *hook) {
+	hook->self = list->tail;
+	list->tail = &hook->next;
+	rcu_init(&hook->next, NULL);
+	rcu_update(hook->self, hook);
 }
 
 /** Remove a hook from the linked list. */
-static void sigpop(struct rcu *rcu, struct sighook *hook) {
+static void sigpop(struct siglist *list, struct sighook *hook) {
 	struct sighook *next = rcu_peek(&hook->next);
-	rcu_update(rcu, next);
+	rcu_update(hook->self, next);
+	if (next) {
+		next->self = hook->self;
+	}
 }
 
 /** The lists of signal hooks. */
-static struct rcu rcu_sighooks[64];
-/** The list of atsigexit() hooks. */
-static struct rcu rcu_exithooks;
+static struct siglist sighooks[64];
 
 /** Get the hook list for a particular signal. */
-static struct rcu *siglist(int sig) {
-	return &rcu_sighooks[sig % countof(rcu_sighooks)];
+static struct siglist *siglist(int sig) {
+	return &sighooks[sig % countof(sighooks)];
 }
 
 /** Mutex for initialization and RCU writer exclusion. */
@@ -365,11 +386,11 @@ fail:
 }
 
 /** Find any matching hooks and run them. */
-static enum sigflags run_hooks(struct rcu *rcu, int sig, siginfo_t *info) {
+static enum sigflags run_hooks(struct siglist *list, int sig, siginfo_t *info) {
 	enum sigflags ret = 0;
 
 	struct arc *slot = NULL;
-	struct sighook *hook = rcu_read(rcu, &slot);
+	struct sighook *hook = rcu_read(&list->head, &slot);
 	while (hook) {
 		if (hook->sig == sig || hook->sig == 0) {
 			hook->fn(sig, info, hook->arg);
@@ -407,12 +428,13 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	int error = errno;
 
 	// Run the normal hooks
-	struct rcu *rcu = siglist(sig);
-	enum sigflags flags = run_hooks(rcu, sig, info);
+	struct siglist *list = siglist(sig);
+	enum sigflags flags = run_hooks(list, sig, info);
 
 	// Run the atsigexit() hooks, if we're exiting
 	if (!(flags & SH_CONTINUE) && is_fatal(sig)) {
-		run_hooks(&rcu_exithooks, sig, info);
+		list = siglist(0);
+		run_hooks(list, sig, info);
 		reraise(sig);
 	}
 
@@ -435,10 +457,9 @@ static int siginit(int sig) {
 			return -1;
 		}
 
-		for (size_t i = 0; i < countof(rcu_sighooks); ++i) {
-			rcu_init(&rcu_sighooks[i], NULL);
+		for (size_t i = 0; i < countof(sighooks); ++i) {
+			siglist_init(&sighooks[i]);
 		}
-		rcu_init(&rcu_exithooks, NULL);
 
 		initialized = true;
 	}
@@ -462,7 +483,7 @@ static int siginit(int sig) {
 }
 
 /** Shared sighook()/atsigexit() implementation. */
-static struct sighook *sighook_impl(struct rcu *rcu, int sig, sighook_fn *fn, void *arg, enum sigflags flags) {
+static struct sighook *sighook_impl(int sig, sighook_fn *fn, void *arg, enum sigflags flags) {
 	struct sighook *hook = ALLOC(struct sighook);
 	if (!hook) {
 		return NULL;
@@ -473,21 +494,21 @@ static struct sighook *sighook_impl(struct rcu *rcu, int sig, sighook_fn *fn, vo
 	hook->fn = fn;
 	hook->arg = arg;
 
-	sigpush(rcu, hook);
+	struct siglist *list = siglist(sig);
+	sigpush(list, hook);
 	return hook;
 }
 
 struct sighook *sighook(int sig, sighook_fn *fn, void *arg, enum sigflags flags) {
+	bfs_assert(sig > 0);
+
 	mutex_lock(&sigmutex);
 
 	struct sighook *ret = NULL;
-	if (siginit(sig) != 0) {
-		goto done;
+	if (siginit(sig) == 0) {
+		ret = sighook_impl(sig, fn, arg, flags);
 	}
 
-	struct rcu *rcu = siglist(sig);
-	ret = sighook_impl(rcu, sig, fn, arg, flags);
-done:
 	mutex_unlock(&sigmutex);
 	return ret;
 }
@@ -508,7 +529,7 @@ struct sighook *atsigexit(sighook_fn *fn, void *arg) {
 	}
 #endif
 
-	struct sighook *ret = sighook_impl(&rcu_exithooks, 0, fn, arg, 0);
+	struct sighook *ret = sighook_impl(0, fn, arg, 0);
 	mutex_unlock(&sigmutex);
 	return ret;
 }
@@ -520,19 +541,8 @@ void sigunhook(struct sighook *hook) {
 
 	mutex_lock(&sigmutex);
 
-	struct rcu *rcu;
-	if (hook->sig) {
-		rcu = siglist(hook->sig);
-	} else {
-		rcu = &rcu_exithooks;
-	}
-
-	struct sighook *node = rcu_peek(rcu);
-	while (node != hook) {
-		rcu = &node->next;
-		node = rcu_peek(rcu);
-	}
-	sigpop(rcu, hook);
+	struct siglist *list = siglist(hook->sig);
+	sigpop(list, hook);
 
 	mutex_unlock(&sigmutex);
 
