@@ -228,7 +228,7 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 #  define BFS_POSIX_SPAWN_ADDFCHDIR posix_spawn_file_actions_addfchdir_np
 #endif
 
-#if _POSIX_SPAWN > 0 && defined(BFS_POSIX_SPAWN_FCHDIR)
+#if _POSIX_SPAWN > 0 && defined(BFS_POSIX_SPAWN_ADDFCHDIR)
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = BFS_POSIX_SPAWN_ADDFCHDIR(&ctx->actions, fd);
 		if (errno != 0) {
