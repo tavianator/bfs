@@ -1673,6 +1673,12 @@ static struct bfs_expr *data_flow_links(struct bfs_opt *opt, struct bfs_expr *ex
 	return expr;
 }
 
+/** Transfer function for -lname. */
+static struct bfs_expr *data_flow_lname(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt->after_true.types &= 1 << BFS_LNK;
+	return expr;
+}
+
 /** Transfer function for -samefile. */
 static struct bfs_expr *data_flow_samefile(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
 	struct df_range *true_range = &opt->after_true.ranges[INUM_RANGE];
@@ -1863,6 +1869,7 @@ static const struct visitor data_flow = {
 		{eval_gid, data_flow_gid},
 		{eval_inum, data_flow_inum},
 		{eval_links, data_flow_links},
+		{eval_lname, data_flow_lname},
 		{eval_samefile, data_flow_samefile},
 		{eval_size, data_flow_size},
 		{eval_type, data_flow_type},
