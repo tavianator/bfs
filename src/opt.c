@@ -173,9 +173,15 @@ static void constrain_min(struct df_range *range, long long value) {
 	range->min = max_value(range->min, value);
 }
 
-/** Contrain the maximum of a range. */
+/** Constrain the maximum of a range. */
 static void constrain_max(struct df_range *range, long long value) {
 	range->max = min_value(range->max, value);
+}
+
+/** Constrain a range to a single value. */
+static void constrain_range(struct df_range *range, long long value) {
+	constrain_min(range, value);
+	constrain_max(range, value);
 }
 
 /** Remove a single value from a range. */
@@ -1601,8 +1607,7 @@ static void data_flow_icmp(struct bfs_opt *opt, const struct bfs_expr *expr, enu
 
 	switch (expr->int_cmp) {
 	case BFS_INT_EQUAL:
-		constrain_min(true_range, value);
-		constrain_max(true_range, value);
+		constrain_range(true_range, value);
 		range_remove(false_range, value);
 		break;
 
@@ -1630,6 +1635,18 @@ static struct bfs_expr *data_flow_access(struct bfs_opt *opt, struct bfs_expr *e
 	}
 	if (expr->num & X_OK) {
 		data_flow_pred(opt, EXECUTABLE_PRED, true);
+	}
+
+	return expr;
+}
+
+/** Transfer function for -empty. */
+static struct bfs_expr *data_flow_empty(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt->after_true.types &= (1 << BFS_REG) | (1 << BFS_DIR);
+
+	if (opt->before.types == (1 << BFS_REG)) {
+		constrain_range(&opt->after_true.ranges[SIZE_RANGE], 0);
+		range_remove(&opt->after_false.ranges[SIZE_RANGE], 0);
 	}
 
 	return expr;
@@ -1682,8 +1699,7 @@ static struct bfs_expr *data_flow_lname(struct bfs_opt *opt, struct bfs_expr *ex
 /** Transfer function for -samefile. */
 static struct bfs_expr *data_flow_samefile(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
 	struct df_range *true_range = &opt->after_true.ranges[INUM_RANGE];
-	constrain_min(true_range, expr->ino);
-	constrain_max(true_range, expr->ino);
+	constrain_range(true_range, expr->ino);
 
 	struct df_range *false_range = &opt->after_false.ranges[INUM_RANGE];
 	range_remove(false_range, expr->ino);
@@ -1866,6 +1882,7 @@ static const struct visitor data_flow = {
 	.leave = data_flow_leave,
 	.table = (const struct visitor_table[]) {
 		{eval_access, data_flow_access},
+		{eval_empty, data_flow_empty},
 		{eval_gid, data_flow_gid},
 		{eval_inum, data_flow_inum},
 		{eval_links, data_flow_links},
