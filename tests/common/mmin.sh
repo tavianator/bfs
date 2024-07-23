@@ -9,7 +9,7 @@ now=$(epoch_time)
 "$XTOUCH" -mt "@$((now + 60))" in_one_minute
 "$XTOUCH" -mt "@$((now + 60 * 60))" in_one_hour
 
-bfs_diff -mindepth 1 \
+bfs_diff . -mindepth 1 \
     \( -mmin -1 -exec printf -- '-mmin -1: %s\n' {} \; -o -true \) \
     \( -mmin  1 -exec printf -- '-mmin  1: %s\n' {} \; -o -true \) \
     \( -mmin +1 -exec printf -- '-mmin +1: %s\n' {} \; -o -true \)

@@ -9,7 +9,7 @@ now=$(epoch_time)
 "$XTOUCH" -at "@$((now))" now
 "$XTOUCH" -at "@$((now + 60 * 60 * 24))" tomorrow
 
-bfs_diff -mindepth 1 \
+bfs_diff . -mindepth 1 \
     \( -atime -1 -exec printf -- '-atime -1: %s\n' {} \; -o -true \) \
     \( -atime  1 -exec printf -- '-atime  1: %s\n' {} \; -o -true \) \
     \( -atime +1 -exec printf -- '-atime +1: %s\n' {} \; -o -true \)
