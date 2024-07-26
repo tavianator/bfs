@@ -94,9 +94,10 @@ reap_test() {
 
 # Wait for a background test to finish
 wait_test() {
-    local pid
+    local pid line
 
     while true; do
+        line=$((LINENO + 1))
         wait -n -ppid
         ret=$?
 
@@ -106,7 +107,7 @@ wait_test() {
             # Interrupted by signal
             continue
         else
-            debug "${BASH_SOURCE[0]}" $((LINENO - 3)) "${RED}error $ret${RST}" >&$DUPERR
+            debug "${BASH_SOURCE[0]}" $line "${RED}error $ret${RST}" >&$DUPERR
             exit 1
         fi
     done
