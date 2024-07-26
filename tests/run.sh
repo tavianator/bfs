@@ -94,7 +94,7 @@ reap_test() {
 
 # Wait for a background test to finish
 wait_test() {
-    local pid line
+    local pid line ret
 
     while true; do
         line=$((LINENO + 1))
@@ -121,7 +121,9 @@ wait_ready() {
         # We'd like to parse the output of jobs -n, but we can't run it in a
         # subshell or we won't get the right output
         jobs -n >"$TMP/jobs"
-        while read -r job status ret foo; do
+
+        local job status ret rest
+        while read -r job status ret rest; do
             case "$status" in
                 Done)
                     reap_test 0
