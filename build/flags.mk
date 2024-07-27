@@ -103,7 +103,11 @@ _LDLIBS := ${LDLIBS} ${EXTRA_LDLIBS} ${_LDLIBS}
 
 include build/exports.mk
 
-gen/flags.mk::
+# Conditionally-supported flags
+AUTO_FLAGS := \
+    gen/flags/deps.mk
+
+gen/flags.mk: ${AUTO_FLAGS}
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
 	@printf '_CPPFLAGS := %s\n' "$$XCPPFLAGS" >>$@
@@ -112,4 +116,18 @@ gen/flags.mk::
 	@printf '_LDLIBS := %s\n' "$$XLDLIBS" >>$@
 	@printf 'NOLIBS := %s\n' "$$XNOLIBS" >>$@
 	@test "${OS}-${SAN}" != FreeBSD-y || printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@
+	@cat ${.ALLSRC} >>$@
 	${VCAT} $@
+.PHONY: gen/flags.mk
+
+# The short name of the config test
+SLUG = ${@:gen/%.mk=%}
+# The source file to build
+CSRC = build/${SLUG}.c
+# The hidden output file name
+OUT = ${SLUG:flags/%=gen/flags/.%.out}
+
+${AUTO_FLAGS}::
+	@${MKDIR} ${@D}
+	@build/flags-if.sh ${CSRC} -o ${OUT} >$@ 2>$@.log; \
+	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
