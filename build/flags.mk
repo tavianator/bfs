@@ -105,7 +105,8 @@ include build/exports.mk
 
 # Conditionally-supported flags
 AUTO_FLAGS := \
-    gen/flags/deps.mk
+    gen/flags/deps.mk \
+    gen/flags/missing-var-decls.mk
 
 gen/flags.mk: ${AUTO_FLAGS}
 	${MSG} "[ GEN] $@"
