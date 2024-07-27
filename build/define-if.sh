@@ -7,9 +7,7 @@
 
 set -eu
 
-SLUG="${1#build/}"
-SLUG="${SLUG%.c}"
-MACRO="BFS_$(printf '%s' "$SLUG" | tr '/a-z-' '_A-Z_')"
+MACRO=$(printf 'BFS_%s' "$1" | tr '/a-z-' '_A-Z_')
 shift
 
 if "$@"; then
