@@ -612,7 +612,11 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 		goto fail;
 	}
 
+#if BFS_HAS__FORK
+	pid_t pid = _Fork();
+#else
 	pid_t pid = fork();
+#endif
 	if (pid == 0) {
 		// Child
 		bfs_spawn_exec(res, ctx, argv, envp, pipefd);

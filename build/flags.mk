@@ -105,6 +105,7 @@ include build/exports.mk
 
 # Conditionally-supported flags
 AUTO_FLAGS := \
+    gen/flags/bind-now.mk \
     gen/flags/deps.mk \
     gen/flags/missing-var-decls.mk
 
