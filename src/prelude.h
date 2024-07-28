@@ -22,7 +22,6 @@
 #if __STDC_VERSION__ < C23
 #  include <stdalign.h>
 #  include <stdbool.h>
-#  include <stdnoreturn.h>
 #endif
 
 // bfs packaging configuration
@@ -184,54 +183,63 @@ extern const char bfs_ldlibs[];
  * Silence warnings about unused declarations.
  */
 #if __has_attribute(unused)
-#  define attr_maybe_unused __attribute__((unused))
+#  define _maybe_unused __attribute__((unused))
 #else
-#  define attr_maybe_unused
+#  define _maybe_unused
 #endif
 
 /**
  * Warn if a value is unused.
  */
 #if __has_attribute(warn_unused_result)
-#  define attr_nodiscard __attribute__((warn_unused_result))
+#  define _nodiscard __attribute__((warn_unused_result))
 #else
-#  define attr_nodiscard
+#  define _nodiscard
 #endif
 
 /**
  * Hint to avoid inlining a function.
  */
 #if __has_attribute(noinline)
-#  define attr_noinline __attribute__((noinline))
+#  define _noinline __attribute__((noinline))
 #else
-#  define attr_noinline
+#  define _noinline
+#endif
+
+/**
+ * Marks a non-returning function.
+ */
+#if __STDC_VERSION__ >= C23
+#  define _noreturn [[noreturn]]
+#else
+#  define _noreturn _Noreturn
 #endif
 
 /**
  * Hint that a function is unlikely to be called.
  */
 #if __has_attribute(cold)
-#  define attr_cold attr_noinline __attribute__((cold))
+#  define _cold _noinline __attribute__((cold))
 #else
-#  define attr_cold attr_noinline
+#  define _cold _noinline
 #endif
 
 /**
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
 #if __has_attribute(format)
-#  define attr_printf(fmt, args) __attribute__((format(printf, fmt, args)))
+#  define _printf(fmt, args) __attribute__((format(printf, fmt, args)))
 #else
-#  define attr_printf(fmt, args)
+#  define _printf(fmt, args)
 #endif
 
 /**
  * Annotates functions that potentially modify and return format strings.
  */
 #if __has_attribute(format_arg)
-#  define attr_format_arg(arg) __attribute__((format_arg(arg)))
+#  define _format_arg(arg) __attribute__((format_arg(arg)))
 #else
-#  define attr_format_arg(args)
+#  define _format_arg(arg)
 #endif
 
 /**
@@ -239,38 +247,36 @@ extern const char bfs_ldlibs[];
  */
 #if __has_attribute(malloc)
 #  if __GNUC__ >= 11 && !__OPTIMIZE__ // malloc(deallocator) disables inlining on GCC
-#    define attr_malloc(...) attr_nodiscard __attribute__((malloc(__VA_ARGS__)))
+#    define _malloc(...) _nodiscard __attribute__((malloc(__VA_ARGS__)))
 #  else
-#    define attr_malloc(...) attr_nodiscard __attribute__((malloc))
+#    define _malloc(...) _nodiscard __attribute__((malloc))
 #  endif
 #else
-#  define attr_malloc(...) attr_nodiscard
+#  define _malloc(...) _nodiscard
 #endif
 
 /**
  * Specifies that a function returns allocations with a given alignment.
  */
 #if __has_attribute(alloc_align)
-#  define attr_alloc_align(param) __attribute__((alloc_align(param)))
+#  define _alloc_align(param) __attribute__((alloc_align(param)))
 #else
-#  define attr_alloc_align(param)
+#  define _alloc_align(param)
 #endif
 
 /**
  * Specifies that a function returns allocations with a given size.
  */
 #if __has_attribute(alloc_size)
-#  define attr_alloc_size(...) __attribute__((alloc_size(__VA_ARGS__)))
+#  define _alloc_size(...) __attribute__((alloc_size(__VA_ARGS__)))
 #else
-#  define attr_alloc_size(...)
+#  define _alloc_size(...)
 #endif
 
 /**
- * Shorthand for attr_alloc_align() and attr_alloc_size().
+ * Shorthand for _alloc_align() and _alloc_size().
  */
-#define attr_aligned_alloc(align, ...) \
-	attr_alloc_align(align) \
-	attr_alloc_size(__VA_ARGS__)
+#define _aligned_alloc(align, ...) _alloc_align(align) _alloc_size(__VA_ARGS__)
 
 /**
  * Check if function multiversioning via GNU indirect functions (ifunc) is supported.
@@ -285,83 +291,9 @@ extern const char bfs_ldlibs[];
  * Apply the target_clones attribute, if available.
  */
 #if BFS_USE_TARGET_CLONES
-#  define attr_target_clones(...) __attribute__((target_clones(__VA_ARGS__)))
+#  define _target_clones(...) __attribute__((target_clones(__VA_ARGS__)))
 #else
-#  define attr_target_clones(...)
+#  define _target_clones(...)
 #endif
-
-/**
- * Shorthand for multiple attributes at once. attr(a, b(c), d) is equivalent to
- *
- *     attr_a
- *     attr_b(c)
- *     attr_d
- */
-#define attr(...) \
-	attr__(attr_##__VA_ARGS__, none, none, none, none, none, none, none, none, none, )
-
-/**
- * attr() helper.  For exposition, pretend we support only 2 args, instead of 9.
- * There are a few cases:
- *
- *     attr()
- *         => attr__(attr_, none, none)
- *         => attr_                =>
- *            attr_none            =>
- *            attr_too_many_none() =>
- *
- *     attr(a)
- *         => attr__(attr_a, none, none)
- *         => attr_a               => __attribute__((a))
- *            attr_none            =>
- *            attr_too_many_none() =>
- *
- *     attr(a, b(c))
- *         => attr__(attr_a, b(c), none, none)
- *         => attr_a                   => __attribute__((a))
- *            attr_b(c)                => __attribute__((b(c)))
- *            attr_too_many_none(none) =>
- *
- *     attr(a, b(c), d)
- *         => attr__(attr_a, b(c), d, none, none)
- *         => attr_a                      => __attribute__((a))
- *            attr_b(c)                   => __attribute__((b(c)))
- *            attr_too_many_d(none, none) => error
- *
- * Some attribute names are the same as standard library functions, e.g. printf.
- * Standard libraries are permitted to define these functions as macros, like
- *
- *     #define printf(...) __builtin_printf(__VA_ARGS__)
- *
- * The token paste in
- *
- *     #define attr(...) attr__(attr_##__VA_ARGS__, none, none)
- *
- * is necessary to prevent macro expansion before evaluating attr__().
- * Otherwise, we could get
- *
- *     attr(printf(1, 2))
- *         => attr__(__builtin_printf(1, 2), none, none)
- *         => attr____builtin_printf(1, 2)
- *         => error
- */
-#define attr__(a1, a2, a3, a4, a5, a6, a7, a8, a9, none, ...) \
-	a1 \
-	attr_##a2 \
-	attr_##a3 \
-	attr_##a4 \
-	attr_##a5 \
-	attr_##a6 \
-	attr_##a7 \
-	attr_##a8 \
-	attr_##a9 \
-	attr_too_many_##none(__VA_ARGS__)
-
-// Ignore `attr_none` from expanding 1-9 argument attr(a1, a2, ...)
-#define attr_none
-// Ignore `attr_` from expanding 0-argument attr()
-#define attr_
-// Only trigger an error on more than 9 arguments
-#define attr_too_many_none(...)
 
 #endif // BFS_PRELUDE_H

@@ -165,7 +165,7 @@ static void highlight_args(const struct bfs_ctx *ctx, char **argv, size_t argc, 
 /**
  * Print an error message during parsing.
  */
-attr(printf(2, 3))
+_printf(2, 3)
 static void parse_error(const struct bfs_parser *parser, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -183,7 +183,7 @@ static void parse_error(const struct bfs_parser *parser, const char *format, ...
 /**
  * Print an error about some command line arguments.
  */
-attr(printf(4, 5))
+_printf(4, 5)
 static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_t argc, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -201,7 +201,7 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
 /**
  * Print an error about conflicting command line arguments.
  */
-attr(printf(6, 7))
+_printf(6, 7)
 static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -220,7 +220,7 @@ static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, 
 /**
  * Print an error about an expression.
  */
-attr(printf(3, 4))
+_printf(3, 4)
 static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -235,7 +235,7 @@ static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_e
 /**
  * Print a warning message during parsing.
  */
-attr(printf(2, 3))
+_printf(2, 3)
 static bool parse_warning(const struct bfs_parser *parser, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -256,7 +256,7 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
 /**
  * Print a warning about conflicting command line arguments.
  */
-attr(printf(6, 7))
+_printf(6, 7)
 static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -278,7 +278,7 @@ static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1
 /**
  * Print a warning about an expression.
  */
-attr(printf(3, 4))
+_printf(3, 4)
 static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 

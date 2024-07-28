@@ -15,7 +15,7 @@
 #include <stdlib.h>
 
 /** bfs_diagf() implementation. */
-attr(printf(2, 0))
+_printf(2, 0)
 static void bfs_vdiagf(const struct bfs_loc *loc, const char *format, va_list args) {
 	fprintf(stderr, "%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
 	vfprintf(stderr, format, args);
@@ -29,7 +29,8 @@ void bfs_diagf(const struct bfs_loc *loc, const char *format, ...) {
 	va_end(args);
 }
 
-noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
+_noreturn
+void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	bfs_vdiagf(loc, format, args);

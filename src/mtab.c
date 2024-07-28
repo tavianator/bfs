@@ -65,7 +65,7 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-attr(maybe_unused)
+_maybe_unused
 static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
 	size_t path_size = strlen(path) + 1;
 	size_t type_size = strlen(type) + 1;

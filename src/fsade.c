@@ -36,7 +36,7 @@
  * Many of the APIs used here don't have *at() variants, but we can try to
  * emulate something similar if /proc/self/fd is available.
  */
-attr(maybe_unused)
+_maybe_unused
 static const char *fake_at(const struct BFTW *ftwbuf) {
 	static atomic int proc_works = -1;
 
@@ -70,7 +70,7 @@ fail:
 	return ftwbuf->path;
 }
 
-attr(maybe_unused)
+_maybe_unused
 static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 	if (path != ftwbuf->path) {
 		dstrfree((dchar *)path);
@@ -80,7 +80,7 @@ static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 /**
  * Check if an error was caused by the absence of support or data for a feature.
  */
-attr(maybe_unused)
+_maybe_unused
 static bool is_absence_error(int error) {
 	// If the OS doesn't support the feature, it's obviously not enabled for
 	// any files
@@ -160,7 +160,7 @@ static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
 }
 
 /** Unified interface for acl_get_tag_type(). */
-attr(maybe_unused)
+_maybe_unused
 static int bfs_acl_tag_type(acl_entry_t entry, acl_tag_t *tag) {
 #if BFS_HAS_ACL_GET_TAG_TYPE
 	return acl_get_tag_type(entry, tag);

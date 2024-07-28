@@ -366,7 +366,8 @@ static bool is_fatal(int sig) {
 }
 
 /** Reraise a fatal signal. */
-static noreturn void reraise(int sig) {
+_noreturn
+static void reraise(int sig) {
 	// Restore the default signal action
 	if (signal(sig, SIG_DFL) == SIG_ERR) {
 		goto fail;

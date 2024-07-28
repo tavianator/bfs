@@ -41,7 +41,7 @@ void dstrfree(dchar *dstr);
  * @param cap
  *         The initial capacity of the string.
  */
-attr(malloc(dstrfree, 1))
+_malloc(dstrfree, 1)
 dchar *dstralloc(size_t cap);
 
 /**
@@ -50,7 +50,7 @@ dchar *dstralloc(size_t cap);
  * @param str
  *         The NUL-terminated string to copy.
  */
-attr(malloc(dstrfree, 1))
+_malloc(dstrfree, 1)
 dchar *dstrdup(const char *str);
 
 /**
@@ -61,7 +61,7 @@ dchar *dstrdup(const char *str);
  * @param n
  *         The maximum number of characters to copy from str.
  */
-attr(malloc(dstrfree, 1))
+_malloc(dstrfree, 1)
 dchar *dstrndup(const char *str, size_t n);
 
 /**
@@ -70,7 +70,7 @@ dchar *dstrndup(const char *str, size_t n);
  * @param dstr
  *         The dynamic string to copy.
  */
-attr(malloc(dstrfree, 1))
+_malloc(dstrfree, 1)
 dchar *dstrddup(const dchar *dstr);
 
 /**
@@ -81,7 +81,7 @@ dchar *dstrddup(const dchar *dstr);
  * @param len
  *         The length of the string, which may include internal NUL bytes.
  */
-attr(malloc(dstrfree, 1))
+_malloc(dstrfree, 1)
 dchar *dstrxdup(const char *str, size_t len);
 
 /**
@@ -243,7 +243,7 @@ int dstrxcpy(dchar **dest, const char *str, size_t len);
  * @return
  *         The created string, or NULL on failure.
  */
-attr(printf(1, 2))
+_printf(1, 2)
 dchar *dstrprintf(const char *format, ...);
 
 /**
@@ -256,7 +256,7 @@ dchar *dstrprintf(const char *format, ...);
  * @return
  *         The created string, or NULL on failure.
  */
-attr(printf(1, 0))
+_printf(1, 0)
 dchar *dstrvprintf(const char *format, va_list args);
 
 /**
@@ -271,7 +271,7 @@ dchar *dstrvprintf(const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
-attr(printf(2, 3))
+_printf(2, 3)
 int dstrcatf(dchar **str, const char *format, ...);
 
 /**
@@ -286,7 +286,7 @@ int dstrcatf(dchar **str, const char *format, ...);
  * @return
  *         0 on success, -1 on failure.
  */
-attr(printf(2, 0))
+_printf(2, 0)
 int dstrvcatf(dchar **str, const char *format, va_list args);
 
 /**

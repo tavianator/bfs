@@ -263,7 +263,7 @@ static struct ioq_monitor *ioq_slot_monitor(struct ioqq *ioqq, ioq_slot *slot) {
 }
 
 /** Atomically wait for a slot to change. */
-attr(noinline)
+_noinline
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
 	struct ioq_monitor *monitor = ioq_slot_monitor(ioqq, slot);
 	mutex_lock(&monitor->mutex);
@@ -293,7 +293,7 @@ done:
 }
 
 /** Wake up any threads waiting on a slot. */
-attr(noinline)
+_noinline
 static void ioq_slot_wake(struct ioqq *ioqq, ioq_slot *slot) {
 	struct ioq_monitor *monitor = ioq_slot_monitor(ioqq, slot);
 

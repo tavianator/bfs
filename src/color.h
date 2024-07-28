@@ -100,13 +100,13 @@ int cfclose(CFILE *cfile);
  * @return
  *         0 on success, -1 on failure.
  */
-attr(printf(2, 3))
+_printf(2, 3)
 int cfprintf(CFILE *cfile, const char *format, ...);
 
 /**
  * cfprintf() variant that takes a va_list.
  */
-attr(printf(2, 0))
+_printf(2, 0)
 int cvfprintf(CFILE *cfile, const char *format, va_list args);
 
 /**

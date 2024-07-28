@@ -115,7 +115,8 @@ static inline size_t flex_size(size_t align, size_t min, size_t offset, size_t s
  * @return
  *         The allocated memory, or NULL on failure.
  */
-attr(malloc(free, 1), aligned_alloc(1, 2))
+_malloc(free, 1)
+_aligned_alloc(1, 2)
 void *alloc(size_t align, size_t size);
 
 /**
@@ -128,7 +129,8 @@ void *alloc(size_t align, size_t size);
  * @return
  *         The allocated memory, or NULL on failure.
  */
-attr(malloc(free, 1), aligned_alloc(1, 2))
+_malloc(free, 1)
+_aligned_alloc(1, 2)
 void *zalloc(size_t align, size_t size);
 
 /** Allocate memory for the given type. */
@@ -169,7 +171,8 @@ void *zalloc(size_t align, size_t size);
  * @return
  *         The reallocated memory, or NULL on failure.
  */
-attr(nodiscard, aligned_alloc(2, 4))
+_aligned_alloc(2, 4)
+_nodiscard
 void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
 
 /** Reallocate memory for an array. */
@@ -195,7 +198,7 @@ void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
  *         for (count + 1) elements.  On failure, errno will be non-zero, and
  *         ptr will returned unchanged.
  */
-attr(nodiscard)
+_nodiscard
 void *reserve(void *ptr, size_t align, size_t size, size_t count);
 
 /**
@@ -253,7 +256,7 @@ void arena_free(struct arena *arena, void *ptr);
 /**
  * Allocate an object out of the arena.
  */
-attr(malloc(arena_free, 2))
+_malloc(arena_free, 2)
 void *arena_alloc(struct arena *arena);
 
 /**
@@ -335,7 +338,7 @@ void varena_free(struct varena *varena, void *ptr, size_t count);
  * @return
  *         The allocated struct, or NULL on failure.
  */
-attr(malloc(varena_free, 2))
+_malloc(varena_free, 2)
 void *varena_alloc(struct varena *varena, size_t count);
 
 /**
@@ -352,7 +355,7 @@ void *varena_alloc(struct varena *varena, size_t count);
  * @return
  *         The resized struct, or NULL on failure.
  */
-attr(nodiscard)
+_nodiscard
 void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t new_count);
 
 /**
@@ -367,7 +370,7 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
  * @return
  *         The resized struct, or NULL on failure.
  */
-attr(nodiscard)
+_nodiscard
 void *varena_grow(struct varena *varena, void *ptr, size_t *count);
 
 /**

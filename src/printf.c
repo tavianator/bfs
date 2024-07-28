@@ -89,7 +89,7 @@ static bool should_color(CFILE *cfile, const struct bfs_fmt *fmt) {
 	(void)ret
 
 /** Return a dynamic format string. */
-attr(format_arg(2))
+_format_arg(2)
 static const char *dyn_fmt(const char *str, const char *fake) {
 	bfs_assert(strcmp(str + strlen(str) - strlen(fake) + 1, fake + 1) == 0,
 		"Mismatched format specifiers: '%s' vs. '%s'", str, fake);
@@ -97,7 +97,7 @@ static const char *dyn_fmt(const char *str, const char *fake) {
 }
 
 /** Wrapper for fprintf(). */
-attr(printf(3, 4))
+_printf(3, 4)
 static int bfs_fprintf(CFILE *cfile, const struct bfs_fmt *fmt, const char *fake, ...) {
 	va_list args;
 	va_start(args, fake);
@@ -560,7 +560,7 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 }
 
 /** %Z: SELinux context */
-attr(maybe_unused)
+_maybe_unused
 static int bfs_printf_Z(CFILE *cfile, const struct bfs_fmt *fmt, const struct BFTW *ftwbuf) {
 	char *con = bfs_getfilecon(ftwbuf);
 	if (!con) {
