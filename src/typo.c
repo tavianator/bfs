@@ -125,7 +125,7 @@ int typo_distance(const char *actual, const char *expected) {
 	// This is the Wagner-Fischer algorithm for Levenshtein distance, using
 	// Manhattan distance on the keyboard for individual characters.
 
-	const int insert_cost = (40 + 12 + 1) / 2;
+	const int insert_cost = 12;
 
 	size_t rows = strlen(actual) + 1;
 	size_t cols = strlen(expected) + 1;
