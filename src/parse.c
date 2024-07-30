@@ -1126,7 +1126,7 @@ static struct bfs_expr *parse_fnmatch(const struct bfs_parser *parser, struct bf
 	// strcmp() can be much faster than fnmatch() since it doesn't have to
 	// parse the pattern, so special-case patterns with no wildcards.
 	//
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01
+	//     https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_14_01
 	expr->literal = strcspn(expr->pattern, "?*\\[") == len;
 
 	return expr;
