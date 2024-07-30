@@ -1921,7 +1921,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 	//
 	// PERMCOPY : "u" | "g" | "o"
 
-	// Parser machine parser
+	// State machine state
 	enum {
 		MODE_CLAUSE,
 		MODE_WHO,
@@ -1929,7 +1929,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		MODE_ACTION_APPLY,
 		MODE_OP,
 		MODE_PERM,
-	} mparser = MODE_CLAUSE;
+	} state = MODE_CLAUSE;
 
 	enum {
 		MODE_PLUS,
@@ -1943,10 +1943,10 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 
 	const char *i = mode;
 	while (true) {
-		switch (mparser) {
+		switch (state) {
 		case MODE_CLAUSE:
 			who = 0;
-			mparser = MODE_WHO;
+			state = MODE_WHO;
 			fallthru;
 
 		case MODE_WHO:
@@ -1964,7 +1964,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				who |= 0777;
 				break;
 			default:
-				mparser = MODE_ACTION;
+				state = MODE_ACTION;
 				continue;
 			}
 			break;
@@ -1994,27 +1994,27 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			switch (*i) {
 			case '+':
 				op = MODE_PLUS;
-				mparser = MODE_OP;
+				state = MODE_OP;
 				break;
 			case '-':
 				op = MODE_MINUS;
-				mparser = MODE_OP;
+				state = MODE_OP;
 				break;
 			case '=':
 				op = MODE_EQUALS;
-				mparser = MODE_OP;
+				state = MODE_OP;
 				break;
 
 			case ',':
-				if (mparser == MODE_ACTION_APPLY) {
-					mparser = MODE_CLAUSE;
+				if (state == MODE_ACTION_APPLY) {
+					state = MODE_CLAUSE;
 				} else {
 					goto fail;
 				}
 				break;
 
 			case '\0':
-				if (mparser == MODE_ACTION_APPLY) {
+				if (state == MODE_ACTION_APPLY) {
 					goto done;
 				} else {
 					goto fail;
@@ -2043,7 +2043,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			default:
 				file_change = 0;
 				dir_change = 0;
-				mparser = MODE_PERM;
+				state = MODE_PERM;
 				continue;
 			}
 
@@ -2051,7 +2051,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			file_change &= who;
 			dir_change |= (dir_change << 6) | (dir_change << 3);
 			dir_change &= who;
-			mparser = MODE_ACTION_APPLY;
+			state = MODE_ACTION_APPLY;
 			break;
 
 		case MODE_PERM:
@@ -2087,7 +2087,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				}
 				break;
 			default:
-				mparser = MODE_ACTION_APPLY;
+				state = MODE_ACTION_APPLY;
 				continue;
 			}
 			break;
