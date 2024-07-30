@@ -14,13 +14,31 @@ make_basic() {
 
 # Creates a file+directory structure with various permissions for tests
 make_perms() {
-    "$XTOUCH" -p -M000 "$1/f---"
-    "$XTOUCH" -p -M444 "$1/fr--"
-    "$XTOUCH" -p -M222 "$1/f-w-"
-    "$XTOUCH" -p -M644 "$1/frw-"
-    "$XTOUCH" -p -M311 "$1/f-wx"
-    "$XTOUCH" -p -M555 "$1/fr-x" "$1/dr-x/"
-    "$XTOUCH" -p -M755 "$1/frwx" "$1/drwx/"
+    "$XTOUCH" -p -M000 "$1/f---------"
+    "$XTOUCH" -p -M111 "$1/f--x--x--x"
+    "$XTOUCH" -p -M222 "$1/f-w--w--w-"
+    "$XTOUCH" -p -M333 "$1/f-wx-wx-wx"
+    "$XTOUCH" -p -M444 "$1/fr--r--r--"
+    "$XTOUCH" -p -M555 "$1/fr-xr-xr-x" "$1/dr-xr-xr-x/"
+    "$XTOUCH" -p -M666 "$1/frw-rw-rw-"
+    "$XTOUCH" -p -M777 "$1/frwxrwxrwx" "$1/drwxrwxrwx/"
+
+    "$XTOUCH" -p -M220 "$1/f-w--w----"
+    "$XTOUCH" -p -M331 "$1/f-wx-wx--x"
+    "$XTOUCH" -p -M664 "$1/frw-rw-r--"
+    "$XTOUCH" -p -M775 "$1/frwxrwxr-x" "$1/drwxrwxr-x/"
+
+    "$XTOUCH" -p -M311 "$1/f-wx--x--x"
+    "$XTOUCH" -p -M644 "$1/frw-r--r--"
+    "$XTOUCH" -p -M755 "$1/frwxr-xr-x" "$1/drwxr-xr-x/"
+
+    "$XTOUCH" -p -M100 "$1/f--x------"
+    "$XTOUCH" -p -M200 "$1/f-w-------"
+    "$XTOUCH" -p -M300 "$1/f-wx------"
+    "$XTOUCH" -p -M400 "$1/fr--------"
+    "$XTOUCH" -p -M500 "$1/fr-x------" "$1/dr-x------/"
+    "$XTOUCH" -p -M600 "$1/frw-------"
+    "$XTOUCH" -p -M700 "$1/frwxr-----" "$1/drwx------/"
 }
 
 # Creates a file+directory structure with various symbolic and hard links
