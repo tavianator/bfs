@@ -1,2 +1,3 @@
-perms/drwxrwxrwx
-perms/frwxrwxrwx
+perms
+perms/drwxr-xr-x
+perms/frwxr-xr-x

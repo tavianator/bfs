@@ -1901,6 +1901,8 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		return 0;
 	}
 
+	mode_t umask = parser->ctx->umask;
+
 	expr->file_mode = 0;
 	expr->dir_mode = 0;
 
@@ -1938,6 +1940,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 	} op uninit(MODE_EQUALS);
 
 	mode_t who uninit(0);
+	mode_t mask uninit(0);
 	mode_t file_change uninit(0);
 	mode_t dir_change uninit(0);
 
@@ -1946,6 +1949,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		switch (state) {
 		case MODE_CLAUSE:
 			who = 0;
+			mask = 0777;
 			state = MODE_WHO;
 			fallthru;
 
@@ -1989,6 +1993,9 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		case MODE_ACTION:
 			if (who == 0) {
 				who = 0777;
+				mask = who & ~umask;
+			} else {
+				mask = who;
 			}
 
 			switch (*i) {
@@ -2048,27 +2055,27 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			}
 
 			file_change |= (file_change << 6) | (file_change << 3);
-			file_change &= who;
+			file_change &= mask;
 			dir_change |= (dir_change << 6) | (dir_change << 3);
-			dir_change &= who;
+			dir_change &= mask;
 			state = MODE_ACTION_APPLY;
 			break;
 
 		case MODE_PERM:
 			switch (*i) {
 			case 'r':
-				file_change |= who & 0444;
-				dir_change |= who & 0444;
+				file_change |= mask & 0444;
+				dir_change |= mask & 0444;
 				break;
 			case 'w':
-				file_change |= who & 0222;
-				dir_change |= who & 0222;
+				file_change |= mask & 0222;
+				dir_change |= mask & 0222;
 				break;
 			case 'x':
-				file_change |= who & 0111;
+				file_change |= mask & 0111;
 				fallthru;
 			case 'X':
-				dir_change |= who & 0111;
+				dir_change |= mask & 0111;
 				break;
 			case 's':
 				if (who & 0700) {

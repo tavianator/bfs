@@ -52,6 +52,9 @@ struct bfs_ctx *bfs_ctx_new(void) {
 
 	trie_init(&ctx->files);
 
+	ctx->umask = umask(0);
+	umask(ctx->umask);
+
 	if (getrlimit(RLIMIT_NOFILE, &ctx->orig_nofile) != 0) {
 		goto fail;
 	}

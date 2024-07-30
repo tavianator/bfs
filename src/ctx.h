@@ -16,6 +16,7 @@
 #include "trie.h"
 #include <stddef.h>
 #include <sys/resource.h>
+#include <sys/types.h>
 #include <time.h>
 
 struct CFILE;
@@ -97,6 +98,9 @@ struct bfs_ctx {
 	struct trie files;
 	/** The number of files owned by the context. */
 	int nfiles;
+
+	/** The current file creation mask. */
+	mode_t umask;
 
 	/** The initial RLIMIT_NOFILE limits. */
 	struct rlimit orig_nofile;
