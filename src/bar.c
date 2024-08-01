@@ -17,6 +17,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <unistd.h>
 
 struct bfs_bar {
 	int fd;
