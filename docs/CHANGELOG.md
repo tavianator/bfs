@@ -23,6 +23,10 @@
   `bfs` has been warning about this change since version 1.5.1 (September 2019).
   ([`33b85e1`](https://github.com/tavianator/bfs/commit/33b85e1f8769e7f75721887638ae454d109a034f))
 
+- `-perm` now takes the current file creation mask into account when parsing a symbolic mode like `+rw`, as clarified by [POSIX defect 1392](https://www.austingroupbugs.net/view.php?id=1392).
+    This matches the behaviour of BSD `find`, contrary to the behaviour of GNU `find`.
+  ([`6290ce4`](https://github.com/tavianator/bfs/commit/6290ce41f3ec1f889abb881cf90ca91da869b5b2))
+
 ### Bug fixes
 
 - Fixed commands like `./configure CC=clang --enable-release` that set variables before other options
@@ -39,6 +43,8 @@
 
 - Fixed `$LS_COLORS` case-sensitivity to match GNU ls more closely when the same extension is specified multiple times
   ([`08030ae`](https://github.com/tavianator/bfs/commit/08030aea919039165c02805e8c637a9ec1ad0d70))
+
+- Fixed the `-status` bar on Solaris/Illumos
 
 
 3.*
