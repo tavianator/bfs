@@ -80,8 +80,26 @@ static char *ass_itoa(char *str, unsigned int n) {
 	return str + len;
 }
 
+/** Reset the scrollable region and hide the bar. */
+static int bfs_bar_reset(struct bfs_bar *bar) {
+	return bfs_bar_puts(bar,
+		"\0337"  // DECSC: Save cursor
+		"\033[r" // DECSTBM: Reset scrollable region
+		"\0338"  // DECRC: Restore cursor
+		"\033[J" // ED: Erase display from cursor to end
+	);
+}
+
+/** Hide the bar if the terminal is shorter than this. */
+#define BFS_BAR_MIN_HEIGHT 3
+
 /** Update the size of the scrollable region. */
 static int bfs_bar_resize(struct bfs_bar *bar) {
+	unsigned int height = load(&bar->height, relaxed);
+	if (height < BFS_BAR_MIN_HEIGHT) {
+		return bfs_bar_reset(bar);
+	}
+
 	static const char PREFIX[] =
 		"\033D"   // IND: Line feed, possibly scrolling
 		"\033[1A" // CUU: Move cursor up 1 row
@@ -95,10 +113,8 @@ static int bfs_bar_resize(struct bfs_bar *bar) {
 	char esc_seq[sizeof(PREFIX) + ITOA_DIGITS + sizeof(SUFFIX)];
 
 	// DECSTBM takes the height as the second argument
-	unsigned int height = load(&bar->height, relaxed) - 1;
-
 	char *cur = stpcpy(esc_seq, PREFIX);
-	cur = ass_itoa(cur, height);
+	cur = ass_itoa(cur, height - 1);
 	cur = stpcpy(cur, SUFFIX);
 
 	return bfs_bar_write(bar, esc_seq, cur - esc_seq);
@@ -112,16 +128,6 @@ static void bfs_bar_sigwinch(int sig, siginfo_t *info, void *arg) {
 	bfs_bar_resize(bar);
 }
 #endif
-
-/** Reset the scrollable region and hide the bar. */
-static int bfs_bar_reset(struct bfs_bar *bar) {
-	return bfs_bar_puts(bar,
-		"\0337"  // DECSC: Save cursor
-		"\033[r" // DECSTBM: Reset scrollable region
-		"\0338"  // DECRC: Restore cursor
-		"\033[J" // ED: Erase display from cursor to end
-	);
-}
 
 /** Signal handler for process-terminating signals. */
 static void bfs_bar_sigexit(int sig, siginfo_t *info, void *arg) {
@@ -191,6 +197,10 @@ unsigned int bfs_bar_width(const struct bfs_bar *bar) {
 
 int bfs_bar_update(struct bfs_bar *bar, const char *str) {
 	unsigned int height = load(&bar->height, relaxed);
+	if (height < BFS_BAR_MIN_HEIGHT) {
+		return 0;
+	}
+
 	return bfs_bar_printf(bar,
 		"\0337"      // DECSC: Save cursor
 		"\033[%u;0f" // HVP: Move cursor to row, column
