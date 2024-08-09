@@ -174,9 +174,9 @@ extern const char bfs_ldlibs[];
  * Silence warnings about switch/case fall-throughs.
  */
 #if __has_attribute(fallthrough)
-#  define fallthru __attribute__((fallthrough))
+#  define _fallthrough __attribute__((fallthrough))
 #else
-#  define fallthru ((void)0)
+#  define _fallthrough ((void)0)
 #endif
 
 /**

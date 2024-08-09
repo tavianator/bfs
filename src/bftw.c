@@ -1431,7 +1431,7 @@ static bool bftw_must_stat(const struct bftw_state *state, size_t depth, enum bf
 		if (!(bftw_stat_flags(state, depth) & BFS_STAT_NOFOLLOW)) {
 			return true;
 		}
-		fallthru;
+		_fallthrough;
 
 	default:
 #if __linux__

@@ -269,10 +269,10 @@ bool eval_time(const struct bfs_expr *expr, struct bfs_eval *state) {
 	switch (expr->time_unit) {
 	case BFS_DAYS:
 		diff /= 60 * 24;
-		fallthru;
+		_fallthrough;
 	case BFS_MINUTES:
 		diff /= 60;
-		fallthru;
+		_fallthrough;
 	case BFS_SECONDS:
 		break;
 	}

@@ -706,7 +706,7 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 				case '+':
 				case ' ':
 					must_be_numeric = true;
-					fallthru;
+					_fallthrough;
 				case '-':
 					if (strchr(fmt.str, c)) {
 						bfs_expr_error(ctx, expr);

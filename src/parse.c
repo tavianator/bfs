@@ -1005,16 +1005,16 @@ static struct bfs_expr *parse_time(struct bfs_parser *parser, int field, int arg
 		switch (*tail) {
 		case 'w':
 			time *= 7;
-			fallthru;
+			_fallthrough;
 		case 'd':
 			time *= 24;
-			fallthru;
+			_fallthrough;
 		case 'h':
 			time *= 60;
-			fallthru;
+			_fallthrough;
 		case 'm':
 			time *= 60;
-			fallthru;
+			_fallthrough;
 		case 's':
 			break;
 		default:
@@ -1951,7 +1951,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			who = 0;
 			mask = 0777;
 			state = MODE_WHO;
-			fallthru;
+			_fallthrough;
 
 		case MODE_WHO:
 			switch (*i) {
@@ -1978,7 +1978,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			case MODE_EQUALS:
 				expr->file_mode &= ~who;
 				expr->dir_mode &= ~who;
-				fallthru;
+				_fallthrough;
 			case MODE_PLUS:
 				expr->file_mode |= file_change;
 				expr->dir_mode |= dir_change;
@@ -1988,7 +1988,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				expr->dir_mode &= ~dir_change;
 				break;
 			}
-			fallthru;
+			_fallthrough;
 
 		case MODE_ACTION:
 			if (who == 0) {
@@ -2073,7 +2073,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				break;
 			case 'x':
 				file_change |= mask & 0111;
-				fallthru;
+				_fallthrough;
 			case 'X':
 				dir_change |= mask & 0111;
 				break;
@@ -2136,7 +2136,7 @@ static struct bfs_expr *parse_perm(struct bfs_parser *parser, int field, int arg
 			++mode;
 			break;
 		}
-		fallthru;
+		_fallthrough;
 	default:
 		expr->mode_cmp = BFS_MODE_EQUAL;
 		break;
