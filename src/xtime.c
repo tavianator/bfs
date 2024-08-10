@@ -350,17 +350,3 @@ invalid:
 error:
 	return -1;
 }
-
-int xgettime(struct timespec *result) {
-#if _POSIX_TIMERS > 0
-	return clock_gettime(CLOCK_REALTIME, result);
-#else
-	struct timeval tv;
-	int ret = gettimeofday(&tv, NULL);
-	if (ret == 0) {
-		result->tv_sec = tv.tv_sec;
-		result->tv_nsec = tv.tv_usec * 1000L;
-	}
-	return ret;
-#endif
-}

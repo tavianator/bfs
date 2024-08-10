@@ -247,8 +247,8 @@ int main(int argc, char *argv[]) {
 		times[1] = times[0];
 	} else {
 		// Don't use UTIME_NOW, so that multiple paths all get the same timestamp
-		if (xgettime(&times[0]) != 0) {
-			perror("xgettime()");
+		if (clock_gettime(CLOCK_REALTIME, &times[0]) != 0) {
+			perror("clock_gettime()");
 			return EXIT_FAILURE;
 		}
 		times[1] = times[0];

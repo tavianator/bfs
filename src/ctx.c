@@ -71,7 +71,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 		goto fail;
 	}
 
-	if (xgettime(&ctx->now) != 0) {
+	if (clock_gettime(CLOCK_REALTIME, &ctx->now) != 0) {
 		goto fail;
 	}
 

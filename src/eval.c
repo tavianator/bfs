@@ -1014,25 +1014,20 @@ bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 }
 
-#if _POSIX_MONOTONIC_CLOCK > 0
-#  define BFS_CLOCK CLOCK_MONOTONIC
-#elif _POSIX_TIMERS > 0
-#  define BFS_CLOCK CLOCK_REALTIME
-#endif
-
 /**
- * Call clock_gettime(), if available.
+ * clock_gettime() wrapper.
  */
 static int eval_gettime(struct bfs_eval *state, struct timespec *ts) {
-#ifdef BFS_CLOCK
-	int ret = clock_gettime(BFS_CLOCK, ts);
+#if _POSIX_MONOTONIC_CLOCK > 0
+	int ret = clock_gettime(CLOCK_MONOTONIC, ts);
+#else
+	int ret = clock_gettime(CLOCK_REALTIME, ts);
+#endif
+
 	if (ret != 0) {
 		bfs_warning(state->ctx, "%pP: clock_gettime(): %s.\n", state->ftwbuf, errstr());
 	}
 	return ret;
-#else
-	return -1;
-#endif
 }
 
 /**
