@@ -20,7 +20,7 @@
 #  include <paths.h>
 #endif
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 #  include <spawn.h>
 #endif
 
@@ -70,29 +70,42 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 	ctx->flags = 0;
 	SLIST_INIT(ctx);
 
-#if _POSIX_SPAWN > 0
-	ctx->flags |= BFS_SPAWN_USE_POSIX;
+#if BFS_POSIX_SPAWN >= 0
+	if (sysoption(SPAWN) > 0) {
+		ctx->flags |= BFS_SPAWN_USE_POSIX;
 
-	errno = posix_spawn_file_actions_init(&ctx->actions);
-	if (errno != 0) {
-		return -1;
-	}
+		errno = posix_spawn_file_actions_init(&ctx->actions);
+		if (errno != 0) {
+			return -1;
+		}
 
-	errno = posix_spawnattr_init(&ctx->attr);
-	if (errno != 0) {
-		posix_spawn_file_actions_destroy(&ctx->actions);
-		return -1;
+		errno = posix_spawnattr_init(&ctx->attr);
+		if (errno != 0) {
+			posix_spawn_file_actions_destroy(&ctx->actions);
+			return -1;
+		}
 	}
 #endif
 
 	return 0;
 }
 
-int bfs_spawn_destroy(struct bfs_spawn *ctx) {
-#if _POSIX_SPAWN > 0
-	posix_spawnattr_destroy(&ctx->attr);
-	posix_spawn_file_actions_destroy(&ctx->actions);
+/**
+ * Clear the BFS_SPAWN_USE_POSIX flag and free the attributes.
+ */
+static void bfs_spawn_clear_posix(struct bfs_spawn *ctx) {
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+
+#if BFS_POSIX_SPAWN >= 0
+		posix_spawnattr_destroy(&ctx->attr);
+		posix_spawn_file_actions_destroy(&ctx->actions);
 #endif
+	}
+}
+
+int bfs_spawn_destroy(struct bfs_spawn *ctx) {
+	bfs_spawn_clear_posix(ctx);
 
 	for_slist (struct bfs_spawn_action, action, ctx) {
 		free(action);
@@ -101,7 +114,7 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 	return 0;
 }
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 /** Set some posix_spawnattr flags. */
 _maybe_unused
 static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
@@ -121,7 +134,7 @@ static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 
 	return 0;
 }
-#endif // _POSIX_SPAWN > 0
+#endif
 
 /** Allocate a spawn action. */
 static struct bfs_spawn_action *bfs_spawn_action(enum bfs_spawn_op op) {
@@ -143,7 +156,7 @@ int bfs_spawn_addopen(struct bfs_spawn *ctx, int fd, const char *path, int flags
 		return -1;
 	}
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_addopen(&ctx->actions, fd, path, flags, mode);
 		if (errno != 0) {
@@ -167,7 +180,7 @@ int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
 		return -1;
 	}
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_addclose(&ctx->actions, fd);
 		if (errno != 0) {
@@ -188,7 +201,7 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
 		return -1;
 	}
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_adddup2(&ctx->actions, oldfd, newfd);
 		if (errno != 0) {
@@ -228,7 +241,7 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 #  define BFS_POSIX_SPAWN_ADDFCHDIR posix_spawn_file_actions_addfchdir_np
 #endif
 
-#if _POSIX_SPAWN > 0 && defined(BFS_POSIX_SPAWN_ADDFCHDIR)
+#if BFS_POSIX_SPAWN >= 0 && defined(BFS_POSIX_SPAWN_ADDFCHDIR)
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = BFS_POSIX_SPAWN_ADDFCHDIR(&ctx->actions, fd);
 		if (errno != 0) {
@@ -237,7 +250,7 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 		}
 	}
 #else
-	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+	bfs_spawn_clear_posix(ctx);
 #endif
 
 	action->in_fd = fd;
@@ -261,7 +274,7 @@ int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit
 		goto fail;
 	}
 #else
-	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+	bfs_spawn_clear_posix(ctx);
 #endif
 
 	action->resource = resource;
@@ -482,7 +495,7 @@ fail:
 	return -1;
 }
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 
 /** bfs_spawn() implementation using posix_spawn(). */
 static pid_t bfs_posix_spawn(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
@@ -516,7 +529,7 @@ static bool bfs_use_posix_spawn(const struct bfs_resolver *res, const struct bfs
 	return true;
 }
 
-#endif // _POSIX_SPAWN > 0
+#endif // BFS_POSIX_SPAWN >= 0
 
 /** Actually exec() the new process. */
 _noreturn
@@ -653,7 +666,7 @@ fail:
 
 /** Call the right bfs_spawn() implementation. */
 static pid_t bfs_spawn_impl(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (bfs_use_posix_spawn(res, ctx)) {
 		return bfs_posix_spawn(res, ctx, argv, envp);
 	}

@@ -29,7 +29,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#if _POSIX_SEMAPHORES > 0
+#ifdef _POSIX_SEMAPHORES
+#  define BFS_POSIX_SEMAPHORES _POSIX_SEMAPHORES
+#else
+#  define BFS_POSIX_SEMAPHORES (-1)
+#endif
+
+#if BFS_POSIX_SEMAPHORES >= 0
 #  include <semaphore.h>
 #endif
 
@@ -42,7 +48,7 @@ struct arc {
 	/** The reference itself. */
 	void *ptr;
 
-#if _POSIX_SEMAPHORES > 0
+#if BFS_POSIX_SEMAPHORES >= 0
 	/** A semaphore for arc_wake(). */
 	sem_t sem;
 	/** sem_init() result. */
@@ -57,8 +63,12 @@ static void arc_init(struct arc *arc) {
 	atomic_init(&arc->refs, 0);
 	arc->ptr = NULL;
 
-#if _POSIX_SEMAPHORES > 0
-	arc->sem_status = sem_init(&arc->sem, false, 0);
+#if BFS_POSIX_SEMAPHORES >= 0
+	if (sysoption(SEMAPHORES) > 0) {
+		arc->sem_status = sem_init(&arc->sem, false, 0);
+	} else {
+		arc->sem_status = -1;
+	}
 #endif
 }
 
@@ -93,7 +103,7 @@ static void arc_put(struct arc *arc) {
 	size_t refs = fetch_sub(&arc->refs, 1, release);
 
 	if (refs == 1) {
-#if _POSIX_SEMAPHORES > 0
+#if BFS_POSIX_SEMAPHORES >= 0
 		if (arc->sem_status == 0 && sem_post(&arc->sem) != 0) {
 			abort();
 		}
@@ -103,7 +113,7 @@ static void arc_put(struct arc *arc) {
 
 /** Wait on the semaphore. */
 static int arc_sem_wait(struct arc *arc) {
-#if _POSIX_SEMAPHORES > 0
+#if BFS_POSIX_SEMAPHORES >= 0
 	if (arc->sem_status == 0) {
 		while (sem_wait(&arc->sem) != 0) {
 			bfs_everify(errno == EINTR, "sem_wait()");
@@ -146,7 +156,7 @@ done:;
 static void arc_destroy(struct arc *arc) {
 	bfs_assert(arc_refs(arc) == 0);
 
-#if _POSIX_SEMAPHORES > 0
+#if BFS_POSIX_SEMAPHORES >= 0
 	if (arc->sem_status == 0) {
 		bfs_everify(sem_destroy(&arc->sem) == 0, "sem_destroy()");
 	}

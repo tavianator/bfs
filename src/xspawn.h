@@ -13,7 +13,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#if _POSIX_SPAWN > 0
+#ifdef _POSIX_SPAWN
+#  define BFS_POSIX_SPAWN _POSIX_SPAWN
+#else
+#  define BFS_POSIX_SPAWN (-1)
+#endif
+
+#if BFS_POSIX_SPAWN >= 0
 #  include <spawn.h>
 #endif
 
@@ -38,7 +44,7 @@ struct bfs_spawn {
 	struct bfs_spawn_action *head;
 	struct bfs_spawn_action **tail;
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	/** posix_spawn() context, for when we can use it. */
 	posix_spawn_file_actions_t actions;
 	posix_spawnattr_t attr;

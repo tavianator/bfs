@@ -447,6 +447,19 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
  */
 long xsysconf(int name);
 
+/**
+ * Check for a POSIX option[1] at runtime.
+ *
+ * [1]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap02.html#tag_02_01_06
+ *
+ * @param name
+ *         The symbolic name of the POSIX option (e.g. SPAWN).
+ * @return
+ *         The value of the option, either -1 or a date like 202405.
+ */
+#define sysoption(name) \
+	(_POSIX_##name == 0 ? xsysconf(_SC_##name) : _POSIX_##name)
+
 #include <wchar.h>
 
 /**

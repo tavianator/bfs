@@ -1018,12 +1018,15 @@ bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
  * clock_gettime() wrapper.
  */
 static int eval_gettime(struct bfs_eval *state, struct timespec *ts) {
-#if _POSIX_MONOTONIC_CLOCK > 0
-	int ret = clock_gettime(CLOCK_MONOTONIC, ts);
-#else
-	int ret = clock_gettime(CLOCK_REALTIME, ts);
+	clockid_t clock = CLOCK_REALTIME;
+
+#if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
+	if (sysoption(MONOTONIC_CLOCK) > 0) {
+		clock = CLOCK_MONOTONIC;
+	}
 #endif
 
+	int ret = clock_gettime(clock, ts);
 	if (ret != 0) {
 		bfs_warning(state->ctx, "%pP: clock_gettime(): %s.\n", state->ftwbuf, errstr());
 	}
