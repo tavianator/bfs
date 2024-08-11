@@ -29,7 +29,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#ifdef _POSIX_SEMAPHORES
+// NetBSD opens a file descriptor for each sem_init()
+#if defined(_POSIX_SEMAPHORES) && !__NetBSD__
 #  define BFS_POSIX_SEMAPHORES _POSIX_SEMAPHORES
 #else
 #  define BFS_POSIX_SEMAPHORES (-1)
