@@ -1980,6 +1980,10 @@ static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *exp
 	}
 
 	expr = visit_shallow(opt, expr, &annotate);
+	if (!expr) {
+		return NULL;
+	}
+
 	return negate_expr(opt, expr, &fake_not_arg);
 }
 
