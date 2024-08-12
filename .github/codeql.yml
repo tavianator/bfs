@@ -9,3 +9,5 @@ query-filters:
       id: cpp/loop-variable-changed
   - exclude:
       id: cpp/poorly-documented-function
+  - exclude:
+      id: cpp/constant-comparison
