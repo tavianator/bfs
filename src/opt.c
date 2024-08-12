@@ -2127,6 +2127,8 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 	};
 
 	struct df_domain impure;
+	df_init_top(&opt->after_true);
+	df_init_top(&opt->after_false);
 
 	for (int i = 0; i < 3; ++i) {
 		struct bfs_opt nested = *opt;
@@ -2140,9 +2142,11 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 				continue;
 			}
 
+			const struct visitor *visitor = passes[j].visitor;
+
 			// Skip reordering the first time through the passes, to
 			// make warnings more understandable
-			if (passes[j].visitor == &reorder) {
+			if (visitor == &reorder) {
 				if (i == 0) {
 					continue;
 				} else {
@@ -2150,9 +2154,14 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 				}
 			}
 
-			expr = visit(&nested, expr, passes[j].visitor);
+			expr = visit(&nested, expr, visitor);
 			if (!expr) {
 				return NULL;
+			}
+
+			if (visitor == &data_flow) {
+				opt->after_true = nested.after_true;
+				opt->after_false = nested.after_false;
 			}
 		}
 
