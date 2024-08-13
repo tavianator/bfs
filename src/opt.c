@@ -1823,7 +1823,7 @@ static bool opt_ignore(struct bfs_opt *opt, struct bfs_expr *expr) {
 	if (opt_warning(opt, expr, "The result of this expression is ignored.\n")) {
 		if (ctx->interactive && ctx->dangerous) {
 			bfs_warning(ctx, "Do you want to continue? ");
-			if (ynprompt() == 0) {
+			if (ynprompt() <= 0) {
 				errno = 0;
 				return false;
 			}

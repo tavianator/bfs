@@ -3546,7 +3546,7 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 
 		if (ctx->interactive) {
 			bfs_warning(ctx, "Do you want to continue? ");
-			if (ynprompt() == 0) {
+			if (ynprompt() <= 0) {
 				return NULL;
 			}
 		}
