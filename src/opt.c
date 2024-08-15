@@ -1811,39 +1811,45 @@ static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *ex
 	return visit_leave(opt, expr, visitor);
 }
 
-/**
- * Warn about an ignored expression.
- *
- * @return
- *         True to continue optimizing, false to cancel.
- */
-static bool opt_ignore(struct bfs_opt *opt, struct bfs_expr *expr) {
-	struct bfs_ctx *ctx = opt->ctx;
-
-	if (opt_warning(opt, expr, "The result of this expression is ignored.\n")) {
-		if (ctx->interactive && ctx->dangerous) {
-			bfs_warning(ctx, "Do you want to continue? ");
-			if (ynprompt() <= 0) {
-				errno = 0;
-				return false;
-			}
-		}
-
-		fprintf(stderr, "\n");
+/** Ignore an expression (and possibly warn/prompt). */
+static struct bfs_expr *opt_ignore(struct bfs_opt *opt, struct bfs_expr *expr, bool delete) {
+	if (delete) {
+		opt_delete(opt, "%pe [ignored result]\n", expr);
+	} else {
+		opt_debug(opt, "ignored result");
 	}
 
-	return true;
+	if (expr->kind != BFS_TEST) {
+		goto done;
+	}
+
+	if (!opt_warning(opt, expr, "The result of this expression is ignored.\n")) {
+		goto done;
+	}
+
+	struct bfs_ctx *ctx = opt->ctx;
+	if (ctx->interactive && ctx->dangerous) {
+		bfs_warning(ctx, "Do you want to continue? ");
+		if (ynprompt() <= 0) {
+			errno = 0;
+			return NULL;
+		}
+	}
+
+	fprintf(stderr, "\n");
+
+done:
+	if (!delete && expr->pure) {
+		// If we're not deleting the expression entirely, replace it with -false
+		expr = opt_const(opt, false);
+	}
+	return expr;
 }
 
 /** Data flow visitor function. */
 static struct bfs_expr *data_flow_visit(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
-	if (opt->ignore_result && expr->pure) {
-		opt_debug(opt, "ignored result\n");
-		if (!opt_ignore(opt, expr)) {
-			return NULL;
-		}
-
-		expr = opt_const(opt, false);
+	if (opt->ignore_result) {
+		expr = opt_ignore(opt, expr, false);
 		if (!expr) {
 			return NULL;
 		}
@@ -2021,8 +2027,7 @@ static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr,
 		}
 
 		if (ignore) {
-			opt_delete(opt, "%pe [ignored result]\n", child);
-			if (!opt_ignore(opt, child)) {
+			if (!opt_ignore(opt, child, true)) {
 				return NULL;
 			}
 			continue;
@@ -2071,8 +2076,7 @@ static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 		}
 
 		if (ignore) {
-			opt_delete(opt, "%pe [ignored result]\n", child);
-			if (!opt_ignore(opt, child)) {
+			if (!opt_ignore(opt, child, true)) {
 				return NULL;
 			}
 			continue;
@@ -2114,8 +2118,7 @@ static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *exp
 		struct bfs_expr *child = SLIST_POP(&children);
 
 		if (opt->level >= 2 && child->pure && !SLIST_EMPTY(&children)) {
-			opt_delete(opt, "%pe [ignored result]\n", child);
-			if (!opt_ignore(opt, child)) {
+			if (!opt_ignore(opt, child, true)) {
 				return NULL;
 			}
 			continue;
