@@ -1337,7 +1337,7 @@ static struct bfs_expr *opt_const(struct bfs_opt *opt, bool value) {
 	static bfs_eval_fn *const fns[] = {eval_false, eval_true};
 	static char *fake_args[] = {"-false", "-true"};
 
-	struct bfs_expr *expr = bfs_expr_new(opt->ctx, fns[value], 1, &fake_args[value]);
+	struct bfs_expr *expr = bfs_expr_new(opt->ctx, fns[value], 1, &fake_args[value], BFS_TEST);
 	return visit_shallow(opt, expr, &annotate);
 }
 
@@ -1351,7 +1351,7 @@ static struct bfs_expr *negate_expr(struct bfs_opt *opt, struct bfs_expr *expr, 
 		return opt_const(opt, true);
 	}
 
-	struct bfs_expr *ret = bfs_expr_new(opt->ctx, eval_not, 1, argv);
+	struct bfs_expr *ret = bfs_expr_new(opt->ctx, eval_not, 1, argv, BFS_OPERATOR);
 	if (!ret) {
 		return NULL;
 	}

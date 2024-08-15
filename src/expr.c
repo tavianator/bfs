@@ -12,7 +12,9 @@
 #include "xregex.h"
 #include <string.h>
 
-struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t argc, char **argv) {
+struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t argc, char **argv, enum bfs_kind kind) {
+	bfs_assert(kind != BFS_PATH);
+
 	struct bfs_expr *expr = arena_alloc(&ctx->expr_arena);
 	if (!expr) {
 		return NULL;
@@ -22,6 +24,7 @@ struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t 
 	expr->eval_fn = eval_fn;
 	expr->argc = argc;
 	expr->argv = argv;
+	expr->kind = kind;
 	expr->probability = 0.5;
 	SLIST_PREPEND(&ctx->expr_list, expr, freelist);
 

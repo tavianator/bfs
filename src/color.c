@@ -1136,14 +1136,20 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, i
 		return -1;
 	}
 
-	if (bfs_expr_is_parent(expr)) {
-		if (cbuff(cfile, "${red}%pq${rs}", expr->argv[0]) < 0) {
-			return -1;
-		}
-	} else {
-		if (cbuff(cfile, "${blu}%pq${rs}", expr->argv[0]) < 0) {
-			return -1;
-		}
+	int ret;
+	switch (expr->kind) {
+	case BFS_FLAG:
+		ret = cbuff(cfile, "${cyn}%pq${rs}", expr->argv[0]);
+		break;
+	case BFS_OPERATOR:
+		ret = cbuff(cfile, "${red}%pq${rs}", expr->argv[0]);
+		break;
+	default:
+		ret = cbuff(cfile, "${blu}%pq${rs}", expr->argv[0]);
+		break;
+	}
+	if (ret < 0) {
+		return -1;
 	}
 
 	for (size_t i = 1; i < expr->argc; ++i) {

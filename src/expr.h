@@ -16,6 +16,27 @@
 #include <time.h>
 
 /**
+ * Argument/token/expression kinds.
+ */
+enum bfs_kind {
+	/** A flag (-H, -L, etc.). */
+	BFS_FLAG,
+
+	/** A root path. */
+	BFS_PATH,
+
+	/** An option (-follow, -mindepth, etc.). */
+	BFS_OPTION,
+	/** A test (-name, -size, etc.). */
+	BFS_TEST,
+	/** An action (-print, -exec, etc.). */
+	BFS_ACTION,
+
+	/** An operator (-and, -or, etc.). */
+	BFS_OPERATOR,
+};
+
+/**
  * Integer comparison modes.
  */
 enum bfs_int_cmp {
@@ -97,6 +118,8 @@ struct bfs_expr {
 	size_t argc;
 	/** The command line arguments comprising this expression. */
 	char **argv;
+	/** The kind of expression this is. */
+	enum bfs_kind kind;
 
 	/** The number of files this expression keeps open between evaluations. */
 	int persistent_fds;
@@ -207,7 +230,7 @@ struct bfs_ctx;
 /**
  * Create a new expression.
  */
-struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv);
+struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv, enum bfs_kind kind);
 
 /**
  * @return Whether this type of expression has children.

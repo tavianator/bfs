@@ -113,31 +113,6 @@ struct bfs_parser {
 };
 
 /**
- * Token types and flags.
- */
-enum token_info {
-	/** A flag. */
-	T_FLAG      = 1,
-	/** A root path. */
-	T_PATH      = 2,
-	/** An option. */
-	T_OPTION    = 3,
-	/** A test. */
-	T_TEST      = 4,
-	/** An action. */
-	T_ACTION    = 5,
-	/** An operator. */
-	T_OPERATOR  = 6,
-	/** Mask for token types. */
-	T_TYPE      = (1 << 3) - 1,
-
-	/** A token can match a prefix of an argument, like -On, -newerXY, etc. */
-	T_PREFIX    = 1 << 3,
-	/** A flag that takes an argument. */
-	T_NEEDS_ARG = 1 << 4,
-};
-
-/**
  * Print a low-level error message during parsing.
  */
 static void parse_perror(const struct bfs_parser *parser, const char *str) {
@@ -294,8 +269,8 @@ static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs
 /**
  * Allocate a new expression.
  */
-static struct bfs_expr *parse_new_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc, char **argv) {
-	struct bfs_expr *expr = bfs_expr_new(parser->ctx, eval_fn, argc, argv);
+static struct bfs_expr *parse_new_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc, char **argv, enum bfs_kind kind) {
+	struct bfs_expr *expr = bfs_expr_new(parser->ctx, eval_fn, argc, argv, kind);
 	if (!expr) {
 		parse_perror(parser, "bfs_expr_new()");
 	}
@@ -306,7 +281,7 @@ static struct bfs_expr *parse_new_expr(const struct bfs_parser *parser, bfs_eval
  * Create a new unary expression.
  */
 static struct bfs_expr *new_unary_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, struct bfs_expr *rhs, char **argv) {
-	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv);
+	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv, BFS_OPERATOR);
 	if (!expr) {
 		return NULL;
 	}
@@ -320,7 +295,7 @@ static struct bfs_expr *new_unary_expr(const struct bfs_parser *parser, bfs_eval
  * Create a new binary expression.
  */
 static struct bfs_expr *new_binary_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, struct bfs_expr *lhs, struct bfs_expr *rhs, char **argv) {
-	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv);
+	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv, BFS_OPERATOR);
 	if (!expr) {
 		return NULL;
 	}
@@ -405,14 +380,12 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser);
 /**
  * Advance by a single token.
  */
-static char **parser_advance(struct bfs_parser *parser, enum token_info type, size_t argc) {
-	bfs_assert(type == (type & T_TYPE));
-
-	if (type != T_FLAG && type != T_PATH) {
+static char **parser_advance(struct bfs_parser *parser, enum bfs_kind kind, size_t argc) {
+	if (kind != BFS_FLAG && kind != BFS_PATH) {
 		parser->expr_started = true;
 	}
 
-	if (type != T_PATH) {
+	if (kind != BFS_PATH) {
 		parser->last_arg = parser->argv;
 	}
 
@@ -458,7 +431,7 @@ static int skip_paths(struct bfs_parser *parser) {
 				// find uses -- to separate flags from the rest
 				// of the command line.  We allow mixing flags
 				// and paths/predicates, so we just ignore --.
-				parser_advance(parser, T_FLAG, 1);
+				parser_advance(parser, BFS_FLAG, 1);
 				continue;
 			}
 			if (strcmp(arg, "-") != 0) {
@@ -490,7 +463,7 @@ static int skip_paths(struct bfs_parser *parser) {
 			return -1;
 		}
 
-		parser_advance(parser, T_PATH, 1);
+		parser_advance(parser, BFS_PATH, 1);
 	}
 }
 
@@ -621,8 +594,8 @@ static bool looks_like_icmp(const char *str) {
  * Parse a single flag.
  */
 static struct bfs_expr *parse_flag(struct bfs_parser *parser, size_t argc) {
-	char **argv = parser_advance(parser, T_FLAG, argc);
-	return parse_new_expr(parser, eval_true, argc, argv);
+	char **argv = parser_advance(parser, BFS_FLAG, argc);
+	return parse_new_expr(parser, eval_true, argc, argv, BFS_FLAG);
 }
 
 /**
@@ -675,8 +648,8 @@ static struct bfs_expr *parse_prefix_flag(struct bfs_parser *parser, char flag, 
  * Parse a single option.
  */
 static struct bfs_expr *parse_option(struct bfs_parser *parser, size_t argc) {
-	char **argv = parser_advance(parser, T_OPTION, argc);
-	return parse_new_expr(parser, eval_true, argc, argv);
+	char **argv = parser_advance(parser, BFS_OPTION, argc);
+	return parse_new_expr(parser, eval_true, argc, argv, BFS_OPTION);
 }
 
 /**
@@ -704,8 +677,8 @@ static struct bfs_expr *parse_unary_option(struct bfs_parser *parser) {
  * Parse a single test.
  */
 static struct bfs_expr *parse_test(struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc) {
-	char **argv = parser_advance(parser, T_TEST, argc);
-	return parse_new_expr(parser, eval_fn, argc, argv);
+	char **argv = parser_advance(parser, BFS_TEST, argc);
+	return parse_new_expr(parser, eval_fn, argc, argv, BFS_TEST);
 }
 
 /**
@@ -733,7 +706,7 @@ static struct bfs_expr *parse_unary_test(struct bfs_parser *parser, bfs_eval_fn 
  * Parse a single action.
  */
 static struct bfs_expr *parse_action(struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc) {
-	char **argv = parser_advance(parser, T_ACTION, argc);
+	char **argv = parser_advance(parser, BFS_ACTION, argc);
 
 	if (parser->excluding) {
 		parse_argv_error(parser, argv, argc, "This action is not supported within ${red}-exclude${rs}.\n");
@@ -744,7 +717,7 @@ static struct bfs_expr *parse_action(struct bfs_parser *parser, bfs_eval_fn *eva
 		parser->implicit_print = false;
 	}
 
-	return parse_new_expr(parser, eval_fn, argc, argv);
+	return parse_new_expr(parser, eval_fn, argc, argv, BFS_ACTION);
 }
 
 /**
@@ -1859,7 +1832,7 @@ static struct bfs_expr *parse_nogroup(struct bfs_parser *parser, int arg1, int a
  * Parse -nohidden.
  */
 static struct bfs_expr *parse_nohidden(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *hidden = parse_new_expr(parser, eval_hidden, 1, &fake_hidden_arg);
+	struct bfs_expr *hidden = parse_new_expr(parser, eval_hidden, 1, &fake_hidden_arg, BFS_TEST);
 	if (!hidden) {
 		return NULL;
 	}
@@ -2992,136 +2965,138 @@ typedef struct bfs_expr *parse_fn(struct bfs_parser *parser, int arg1, int arg2)
  */
 struct table_entry {
 	char *arg;
-	enum token_info info;
+	enum bfs_kind kind;
 	parse_fn *parse;
 	int arg1;
 	int arg2;
+	bool prefix;
+	bool needs_arg;
 };
 
 /**
  * The parse table for primary expressions.
  */
 static const struct table_entry parse_table[] = {
-	{"--", T_FLAG},
-	{"--help", T_ACTION, parse_help},
-	{"--version", T_ACTION, parse_version},
-	{"-Bmin", T_TEST, parse_min, BFS_STAT_BTIME},
-	{"-Bnewer", T_TEST, parse_newer, BFS_STAT_BTIME},
-	{"-Bsince", T_TEST, parse_since, BFS_STAT_BTIME},
-	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME},
-	{"-D", T_FLAG | T_PREFIX, parse_debug},
-	{"-E", T_FLAG, parse_regex_extended},
-	{"-H", T_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
-	{"-L", T_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
-	{"-O", T_FLAG | T_PREFIX, parse_optlevel},
-	{"-P", T_FLAG, parse_follow, 0, false},
-	{"-S", T_FLAG | T_PREFIX, parse_search_strategy},
-	{"-X", T_FLAG, parse_xargs_safe},
-	{"-a", T_OPERATOR},
-	{"-acl", T_TEST, parse_acl},
-	{"-amin", T_TEST, parse_min, BFS_STAT_ATIME},
-	{"-and", T_OPERATOR},
-	{"-anewer", T_TEST, parse_newer, BFS_STAT_ATIME},
-	{"-asince", T_TEST, parse_since, BFS_STAT_ATIME},
-	{"-atime", T_TEST, parse_time, BFS_STAT_ATIME},
-	{"-capable", T_TEST, parse_capable},
-	{"-cmin", T_TEST, parse_min, BFS_STAT_CTIME},
-	{"-cnewer", T_TEST, parse_newer, BFS_STAT_CTIME},
-	{"-color", T_OPTION, parse_color, true},
-	{"-context", T_TEST, parse_context, true},
-	{"-csince", T_TEST, parse_since, BFS_STAT_CTIME},
-	{"-ctime", T_TEST, parse_time, BFS_STAT_CTIME},
-	{"-d", T_FLAG, parse_depth},
-	{"-daystart", T_OPTION, parse_daystart},
-	{"-delete", T_ACTION, parse_delete},
-	{"-depth", T_OPTION, parse_depth_n},
-	{"-empty", T_TEST, parse_empty},
-	{"-exclude", T_OPERATOR},
-	{"-exec", T_ACTION, parse_exec, 0},
-	{"-execdir", T_ACTION, parse_exec, BFS_EXEC_CHDIR},
-	{"-executable", T_TEST, parse_access, X_OK},
-	{"-exit", T_ACTION, parse_exit},
-	{"-f", T_FLAG | T_NEEDS_ARG, parse_f},
-	{"-false", T_TEST, parse_const, false},
-	{"-files0-from", T_OPTION, parse_files0_from},
-	{"-flags", T_TEST, parse_flags},
-	{"-fls", T_ACTION, parse_fls},
-	{"-follow", T_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
-	{"-fprint", T_ACTION, parse_fprint},
-	{"-fprint0", T_ACTION, parse_fprint0},
-	{"-fprintf", T_ACTION, parse_fprintf},
-	{"-fstype", T_TEST, parse_fstype},
-	{"-gid", T_TEST, parse_group},
-	{"-group", T_TEST, parse_group},
-	{"-help", T_ACTION, parse_help},
-	{"-hidden", T_TEST, parse_hidden},
-	{"-ignore_readdir_race", T_OPTION, parse_ignore_races, true},
-	{"-ilname", T_TEST, parse_lname, true},
-	{"-iname", T_TEST, parse_name, true},
-	{"-inum", T_TEST, parse_inum},
-	{"-ipath", T_TEST, parse_path, true},
-	{"-iregex", T_TEST, parse_regex, BFS_REGEX_ICASE},
-	{"-iwholename", T_TEST, parse_path, true},
-	{"-j", T_FLAG | T_PREFIX, parse_jobs},
-	{"-limit", T_ACTION, parse_limit},
-	{"-links", T_TEST, parse_links},
-	{"-lname", T_TEST, parse_lname, false},
-	{"-ls", T_ACTION, parse_ls},
-	{"-maxdepth", T_OPTION, parse_depth_limit, false},
-	{"-mindepth", T_OPTION, parse_depth_limit, true},
-	{"-mmin", T_TEST, parse_min, BFS_STAT_MTIME},
-	{"-mnewer", T_TEST, parse_newer, BFS_STAT_MTIME},
-	{"-mount", T_OPTION, parse_mount},
-	{"-msince", T_TEST, parse_since, BFS_STAT_MTIME},
-	{"-mtime", T_TEST, parse_time, BFS_STAT_MTIME},
-	{"-name", T_TEST, parse_name, false},
-	{"-newer", T_TEST, parse_newer, BFS_STAT_MTIME},
-	{"-newer", T_TEST | T_PREFIX, parse_newerxy},
-	{"-nocolor", T_OPTION, parse_color, false},
-	{"-nogroup", T_TEST, parse_nogroup},
-	{"-nohidden", T_TEST, parse_nohidden},
-	{"-noignore_readdir_race", T_OPTION, parse_ignore_races, false},
-	{"-noleaf", T_OPTION, parse_noleaf},
-	{"-not", T_OPERATOR},
-	{"-nouser", T_TEST, parse_nouser},
-	{"-nowarn", T_OPTION, parse_warn, false},
-	{"-o", T_OPERATOR},
-	{"-ok", T_ACTION, parse_exec, BFS_EXEC_CONFIRM},
-	{"-okdir", T_ACTION, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
-	{"-or", T_OPERATOR},
-	{"-path", T_TEST, parse_path, false},
-	{"-perm", T_TEST, parse_perm},
-	{"-print", T_ACTION, parse_print},
-	{"-print0", T_ACTION, parse_print0},
-	{"-printf", T_ACTION, parse_printf},
-	{"-printx", T_ACTION, parse_printx},
-	{"-prune", T_ACTION, parse_prune},
-	{"-quit", T_ACTION, parse_quit},
-	{"-readable", T_TEST, parse_access, R_OK},
-	{"-regex", T_TEST, parse_regex, 0},
-	{"-regextype", T_OPTION, parse_regextype},
-	{"-rm", T_ACTION, parse_delete},
-	{"-s", T_FLAG, parse_s},
-	{"-samefile", T_TEST, parse_samefile},
-	{"-since", T_TEST, parse_since, BFS_STAT_MTIME},
-	{"-size", T_TEST, parse_size},
-	{"-sparse", T_TEST, parse_sparse},
-	{"-status", T_OPTION, parse_status},
-	{"-true", T_TEST, parse_const, true},
-	{"-type", T_TEST, parse_type, false},
-	{"-uid", T_TEST, parse_user},
-	{"-unique", T_OPTION, parse_unique},
-	{"-used", T_TEST, parse_used},
-	{"-user", T_TEST, parse_user},
-	{"-version", T_ACTION, parse_version},
-	{"-warn", T_OPTION, parse_warn, true},
-	{"-wholename", T_TEST, parse_path, false},
-	{"-writable", T_TEST, parse_access, W_OK},
-	{"-x", T_FLAG, parse_xdev},
-	{"-xattr", T_TEST, parse_xattr},
-	{"-xattrname", T_TEST, parse_xattrname},
-	{"-xdev", T_OPTION, parse_xdev},
-	{"-xtype", T_TEST, parse_type, true},
+	{"--", BFS_FLAG},
+	{"--help", BFS_ACTION, parse_help},
+	{"--version", BFS_ACTION, parse_version},
+	{"-Bmin", BFS_TEST, parse_min, BFS_STAT_BTIME},
+	{"-Bnewer", BFS_TEST, parse_newer, BFS_STAT_BTIME},
+	{"-Bsince", BFS_TEST, parse_since, BFS_STAT_BTIME},
+	{"-Btime", BFS_TEST, parse_time, BFS_STAT_BTIME},
+	{"-D", BFS_FLAG, parse_debug, .prefix = true},
+	{"-E", BFS_FLAG, parse_regex_extended},
+	{"-H", BFS_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
+	{"-L", BFS_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
+	{"-O", BFS_FLAG, parse_optlevel, .prefix = true},
+	{"-P", BFS_FLAG, parse_follow, 0, false},
+	{"-S", BFS_FLAG, parse_search_strategy, .prefix = true},
+	{"-X", BFS_FLAG, parse_xargs_safe},
+	{"-a", BFS_OPERATOR},
+	{"-acl", BFS_TEST, parse_acl},
+	{"-amin", BFS_TEST, parse_min, BFS_STAT_ATIME},
+	{"-and", BFS_OPERATOR},
+	{"-anewer", BFS_TEST, parse_newer, BFS_STAT_ATIME},
+	{"-asince", BFS_TEST, parse_since, BFS_STAT_ATIME},
+	{"-atime", BFS_TEST, parse_time, BFS_STAT_ATIME},
+	{"-capable", BFS_TEST, parse_capable},
+	{"-cmin", BFS_TEST, parse_min, BFS_STAT_CTIME},
+	{"-cnewer", BFS_TEST, parse_newer, BFS_STAT_CTIME},
+	{"-color", BFS_OPTION, parse_color, true},
+	{"-context", BFS_TEST, parse_context, true},
+	{"-csince", BFS_TEST, parse_since, BFS_STAT_CTIME},
+	{"-ctime", BFS_TEST, parse_time, BFS_STAT_CTIME},
+	{"-d", BFS_FLAG, parse_depth},
+	{"-daystart", BFS_OPTION, parse_daystart},
+	{"-delete", BFS_ACTION, parse_delete},
+	{"-depth", BFS_OPTION, parse_depth_n},
+	{"-empty", BFS_TEST, parse_empty},
+	{"-exclude", BFS_OPERATOR},
+	{"-exec", BFS_ACTION, parse_exec, 0},
+	{"-execdir", BFS_ACTION, parse_exec, BFS_EXEC_CHDIR},
+	{"-executable", BFS_TEST, parse_access, X_OK},
+	{"-exit", BFS_ACTION, parse_exit},
+	{"-f", BFS_FLAG, parse_f, .needs_arg = true},
+	{"-false", BFS_TEST, parse_const, false},
+	{"-files0-from", BFS_OPTION, parse_files0_from},
+	{"-flags", BFS_TEST, parse_flags},
+	{"-fls", BFS_ACTION, parse_fls},
+	{"-follow", BFS_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
+	{"-fprint", BFS_ACTION, parse_fprint},
+	{"-fprint0", BFS_ACTION, parse_fprint0},
+	{"-fprintf", BFS_ACTION, parse_fprintf},
+	{"-fstype", BFS_TEST, parse_fstype},
+	{"-gid", BFS_TEST, parse_group},
+	{"-group", BFS_TEST, parse_group},
+	{"-help", BFS_ACTION, parse_help},
+	{"-hidden", BFS_TEST, parse_hidden},
+	{"-ignore_readdir_race", BFS_OPTION, parse_ignore_races, true},
+	{"-ilname", BFS_TEST, parse_lname, true},
+	{"-iname", BFS_TEST, parse_name, true},
+	{"-inum", BFS_TEST, parse_inum},
+	{"-ipath", BFS_TEST, parse_path, true},
+	{"-iregex", BFS_TEST, parse_regex, BFS_REGEX_ICASE},
+	{"-iwholename", BFS_TEST, parse_path, true},
+	{"-j", BFS_FLAG, parse_jobs, .prefix = true},
+	{"-limit", BFS_ACTION, parse_limit},
+	{"-links", BFS_TEST, parse_links},
+	{"-lname", BFS_TEST, parse_lname, false},
+	{"-ls", BFS_ACTION, parse_ls},
+	{"-maxdepth", BFS_OPTION, parse_depth_limit, false},
+	{"-mindepth", BFS_OPTION, parse_depth_limit, true},
+	{"-mmin", BFS_TEST, parse_min, BFS_STAT_MTIME},
+	{"-mnewer", BFS_TEST, parse_newer, BFS_STAT_MTIME},
+	{"-mount", BFS_OPTION, parse_mount},
+	{"-msince", BFS_TEST, parse_since, BFS_STAT_MTIME},
+	{"-mtime", BFS_TEST, parse_time, BFS_STAT_MTIME},
+	{"-name", BFS_TEST, parse_name, false},
+	{"-newer", BFS_TEST, parse_newer, BFS_STAT_MTIME},
+	{"-newer", BFS_TEST, parse_newerxy, .prefix = true},
+	{"-nocolor", BFS_OPTION, parse_color, false},
+	{"-nogroup", BFS_TEST, parse_nogroup},
+	{"-nohidden", BFS_TEST, parse_nohidden},
+	{"-noignore_readdir_race", BFS_OPTION, parse_ignore_races, false},
+	{"-noleaf", BFS_OPTION, parse_noleaf},
+	{"-not", BFS_OPERATOR},
+	{"-nouser", BFS_TEST, parse_nouser},
+	{"-nowarn", BFS_OPTION, parse_warn, false},
+	{"-o", BFS_OPERATOR},
+	{"-ok", BFS_ACTION, parse_exec, BFS_EXEC_CONFIRM},
+	{"-okdir", BFS_ACTION, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
+	{"-or", BFS_OPERATOR},
+	{"-path", BFS_TEST, parse_path, false},
+	{"-perm", BFS_TEST, parse_perm},
+	{"-print", BFS_ACTION, parse_print},
+	{"-print0", BFS_ACTION, parse_print0},
+	{"-printf", BFS_ACTION, parse_printf},
+	{"-printx", BFS_ACTION, parse_printx},
+	{"-prune", BFS_ACTION, parse_prune},
+	{"-quit", BFS_ACTION, parse_quit},
+	{"-readable", BFS_TEST, parse_access, R_OK},
+	{"-regex", BFS_TEST, parse_regex, 0},
+	{"-regextype", BFS_OPTION, parse_regextype},
+	{"-rm", BFS_ACTION, parse_delete},
+	{"-s", BFS_FLAG, parse_s},
+	{"-samefile", BFS_TEST, parse_samefile},
+	{"-since", BFS_TEST, parse_since, BFS_STAT_MTIME},
+	{"-size", BFS_TEST, parse_size},
+	{"-sparse", BFS_TEST, parse_sparse},
+	{"-status", BFS_OPTION, parse_status},
+	{"-true", BFS_TEST, parse_const, true},
+	{"-type", BFS_TEST, parse_type, false},
+	{"-uid", BFS_TEST, parse_user},
+	{"-unique", BFS_OPTION, parse_unique},
+	{"-used", BFS_TEST, parse_used},
+	{"-user", BFS_TEST, parse_user},
+	{"-version", BFS_ACTION, parse_version},
+	{"-warn", BFS_OPTION, parse_warn, true},
+	{"-wholename", BFS_TEST, parse_path, false},
+	{"-writable", BFS_TEST, parse_access, W_OK},
+	{"-x", BFS_FLAG, parse_xdev},
+	{"-xattr", BFS_TEST, parse_xattr},
+	{"-xattrname", BFS_TEST, parse_xattrname},
+	{"-xdev", BFS_OPTION, parse_xdev},
+	{"-xtype", BFS_TEST, parse_type, true},
 	{0},
 };
 
@@ -3129,7 +3104,7 @@ static const struct table_entry parse_table[] = {
 static const struct table_entry *table_lookup(const char *arg) {
 	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
 		bool match;
-		if (entry->info & T_PREFIX) {
+		if (entry->prefix) {
 			match = strncmp(arg, entry->arg, strlen(entry->arg)) == 0;
 		} else {
 			match = strcmp(arg, entry->arg) == 0;
@@ -3145,8 +3120,8 @@ static const struct table_entry *table_lookup(const char *arg) {
 /** Look up a single-character flag in the parse table. */
 static const struct table_entry *flag_lookup(char flag) {
 	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
-		enum token_info type = entry->info & T_TYPE;
-		if (type == T_FLAG && entry->arg[1] == flag && !entry->arg[2]) {
+		enum bfs_kind kind = entry->kind;
+		if (kind == BFS_FLAG && entry->arg[1] == flag && !entry->arg[2]) {
 			return entry;
 		}
 	}
@@ -3178,14 +3153,12 @@ static bool is_flag_group(const char *arg) {
 			return false;
 		}
 
-		if (entry->info & T_PREFIX) {
+		if (entry->prefix) {
 			// The rest is the flag's argument
 			break;
 		}
 
-		if (entry->info & T_NEEDS_ARG) {
-			needs_arg = true;
-		}
+		needs_arg |= entry->needs_arg;
 	}
 
 	return has_upper;
@@ -3209,7 +3182,7 @@ static struct bfs_expr *parse_flag_group(struct bfs_parser *parser) {
 			end = parser->argv;
 		}
 
-		if (!expr || entry->info & T_PREFIX) {
+		if (!expr || entry->prefix) {
 			break;
 		}
 	}
@@ -3269,11 +3242,11 @@ static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
 
 	CFILE *cerr = ctx->cerr;
 	parse_error(parser, "Unknown argument; did you mean ");
-	switch (match->info & T_TYPE) {
-	case T_FLAG:
+	switch (match->kind) {
+	case BFS_FLAG:
 		cfprintf(cerr, "${cyn}%s${rs}?", match->arg);
 		break;
-	case T_OPERATOR:
+	case BFS_OPERATOR:
 		cfprintf(cerr, "${red}%s${rs}?", match->arg);
 		break;
 	default:
@@ -3323,7 +3296,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 	}
 
 	if (strcmp(arg, "(") == 0) {
-		parser_advance(parser, T_OPERATOR, 1);
+		parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *expr = parse_expr(parser);
 		if (!expr) {
@@ -3340,7 +3313,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 			return NULL;
 		}
 
-		parser_advance(parser, T_OPERATOR, 1);
+		parser_advance(parser, BFS_OPERATOR, 1);
 		return expr;
 	} else if (strcmp(arg, "-exclude") == 0) {
 		if (parser->excluding) {
@@ -3348,7 +3321,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 			return NULL;
 		}
 
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 		parser->excluding = true;
 
 		struct bfs_expr *factor = parse_factor(parser);
@@ -3359,9 +3332,9 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 		parser->excluding = false;
 
 		bfs_expr_append(parser->ctx->exclude, factor);
-		return parse_new_expr(parser, eval_true, parser->argv - argv, argv);
+		return parse_new_expr(parser, eval_true, parser->argv - argv, argv, BFS_OPERATOR);
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *factor = parse_factor(parser);
 		if (!factor) {
@@ -3401,7 +3374,7 @@ static struct bfs_expr *parse_term(struct bfs_parser *parser) {
 
 		char **argv = &fake_and_arg;
 		if (strcmp(arg, "-a") == 0 || strcmp(arg, "-and") == 0) {
-			argv = parser_advance(parser, T_OPERATOR, 1);
+			argv = parser_advance(parser, BFS_OPERATOR, 1);
 		}
 
 		struct bfs_expr *lhs = term;
@@ -3438,7 +3411,7 @@ static struct bfs_expr *parse_clause(struct bfs_parser *parser) {
 			break;
 		}
 
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *lhs = clause;
 		struct bfs_expr *rhs = parse_term(parser);
@@ -3473,7 +3446,7 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser) {
 			break;
 		}
 
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *lhs = expr;
 		struct bfs_expr *rhs = parse_clause(parser);
@@ -3501,7 +3474,7 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 	if (parser->argv[0]) {
 		expr = parse_expr(parser);
 	} else {
-		expr = parse_new_expr(parser, eval_true, 1, &fake_true_arg);
+		expr = parse_new_expr(parser, eval_true, 1, &fake_true_arg, BFS_TEST);
 	}
 	if (!expr) {
 		return NULL;
@@ -3521,7 +3494,7 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 			return NULL;
 		}
 
-		struct bfs_expr *print = parse_new_expr(parser, eval_fprint, 1, &fake_print_arg);
+		struct bfs_expr *print = parse_new_expr(parser, eval_fprint, 1, &fake_print_arg, BFS_ACTION);
 		if (!print) {
 			return NULL;
 		}
@@ -3803,7 +3776,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.now = ctx->now,
 	};
 
-	ctx->exclude = parse_new_expr(&parser, eval_or, 1, &fake_or_arg);
+	ctx->exclude = parse_new_expr(&parser, eval_or, 1, &fake_or_arg, BFS_OPERATOR);
 	if (!ctx->exclude) {
 		goto fail;
 	}
