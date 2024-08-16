@@ -1380,8 +1380,6 @@ struct callback_args {
 	struct bfs_bar *bar;
 	/** The time of the last status update. */
 	struct timespec last_status;
-	/** SIGINFO hook. */
-	struct sighook *info_hook;
 	/** Flag set by SIGINFO hook. */
 	atomic bool info_flag;
 
@@ -1670,7 +1668,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 #else
 	int siginfo = SIGUSR1;
 #endif
-	args.info_hook = sighook(siginfo, eval_siginfo, &args, SH_CONTINUE);
+	struct sighook *info_hook = sighook(siginfo, eval_siginfo, &args, SH_CONTINUE);
 
 	struct trie seen;
 	if (ctx->unique) {
@@ -1739,7 +1737,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 		trie_destroy(&seen);
 	}
 
-	sigunhook(args.info_hook);
+	sigunhook(info_hook);
 	bfs_bar_hide(args.bar);
 
 	return args.ret;
