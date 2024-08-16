@@ -1,10 +1,10 @@
 4.*
 ===
 
-**Unreleased**
-
 4.0
 ---
+
+**August 16, 2024**
 
 ### New features
 
