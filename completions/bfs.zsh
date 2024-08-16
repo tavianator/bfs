@@ -42,6 +42,7 @@ args=(
     '*-maxdepth[ignore files deeper than N]:maximum search depth'
     '*-mindepth[ignore files shallower than N]:minimum search depth'
     "*-mount[don't descend into other mount points]"
+    '*-noerror[ignore any errors that occur during traversal]'
     '*-nohidden[exclude hidden files]'
     '*-noleaf[ignored, for compatibility with GNU find]'
     '-regextype[type of regex to use, default posix-basic]:regexp syntax:(help posix-basic posix-extended ed emacs grep sed)'

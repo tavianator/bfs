@@ -53,6 +53,8 @@ struct bfs_eval {
 	enum bftw_action action;
 	/** The bfs_eval() return value. */
 	int *ret;
+	/** The number of errors that have occurred. */
+	size_t *nerrors;
 	/** Whether to quit immediately. */
 	bool quit;
 };
@@ -62,10 +64,16 @@ struct bfs_eval {
  */
 _printf(2, 3)
 static void eval_error(struct bfs_eval *state, const char *format, ...) {
+	const struct bfs_ctx *ctx = state->ctx;
+
+	++*state->nerrors;
+	if (ctx->ignore_errors) {
+		return;
+	}
+
 	// By POSIX, any errors should be accompanied by a non-zero exit status
 	*state->ret = EXIT_FAILURE;
 
-	const struct bfs_ctx *ctx = state->ctx;
 	CFILE *cerr = ctx->cerr;
 
 	bfs_error(ctx, "%pP: ", state->ftwbuf);
@@ -1389,6 +1397,8 @@ struct callback_args {
 	/** The set of seen files. */
 	struct trie *seen;
 
+	/** The number of errors that have occurred. */
+	size_t nerrors;
 	/** Eventual return value from bfs_eval(). */
 	int ret;
 };
@@ -1407,6 +1417,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	state.ctx = ctx;
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
+	state.nerrors = &args->nerrors;
 	state.quit = false;
 
 	// Check whether SIGINFO was delivered and show/hide the bar
@@ -1739,6 +1750,10 @@ int bfs_eval(struct bfs_ctx *ctx) {
 
 	sigunhook(info_hook);
 	bfs_bar_hide(args.bar);
+
+	if (args.nerrors > 0) {
+		bfs_warning(ctx, "suppressed errors: %zu\n", args.nerrors);
+	}
 
 	return args.ret;
 }

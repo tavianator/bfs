@@ -99,6 +99,7 @@ _bfs() {
         -ignore_readdir_race
         -mount
         -nocolor
+        -noerror
         -noignore_readdir_race
         -noleaf
         -nowarn

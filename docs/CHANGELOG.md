@@ -16,6 +16,9 @@
   For example, `bfs -newermt @946684800` will print files modified since January 1, 2000 (UTC).
   ([`c6bb003`](https://github.com/tavianator/bfs/commit/c6bb003b8882e9a16941f5803d072ec1cb728318))
 
+- The new `-noerror` option suppresses all error messages during traversal.
+  ([#142](https://github.com/tavianator/bfs/issues/142))
+
 ### Changes
 
 - `-mount` now excludes mount points entirely, to comply with the recently published POSIX 2024 standard.

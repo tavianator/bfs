@@ -43,6 +43,7 @@ complete -c bfs -o noignore_readdir_race -d "Report an error if the file tree is
 complete -c bfs -o maxdepth -d "Ignore files deeper than specified number" -x
 complete -c bfs -o mindepth -d "Ignore files shallower than specified number" -x
 complete -c bfs -o mount -d "Don't descend into other mount points"
+complete -c bfs -o noerror -d "Ignore any errors that occur during traversal"
 complete -c bfs -o nohidden -d "Exclude hidden files and directories"
 complete -c bfs -o noleaf -d "Ignored; for compatibility with GNU find"
 complete -c bfs -o regextype -d "Use specified flavored regex" -a $regex_type_comp -x

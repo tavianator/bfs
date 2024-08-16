@@ -75,6 +75,8 @@ struct bfs_ctx {
 	bool interactive;
 	/** Whether to print warnings (-warn/-nowarn). */
 	bool warn;
+	/** Whether to report errors (-noerror). */
+	bool ignore_errors;
 	/** Whether any dangerous actions (-delete/-exec) are present. */
 	bool dangerous;
 

@@ -1817,6 +1817,14 @@ static struct bfs_expr *parse_newerxy(struct bfs_parser *parser, int arg1, int a
 }
 
 /**
+ * Parse -noerror.
+ */
+static struct bfs_expr *parse_noerror(struct bfs_parser *parser, int arg1, int arg2) {
+	parser->ctx->ignore_errors = true;
+	return parse_nullary_option(parser);
+}
+
+/**
  * Parse -nogroup.
  */
 static struct bfs_expr *parse_nogroup(struct bfs_parser *parser, int arg1, int arg2) {
@@ -2759,6 +2767,8 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
 	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs} for now, but will\n");
 	cfprintf(cout, "      skip mount points entirely in the future)\n");
+	cfprintf(cout, "  ${blu}-noerror${rs}\n");
+	cfprintf(cout, "      Ignore any errors that occur during traversal\n");
 	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
 	cfprintf(cout, "      Exclude hidden files\n");
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
@@ -3053,6 +3063,7 @@ static const struct table_entry parse_table[] = {
 	{"-newer", BFS_TEST, parse_newer, BFS_STAT_MTIME},
 	{"-newer", BFS_TEST, parse_newerxy, .prefix = true},
 	{"-nocolor", BFS_OPTION, parse_color, false},
+	{"-noerror", BFS_OPTION, parse_noerror},
 	{"-nogroup", BFS_TEST, parse_nogroup},
 	{"-nohidden", BFS_TEST, parse_nohidden},
 	{"-noignore_readdir_race", BFS_OPTION, parse_ignore_races, false},
