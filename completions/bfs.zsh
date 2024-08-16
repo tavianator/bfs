@@ -41,7 +41,7 @@ args=(
     '*-noignore_readdir_race[do not report an error if bfs detects file tree is modified during search]'
     '*-maxdepth[ignore files deeper than N]:maximum search depth'
     '*-mindepth[ignore files shallower than N]:minimum search depth'
-    "*-mount[don't descend into other mount points]"
+    "*-mount[exclude mount points]"
     '*-noerror[ignore any errors that occur during traversal]'
     '*-nohidden[exclude hidden files]'
     '*-noleaf[ignored, for compatibility with GNU find]'

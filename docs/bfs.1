@@ -316,9 +316,7 @@ Ignore files deeper/shallower than
 .RE
 .TP
 .B \-mount
-Don't descend into other mount points (same as
-.B \-xdev
-for now, but will skip mount points entirely in the future).
+Exclude mount points entirely from the results.
 .TP
 .B \-noerror
 Ignore any errors that occur during traversal.
@@ -384,6 +382,9 @@ Turn on or off warnings about the command line.
 .TP
 .B \-xdev
 Don't descend into other mount points.
+Unlike
+.BR \-mount ,
+the mount point itself is still included.
 .SH TESTS
 .TP
 .B \-acl

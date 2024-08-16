@@ -2765,8 +2765,7 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
 	cfprintf(cout, "      Ignore files deeper/shallower than ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
-	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs} for now, but will\n");
-	cfprintf(cout, "      skip mount points entirely in the future)\n");
+	cfprintf(cout, "      Exclude mount points entirely from the results\n");
 	cfprintf(cout, "  ${blu}-noerror${rs}\n");
 	cfprintf(cout, "      Ignore any errors that occur during traversal\n");
 	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
