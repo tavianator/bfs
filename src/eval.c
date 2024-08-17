@@ -1752,7 +1752,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	bfs_bar_hide(args.bar);
 
 	if (args.nerrors > 0) {
-		bfs_warning(ctx, "suppressed errors: %zu\n", args.nerrors);
+		bfs_warning(ctx, "Suppressed errors: %zu\n", args.nerrors);
 	}
 
 	return args.ret;
