@@ -50,7 +50,7 @@ struct arc {
 	void *ptr;
 
 #if BFS_POSIX_SEMAPHORES >= 0
-	/** A semaphore for arc_wake(). */
+	/** A semaphore for arc_wait(). */
 	sem_t sem;
 	/** sem_init() result. */
 	int sem_status;
