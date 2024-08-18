@@ -269,12 +269,7 @@ setup() {
             )
         done
 
-        # $SETUP_DIR contains `:` so it won't work in $PATH
-        # Work around this with a symlink
-        tmp=$(as-user mktemp)
-        as-user ln -sf "$bin" "$tmp"
-        defer rm "$tmp"
-        export PATH="$tmp:$PATH"
+        export PATH="$bin:$PATH"
     fi
 
     export_array BFS
