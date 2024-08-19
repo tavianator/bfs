@@ -1751,7 +1751,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	sigunhook(info_hook);
 	bfs_bar_hide(args.bar);
 
-	if (args.nerrors > 0) {
+	if (ctx->ignore_errors && args.nerrors > 0) {
 		bfs_warning(ctx, "Suppressed errors: %zu\n", args.nerrors);
 	}
 
