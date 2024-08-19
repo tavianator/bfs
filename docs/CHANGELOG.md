@@ -1,6 +1,17 @@
 4.*
 ===
 
+4.0.1
+-----
+
+**August 19, 2024**
+
+### Bug fixes
+
+- `bfs` no longer prints a "suppressed errors" warning unless `-noerror` is actually suppressing errors
+  [`5d03c9d`](https://github.com/tavianator/bfs/commit/5d03c9d460d1c1afcdf062d494537986ce96a690)
+
+
 4.0
 ---
 
