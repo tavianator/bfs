@@ -6,7 +6,7 @@ jobs:
   linux:
     name: Linux
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +68,7 @@ jobs:
   freebsd:
     name: FreeBSD
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -97,7 +97,7 @@ jobs:
   openbsd:
     name: OpenBSD
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -126,7 +126,7 @@ jobs:
   netbsd:
     name: NetBSD
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -156,10 +156,15 @@ jobs:
   dragonflybsd:
     name: DragonFly BSD
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
+
+      # Work around https://github.com/vmactions/freebsd-vm/issues/83
+      - name: Fix pip
+        run: |
+          sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED
 
       - name: Run tests
         uses: vmactions/dragonflybsd-vm@v1
@@ -192,10 +197,15 @@ jobs:
   omnios:
     name: OmniOS
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
+
+      # Work around https://github.com/vmactions/freebsd-vm/issues/83
+      - name: Fix pip
+        run: |
+          sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED
 
       - name: Run tests
         uses: vmactions/omnios-vm@v1
