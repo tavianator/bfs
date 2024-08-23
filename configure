@@ -13,7 +13,7 @@ help() {
 Usage:
 
   \$ $0 [--enable-*|--disable-*] [--with-*|--without-*] [CC=...] [...]
-  \$ $MAKE $j
+  \$ $MAKE -j$(nproc)
 
 Variables set in the environment or on the command line will be picked up:
 
@@ -61,7 +61,7 @@ Packaging:
 This script is a thin wrapper around a makefile-based configuration system.
 Any other arguments will be passed directly to the $MAKE invocation, e.g.
 
-  \$ $0 $j V=1
+  \$ $0 -j$(nproc) V=1
 EOF
 }
 
