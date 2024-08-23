@@ -138,6 +138,10 @@ extern const char bfs_ldlibs[];
 #  define __has_attribute(attr) false
 #endif
 
+#ifndef __has_builtin
+#  define __has_builtin(builtin) false
+#endif
+
 // Fundamental utilities
 
 /**
