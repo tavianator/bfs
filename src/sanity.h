@@ -11,18 +11,6 @@
 #include "prelude.h"
 #include <stddef.h>
 
-#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
-#  define SANITIZE_ADDRESS true
-#endif
-
-#if __has_feature(memory_sanitizer) || defined(__SANITIZE_MEMORY__)
-#  define SANITIZE_MEMORY true
-#endif
-
-#if __has_feature(thread_sanitizer) || defined(__SANITIZE_THREAD__)
-#  define SANITIZE_THREAD true
-#endif
-
 // Call macro(ptr, size) or macro(ptr, sizeof(*ptr))
 #define SANITIZE_CALL(...) \
 	SANITIZE_CALL_(__VA_ARGS__, )
@@ -33,7 +21,7 @@
 #define SANITIZE_CALL__(macro, ptr, size, ...) \
 	macro(ptr, size)
 
-#if SANITIZE_ADDRESS
+#if __SANITIZE_ADDRESS__
 #  include <sanitizer/asan_interface.h>
 
 /**
@@ -55,7 +43,7 @@
 #  define sanitize_free sanitize_uninit
 #endif
 
-#if SANITIZE_MEMORY
+#if __SANITIZE_MEMORY__
 #  include <sanitizer/msan_interface.h>
 
 /**
@@ -85,7 +73,7 @@
 /**
  * Initialize a variable, unless sanitizers would detect uninitialized uses.
  */
-#if SANITIZE_MEMORY
+#if __SANITIZE_MEMORY__
 #  define uninit(value)
 #else
 #  define uninit(value) = value

@@ -9,7 +9,6 @@
 #define BFS_ATOMIC_H
 
 #include "prelude.h"
-#include "sanity.h"
 #include <stdatomic.h>
 
 /**
@@ -87,7 +86,7 @@
 /**
  * Shorthand for atomic_thread_fence().
  */
-#if SANITIZE_THREAD
+#if __SANITIZE_THREAD__
 // TSan doesn't support fences: https://github.com/google/sanitizers/issues/1415
 #  define thread_fence(obj, order) \
 	fetch_add(obj, 0, order)

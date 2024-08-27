@@ -9,7 +9,6 @@
 #define BFS_BFSTD_H
 
 #include "prelude.h"
-#include "sanity.h"
 #include <stddef.h>
 
 #include <ctype.h>
@@ -18,7 +17,7 @@
  * Work around https://github.com/llvm/llvm-project/issues/65532 by forcing a
  * function, not a macro, to be called.
  */
-#if __FreeBSD__ && SANITIZE_MEMORY
+#if __FreeBSD__ && __SANITIZE_MEMORY__
 #  define BFS_INTERCEPT(fn) (fn)
 #else
 #  define BFS_INTERCEPT(fn) fn

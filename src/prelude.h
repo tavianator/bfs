@@ -156,6 +156,18 @@ extern const char bfs_ldlibs[];
 #  define __has_builtin(builtin) false
 #endif
 
+// Sanitizer macros (GCC defines these but Clang does not)
+
+#if __has_feature(address_sanitizer) && !defined(__SANITIZE_ADDRESS__)
+#  define __SANITIZE_ADDRESS__ true
+#endif
+#if __has_feature(memory_sanitizer) && !defined(__SANITIZE_MEMORY__)
+#  define __SANITIZE_MEMORY__ true
+#endif
+#if __has_feature(thread_sanitizer) && !defined(__SANITIZE_THREAD__)
+#  define __SANITIZE_THREAD__ true
+#endif
+
 // Fundamental utilities
 
 /**

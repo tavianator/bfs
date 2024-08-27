@@ -324,7 +324,7 @@ const char *xstrerror(int errnum) {
 
 	// On FreeBSD with MemorySanitizer, duplocale() triggers
 	// https://github.com/llvm/llvm-project/issues/65532
-#if BFS_HAS_STRERROR_L && !(__FreeBSD__ && SANITIZE_MEMORY)
+#if BFS_HAS_STRERROR_L && !(__FreeBSD__ && __SANITIZE_MEMORY__)
 #  if BFS_HAS_USELOCALE
 	locale_t loc = uselocale((locale_t)0);
 #  else
@@ -715,14 +715,14 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 }
 
 long xsysconf(int name) {
-#if __FreeBSD__ && SANITIZE_MEMORY
+#if __FreeBSD__ && __SANITIZE_MEMORY__
 	// Work around https://github.com/llvm/llvm-project/issues/88163
 	__msan_scoped_disable_interceptor_checks();
 #endif
 
 	long ret = sysconf(name);
 
-#if __FreeBSD__ && SANITIZE_MEMORY
+#if __FreeBSD__ && __SANITIZE_MEMORY__
 	__msan_scoped_enable_interceptor_checks();
 #endif
 
