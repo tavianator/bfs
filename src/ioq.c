@@ -180,8 +180,7 @@ typedef atomic uintptr_t ioq_slot;
 /** Amount to add for an additional skip. */
 #define IOQ_SKIP_ONE (~IOQ_BLOCKED)
 
-// Need room for two flag bits
-bfs_static_assert(alignof(struct ioq_ent) >= (1 << 2));
+static_assert(alignof(struct ioq_ent) >= (1 << 2), "struct ioq_ent is underaligned");
 
 /**
  * An MPMC queue of I/O commands.

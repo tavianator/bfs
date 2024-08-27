@@ -13,16 +13,6 @@
 #include <stdarg.h>
 
 /**
- * static_assert() with an optional second argument.
- */
-#if __STDC_VERSION__ >= C23
-#  define bfs_static_assert static_assert
-#else
-#  define bfs_static_assert(...) bfs_static_assert_(__VA_ARGS__, #__VA_ARGS__, )
-#  define bfs_static_assert_(expr, msg, ...) _Static_assert(expr, msg)
-#endif
-
-/**
  * A source code location.
  */
 struct bfs_loc {

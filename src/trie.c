@@ -90,7 +90,7 @@
 #include <stdint.h>
 #include <string.h>
 
-bfs_static_assert(CHAR_WIDTH == 8);
+static_assert(CHAR_WIDTH == 8, "This trie implementation assumes 8-bit bytes.");
 
 #if __i386__ || __x86_64__
 #  define _trie_clones _target_clones("popcnt", "default")
