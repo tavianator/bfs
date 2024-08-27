@@ -9,7 +9,6 @@
 #include "tests.h"
 #include "bfstd.h"
 #include "color.h"
-#include "thread.h"
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -11,14 +11,6 @@
 #include "prelude.h"
 #include <pthread.h>
 
-#if __STDC_VERSION__ < C23 && !defined(thread_local)
-#  if BFS_USE_THREADS_H
-#    include <threads.h>
-#  else
-#    define thread_local _Thread_local
-#  endif
-#endif
-
 /** Thread entry point type. */
 typedef void *thread_fn(void *arg);
 

@@ -19,10 +19,24 @@
 // Get the static_assert() definition as well as __GLIBC__
 #include <assert.h>
 
+// Get the convenience macros that became standard spellings in C23
 #if __STDC_VERSION__ < C23
-#  include <stdalign.h>
-#  include <stdbool.h>
-#endif
+
+/** _Alignas(), _Alignof() => alignas(), alignof() */
+#include <stdalign.h>
+/** _Bool => bool, true, false */
+#include <stdbool.h>
+
+/**
+ * C23 deprecates `noreturn void` in favour of `[[noreturn]] void`, so we expose
+ * _noreturn instead with the other attributes.
+ */
+// #include <stdnoreturn.h>
+
+/** Part of <threads.h>, but we don't use anything else from it. */
+#define thread_local _Thread_local
+
+#endif // !C23
 
 // bfs packaging configuration
 
