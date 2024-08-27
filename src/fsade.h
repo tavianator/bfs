@@ -17,7 +17,9 @@
 
 #define BFS_CAN_CHECK_CONTEXT BFS_WITH_LIBSELINUX
 
-#define BFS_CAN_CHECK_XATTRS (BFS_USE_SYS_EXTATTR_H || BFS_USE_SYS_XATTR_H)
+#if __has_include(<sys/extattr.h>) || __has_include(<sys/xattr.h>)
+#  define BFS_CAN_CHECK_XATTRS true
+#endif
 
 struct BFTW;
 

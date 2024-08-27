@@ -25,7 +25,7 @@
 #  define BFS_USE_STATX (BFS_HAS_STATX || BFS_HAS_STATX_SYSCALL)
 #endif
 
-#if BFS_USE_SYS_PARAM_H
+#if __has_include(<sys/param.h>)
 #  include <sys/param.h>
 #endif
 

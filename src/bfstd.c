@@ -27,13 +27,13 @@
 #include <unistd.h>
 #include <wchar.h>
 
-#if BFS_USE_SYS_SYSMACROS_H
+#if __has_include(<sys/sysmacros.h>)
 #  include <sys/sysmacros.h>
-#elif BFS_USE_SYS_MKDEV_H
+#elif __has_include(<sys/mkdev.h>)
 #  include <sys/mkdev.h>
 #endif
 
-#if BFS_USE_UTIL_H
+#if __has_include(<util.h>)
 #  include <util.h>
 #endif
 

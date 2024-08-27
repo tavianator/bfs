@@ -16,7 +16,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#if BFS_USE_PATHS_H
+#if __has_include(<paths.h>)
 #  include <paths.h>
 #endif
 

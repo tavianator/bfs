@@ -12,7 +12,7 @@
 #include <limits.h>
 #include <stdint.h>
 
-#if BFS_HAS_STDBIT_H
+#if __has_include(<stdbit.h>)
 #  include <stdbit.h>
 #endif
 
