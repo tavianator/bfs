@@ -159,6 +159,8 @@ distcheck:
 	@+test "$$(uname)" = FreeBSD || ${MAKE} distcheck-tsan
 	@+test "$$(uname)-$$(uname -m)" != Linux-x86_64 || ${MAKE} distcheck-m32
 	@+${MAKE} distcheck-release
+	@+${MAKE} -C distcheck-release check-install
+	@+test "$$(uname)" != Linux || ${MAKE} check-man
 .PHONY: distcheck
 
 # Per-distcheck configuration
@@ -229,6 +231,6 @@ clean::
 
 # Clean everything, including generated files
 distclean: clean
-	${MSG} "[ RM ] gen" \
+	${MSG} "[ RM ] gen distcheck-*" \
 	    ${RM} -r gen ${DISTCHECKS}
 .PHONY: distclean
