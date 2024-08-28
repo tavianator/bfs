@@ -123,6 +123,13 @@ gen/flags.mk: ${AUTO_FLAGS}
 	${VCAT} $@
 .PHONY: gen/flags.mk
 
+# Check that the C compiler works at all
+cc::
+	@build/cc.sh -q build/empty.c -o gen/.cc.out; \
+	    ret=$$?; \
+	    build/msg-if.sh "[ CC ] build/empty.c" test $$ret -eq 0; \
+	    exit $$ret
+
 # The short name of the config test
 SLUG = ${@:gen/%.mk=%}
 # The source file to build
@@ -130,7 +137,8 @@ CSRC = build/${SLUG}.c
 # The hidden output file name
 OUT = ${SLUG:flags/%=gen/flags/.%.out}
 
-${AUTO_FLAGS}::
+${AUTO_FLAGS}: cc
 	@${MKDIR} ${@D}
 	@build/flags-if.sh ${CSRC} -o ${OUT} >$@ 2>$@.log; \
 	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
+.PHONY: ${AUTO_FLAGS}

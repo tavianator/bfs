@@ -5,5 +5,12 @@
 
 # Run the compiler and check if it succeeded
 
-set -eux
+set -eu
+
+if [ "$1" = "-q" ]; then
+    shift
+else
+    set -x
+fi
+
 $XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS "$@" $XLDLIBS
