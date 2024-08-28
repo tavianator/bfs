@@ -7,6 +7,9 @@
 
 set -eu
 
+# Get the relative path to the source tree based on how the script was run
+DIR=$(dirname -- "$0")
+
 # Print the help message
 help() {
     cat <<EOF
@@ -57,6 +60,8 @@ Packaging:
       Set the installation prefix (default: /usr)
   --mandir=/path
       Set the man page directory (default: \$PREFIX/share/man)
+  --version=X.Y.Z
+      Set the version string (default: $("$DIR/build/version.sh"))
 
 This script is a thin wrapper around a makefile-based configuration system.
 Any other arguments will be passed directly to the $MAKE invocation, e.g.
@@ -134,7 +139,7 @@ for arg; do
                     printf 'warning: Treating "%s" like "%s"\n' "$old" "$arg" >&2
                     ;;
             esac
-        ;;
+            ;;
     esac
 
     case "$arg" in
@@ -165,7 +170,7 @@ for arg; do
             esac
             ;;
 
-        --prefix=*|--mandir=*)
+        --prefix=*|--mandir=*|--version=*)
             set -- "$@" "$NAME=$value"
             ;;
 
@@ -187,9 +192,6 @@ for arg; do
             ;;
     esac
 done
-
-# Get the relative path to the source tree based on how the script was run
-DIR=$(dirname -- "$0")
 
 # Set up symbolic links for out-of-tree builds
 for f in Makefile build completions docs src tests; do

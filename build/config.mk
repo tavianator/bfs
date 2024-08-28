@@ -38,6 +38,7 @@ gen/vars.mk::
 	@printf 'MKDIR := %s\n' "$$XMKDIR" >>$@
 	@printf 'PKG_CONFIG := %s\n' "$$XPKG_CONFIG" >>$@
 	@printf 'RM := %s\n' "$$XRM" >>$@
+	@test -z "$$VERSION" || printf 'export VERSION=%s\n' "$$VERSION" >>$@
 	${VCAT} $@
 
 # Sets the build flags.  This depends on vars.mk and uses a recursive make so
