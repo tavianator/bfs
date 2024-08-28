@@ -7,11 +7,15 @@
 
 set -eu
 
-OLD_FLAGS="$XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS $XLDLIBS"
-NEW_FLAGS=$(sed -n '\|^///|{s|^/// ||; s|[^=]*= ||; p;}' "$1")
-build/cc.sh "$@" $NEW_FLAGS || exit 1
+build/cc.sh "$@" || exit 1
 
-# De-duplicate against the existing flags
+# If the build succeeded, print any lines like
+#
+#     /// _CFLAGS += -foo
+#
+# (unless they're already set)
+OLD_FLAGS="$XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS $XLDLIBS"
+
 while IFS="" read -r line; do
     case "$line" in
         ///*=*)

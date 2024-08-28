@@ -34,10 +34,10 @@ if [ -z "$MODE" ]; then
             n|0) exit 1 ;;
         esac
 
-        CFLAGS=$("$0" --cflags "$LIB") || exit 1
-        LDFLAGS=$("$0" --ldflags "$LIB") || exit 1
-        LDLIBS=$("$0" --ldlibs "$LIB") || exit 1
-        build/cc.sh $CFLAGS $LDFLAGS "build/with/$LIB.c" $LDLIBS -o "gen/with/.$LIB.out" || exit 1
+        XCFLAGS="$XCFLAGS $("$0" --cflags "$LIB")" || exit 1
+        XLDFLAGS="$XLDFLAGS $("$0" --ldflags "$LIB")" || exit 1
+        XLDLIBS="$("$0" --ldlibs "$LIB") $XLDLIBS" || exit 1
+        build/cc.sh "build/with/$LIB.c" -o "gen/with/.$LIB.out" || exit 1
     done
 fi
 
@@ -92,5 +92,5 @@ done
 case "$MODE" in
     --ldlibs)
         printf '%s\n' "$LDLIBS"
-    ;;
+        ;;
 esac
