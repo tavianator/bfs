@@ -8,8 +8,6 @@
 #ifndef BFS_H
 #define BFS_H
 
-#include "prelude.h"
-
 // Standard versions
 
 /** Possible __STDC_VERSION__ values. */

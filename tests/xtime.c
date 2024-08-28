@@ -1,12 +1,11 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
+#include "tests.h"
 
 #include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
-#include "tests.h"
 #include "xtime.h"
 
 #include <errno.h>

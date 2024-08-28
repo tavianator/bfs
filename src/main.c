@@ -20,6 +20,7 @@
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
+ *     - prelude.h     (feature test macros; automatically included)
  *     - alloc.[ch]    (memory allocation)
  *     - atomic.h      (atomic operations)
  *     - bar.[ch]      (a terminal status bar)
@@ -27,7 +28,6 @@
  *     - bfs.h         (configuration and fundamental utilities)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
- *     - prelude.h     (configuration and feature/platform detection)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
@@ -47,8 +47,6 @@
  *     - xspawn.[ch]   (spawns processes)
  *     - xtime.[ch]    (date/time handling utilities)
  */
-
-#include "prelude.h"
 
 #include "bfstd.h"
 #include "ctx.h"

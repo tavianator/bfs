@@ -17,7 +17,6 @@
  * drop to zero.  Once it does, the old pointer can be safely freed.
  */
 
-#include "prelude.h"
 #include "sighook.h"
 
 #include "alloc.h"

@@ -8,8 +8,6 @@
 #ifndef BFS_THREAD_H
 #define BFS_THREAD_H
 
-#include "prelude.h"
-
 #include <pthread.h>
 
 /** Thread entry point type. */

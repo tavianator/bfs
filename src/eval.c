@@ -5,7 +5,6 @@
  * Implementation of all the primary expressions.
  */
 
-#include "prelude.h"
 #include "eval.h"
 
 #include "atomic.h"

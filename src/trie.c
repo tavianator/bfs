@@ -81,7 +81,6 @@
  * and insert intermediate singleton "jump" nodes when necessary.
  */
 
-#include "prelude.h"
 #include "trie.h"
 
 #include "alloc.h"

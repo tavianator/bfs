@@ -8,8 +8,6 @@
 #ifndef BFS_EXPR_H
 #define BFS_EXPR_H
 
-#include "prelude.h"
-
 #include "color.h"
 #include "eval.h"
 #include "stat.h"

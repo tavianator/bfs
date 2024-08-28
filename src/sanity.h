@@ -8,8 +8,6 @@
 #ifndef BFS_SANITY_H
 #define BFS_SANITY_H
 
-#include "prelude.h"
-
 #include <stddef.h>
 
 // Call macro(ptr, size) or macro(ptr, sizeof(*ptr))

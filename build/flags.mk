@@ -7,19 +7,7 @@ include build/prelude.mk
 include gen/vars.mk
 
 # Internal flags
-_CPPFLAGS := \
-    -Isrc \
-    -Igen \
-    -D__EXTENSIONS__ \
-    -D_ATFILE_SOURCE \
-    -D_BSD_SOURCE \
-    -D_DARWIN_C_SOURCE \
-    -D_DEFAULT_SOURCE \
-    -D_GNU_SOURCE \
-    -D_POSIX_PTHREAD_SEMANTICS \
-    -D_FILE_OFFSET_BITS=64 \
-    -D_TIME_BITS=64
-
+_CPPFLAGS := -Isrc -Igen -include src/prelude.h
 _CFLAGS := -std=c17 -pthread
 _LDFLAGS :=
 _LDLIBS :=

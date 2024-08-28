@@ -8,8 +8,6 @@
 #ifndef BFS_BIT_H
 #define BFS_BIT_H
 
-#include "prelude.h"
-
 #include "bfs.h"
 
 #include <limits.h>

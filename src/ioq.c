@@ -118,7 +118,6 @@
  * [1]: https://arxiv.org/abs/2201.02179
  */
 
-#include "prelude.h"
 #include "ioq.h"
 
 #include "alloc.h"

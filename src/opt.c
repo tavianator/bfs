@@ -25,7 +25,6 @@
  * effects are reachable at all, skipping the traversal if not.
  */
 
-#include "prelude.h"
 #include "opt.h"
 
 #include "bfs.h"

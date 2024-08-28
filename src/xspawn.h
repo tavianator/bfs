@@ -8,8 +8,6 @@
 #ifndef BFS_XSPAWN_H
 #define BFS_XSPAWN_H
 
-#include "prelude.h"
-
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <unistd.h>

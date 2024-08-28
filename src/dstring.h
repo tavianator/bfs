@@ -8,8 +8,6 @@
 #ifndef BFS_DSTRING_H
 #define BFS_DSTRING_H
 
-#include "prelude.h"
-
 #include "bfs.h"
 #include "bfstd.h"
 

@@ -8,8 +8,6 @@
 #ifndef BFS_ALLOC_H
 #define BFS_ALLOC_H
 
-#include "prelude.h"
-
 #include "bfs.h"
 
 #include <errno.h>

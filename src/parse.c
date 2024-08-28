@@ -8,7 +8,6 @@
  * flags like always-true options, and skipping over paths wherever they appear.
  */
 
-#include "prelude.h"
 #include "parse.h"
 
 #include "alloc.h"

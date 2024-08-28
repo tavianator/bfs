@@ -5,7 +5,6 @@
  * Entry point for unit tests.
  */
 
-#include "prelude.h"
 #include "tests.h"
 
 #include "bfstd.h"

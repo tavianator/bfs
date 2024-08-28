@@ -18,7 +18,6 @@
  *   various helper functions to take fewer parameters.
  */
 
-#include "prelude.h"
 #include "bftw.h"
 
 #include "alloc.h"
