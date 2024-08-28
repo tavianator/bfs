@@ -178,11 +178,11 @@ It can be handy to generate the snapshot with a different `find` implementation 
 But keep in mind, other `find` implementations may not be correct.
 To my knowledge, no other implementation passes even the POSIX-compatible subset of the tests:
 
-    $ ./tests/tests.sh --bfs=find --posix
+    $ ./tests/tests.sh --bfs=find --sudo --posix
     ...
-    tests passed: 90
-    tests skipped: 3
-    tests failed: 6
+    [PASS] 104 / 119
+    [SKIP]   1 / 119
+    [FAIL]  14 / 119
 
 Run
 
