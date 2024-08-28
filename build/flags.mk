@@ -119,6 +119,7 @@ gen/flags.mk: ${AUTO_FLAGS}
 	@printf 'NOLIBS := %s\n' "$$XNOLIBS" >>$@
 	@test "${OS}-${SAN}" != FreeBSD-y || printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@
 	@cat ${.ALLSRC} >>$@
+	@cat ${.ALLSRC:%=%.log} >gen/flags.log
 	${VCAT} $@
 .PHONY: gen/flags.mk
 

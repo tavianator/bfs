@@ -66,7 +66,7 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	@printf '#define BFS_CONFIG_H\n' >>$@
 	@cat ${.ALLSRC} >>$@
 	@printf '#endif // BFS_CONFIG_H\n' >>$@
-	@cat gen/cc.log ${.ALLSRC:%=%.log} >gen/config.log
+	@cat gen/cc.log gen/flags.log ${.ALLSRC:%=%.log} >gen/config.log
 	${VCAT} $@
 	@printf '%s' "$$CONFFLAGS" | build/embed.sh >gen/confflags.i
 	@printf '%s' "$$XCC" | build/embed.sh >gen/cc.i
