@@ -1281,8 +1281,8 @@ static int bftw_pin_parent(struct bftw_state *state, struct bftw_file *file) {
 
 	int fd = parent->fd;
 	if (fd < 0) {
-		bfs_static_assert((int)AT_FDCWD != -1);
-		return -1;
+		// Don't confuse failures with AT_FDCWD
+		return (int)AT_FDCWD == -1 ? -2 : -1;
 	}
 
 	bftw_cache_pin(&state->cache, parent);
