@@ -68,13 +68,7 @@ ${OBJS}: gen/config.mk
 # Save the version number to this file, but only update version.c if it changes
 gen/version.i.new::
 	@${MKDIR} ${@D}
-	@if [ "$$VERSION" ]; then \
-	    printf '%s' "$$VERSION"; \
-	elif test -e src/../.git && command -v git >/dev/null 2>&1; then \
-	    git -C src/.. describe --always --dirty; \
-	else \
-	    echo "4.0.1"; \
-	fi | tr -d '\n' | build/embed.sh >$@
+	@build/version.sh | tr -d '\n' | build/embed.sh >$@
 
 gen/version.i: gen/version.i.new
 	@test -e $@ && cmp -s $@ ${.ALLSRC} && ${RM} ${.ALLSRC} || mv ${.ALLSRC} $@
