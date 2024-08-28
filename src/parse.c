@@ -10,7 +10,9 @@
 
 #include "prelude.h"
 #include "parse.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -31,6 +33,7 @@
 #include "xregex.h"
 #include "xspawn.h"
 #include "xtime.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>

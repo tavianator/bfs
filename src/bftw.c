@@ -20,7 +20,9 @@
 
 #include "prelude.h"
 #include "bftw.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "dir.h"
@@ -30,6 +32,7 @@
 #include "mtab.h"
 #include "stat.h"
 #include "trie.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>

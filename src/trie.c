@@ -83,10 +83,13 @@
 
 #include "prelude.h"
 #include "trie.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bit.h"
 #include "diag.h"
 #include "list.h"
+
 #include <stdint.h>
 #include <string.h>
 

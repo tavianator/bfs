@@ -120,14 +120,17 @@
 
 #include "prelude.h"
 #include "ioq.h"
+
 #include "alloc.h"
 #include "atomic.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bit.h"
 #include "diag.h"
 #include "dir.h"
 #include "stat.h"
 #include "thread.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>

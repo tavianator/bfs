@@ -3,10 +3,12 @@
 
 #include "prelude.h"
 #include "tests.h"
-#include "ioq.h"
+
 #include "bfstd.h"
 #include "diag.h"
 #include "dir.h"
+#include "ioq.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>

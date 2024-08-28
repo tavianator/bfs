@@ -3,8 +3,10 @@
 
 #include "prelude.h"
 #include "thread.h"
+
 #include "bfstd.h"
 #include "diag.h"
+
 #include <errno.h>
 #include <pthread.h>
 

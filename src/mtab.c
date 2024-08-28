@@ -3,10 +3,13 @@
 
 #include "prelude.h"
 #include "mtab.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "stat.h"
 #include "trie.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>

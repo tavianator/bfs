@@ -9,8 +9,10 @@
 #define BFS_IOQ_H
 
 #include "prelude.h"
+
 #include "dir.h"
 #include "stat.h"
+
 #include <stddef.h>
 
 /**

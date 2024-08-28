@@ -7,8 +7,10 @@
 
 #include "prelude.h"
 #include "eval.h"
+
 #include "atomic.h"
 #include "bar.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -27,6 +29,7 @@
 #include "stat.h"
 #include "trie.h"
 #include "xregex.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>

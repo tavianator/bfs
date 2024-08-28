@@ -9,7 +9,10 @@
 #define BFS_DIAG_H
 
 #include "prelude.h"
+
+#include "bfs.h"
 #include "bfstd.h"
+
 #include <stdarg.h>
 
 /**

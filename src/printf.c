@@ -3,7 +3,9 @@
 
 #include "prelude.h"
 #include "printf.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -16,6 +18,7 @@
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
+
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>

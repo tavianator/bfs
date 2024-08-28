@@ -3,10 +3,13 @@
 
 #include "prelude.h"
 #include "xspawn.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "list.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>

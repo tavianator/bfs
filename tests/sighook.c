@@ -3,9 +3,11 @@
 
 #include "prelude.h"
 #include "tests.h"
-#include "sighook.h"
+
 #include "atomic.h"
 #include "thread.h"
+#include "sighook.h"
+
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>

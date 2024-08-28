@@ -19,11 +19,14 @@
 
 #include "prelude.h"
 #include "sighook.h"
+
 #include "alloc.h"
 #include "atomic.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "thread.h"
+
 #include <errno.h>
 #include <signal.h>
 #include <stdlib.h>

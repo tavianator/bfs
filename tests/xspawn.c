@@ -3,10 +3,12 @@
 
 #include "prelude.h"
 #include "tests.h"
+
 #include "alloc.h"
 #include "bfstd.h"
 #include "dstring.h"
 #include "xspawn.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>

@@ -9,6 +9,9 @@
 #define BFS_ATOMIC_H
 
 #include "prelude.h"
+
+#include "bfs.h"
+
 #include <stdatomic.h>
 
 /**

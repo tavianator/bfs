@@ -3,9 +3,12 @@
 
 #include "prelude.h"
 #include "alloc.h"
+
+#include "bfs.h"
 #include "bit.h"
 #include "diag.h"
 #include "sanity.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>

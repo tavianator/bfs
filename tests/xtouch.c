@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "prelude.h"
+
 #include "bfstd.h"
 #include "sanity.h"
 #include "xtime.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

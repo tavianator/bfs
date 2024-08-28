@@ -3,12 +3,15 @@
 
 #include "prelude.h"
 #include "fsade.h"
+
 #include "atomic.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "dir.h"
 #include "dstring.h"
 #include "sanity.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>

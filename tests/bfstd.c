@@ -3,8 +3,10 @@
 
 #include "prelude.h"
 #include "tests.h"
+
 #include "bfstd.h"
 #include "diag.h"
+
 #include <errno.h>
 #include <langinfo.h>
 #include <stdlib.h>

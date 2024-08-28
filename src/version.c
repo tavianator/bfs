@@ -3,6 +3,8 @@
 
 #include "prelude.h"
 
+#include "bfs.h"
+
 const char bfs_version[] = {
 #include "version.i"
 };

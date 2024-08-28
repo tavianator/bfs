@@ -3,11 +3,14 @@
 
 #include "prelude.h"
 #include "dir.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "sanity.h"
 #include "trie.h"
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

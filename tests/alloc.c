@@ -3,8 +3,10 @@
 
 #include "prelude.h"
 #include "tests.h"
+
 #include "alloc.h"
 #include "diag.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>

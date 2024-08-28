@@ -83,6 +83,7 @@
 #define BFS_LIST_H
 
 #include "diag.h"
+
 #include <stddef.h>
 #include <string.h>
 

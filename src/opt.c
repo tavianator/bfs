@@ -27,6 +27,8 @@
 
 #include "prelude.h"
 #include "opt.h"
+
+#include "bfs.h"
 #include "bftw.h"
 #include "bit.h"
 #include "color.h"
@@ -38,6 +40,7 @@
 #include "expr.h"
 #include "list.h"
 #include "pwcache.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>

@@ -9,11 +9,13 @@
 #define BFS_CTX_H
 
 #include "prelude.h"
+
 #include "alloc.h"
 #include "bftw.h"
 #include "diag.h"
 #include "expr.h"
 #include "trie.h"
+
 #include <stddef.h>
 #include <sys/resource.h>
 #include <sys/types.h>

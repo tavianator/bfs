@@ -24,6 +24,7 @@
  *     - atomic.h      (atomic operations)
  *     - bar.[ch]      (a terminal status bar)
  *     - bit.h         (bit manipulation)
+ *     - bfs.h         (configuration and fundamental utilities)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
  *     - prelude.h     (configuration and feature/platform detection)
@@ -48,11 +49,13 @@
  */
 
 #include "prelude.h"
+
 #include "bfstd.h"
 #include "ctx.h"
 #include "diag.h"
 #include "eval.h"
 #include "parse.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <locale.h>

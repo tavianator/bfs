@@ -9,6 +9,9 @@
 #define BFS_BIT_H
 
 #include "prelude.h"
+
+#include "bfs.h"
+
 #include <limits.h>
 #include <stdint.h>
 

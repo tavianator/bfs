@@ -3,11 +3,14 @@
 
 #include "prelude.h"
 #include "xregex.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "sanity.h"
 #include "thread.h"
+
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>

@@ -13,6 +13,9 @@
 #define BFS_STAT_H
 
 #include "prelude.h"
+
+#include "bfs.h"
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>

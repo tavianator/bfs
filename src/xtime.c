@@ -3,8 +3,11 @@
 
 #include "prelude.h"
 #include "xtime.h"
+
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <sys/time.h>

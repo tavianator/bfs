@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "ctx.h"
+
 #include "alloc.h"
 #include "bfstd.h"
 #include "color.h"
@@ -14,6 +15,7 @@
 #include "stat.h"
 #include "trie.h"
 #include "xtime.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>

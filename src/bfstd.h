@@ -9,6 +9,9 @@
 #define BFS_BFSTD_H
 
 #include "prelude.h"
+
+#include "bfs.h"
+
 #include <stddef.h>
 
 #include <ctype.h>

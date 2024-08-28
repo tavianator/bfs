@@ -9,7 +9,10 @@
 #define BFS_DSTRING_H
 
 #include "prelude.h"
+
+#include "bfs.h"
 #include "bfstd.h"
+
 #include <stdarg.h>
 #include <stddef.h>
 

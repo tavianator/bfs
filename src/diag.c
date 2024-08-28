@@ -3,12 +3,15 @@
 
 #include "prelude.h"
 #include "diag.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "color.h"
 #include "ctx.h"
 #include "dstring.h"
 #include "expr.h"
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>

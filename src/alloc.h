@@ -9,6 +9,9 @@
 #define BFS_ALLOC_H
 
 #include "prelude.h"
+
+#include "bfs.h"
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>

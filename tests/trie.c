@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "prelude.h"
+
+#include "bfs.h"
+#include "diag.h"
 #include "tests.h"
 #include "trie.h"
-#include "diag.h"
+
 #include <stdlib.h>
 #include <string.h>
 

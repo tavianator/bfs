@@ -9,6 +9,7 @@
 #define BFS_TESTS_H
 
 #include "prelude.h"
+
 #include "bfstd.h"
 #include "diag.h"
 

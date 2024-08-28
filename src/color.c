@@ -3,7 +3,9 @@
 
 #include "prelude.h"
 #include "color.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "diag.h"
@@ -13,6 +15,7 @@
 #include "fsade.h"
 #include "stat.h"
 #include "trie.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>

@@ -9,7 +9,10 @@
 #define BFS_COLOR_H
 
 #include "prelude.h"
+
+#include "bfs.h"
 #include "dstring.h"
+
 #include <stdio.h>
 
 /**

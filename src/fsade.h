@@ -11,6 +11,8 @@
 
 #include "prelude.h"
 
+#include "bfs.h"
+
 #define BFS_CAN_CHECK_ACL (BFS_HAS_ACL_GET_FILE || BFS_HAS_ACL_TRIVIAL)
 
 #define BFS_CAN_CHECK_CAPABILITIES BFS_WITH_LIBCAP

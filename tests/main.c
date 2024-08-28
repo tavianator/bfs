@@ -7,8 +7,10 @@
 
 #include "prelude.h"
 #include "tests.h"
+
 #include "bfstd.h"
 #include "color.h"
+
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
