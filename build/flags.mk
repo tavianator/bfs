@@ -41,10 +41,6 @@ _GCOV := ${TRUTHY,${GCOV}}
 _LINT := ${TRUTHY,${LINT}}
 _RELEASE := ${TRUTHY,${RELEASE}}
 
-# https://github.com/google/sanitizers/issues/342
-TSAN_CPPFLAGS,y := -DBFS_USE_TARGET_CLONES=0
-_CPPFLAGS += ${TSAN_CPPFLAGS,${_TSAN}}
-
 ASAN_CFLAGS,y := -fsanitize=address
 LSAN_CFLAGS,y := -fsanitize=leak
 MSAN_CFLAGS,y := -fsanitize=memory -fsanitize-memory-track-origins

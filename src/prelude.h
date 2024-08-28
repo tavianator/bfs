@@ -310,9 +310,11 @@ extern const char bfs_ldlibs[];
 
 /**
  * Check if function multiversioning via GNU indirect functions (ifunc) is supported.
+ *
+ * Disabled on TSan due to https://github.com/google/sanitizers/issues/342.
  */
 #ifndef BFS_USE_TARGET_CLONES
-#  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__)
+#  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__) && !__SANITIZE_THREAD__
 #    define BFS_USE_TARGET_CLONES true
 #  endif
 #endif
