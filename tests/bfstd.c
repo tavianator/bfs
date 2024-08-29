@@ -6,7 +6,6 @@
 #include "bfstd.h"
 #include "diag.h"
 
-#include <errno.h>
 #include <langinfo.h>
 #include <stdlib.h>
 #include <string.h>

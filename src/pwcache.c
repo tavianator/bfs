@@ -10,8 +10,6 @@
 #include <grp.h>
 #include <pwd.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /** Represents cache hits for negative results. */
 static void *MISSING = &MISSING;

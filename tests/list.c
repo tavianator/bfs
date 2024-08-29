@@ -4,7 +4,10 @@
 #include "tests.h"
 
 #include "bfs.h"
+#include "diag.h"
 #include "list.h"
+
+#include <stddef.h>
 
 struct item {
 	int n;

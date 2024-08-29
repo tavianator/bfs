@@ -14,13 +14,14 @@
 #include "sighook.h"
 #include "stat.h"
 #include "trie.h"
-#include "xtime.h"
 
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 /** Get the initial value for ctx->threads (-j). */

@@ -7,6 +7,7 @@
 #include "thread.h"
 #include "sighook.h"
 
+#include <stddef.h>
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>

@@ -4,7 +4,6 @@
 #include "tests.h"
 
 #include "bfs.h"
-#include "bfstd.h"
 #include "diag.h"
 #include "xtime.h"
 

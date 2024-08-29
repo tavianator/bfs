@@ -28,6 +28,7 @@
 #include "opt.h"
 
 #include "bfs.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "bit.h"
 #include "color.h"

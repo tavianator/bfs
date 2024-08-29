@@ -7,7 +7,6 @@
 
 #include "tests.h"
 
-#include "bfstd.h"
 #include "color.h"
 
 #include <locale.h>

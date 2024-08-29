@@ -27,6 +27,7 @@
 #include "thread.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>

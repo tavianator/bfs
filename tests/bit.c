@@ -5,7 +5,6 @@
 
 #include "bfs.h"
 #include "bit.h"
-#include "diag.h"
 
 #include <limits.h>
 #include <stdint.h>
