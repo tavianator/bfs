@@ -27,10 +27,11 @@ asan lsan msan tsan ubsan gcov lint release::
 
 # Print an error if `make` is run before `./configure`
 gen/config.mk::
-	@if ! [ -e $@ ]; then \
+	if ! [ -e $@ ]; then \
 	    printf 'error: You must run `./configure` before `%s`.\n' "${MAKE}" >&2; \
 	    false; \
 	fi
+.SILENT: gen/config.mk
 
 ## Build phase (`make`)
 
@@ -67,11 +68,13 @@ ${OBJS}: gen/config.mk
 
 # Save the version number to this file, but only update version.c if it changes
 gen/version.i.new::
-	@${MKDIR} ${@D}
-	@build/version.sh | tr -d '\n' | build/embed.sh >$@
+	${MKDIR} ${@D}
+	build/version.sh | tr -d '\n' | build/embed.sh >$@
+.SILENT: gen/version.i.new
 
 gen/version.i: gen/version.i.new
-	@test -e $@ && cmp -s $@ ${.ALLSRC} && ${RM} ${.ALLSRC} || mv ${.ALLSRC} $@
+	test -e $@ && cmp -s $@ ${.ALLSRC} && ${RM} ${.ALLSRC} || mv ${.ALLSRC} $@
+.SILENT: gen/version.i
 
 obj/src/version.o: gen/version.i
 
