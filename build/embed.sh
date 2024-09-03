@@ -9,4 +9,4 @@ set -eu
 
 { cat; printf '\0'; } \
     | od -An -tx1 \
-    | sed 's/\([^ ][^ ]*\)/0x\1,/g'
+    | sed 's/[^ ][^ ]*/0x&,/g'
