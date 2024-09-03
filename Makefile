@@ -167,7 +167,7 @@ DISTCHECK_CONFIG_release := --enable-release
 ${DISTCHECKS}::
 	@${MKDIR} $@
 	@+cd $@ \
-	    && ../configure ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
+	    && ../configure MAKE="${MAKE}" ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
 	    && ${MAKE} check TEST_FLAGS="--sudo --verbose=skipped"
 
 ## Packaging (`make install`)
