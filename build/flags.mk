@@ -67,16 +67,7 @@ _CPPFLAGS += ${RELEASE_CPPFLAGS,${_RELEASE}}
 _CFLAGS += ${RELEASE_CFLAGS,${_RELEASE}}
 
 # Configurable flags
-CFLAGS ?= \
-    -g \
-    -Wall \
-    -Wformat=2 \
-    -Werror=implicit \
-    -Wimplicit-fallthrough \
-    -Wmissing-declarations \
-    -Wshadow \
-    -Wsign-compare \
-    -Wstrict-prototypes
+CFLAGS ?= -g -Wall
 
 # Add the configurable flags last so they can override ours
 _CPPFLAGS += ${CPPFLAGS} ${EXTRA_CPPFLAGS}
@@ -89,9 +80,16 @@ include build/exports.mk
 
 # Conditionally-supported flags
 AUTO_FLAGS := \
+    gen/flags/Wformat.mk \
+    gen/flags/Wimplicit-fallthrough.mk \
+    gen/flags/Wimplicit.mk \
+    gen/flags/Wmissing-decls.mk \
+    gen/flags/Wmissing-var-decls.mk \
+    gen/flags/Wshadow.mk \
+    gen/flags/Wsign-compare.mk \
+    gen/flags/Wstrict-prototypes.mk \
     gen/flags/bind-now.mk \
-    gen/flags/deps.mk \
-    gen/flags/missing-var-decls.mk
+    gen/flags/deps.mk
 
 gen/flags.mk: ${AUTO_FLAGS}
 	${MSG} "[ GEN] $@"
