@@ -41,7 +41,7 @@ For example,
 .PP
 .nf
 .RS
-.B bfs \\\( \-name '*.txt' \-or \-lname '*.txt' \\\\) \-and \-print
+.B bfs \e( \-name '*.txt' \-or \-lname '*.txt' \e) \-and \-print
 .RE
 .fi
 .PP
@@ -51,7 +51,7 @@ is implied between two consecutive expressions, so this is equivalent:
 .PP
 .nf
 .RS
-.B bfs \\\( \-name '*.txt' \-or \-lname '*.txt' \\\\) \-print
+.B bfs \e( \-name '*.txt' \-or \-lname '*.txt' \e) \-print
 .RE
 .fi
 .PP
@@ -115,7 +115,6 @@ Don't descend into other mount points (same as \fB\-xdev\fR).
 Treat
 .I PATH
 as a path to search (useful if it begins with a dash).
-.PP
 .TP
 \fB\-D \fIFLAG\fR
 Turn on a debugging flag (see
@@ -188,9 +187,9 @@ threads in parallel (default: number of CPUs, up to
 \fB( \fIexpression \fB)\fR
 Parentheses are used for grouping expressions together.
 You'll probably have to write
-.B \\\\(
+.B \e(
 .I expression
-.B \\\\)
+.B \e)
 to avoid the parentheses being interpreted by the shell.
 .PP
 \fB! \fIexpression\fR
@@ -199,7 +198,7 @@ to avoid the parentheses being interpreted by the shell.
 .RS
 The "not" operator: returns the negation of the truth value of the
 .IR expression .
-You may have to write \fB\\! \fIexpression\fR to avoid \fB!\fR being interpreted by the shell.
+You may have to write \fB\e! \fIexpression\fR to avoid \fB!\fR being interpreted by the shell.
 .RE
 .PP
 \fIexpression\fR \fIexpression\fR
@@ -266,7 +265,6 @@ Print usage information, and exit immediately (without parsing the rest of the c
 Print version information, and exit immediately.
 .RE
 .SH OPTIONS
-.PP
 .B \-color
 .br
 .B \-nocolor
@@ -289,7 +287,7 @@ Follow all symbolic links (same as
 .BR \-L ).
 .TP
 \fB\-files0\-from \fIFILE\fR
-Treat the NUL ('\\0')-separated paths in
+Treat the NUL ('\e0')-separated paths in
 .I FILE
 as starting points for the search.
 Pass
@@ -689,7 +687,6 @@ Find files of the given type, following links when
 .B \-type
 would not, and vice versa.
 .SH ACTIONS
-.PP
 .B \-delete
 .br
 .B \-rm
@@ -753,7 +750,7 @@ Print the path to the found file.
 .B \-print0
 Like
 .BR \-print ,
-but use the null character ('\\0') as a separator rather than newlines.
+but use the null character ('\e0') as a separator rather than newlines.
 Useful in conjunction with
 .B xargs
 .IR \-0 .

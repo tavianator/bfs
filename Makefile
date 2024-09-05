@@ -216,8 +216,9 @@ check-install::
 
 # Check man page markup
 check-man::
-	${MSG} "[LINT] docs/bfs.1" \
-	    groff -man -rCHECKSTYLE=3 -ww -b -z docs/bfs.1
+	${MSG} "[LINT] docs/bfs.1"
+	${Q}groff -man -rCHECKSTYLE=3 -ww -b -z docs/bfs.1
+	${Q}mandoc -Tlint -Wwarning docs/bfs.1
 
 ## Cleanup (`make clean`)
 
