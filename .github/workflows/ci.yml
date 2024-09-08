@@ -162,11 +162,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Work around https://github.com/vmactions/freebsd-vm/issues/83
-      - name: Fix pip
-        run: |
-          sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED
-
       - name: Run tests
         uses: vmactions/dragonflybsd-vm@v1
         with:
@@ -202,11 +197,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      # Work around https://github.com/vmactions/freebsd-vm/issues/83
-      - name: Fix pip
-        run: |
-          sudo rm /usr/lib/python3.12/EXTERNALLY-MANAGED
 
       - name: Run tests
         uses: vmactions/omnios-vm@v1
