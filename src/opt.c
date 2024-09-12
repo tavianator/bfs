@@ -1819,7 +1819,7 @@ static struct bfs_expr *opt_ignore(struct bfs_opt *opt, struct bfs_expr *expr, b
 	if (delete) {
 		opt_delete(opt, "%pe [ignored result]\n", expr);
 	} else {
-		opt_debug(opt, "ignored result");
+		opt_debug(opt, "ignored result\n");
 	}
 
 	if (expr->kind != BFS_TEST) {
