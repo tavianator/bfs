@@ -50,8 +50,43 @@ BINS := \
 all: ${BINS}
 .PHONY: all
 
+# All object files except the entry point
+LIBBFS := \
+    obj/src/alloc.o \
+    obj/src/bar.o \
+    obj/src/bfstd.o \
+    obj/src/bftw.o \
+    obj/src/color.o \
+    obj/src/ctx.o \
+    obj/src/diag.o \
+    obj/src/dir.o \
+    obj/src/dstring.o \
+    obj/src/eval.o \
+    obj/src/exec.o \
+    obj/src/expr.o \
+    obj/src/fsade.o \
+    obj/src/ioq.o \
+    obj/src/mtab.o \
+    obj/src/opt.o \
+    obj/src/parse.o \
+    obj/src/printf.o \
+    obj/src/pwcache.o \
+    obj/src/sighook.o \
+    obj/src/stat.o \
+    obj/src/thread.o \
+    obj/src/trie.o \
+    obj/src/typo.o \
+    obj/src/version.o \
+    obj/src/xregex.o \
+    obj/src/xspawn.o \
+    obj/src/xtime.o
+
+# All object files
+OBJS := ${LIBBFS}
+
 # The main binary
-bin/bfs: ${LIBBFS} obj/src/main.o
+bin/bfs: obj/src/main.o ${LIBBFS}
+OBJS += obj/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
@@ -60,11 +95,6 @@ ${BINS}:
 
 # Get the .c file for a .o file
 CSRC = ${@:obj/%.o=%.c}
-
-# Rebuild when the configuration changes
-${OBJS}: gen/config.mk
-	@${MKDIR} ${@D}
-	${MSG} "[ CC ] ${CSRC}" ${CC} ${_CPPFLAGS} ${_CFLAGS} -c ${CSRC} -o $@
 
 # Save the version number to this file, but only update version.c if it changes
 gen/version.i.new::
@@ -103,12 +133,24 @@ unit-tests: ${UTEST_BINS}
 	${MSG} "[TEST] tests/units" bin/tests/units
 .PHONY: unit-tests
 
-bin/tests/units: \
-    ${UNIT_OBJS} \
-    ${LIBBFS}
+# Unit test objects
+UNIT_OBJS := \
+    obj/tests/alloc.o \
+    obj/tests/bfstd.o \
+    obj/tests/bit.o \
+    obj/tests/ioq.o \
+    obj/tests/list.o \
+    obj/tests/main.o \
+    obj/tests/sighook.o \
+    obj/tests/trie.o \
+    obj/tests/xspawn.o \
+    obj/tests/xtime.o
 
-bin/tests/xspawnee: \
-    obj/tests/xspawnee.o
+bin/tests/units: ${UNIT_OBJS} ${LIBBFS}
+OBJS += ${UNIT_OBJS}
+
+bin/tests/xspawnee: obj/tests/xspawnee.o
+OBJS += obj/tests/xspawnee.o
 
 # The different flag combinations we check
 INTEGRATIONS := default dfs ids eds j1 j2 j3 s
@@ -133,13 +175,11 @@ check-j1 check-j2 check-j3 check-s: bin/bfs ${ITEST_BINS}
 integration-tests: ${INTEGRATION_TESTS}
 .PHONY: integration-tests
 
-bin/tests/mksock: \
-    obj/tests/mksock.o \
-    ${LIBBFS}
+bin/tests/mksock: obj/tests/mksock.o ${LIBBFS}
+OBJS += obj/tests/mksock.o
 
-bin/tests/xtouch: \
-    obj/tests/xtouch.o \
-    ${LIBBFS}
+bin/tests/xtouch: obj/tests/xtouch.o ${LIBBFS}
+OBJS += obj/tests/xtouch.o
 
 # `make distcheck` configurations
 DISTCHECKS := \
@@ -172,6 +212,16 @@ ${DISTCHECKS}::
 	@+cd $@ \
 	    && ../configure MAKE="${MAKE}" ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
 	    && ${MAKE} check TEST_FLAGS="--sudo --verbose=skipped"
+
+## Automatic dependency tracking
+
+# Rebuild when the configuration changes
+${OBJS}: gen/config.mk
+	@${MKDIR} ${@D}
+	${MSG} "[ CC ] ${CSRC}" ${CC} ${_CPPFLAGS} ${_CFLAGS} -c ${CSRC} -o $@
+
+# Include any generated dependency files
+-include ${OBJS:.o=.d}
 
 ## Packaging (`make install`)
 

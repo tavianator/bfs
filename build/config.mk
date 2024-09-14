@@ -14,7 +14,6 @@ config: gen/config.mk
 MKS := \
     gen/vars.mk \
     gen/flags.mk \
-    gen/deps.mk \
     gen/pkgs.mk
 
 # The main configuration file, which includes the others
@@ -46,11 +45,6 @@ gen/vars.mk::
 gen/flags.mk: gen/vars.mk
 	@+XMAKEFLAGS="$$MAKEFLAGS" ${MAKE} -sf build/flags.mk $@
 .PHONY: gen/flags.mk
-
-# Check for dependency generation support
-gen/deps.mk: gen/flags.mk
-	@+XMAKEFLAGS="$$MAKEFLAGS" ${MAKE} -sf build/deps.mk $@
-.PHONY: gen/deps.mk
 
 # Auto-detect dependencies and their build flags
 gen/pkgs.mk: gen/flags.mk

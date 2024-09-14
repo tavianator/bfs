@@ -71,50 +71,6 @@ ALL_PKGS := \
 
 # List all object files here, as they're needed by both `./configure` and `make`
 
-# All object files except the entry point
-LIBBFS := \
-    obj/src/alloc.o \
-    obj/src/bar.o \
-    obj/src/bfstd.o \
-    obj/src/bftw.o \
-    obj/src/color.o \
-    obj/src/ctx.o \
-    obj/src/diag.o \
-    obj/src/dir.o \
-    obj/src/dstring.o \
-    obj/src/eval.o \
-    obj/src/exec.o \
-    obj/src/expr.o \
-    obj/src/fsade.o \
-    obj/src/ioq.o \
-    obj/src/mtab.o \
-    obj/src/opt.o \
-    obj/src/parse.o \
-    obj/src/printf.o \
-    obj/src/pwcache.o \
-    obj/src/sighook.o \
-    obj/src/stat.o \
-    obj/src/thread.o \
-    obj/src/trie.o \
-    obj/src/typo.o \
-    obj/src/version.o \
-    obj/src/xregex.o \
-    obj/src/xspawn.o \
-    obj/src/xtime.o \
-
-# Unit test objects
-UNIT_OBJS := \
-    obj/tests/alloc.o \
-    obj/tests/bfstd.o \
-    obj/tests/bit.o \
-    obj/tests/ioq.o \
-    obj/tests/list.o \
-    obj/tests/main.o \
-    obj/tests/sighook.o \
-    obj/tests/trie.o \
-    obj/tests/xspawn.o \
-    obj/tests/xtime.o
-
 # All object files
 OBJS := \
     obj/src/main.o \
