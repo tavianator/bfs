@@ -2946,11 +2946,42 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	return NULL;
 }
 
+/** Print the bfs "logo". */
+static void print_logo(CFILE *cout) {
+	if (!cout->colors) {
+		goto boring;
+	}
+
+	size_t vwidth = xstrwidth(bfs_version);
+	dchar *spaces = dstrepeat(" ", vwidth);
+	dchar *lines = dstrepeat("─", vwidth);
+	if (!spaces || !lines) {
+		dstrfree(lines);
+		dstrfree(spaces);
+		goto boring;
+	}
+
+	// We do ----\r<emoji> rather than <emoji>--- so we don't have to assume
+	// anything about the width of the emoji
+	cfprintf(cout, "╭─────%s╮\r📂\n", lines);
+	cfprintf(cout, "├${ex}b${rs}   %s │\n", spaces);
+	cfprintf(cout, "╰├${ex}f${rs}  ${bld}%s${rs} │\n", bfs_version);
+	cfprintf(cout, " ╰├${ex}s${rs} %s │\n", spaces);
+	cfprintf(cout, "  ╰──%s─╯\n\n", lines);
+
+	dstrfree(lines);
+	dstrfree(spaces);
+	return;
+
+boring:
+	printf("%s %s\n\n", BFS_COMMAND, bfs_version);
+}
+
 /**
  * "Parse" -version.
  */
 static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int arg2) {
-	cfprintf(parser->ctx->cout, "${ex}%s${rs} ${bld}%s${rs}\n\n", BFS_COMMAND, bfs_version);
+	print_logo(parser->ctx->cout);
 
 	printf("Copyright © Tavian Barnes and the bfs contributors\n");
 	printf("No rights reserved (https://opensource.org/license/0BSD)\n\n");
