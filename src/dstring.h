@@ -320,4 +320,9 @@ int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
  */
 int dstrnescat(dchar **dest, const char *str, size_t n, enum wesc_flags flags);
 
+/**
+ * Repeat a string n times.
+ */
+dchar *dstrepeat(const char *str, size_t n);
+
 #endif // BFS_DSTRING_H

@@ -278,3 +278,20 @@ void dstrfree(dchar *dstr) {
 		free(dstrheader(dstr));
 	}
 }
+
+dchar *dstrepeat(const char *str, size_t n) {
+	size_t len = strlen(str);
+	dchar *ret = dstralloc(n * len);
+	if (!ret) {
+		return NULL;
+	}
+
+	for (size_t i = 0; i < n; ++i) {
+		if (dstrxcat(&ret, str, len) < 0) {
+			dstrfree(ret);
+			return NULL;
+		}
+	}
+
+	return ret;
+}
