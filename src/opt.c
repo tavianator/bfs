@@ -1402,12 +1402,11 @@ static struct bfs_expr *sink_not_andor(struct bfs_opt *opt, struct bfs_expr *exp
 
 /** Sink a negation into a comma expression. */
 static struct bfs_expr *sink_not_comma(struct bfs_opt *opt, struct bfs_expr *expr) {
-	bfs_assert(expr->eval_fn == eval_comma);
-
-	opt_enter(opt, "%pe\n", expr);
-
 	char **argv = expr->argv;
 	expr = only_child(expr);
+	opt_enter(opt, "%pe\n", expr);
+
+	bfs_assert(expr->eval_fn == eval_comma);
 
 	struct bfs_exprs children;
 	foster_children(expr, &children);
