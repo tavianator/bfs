@@ -1,6 +1,40 @@
 4.*
 ===
 
+4.0.2
+-----
+
+**September 17, 2024**
+
+### New features
+
+- Implemented `./configure --version=X.Y.Z`, mainly for packagers to override the version number
+  ([`4a278d3`](https://github.com/tavianator/bfs/commit/4a278d3e39a685379711727eac7bfaa83679e0e4))
+
+### Changes
+
+- Minor refactoring of the build system
+
+### Bug fixes
+
+- Fixed `./configure --help`, which was broken since `bfs` 4.0
+  ([`07ae989`](https://github.com/tavianator/bfs/commit/07ae98906dbb0caaac2f758d72e88dd0975b2a81))
+
+- Fixed compiler flag auto-detection on systems with non-GNU `sed`.
+  This fixes a potential race condition on FreeBSD since `bfs` 4.0 due to the [switch to `_Fork()`](https://github.com/tavianator/bfs/commit/085bb402c7b2c2f96624fb0523ff3f9686fe26d9) without passing `-z now` to the linker.
+  ([`34e6081`](https://github.com/tavianator/bfs/commit/34e60816adb0ea8ddb155a454676a99ab225dc8a))
+
+- Fixed `$MAKE distcheck` when `$MAKE` is not `make`, e.g. `gmake distcheck` on BSD
+  ([`2135b00`](https://github.com/tavianator/bfs/commit/2135b00d215efc5c2c38e1abd3254baf31229ad4))
+
+- Fixed some roff syntax issues in the `bfs` manpage
+  ([`812ecd1`](https://github.com/tavianator/bfs/commit/812ecd1feeb002252dd4d732b395d31c4179afaf))
+
+- Fixed an assertion failure optimizing expressions like `bfs -not \( -prune , -type f \)` since `bfs` 3.1.
+  Release builds were not affected, since their assertions are disabled and the behaviour was otherwise correct.
+  ([`b1a9998`](https://github.com/tavianator/bfs/commit/b1a999892b9e13181ddd9a7d895f3d1c65fbb449))
+
+
 4.0.1
 -----
 
@@ -9,7 +43,7 @@
 ### Bug fixes
 
 - `bfs` no longer prints a "suppressed errors" warning unless `-noerror` is actually suppressing errors
-  [`5d03c9d`](https://github.com/tavianator/bfs/commit/5d03c9d460d1c1afcdf062d494537986ce96a690)
+  ([`5d03c9d`](https://github.com/tavianator/bfs/commit/5d03c9d460d1c1afcdf062d494537986ce96a690))
 
 
 4.0

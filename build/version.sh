@@ -14,5 +14,5 @@ if [ "${VERSION-}" ]; then
 elif [ -e "$DIR/.git" ] && command -v git >/dev/null 2>&1; then
     git -C "$DIR" describe --always --dirty
 else
-    echo "4.0.1"
+    echo "4.0.2"
 fi
