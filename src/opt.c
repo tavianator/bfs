@@ -40,6 +40,7 @@
 #include "expr.h"
 #include "list.h"
 #include "pwcache.h"
+#include "xspawn.h"
 
 #include <errno.h>
 #include <limits.h>
