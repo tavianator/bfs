@@ -68,14 +68,3 @@ ALL_PKGS := \
     libselinux \
     liburing \
     oniguruma
-
-# List all object files here, as they're needed by both `./configure` and `make`
-
-# All object files
-OBJS := \
-    obj/src/main.o \
-    obj/tests/mksock.o \
-    obj/tests/xspawnee.o \
-    obj/tests/xtouch.o \
-    ${LIBBFS} \
-    ${UNIT_OBJS}
