@@ -68,8 +68,7 @@ void bfs_expr_append(struct bfs_expr *expr, struct bfs_expr *child) {
 }
 
 void bfs_expr_extend(struct bfs_expr *expr, struct bfs_exprs *children) {
-	while (!SLIST_EMPTY(children)) {
-		struct bfs_expr *child = SLIST_POP(children);
+	drain_slist (struct bfs_expr, child, children) {
 		bfs_expr_append(expr, child);
 	}
 }

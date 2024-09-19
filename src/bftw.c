@@ -1162,12 +1162,13 @@ static int bftw_file_open(struct bftw_state *state, struct bftw_file *file, cons
 	struct bftw_list parents;
 	SLIST_INIT(&parents);
 
-	struct bftw_file *cur;
-	for (cur = file; cur != base; cur = cur->parent) {
+	// Reverse the chain of parents
+	for (struct bftw_file *cur = file; cur != base; cur = cur->parent) {
 		SLIST_PREPEND(&parents, cur);
 	}
 
-	while ((cur = SLIST_POP(&parents))) {
+	// Open each component relative to its parent
+	drain_slist (struct bftw_file, cur, &parents) {
 		if (!cur->parent || cur->parent->fd >= 0) {
 			bftw_file_openat(state, cur, cur->parent, cur->name);
 		}
@@ -1870,8 +1871,8 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	}
 	state->direrror = 0;
 
-	while ((file = SLIST_POP(&state->to_close, ready))) {
-		bftw_unwrapdir(state, file);
+	drain_slist (struct bftw_file, dead, &state->to_close, ready) {
+		bftw_unwrapdir(state, dead);
 	}
 
 	enum bftw_gc_flags visit = BFTW_VISIT_FILE;

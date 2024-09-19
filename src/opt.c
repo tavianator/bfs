@@ -737,9 +737,7 @@ static struct bfs_expr *visit_and(struct bfs_opt *opt, struct bfs_expr *expr, co
 	df_init_bottom(&opt->after_false);
 	struct bfs_opt nested = *opt;
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			nested.ignore_result = opt->ignore_result;
 		} else {
@@ -771,9 +769,7 @@ static struct bfs_expr *visit_or(struct bfs_opt *opt, struct bfs_expr *expr, con
 	df_init_bottom(&opt->after_true);
 	struct bfs_opt nested = *opt;
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			nested.ignore_result = opt->ignore_result;
 		} else {
@@ -803,9 +799,7 @@ static struct bfs_expr *visit_comma(struct bfs_opt *opt, struct bfs_expr *expr, 
 
 	struct bfs_opt nested = *opt;
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			nested.ignore_result = opt->ignore_result;
 		} else {
@@ -1384,8 +1378,7 @@ static struct bfs_expr *sink_not_andor(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		opt_enter(opt, "%pe\n", child);
 
 		child = negate_expr(opt, child, argv);
@@ -1412,8 +1405,7 @@ static struct bfs_expr *sink_not_comma(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			opt_enter(opt, "%pe\n", child);
 			opt_debug(opt, "sink\n");
@@ -1463,8 +1455,7 @@ static struct bfs_expr *canonicalize_assoc(struct bfs_opt *opt, struct bfs_expr 
 	struct bfs_exprs flat;
 	SLIST_INIT(&flat);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child->eval_fn == expr->eval_fn) {
 			struct bfs_expr *head = SLIST_HEAD(&child->children);
 			struct bfs_expr *tail = SLIST_TAIL(&child->children);
@@ -1572,8 +1563,7 @@ static struct bfs_expr *reorder_andor(struct bfs_opt *opt, struct bfs_expr *expr
 	struct bfs_exprs pure;
 	SLIST_INIT(&pure);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child->pure) {
 			SLIST_APPEND(&pure, child);
 		} else {
@@ -1975,8 +1965,7 @@ static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		opt_enter(opt, "%pe\n", child);
 
 		child = negate_expr(opt, child, &fake_not_arg);
@@ -2022,9 +2011,7 @@ static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr,
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child == ignorable) {
 			ignore = true;
 		}
@@ -2045,8 +2032,8 @@ static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr,
 		bfs_expr_append(expr, child);
 
 		if (child->always_false) {
-			while ((child = SLIST_POP(&children))) {
-				opt_delete(opt, "%pe [short-circuit]\n", child);
+			drain_slist (struct bfs_expr, dead, &children) {
+				opt_delete(opt, "%pe [short-circuit]\n", dead);
 			}
 		}
 	}
@@ -2071,9 +2058,7 @@ static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child == ignorable) {
 			ignore = true;
 		}
@@ -2094,8 +2079,8 @@ static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 		bfs_expr_append(expr, child);
 
 		if (child->always_true) {
-			while ((child = SLIST_POP(&children))) {
-				opt_delete(opt, "%pe [short-circuit]\n", child);
+			drain_slist (struct bfs_expr, dead, &children) {
+				opt_delete(opt, "%pe [short-circuit]\n", dead);
 			}
 		}
 	}
@@ -2117,9 +2102,7 @@ static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (opt->level >= 2 && child->pure && !SLIST_EMPTY(&children)) {
 			if (!opt_ignore(opt, child, true)) {
 				return NULL;

@@ -429,6 +429,33 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, size_
 	     item = _next)
 
 /**
+ * Loop over a singly-linked list, popping each item.
+ *
+ * @param type
+ *         The list item type.
+ * @param item
+ *         The induction variable name.
+ * @param list
+ *         The list to drain.
+ * @param node (optional)
+ *         If specified, use head->node.next rather than head->next.
+ */
+#define drain_slist(type, item, ...) \
+	drain_slist_(type, item, __VA_ARGS__, )
+
+#define drain_slist_(type, item, list, ...) \
+	drain_slist__(type, item, (list), LIST_NEXT_(__VA_ARGS__))
+
+#define drain_slist__(type, item, list, next) \
+	for (type *item = list->head; item && \
+	     (SLIST_CHECK_(list), \
+	      list->head = item->next, \
+	      list->tail = list->head ? list->tail : &list->head, \
+	      item->next = NULL, \
+	      true); \
+	     item = list->head)
+
+/**
  * Initialize a doubly-linked list.
  *
  * @param list
