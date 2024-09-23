@@ -108,7 +108,7 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count) {
 	size_t old_size = size * count;
 
 	// Capacity is doubled every power of two, from 0→1, 1→2, 2→4, etc.
-	// If we stayed within the same size class, re-use ptr.
+	// If we stayed within the same size class, reuse ptr.
 	if (count & (count - 1)) {
 		// Tell sanitizers about the new array element
 		sanitize_alloc((char *)ptr + old_size, size);

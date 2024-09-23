@@ -159,7 +159,7 @@ comake() {
     exec {READY_PIPE}<&${COPROC[0]} {DONE_PIPE}>&${COPROC[1]}
 }
 
-# Print the current test progess
+# Print the current test progress
 progress() {
     if [ "${BAR:-}" ]; then
         print_bar "$(printf "$@")"

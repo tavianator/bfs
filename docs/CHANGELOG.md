@@ -324,7 +324,7 @@
 
   - Breadth-first search could become highly unbalanced, negating many of the benefits of `bfs`
 
-  - On non-{Linux,FreeBSD} plaforms, directories could stay open longer than necessary, consuming extra memory
+  - On non-{Linux,FreeBSD} platforms, directories could stay open longer than necessary, consuming extra memory
 
 [#107]: https://github.com/tavianator/bfs/pull/107
 

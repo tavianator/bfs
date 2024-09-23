@@ -31,7 +31,7 @@
 struct esc_seq {
 	/** The length of the escape sequence. */
 	size_t len;
-	/** The escape sequence iteself, without a terminating NUL. */
+	/** The escape sequence itself, without a terminating NUL. */
 	char seq[];
 };
 

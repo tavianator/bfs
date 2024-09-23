@@ -93,7 +93,7 @@ External dependencies are auto-detected by default, but you can build `--with` o
 </pre>
 
 [`pkg-config`] is used, if available, to detect these libraries and any additional build flags they may require.
-If this is undesireable, disable it by setting `PKG_CONFIG` to the empty string (`./configure PKG_CONFIG=""`).
+If this is undesirable, disable it by setting `PKG_CONFIG` to the empty string (`./configure PKG_CONFIG=""`).
 
 [`pkg-config`]: https://www.freedesktop.org/wiki/Software/pkg-config/
 

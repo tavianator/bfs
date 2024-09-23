@@ -350,7 +350,7 @@ void *varena_alloc(struct varena *varena, size_t count);
  * @param ptr
  *         The object to resize.
  * @param old_count
- *         The old array lenth.
+ *         The old array length.
  * @param new_count
  *         The new array length.
  * @return

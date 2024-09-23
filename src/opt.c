@@ -122,7 +122,7 @@ static const char *const pred_names[] = {
 };
 
 /**
- * A contrained integer range.
+ * A constrained integer range.
  */
 struct df_range {
 	/** The (inclusive) minimum value. */

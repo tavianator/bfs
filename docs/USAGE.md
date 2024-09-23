@@ -105,7 +105,7 @@ For expressions like `-name`, that's all they do.
 But some expressions, called *actions*, have other side effects.
 
 If no actions are included in the expression, `bfs` adds the `-print` action automatically, which is why the above examples actually print any output.
-The default `-print` is supressed if any actions are given explicitly.
+The default `-print` is suppressed if any actions are given explicitly.
 Available actions include printing with alternate formats (`-ls`, `-printf`, etc.), executing commands (`-exec`, `-execdir`, etc.), deleting files (`-delete`), and stopping the search (`-quit`, `-exit`).
 
 

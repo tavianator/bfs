@@ -37,7 +37,7 @@ RM ?= rm -f
 #     VAR=1      ${TRUTHY,${VAR}} => ${TRUTHY,1}     => y
 #     VAR=n      ${TRUTHY,${VAR}} => ${TRUTHY,n}     =>   [empty]
 #     VAR=other  ${TRUTHY,${VAR}} => ${TRUTHY,other} =>   [empty]
-#     VAR=       ${TRUTHY,${VAR}} => ${TRUTHY,}      =>   [emtpy]
+#     VAR=       ${TRUTHY,${VAR}} => ${TRUTHY,}      =>   [empty]
 #
 # Inspired by https://github.com/wahern/autoguess
 TRUTHY,y := y

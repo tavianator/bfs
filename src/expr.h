@@ -146,7 +146,7 @@ struct bfs_expr {
 	/** Total time spent running this predicate. */
 	struct timespec elapsed;
 
-	/** Auxilliary data for the evaluation function. */
+	/** Auxiliary data for the evaluation function. */
 	union {
 		/** Child expressions. */
 		struct bfs_exprs children;

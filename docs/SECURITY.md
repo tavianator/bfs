@@ -16,7 +16,7 @@ Anyone with enough control over the command line of `bfs` or any `find`-compatib
 > It is *always* unsafe to allow *any* other part of the command line to be affected by untrusted input.
 > Use the `-f` flag, or `-files0-from`, to ensure that the input is interpreted as a path.
 
-This still has security implications, incuding:
+This still has security implications, including:
 
 - **Information disclosure:** an attacker may learn whether particular files exist by observing `bfs`'s output, exit status, or even side channels like execution time.
 - **Denial of service:** large directory trees or slow/network storage may cause `bfs` to consume excessive system resources.

@@ -360,7 +360,7 @@ bench-complete() {
     fi
 }
 
-# Benchmark quiting as soon as a file is seen
+# Benchmark quitting as soon as a file is seen
 bench-early-quit-corpus() {
     dir="$2"
     max_depth=$(./bin/bfs "$dir" -printf '%d\n' | sort -rn | head -n1)

@@ -70,7 +70,7 @@ stdenv() {
     fi
 }
 
-# Drop root priviliges or bail
+# Drop root privileges or bail
 drop_root() {
     if command -v capsh &>/dev/null; then
         if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then

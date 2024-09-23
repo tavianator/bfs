@@ -91,11 +91,11 @@ args=(
     '*-user[find files owned by user NAME]:user:_users'
     '*-hidden[find hidden files (those beginning with .)]'
 
-    '*-ilname[find symbolic links whose target matches GLOB (case insensitve)]:link pattern to search (case insensitive):'
+    '*-ilname[find symbolic links whose target matches GLOB (case insensitive)]:link pattern to search (case insensitive):'
     '*-iname[find files whose name matches GLOB (case insensitive)]:name pattern to match (case insensitive):'
     '*-inum[find files with inode number N]:inode number:'
-    '*-ipath[find files whose entire path matches GLOB (case insenstive)]:path pattern to search (case insensitive):'
-    '*-iregex[find files whose entire path matches REGEX (case insenstive)]:regular expression to search (case insensitive):'
+    '*-ipath[find files whose entire path matches GLOB (case insensitive)]:path pattern to search (case insensitive):'
+    '*-iregex[find files whose entire path matches REGEX (case insensitive)]:regular expression to search (case insensitive):'
     '*-iwholename[find files whose entire path matches GLOB (case insensitive)]:full path pattern to search (case insensitive):'
 
     '*-links[find files with N hard links]:number of links:'

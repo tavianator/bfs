@@ -448,7 +448,7 @@ static void bftw_queue_rebalance(struct bftw_queue *queue, bool async) {
 	}
 }
 
-/** Detatch the next waiting file. */
+/** Detach the next waiting file. */
 static void bftw_queue_detach(struct bftw_queue *queue, struct bftw_file *file, bool async) {
 	bfs_assert(!file->ioqueued);
 
