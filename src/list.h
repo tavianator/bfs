@@ -82,9 +82,11 @@
 #ifndef BFS_LIST_H
 #define BFS_LIST_H
 
+#include "bfs.h"
 #include "diag.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /**
@@ -372,19 +374,24 @@
 #define SLIST_REMOVE_(list, cursor, ...) \
 	SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_REMOVE__(list, cursor, next) \
-	(list->tail = (*cursor)->next ? list->tail : cursor, \
-	 slist_remove_impl(*cursor, cursor, &(*cursor)->next, sizeof(*cursor)))
+// Scratch variables for the type-safe SLIST_REMOVE() implementation.
+// Not a pointer type due to https://github.com/llvm/llvm-project/issues/109718.
+_maybe_unused
+static thread_local uintptr_t _slist_prev, _slist_next;
 
-// Helper for SLIST_REMOVE()
-static inline void *slist_remove_impl(void *ret, void *cursor, void *next, size_t size) {
-	// ret = *cursor;
-	// *cursor = ret->next;
-	memcpy(cursor, next, size);
-	// ret->next = NULL;
-	memset(next, 0, size);
-	return ret;
+/** Suppress -Wunused-value. */
+_maybe_unused
+static inline void *_slist_cast(uintptr_t ptr) {
+	return (void *)ptr;
 }
+
+#define SLIST_REMOVE__(list, cursor, next) \
+	(_slist_prev = (uintptr_t)(void *)*cursor, \
+	 _slist_next = (uintptr_t)(void *)(*cursor)->next, \
+	 (*cursor)->next = NULL, \
+	 *cursor = (void *)_slist_next, \
+	 list->tail = *cursor ? list->tail : cursor, \
+	 _slist_cast(_slist_prev))
 
 /**
  * Pop the head off a singly-linked list.
@@ -441,19 +448,7 @@ static inline void *slist_remove_impl(void *ret, void *cursor, void *next, size_
  *         If specified, use head->node.next rather than head->next.
  */
 #define drain_slist(type, item, ...) \
-	drain_slist_(type, item, __VA_ARGS__, )
-
-#define drain_slist_(type, item, list, ...) \
-	drain_slist__(type, item, (list), LIST_NEXT_(__VA_ARGS__))
-
-#define drain_slist__(type, item, list, next) \
-	for (type *item = list->head; item && \
-	     (SLIST_CHECK_(list), \
-	      list->head = item->next, \
-	      list->tail = list->head ? list->tail : &list->head, \
-	      item->next = NULL, \
-	      true); \
-	     item = list->head)
+	for (type *item; (item = SLIST_POP(__VA_ARGS__));)
 
 /**
  * Initialize a doubly-linked list.
