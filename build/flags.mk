@@ -88,6 +88,7 @@ AUTO_FLAGS := \
     gen/flags/Wshadow.mk \
     gen/flags/Wsign-compare.mk \
     gen/flags/Wstrict-prototypes.mk \
+    gen/flags/Wundef-prefix.mk \
     gen/flags/bind-now.mk \
     gen/flags/deps.mk
 

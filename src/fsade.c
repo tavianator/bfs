@@ -36,6 +36,13 @@
 #  define BFS_USE_XATTR true
 #endif
 
+#ifndef BFS_USE_EXTATTR
+#  define BFS_USE_EXTATTR false
+#endif
+#ifndef BFS_USE_XATTR
+#  define BFS_USE_XATTR false
+#endif
+
 /**
  * Many of the APIs used here don't have *at() variants, but we can try to
  * emulate something similar if /proc/self/fd is available.

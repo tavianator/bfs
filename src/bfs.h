@@ -33,8 +33,13 @@
 #ifndef BFS_COMMAND
 #  define BFS_COMMAND "bfs"
 #endif
+
 #ifndef BFS_HOMEPAGE
 #  define BFS_HOMEPAGE "https://tavianator.com/projects/bfs.html"
+#endif
+
+#ifndef BFS_LINT
+#  define BFS_LINT false
 #endif
 
 // This is a symbol instead of a literal so we don't have to rebuild everything
