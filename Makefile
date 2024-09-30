@@ -209,9 +209,11 @@ DISTCHECK_CONFIG_release := --enable-release
 
 ${DISTCHECKS}::
 	@${MKDIR} $@
+	@test "$${GITHUB_ACTIONS-}" != true || printf '::group::%s\n' $@
 	@+cd $@ \
 	    && ../configure MAKE="${MAKE}" ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
 	    && ${MAKE} check TEST_FLAGS="--sudo --verbose=skipped"
+	@test "$${GITHUB_ACTIONS-}" != true || printf '::endgroup::\n'
 
 ## Automatic dependency tracking
 
