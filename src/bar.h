@@ -27,9 +27,9 @@ unsigned int bfs_bar_width(const struct bfs_bar *bar);
 /**
  * Update the status bar message.
  *
- * @param bar
+ * @bar
  *         The status bar to update.
- * @param str
+ * @str
  *         The string to display.
  * @return
  *         0 on success, -1 on failure.

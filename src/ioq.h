@@ -83,9 +83,9 @@ struct ioq_ent {
 /**
  * Create an I/O queue.
  *
- * @param depth
+ * @depth
  *         The maximum depth of the queue.
- * @param nthreads
+ * @nthreads
  *         The maximum number of background threads.
  * @return
  *         The new I/O queue, or NULL on failure.
@@ -100,11 +100,11 @@ size_t ioq_capacity(const struct ioq *ioq);
 /**
  * Asynchronous close().
  *
- * @param ioq
+ * @ioq
  *         The I/O queue.
- * @param fd
+ * @fd
  *         The fd to close.
- * @param ptr
+ * @ptr
  *         An arbitrary pointer to associate with the request.
  * @return
  *         0 on success, or -1 on failure.
@@ -114,17 +114,17 @@ int ioq_close(struct ioq *ioq, int fd, void *ptr);
 /**
  * Asynchronous bfs_opendir().
  *
- * @param ioq
+ * @ioq
  *         The I/O queue.
- * @param dir
+ * @dir
  *         The allocated directory.
- * @param dfd
+ * @dfd
  *         The base file descriptor.
- * @param path
+ * @path
  *         The path to open, relative to dfd.
- * @param flags
+ * @flags
  *         Flags that control which directory entries are listed.
- * @param ptr
+ * @ptr
  *         An arbitrary pointer to associate with the request.
  * @return
  *         0 on success, or -1 on failure.
@@ -134,11 +134,11 @@ int ioq_opendir(struct ioq *ioq, struct bfs_dir *dir, int dfd, const char *path,
 /**
  * Asynchronous bfs_closedir().
  *
- * @param ioq
+ * @ioq
  *         The I/O queue.
- * @param dir
+ * @dir
  *         The directory to close.
- * @param ptr
+ * @ptr
  *         An arbitrary pointer to associate with the request.
  * @return
  *         0 on success, or -1 on failure.
@@ -148,17 +148,17 @@ int ioq_closedir(struct ioq *ioq, struct bfs_dir *dir, void *ptr);
 /**
  * Asynchronous bfs_stat().
  *
- * @param ioq
+ * @ioq
  *         The I/O queue.
- * @param dfd
+ * @dfd
  *         The base file descriptor.
- * @param path
+ * @path
  *         The path to stat, relative to dfd.
- * @param flags
+ * @flags
  *         Flags that affect the lookup.
- * @param buf
+ * @buf
  *         A place to store the stat buffer, if successful.
- * @param ptr
+ * @ptr
  *         An arbitrary pointer to associate with the request.
  * @return
  *         0 on success, or -1 on failure.
@@ -168,7 +168,7 @@ int ioq_stat(struct ioq *ioq, int dfd, const char *path, enum bfs_stat_flags fla
 /**
  * Pop a response from the queue.
  *
- * @param ioq
+ * @ioq
  *         The I/O queue.
  * @return
  *         The next response, or NULL.
@@ -178,9 +178,9 @@ struct ioq_ent *ioq_pop(struct ioq *ioq, bool block);
 /**
  * Free a queue entry.
  *
- * @param ioq
+ * @ioq
  *         The I/O queue.
- * @param ent
+ * @ent
  *         The entry to free.
  */
 void ioq_free(struct ioq *ioq, struct ioq_ent *ent);

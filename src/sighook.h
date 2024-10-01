@@ -27,11 +27,11 @@ enum sigflags {
  * A signal hook callback.  Hooks are executed from a signal handler, so must
  * only call async-signal-safe functions.
  *
- * @param sig
+ * @sig
  *         The signal number.
- * @param info
+ * @info
  *         Additional information about the signal.
- * @param arg
+ * @arg
  *         An arbitrary pointer passed to the hook.
  */
 typedef void sighook_fn(int sig, siginfo_t *info, void *arg);
@@ -39,13 +39,13 @@ typedef void sighook_fn(int sig, siginfo_t *info, void *arg);
 /**
  * Install a hook for a signal.
  *
- * @param sig
+ * @sig
  *         The signal to hook.
- * @param fn
+ * @fn
  *         The function to call.
- * @param arg
+ * @arg
  *         An argument passed to the function.
- * @param flags
+ * @flags
  *         Flags for the new hook.
  * @return
  *         The installed hook, or NULL on failure.
@@ -56,9 +56,9 @@ struct sighook *sighook(int sig, sighook_fn *fn, void *arg, enum sigflags flags)
  * On a best-effort basis, invoke the given hook just before the program is
  * abnormally terminated by a signal.
  *
- * @param fn
+ * @fn
  *         The function to call.
- * @param arg
+ * @arg
  *         An argument passed to the function.
  * @return
  *         The installed hook, or NULL on failure.

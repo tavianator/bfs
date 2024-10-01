@@ -119,14 +119,14 @@ struct bfs_stat {
 /**
  * Facade over fstatat().
  *
- * @param at_fd
+ * @at_fd
  *         The base file descriptor for the lookup.
- * @param at_path
+ * @at_path
  *         The path to stat, relative to at_fd.  Pass NULL to fstat() at_fd
  *         itself.
- * @param flags
+ * @flags
  *         Flags that affect the lookup.
- * @param[out] buf
+ * @buf (out)
  *         A place to store the stat buffer, if successful.
  * @return
  *         0 on success, -1 on error.

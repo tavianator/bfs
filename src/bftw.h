@@ -75,9 +75,9 @@ struct BFTW {
  * Get bfs_stat() info for a file encountered during bftw(), caching the result
  * whenever possible.
  *
- * @param ftwbuf
+ * @ftwbuf
  *         bftw() data for the file to stat.
- * @param flags
+ * @flags
  *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
  * @return
  *         A pointer to a bfs_stat() buffer, or NULL if the call failed.
@@ -88,9 +88,9 @@ const struct bfs_stat *bftw_stat(const struct BFTW *ftwbuf, enum bfs_stat_flags 
  * Get bfs_stat() info for a file encountered during bftw(), if it has already
  * been cached.
  *
- * @param ftwbuf
+ * @ftwbuf
  *         bftw() data for the file to stat.
- * @param flags
+ * @flags
  *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
  * @return
  *         A pointer to a bfs_stat() buffer, or NULL if no stat info is cached.
@@ -102,9 +102,9 @@ const struct bfs_stat *bftw_cached_stat(const struct BFTW *ftwbuf, enum bfs_stat
  * whether to follow links.  This function will avoid calling bfs_stat() if
  * possible.
  *
- * @param ftwbuf
+ * @ftwbuf
  *         bftw() data for the file to check.
- * @param flags
+ * @flags
  *         flags for bfs_stat().  Pass ftwbuf->stat_flags for the default flags.
  * @return
  *         The type of the file, or BFS_ERROR if an error occurred.
@@ -126,9 +126,9 @@ enum bftw_action {
 /**
  * Callback function type for bftw().
  *
- * @param ftwbuf
+ * @ftwbuf
  *         Data about the current file.
- * @param ptr
+ * @ptr
  *         The pointer passed to bftw().
  * @return
  *         An action value.
@@ -211,7 +211,7 @@ struct bftw_args {
  * Like ftw(3) and nftw(3), this function walks a directory tree recursively,
  * and invokes a callback for each path it encounters.
  *
- * @param args
+ * @args
  *         The arguments that control the walk.
  * @return
  *         0 on success, or -1 on failure.

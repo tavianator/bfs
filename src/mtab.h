@@ -26,9 +26,9 @@ struct bfs_mtab *bfs_mtab_parse(void);
 /**
  * Determine the file system type that a file is on.
  *
- * @param mtab
+ * @mtab
  *         The current mount table.
- * @param statbuf
+ * @statbuf
  *         The bfs_stat() buffer for the file in question.
  * @return
  *         The type of file system containing this file, "unknown" if not known,
@@ -39,9 +39,9 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 /**
  * Check if a file could be a mount point.
  *
- * @param mtab
+ * @mtab
  *         The current mount table.
- * @param name
+ * @name
  *         The name of the file to check.
  * @return
  *         Whether the named file could be a mount point.

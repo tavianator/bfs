@@ -20,9 +20,9 @@
 /**
  * Shorthand for atomic_load_explicit().
  *
- * @param obj
+ * @obj
  *         A pointer to the atomic object.
- * @param order
+ * @order
  *         The memory ordering to use, without the memory_order_ prefix.
  * @return
  *         The loaded value.

@@ -54,11 +54,11 @@ typedef struct CFILE {
 /**
  * Wrap an existing file into a colored stream.
  *
- * @param file
+ * @file
  *         The underlying file.
- * @param colors
+ * @colors
  *         The color table to use if file is a TTY.
- * @param close
+ * @close
  *         Whether to close the underlying stream when this stream is closed.
  * @return
  *         A colored wrapper around file.
@@ -68,7 +68,7 @@ CFILE *cfwrap(FILE *file, const struct colors *colors, bool close);
 /**
  * Close a colored file.
  *
- * @param cfile
+ * @cfile
  *         The colored file to close.
  * @return
  *         0 on success, -1 on failure.
@@ -78,9 +78,9 @@ int cfclose(CFILE *cfile);
 /**
  * Colored, formatted output.
  *
- * @param cfile
+ * @cfile
  *         The colored stream to print to.
- * @param format
+ * @format
  *         A printf()-style format string, supporting these format specifiers:
  *
  *         %c: A single character

@@ -42,13 +42,13 @@ enum bfs_regexec_flags {
 /**
  * Wrapper for regcomp() that supports additional regex types.
  *
- * @param[out] preg
+ * @preg (out)
  *         Will hold the compiled regex.
- * @param pattern
+ * @pattern
  *         The regular expression to compile.
- * @param type
+ * @type
  *         The regular expression syntax to use.
- * @param flags
+ * @flags
  *         Regex compilation flags.
  * @return
  *         0 on success, -1 on failure.
@@ -58,11 +58,11 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 /**
  * Wrapper for regexec().
  *
- * @param regex
+ * @regex
  *         The regular expression to execute.
- * @param str
+ * @str
  *         The string to match against.
- * @param flags
+ * @flags
  *         Regex execution flags.
  * @return
  *         1 for a match, 0 for no match, -1 on failure.
@@ -77,7 +77,7 @@ void bfs_regfree(struct bfs_regex *regex);
 /**
  * Get a human-readable regex error message.
  *
- * @param regex
+ * @regex
  *         The compiled regex.
  * @return
  *         A human-readable description of the error, which should be free()'d.

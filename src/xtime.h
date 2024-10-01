@@ -13,9 +13,9 @@
 /**
  * mktime() wrapper that reports errors more reliably.
  *
- * @param[in,out] tm
+ * @tm (in+out)
  *         The struct tm to convert.
- * @param[out] timep
+ * @timep (out)
  *         A pointer to the result.
  * @return
  *         0 on success, -1 on failure.
@@ -25,9 +25,9 @@ int xmktime(struct tm *tm, time_t *timep);
 /**
  * A portable timegm(), the inverse of gmtime().
  *
- * @param[in,out] tm
+ * @tm (in+out)
  *         The struct tm to convert.
- * @param[out] timep
+ * @timep (out)
  *         A pointer to the result.
  * @return
  *         0 on success, -1 on failure.
@@ -37,9 +37,9 @@ int xtimegm(struct tm *tm, time_t *timep);
 /**
  * Parse an ISO 8601-style timestamp.
  *
- * @param[in] str
+ * @str
  *         The string to parse.
- * @param[out] result
+ * @result (out)
  *         A pointer to the result.
  * @return
  *         0 on success, -1 on failure.

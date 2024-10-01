@@ -92,7 +92,7 @@
 /**
  * Initialize a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to initialize.
  *
  * ---
@@ -119,9 +119,9 @@
 /**
  * Initialize a singly-linked list item.
  *
- * @param item
+ * @item
  *         The item to initialize.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  *
  * ---
@@ -203,7 +203,7 @@
 /**
  * Get the head of a singly-linked list.
  *
- * @param list
+ * @list
  *         The list in question.
  * @return
  *         The first item in the list.
@@ -230,9 +230,9 @@
 /**
  * Get the tail of a singly-linked list.
  *
- * @param list
+ * @list
  *         The list in question.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  * @return
  *         The last item in the list.
@@ -249,11 +249,11 @@
 /**
  * Check if an item is attached to a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to check.
- * @param item
+ * @item
  *         The item to check.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  * @return
  *         Whether the item is attached to the list.
@@ -270,13 +270,13 @@
 /**
  * Insert an item into a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param cursor
+ * @cursor
  *         A pointer to the item to insert after, e.g. &list->head or list->tail.
- * @param item
+ * @item
  *         The item to insert.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  * @return
  *         A cursor for the next item.
@@ -297,11 +297,11 @@
 /**
  * Add an item to the tail of a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param item
+ * @item
  *         The item to append.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
 #define SLIST_APPEND(list, ...) \
@@ -313,11 +313,11 @@
 /**
  * Add an item to the head of a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param item
+ * @item
  *         The item to prepend.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
 #define SLIST_PREPEND(list, ...) \
@@ -329,11 +329,11 @@
 /**
  * Splice a singly-linked list into another.
  *
- * @param dest
+ * @dest
  *         The destination list.
- * @param cursor
+ * @cursor
  *         A pointer to the item to splice after, e.g. &list->head or list->tail.
- * @param src
+ * @src
  *         The source list.
  */
 #define SLIST_SPLICE(dest, cursor, src) \
@@ -348,9 +348,9 @@
 /**
  * Add an entire singly-linked list to the tail of another.
  *
- * @param dest
+ * @dest
  *         The destination list.
- * @param src
+ * @src
  *         The source list.
  */
 #define SLIST_EXTEND(dest, src) \
@@ -359,11 +359,11 @@
 /**
  * Remove an item from a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param cursor
+ * @cursor
  *         A pointer to the item to remove, either &list->head or &prev->next.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  * @return
  *         The removed item.
@@ -396,9 +396,9 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Pop the head off a singly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  * @return
  *         The popped item, or NULL if the list was empty.
@@ -415,13 +415,13 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Loop over the items in a singly-linked list.
  *
- * @param type
+ * @type
  *         The list item type.
- * @param item
+ * @item
  *         The induction variable name.
- * @param list
+ * @list
  *         The list to iterate.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  */
 #define for_slist(type, item, ...) \
@@ -438,13 +438,13 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Loop over a singly-linked list, popping each item.
  *
- * @param type
+ * @type
  *         The list item type.
- * @param item
+ * @item
  *         The induction variable name.
- * @param list
+ * @list
  *         The list to drain.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  */
 #define drain_slist(type, item, ...) \
@@ -453,7 +453,7 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Initialize a doubly-linked list.
  *
- * @param list
+ * @list
  *         The list to initialize.
  */
 #define LIST_INIT(list) \
@@ -472,9 +472,9 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Initialize a doubly-linked list item.
  *
- * @param item
+ * @item
  *         The item to initialize.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
 #define LIST_ITEM_INIT(...) \
@@ -504,11 +504,11 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Add an item to the tail of a doubly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param item
+ * @item
  *         The item to append.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_APPEND(list, ...) \
@@ -517,11 +517,11 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Add an item to the head of a doubly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param item
+ * @item
  *         The item to prepend.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_PREPEND(list, ...) \
@@ -530,11 +530,11 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Check if an item is attached to a doubly-linked list.
  *
- * @param list
+ * @list
  *         The list to check.
- * @param item
+ * @item
  *         The item to check.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  * @return
  *         Whether the item is attached to the list.
@@ -551,13 +551,13 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Insert into a doubly-linked list after the given cursor.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param cursor
+ * @cursor
  *         Insert after this element.
- * @param item
+ * @item
  *         The item to insert.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_INSERT(list, cursor, ...) \
@@ -576,11 +576,11 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Remove an item from a doubly-linked list.
  *
- * @param list
+ * @list
  *         The list to modify.
- * @param item
+ * @item
  *         The item to remove.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
 #define LIST_REMOVE(list, ...) \
@@ -597,13 +597,13 @@ static inline void *_slist_cast(uintptr_t ptr) {
 /**
  * Loop over the items in a doubly-linked list.
  *
- * @param type
+ * @type
  *         The list item type.
- * @param item
+ * @item
  *         The induction variable name.
- * @param list
+ * @list
  *         The list to iterate.
- * @param node (optional)
+ * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  */
 #define for_list(type, item, ...) \

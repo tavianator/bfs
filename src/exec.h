@@ -67,11 +67,11 @@ struct bfs_exec {
 /**
  * Parse an exec action.
  *
- * @param argv
+ * @argv
  *         The (bfs) command line argument to parse.
- * @param flags
+ * @flags
  *         Any flags for this exec action.
- * @param ctx
+ * @ctx
  *         The bfs context.
  * @return
  *         The parsed exec action, or NULL on failure.
@@ -81,9 +81,9 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
 /**
  * Execute the command for a file.
  *
- * @param execbuf
+ * @execbuf
  *         The parsed exec action.
- * @param ftwbuf
+ * @ftwbuf
  *         The bftw() data for the current file.
  * @return 0 if the command succeeded, -1 if it failed.  If the command could
  *         be executed, -1 is returned, and errno will be non-zero.  For
@@ -94,7 +94,7 @@ int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf);
 /**
  * Finish executing any commands.
  *
- * @param execbuf
+ * @execbuf
  *         The parsed exec action.
  * @return 0 on success, -1 if any errors were encountered.
  */

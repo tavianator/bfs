@@ -129,7 +129,7 @@ struct bfs_ctx *bfs_ctx_new(void);
 /**
  * Get the mount table.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
  * @return
  *         The cached mount table, or NULL on failure.
@@ -139,11 +139,11 @@ const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx);
 /**
  * Deduplicate an opened file.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
- * @param cfile
+ * @cfile
  *         The opened file.
- * @param path
+ * @path
  *         The path to the opened file (or NULL for standard streams).
  * @return
  *         If the same file was opened previously, that file is returned.  If cfile is a new file,
@@ -154,7 +154,7 @@ struct CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, struct CFILE *cfile, const char
 /**
  * Flush any caches for consistency with external processes.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
  */
 void bfs_ctx_flush(const struct bfs_ctx *ctx);
@@ -162,9 +162,9 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx);
 /**
  * Dump the parsed command line.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
- * @param flag
+ * @flag
  *         The -D flag that triggered the dump.
  */
 void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag);
@@ -172,7 +172,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag);
 /**
  * Free a bfs context.
  *
- * @param ctx
+ * @ctx
  *         The context to free.
  * @return
  *         0 on success, -1 if any errors occurred.

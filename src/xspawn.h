@@ -109,13 +109,13 @@ int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit
 /**
  * Spawn a new process.
  *
- * @param exe
+ * @exe
  *         The executable to run.
- * @param ctx
+ * @ctx
  *         The context for the new process.
- * @param argv
+ * @argv
  *         The arguments for the new process.
- * @param envp
+ * @envp
  *         The environment variables for the new process (NULL for the current
  *         environment).
  * @return
@@ -127,7 +127,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
  * Look up an executable in the current PATH, as BFS_SPAWN_USE_PATH or execvp()
  * would do.
  *
- * @param exe
+ * @exe
  *         The name of the binary to execute.  Bare names without a '/' will be
  *         searched on the provided PATH.
  * @return

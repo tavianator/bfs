@@ -48,9 +48,9 @@
  * Check if an error code is "like" another one.  For example, ENOTDIR is
  * like ENOENT because they can both be triggered by non-existent paths.
  *
- * @param error
+ * @error
  *         The error code to check.
- * @param category
+ * @category
  *         The category to test for.  Known categories include ENOENT and
  *         ENAMETOOLONG.
  * @return
@@ -66,7 +66,7 @@ bool errno_is_like(int category);
 /**
  * Apply the "negative errno" convention.
  *
- * @param ret
+ * @ret
  *         The return value of the attempted operation.
  * @return
  *         ret, if non-negative, otherwise -errno.
@@ -106,7 +106,7 @@ int try(int ret);
 /**
  * Re-entrant dirname() variant that always allocates a copy.
  *
- * @param path
+ * @path
  *         The path in question.
  * @return
  *         The parent directory of the path.
@@ -116,7 +116,7 @@ char *xdirname(const char *path);
 /**
  * Re-entrant basename() variant that always allocates a copy.
  *
- * @param path
+ * @path
  *         The path in question.
  * @return
  *         The final component of the path.
@@ -126,7 +126,7 @@ char *xbasename(const char *path);
 /**
  * Find the offset of the final component of a path.
  *
- * @param path
+ * @path
  *         The path in question.
  * @return
  *         The offset of the basename.
@@ -138,9 +138,9 @@ size_t xbaseoff(const char *path);
 /**
  * fopen() variant that takes open() style flags.
  *
- * @param path
+ * @path
  *         The path to open.
- * @param flags
+ * @flags
  *         Flags to pass to open().
  */
 FILE *xfopen(const char *path, int flags);
@@ -148,9 +148,9 @@ FILE *xfopen(const char *path, int flags);
 /**
  * Convenience wrapper for getdelim().
  *
- * @param file
+ * @file
  *         The file to read.
- * @param delim
+ * @delim
  *         The delimiter character to split on.
  * @return
  *         The read chunk (without the delimiter), allocated with malloc().
@@ -161,7 +161,7 @@ char *xgetdelim(FILE *file, char delim);
 /**
  * Open the controlling terminal.
  *
- * @param flags
+ * @flags
  *         The open() flags.
  * @return
  *         An open file descriptor, or -1 on failure.
@@ -181,14 +181,14 @@ const char *xgetprogname(void);
 /**
  * Wrapper for strtoll() that forbids leading spaces.
  *
- * @param str
+ * @str
  *         The string to parse.
- * @param end
+ * @end
  *         If non-NULL, will hold a pointer to the first invalid character.
  *         If NULL, the entire string must be valid.
- * @param base
+ * @base
  *         The base for the conversion, or 0 to auto-detect.
- * @param value
+ * @value
  *         Will hold the parsed integer value, on success.
  * @return
  *         0 on success, -1 on failure.
@@ -212,9 +212,9 @@ size_t asciilen(const char *str);
 /**
  * Get the length of the pure-ASCII prefix of a string.
  *
- * @param str
+ * @str
  *         The string to check.
- * @param n
+ * @n
  *         The maximum prefix length.
  */
 size_t asciinlen(const char *str, size_t n);
@@ -222,9 +222,9 @@ size_t asciinlen(const char *str, size_t n);
 /**
  * Allocate a copy of a region of memory.
  *
- * @param src
+ * @src
  *         The memory region to copy.
- * @param size
+ * @size
  *         The size of the memory region.
  * @return
  *         A copy of the region, allocated with malloc(), or NULL on failure.
@@ -234,12 +234,12 @@ void *xmemdup(const void *src, size_t size);
 /**
  * A nice string copying function.
  *
- * @param dest
+ * @dest
  *         The NUL terminator of the destination string, or `end` if it is
  *         already truncated.
- * @param end
+ * @end
  *         The end of the destination buffer.
- * @param src
+ * @src
  *         The string to copy from.
  * @return
  *         The new NUL terminator of the destination, or `end` on truncation.
@@ -249,14 +249,14 @@ char *xstpecpy(char *dest, char *end, const char *src);
 /**
  * A nice string copying function.
  *
- * @param dest
+ * @dest
  *         The NUL terminator of the destination string, or `end` if it is
  *         already truncated.
- * @param end
+ * @end
  *         The end of the destination buffer.
- * @param src
+ * @src
  *         The string to copy from.
- * @param n
+ * @n
  *         The maximum number of characters to copy.
  * @return
  *         The new NUL terminator of the destination, or `end` on truncation.
@@ -266,7 +266,7 @@ char *xstpencpy(char *dest, char *end, const char *src, size_t n);
 /**
  * Thread-safe strerror().
  *
- * @param errnum
+ * @errnum
  *         An error number.
  * @return
  *         A string describing that error, which remains valid until the next
@@ -282,9 +282,9 @@ const char *errstr(void);
 /**
  * Format a mode like ls -l (e.g. -rw-r--r--).
  *
- * @param mode
+ * @mode
  *         The mode to format.
- * @param str
+ * @str
  *         The string to hold the formatted mode.
  */
 void xstrmode(mode_t mode, char str[11]);
@@ -344,7 +344,7 @@ pid_t xwaitpid(pid_t pid, int *status, int flags);
 /**
  * Like dup(), but set the FD_CLOEXEC flag.
  *
- * @param fd
+ * @fd
  *         The file descriptor to duplicate.
  * @return
  *         A duplicated file descriptor, or -1 on failure.
@@ -354,7 +354,7 @@ int dup_cloexec(int fd);
 /**
  * Like pipe(), but set the FD_CLOEXEC flag.
  *
- * @param pipefd
+ * @pipefd
  *         The array to hold the two file descriptors.
  * @return
  *         0 on success, -1 on failure.
@@ -383,7 +383,7 @@ size_t xwrite(int fd, const void *buf, size_t nbytes);
 /**
  * close() variant that preserves errno.
  *
- * @param fd
+ * @fd
  *         The file descriptor to close.
  */
 void close_quietly(int fd);
@@ -391,7 +391,7 @@ void close_quietly(int fd);
 /**
  * close() wrapper that asserts the file descriptor is valid.
  *
- * @param fd
+ * @fd
  *         The file descriptor to close.
  * @return
  *         0 on success, or -1 on error.
@@ -406,11 +406,11 @@ int xfaccessat(int fd, const char *path, int amode);
 /**
  * readlinkat() wrapper that dynamically allocates the result.
  *
- * @param fd
+ * @fd
  *         The base directory descriptor.
- * @param path
+ * @path
  *         The path to the link, relative to fd.
- * @param size
+ * @size
  *         An estimate for the size of the link name (pass 0 if unknown).
  * @return
  *         The target of the link, allocated with malloc(), or NULL on failure.
@@ -420,7 +420,7 @@ char *xreadlinkat(int fd, const char *path, size_t size);
 /**
  * Wrapper for confstr() that allocates with malloc().
  *
- * @param name
+ * @name
  *         The ID of the confstr to look up.
  * @return
  *         The value of the confstr, or NULL on failure.
@@ -430,12 +430,12 @@ char *xconfstr(int name);
 /**
  * Portability wrapper for strtofflags().
  *
- * @param str
+ * @str
  *         The string to parse.  The pointee will be advanced to the first
  *         invalid position on error.
- * @param set
+ * @set
  *         The flags that are set in the string.
- * @param clear
+ * @clear
  *         The flags that are cleared in the string.
  * @return
  *         0 on success, -1 on failure.
@@ -452,7 +452,7 @@ long xsysconf(int name);
  *
  * [1]: https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap02.html#tag_02_01_06
  *
- * @param name
+ * @name
  *         The symbolic name of the POSIX option (e.g. SPAWN).
  * @return
  *         The value of the option, either -1 or a date like 202405.
@@ -465,13 +465,13 @@ long xsysconf(int name);
 /**
  * Error-recovering mbrtowc() wrapper.
  *
- * @param str
+ * @str
  *         The string to convert.
- * @param i
+ * @i
  *         The current index.
- * @param len
+ * @len
  *         The length of the string.
- * @param mb
+ * @mb
  *         The multi-byte decoding state.
  * @return
  *         The wide character at index *i, or WEOF if decoding fails.  In either
@@ -482,7 +482,7 @@ wint_t xmbrtowc(const char *str, size_t *i, size_t len, mbstate_t *mb);
 /**
  * wcswidth() variant that works on narrow strings.
  *
- * @param str
+ * @str
  *         The string to measure.
  * @return
  *         The likely width of that string in a terminal.
@@ -534,13 +534,13 @@ enum wesc_flags {
 /**
  * Escape a string as a single shell word.
  *
- * @param dest
+ * @dest
  *         The destination string to fill.
- * @param end
+ * @end
  *         The end of the destination buffer.
- * @param src
+ * @src
  *         The string to escape.
- * @param flags
+ * @flags
  *         Controls which characters to escape.
  * @return
  *         The new NUL terminator of the destination, or `end` on truncation.
@@ -550,15 +550,15 @@ char *wordesc(char *dest, char *end, const char *str, enum wesc_flags flags);
 /**
  * Escape a string as a single shell word.
  *
- * @param dest
+ * @dest
  *         The destination string to fill.
- * @param end
+ * @end
  *         The end of the destination buffer.
- * @param src
+ * @src
  *         The string to escape.
- * @param n
+ * @n
  *         The maximum length of the string.
- * @param flags
+ * @flags
  *         Controls which characters to escape.
  * @return
  *         The new NUL terminator of the destination, or `end` on truncation.

@@ -7,9 +7,9 @@
 /**
  * Find the "typo" distance between two strings.
  *
- * @param actual
+ * @actual
  *         The actual string typed by the user.
- * @param expected
+ * @expected
  *         The expected valid string.
  * @return The distance between the two strings.
  */

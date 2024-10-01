@@ -277,9 +277,9 @@ fail:
 /**
  * The "smart case" algorithm.
  *
- * @param ext
+ * @ext
  *         The current extension being added.
- * @param iext
+ * @iext
  *         The previous case-insensitive match, if any, for the same extension.
  * @return
  *         Whether this extension should become case-sensitive.
@@ -418,13 +418,13 @@ static const struct esc_seq *get_ext(const struct colors *colors, const char *fi
  *
  * See man dir_colors.
  *
- * @param str
+ * @str
  *         A dstring to fill with the unescaped chunk.
- * @param value
+ * @value
  *         The value to parse.
- * @param end
+ * @end
  *         The character that marks the end of the chunk.
- * @param[out] next
+ * @next (out)
  *         Will be set to the next chunk.
  * @return
  *         0 on success, -1 on failure.
