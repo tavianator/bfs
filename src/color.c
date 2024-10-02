@@ -237,6 +237,16 @@ static int insert_ext(struct trie *trie, struct ext_color *ext) {
 /** Set the color for an extension. */
 static int set_ext(struct colors *colors, dchar *key, dchar *value) {
 	size_t len = dstrlen(key);
+
+	// Embedded NUL bytes in extensions can lead to a non-prefix-free
+	// set of strings, e.g. {".gz", "\0.gz"} would be transformed to
+	// {"zg.\0", "zg.\0\0"} (showing the implicit terminating NUL).
+	// Our trie implementation only supports prefix-free key sets, but
+	// luckily '\0' cannot appear in filenames so we can ignore them.
+	if (memchr(key, '\0', len)) {
+		return 0;
+	}
+
 	struct ext_color *ext = varena_alloc(&colors->ext_arena, len + 1);
 	if (!ext) {
 		return -1;
