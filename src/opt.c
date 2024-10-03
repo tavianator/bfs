@@ -1433,7 +1433,6 @@ static struct bfs_expr *canonicalize_not(struct bfs_opt *opt, struct bfs_expr *e
 
 	if (rhs->eval_fn == eval_not) {
 		opt_debug(opt, "double negation\n");
-		rhs = only_child(expr);
 		return only_child(rhs);
 	} else if (rhs->eval_fn == eval_and || rhs->eval_fn == eval_or) {
 		return sink_not_andor(opt, expr);
