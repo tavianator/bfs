@@ -171,9 +171,10 @@ void trie_init(struct trie *trie) {
 }
 
 /** Extract the nibble at a certain offset from a byte sequence. */
-static unsigned char trie_key_nibble(const void *key, size_t offset) {
+static unsigned char trie_key_nibble(const void *key, size_t length, size_t offset) {
 	const unsigned char *bytes = key;
 	size_t byte = offset >> 1;
+	bfs_assert(byte < length);
 
 	// A branchless version of
 	// if (offset & 1) {
@@ -183,6 +184,11 @@ static unsigned char trie_key_nibble(const void *key, size_t offset) {
 	// }
 	unsigned int shift = (offset & 1) << 2;
 	return (bytes[byte] >> shift) & 0xF;
+}
+
+/** Extract the nibble at a certain offset from a leaf. */
+static unsigned char trie_leaf_nibble(const struct trie_leaf *leaf, size_t offset) {
+	return trie_key_nibble(leaf->key, leaf->length, offset);
 }
 
 /**
@@ -206,7 +212,7 @@ static struct trie_leaf *trie_representative(const struct trie *trie, const void
 
 		unsigned int index = 0;
 		if ((offset >> 1) < length) {
-			unsigned char nibble = trie_key_nibble(key, offset);
+			unsigned char nibble = trie_key_nibble(key, length, offset);
 			unsigned int bit = 1U << nibble;
 			// bits = bitmap & bit ? bitmap & (bit - 1) : 0
 			unsigned int mask = -!!(node->bitmap & bit);
@@ -307,7 +313,7 @@ static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const ch
 			skip = offset >> 1;
 		}
 
-		unsigned char nibble = trie_key_nibble(key, offset);
+		unsigned char nibble = trie_key_nibble(key, length, offset);
 		unsigned int bit = 1U << nibble;
 		if (node->bitmap & bit) {
 			unsigned int index = count_ones(node->bitmap & (bit - 1));
@@ -494,10 +500,10 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
  *           | Y
  *           +--->key
  */
-static uintptr_t *trie_jump(struct trie *trie, uintptr_t *ptr, const char *key, size_t *offset) {
+static uintptr_t *trie_jump(struct trie *trie, uintptr_t *ptr, size_t *offset) {
 	// We only ever need to jump to leaf nodes, since internal nodes are
 	// guaranteed to be within OFFSET_MAX anyway
-	bfs_assert(trie_is_leaf(*ptr));
+	struct trie_leaf *leaf = trie_decode_leaf(*ptr);
 
 	struct trie_node *node = trie_node_alloc(trie, 1);
 	if (!node) {
@@ -507,7 +513,7 @@ static uintptr_t *trie_jump(struct trie *trie, uintptr_t *ptr, const char *key, 
 	*offset += OFFSET_MAX;
 	node->offset = OFFSET_MAX;
 
-	unsigned char nibble = trie_key_nibble(key, *offset);
+	unsigned char nibble = trie_leaf_nibble(leaf, *offset);
 	node->bitmap = 1 << nibble;
 
 	node->children[0] = *ptr;
@@ -533,8 +539,8 @@ static uintptr_t *trie_jump(struct trie *trie, uintptr_t *ptr, const char *key, 
  *      +--->leaf
  */
 static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, struct trie_leaf *rep, size_t offset, size_t mismatch) {
-	unsigned char key_nibble = trie_key_nibble(leaf->key, mismatch);
-	unsigned char rep_nibble = trie_key_nibble(rep->key, mismatch);
+	unsigned char key_nibble = trie_leaf_nibble(leaf, mismatch);
+	unsigned char rep_nibble = trie_leaf_nibble(rep, mismatch);
 	bfs_assert(key_nibble != rep_nibble);
 
 	struct trie_node *node = trie_node_alloc(trie, 2);
@@ -567,8 +573,14 @@ _trie_clones
 static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	size_t mismatch = trie_mismatch(rep, key, length);
-	if (mismatch >= (length << 1)) {
+	size_t misbyte = mismatch / 2;
+	if (misbyte >= length) {
+		bfs_assert(misbyte == length);
 		return rep;
+	} else if (rep && misbyte >= rep->length) {
+		bfs_bug("trie keys must be prefix-free");
+		errno = EINVAL;
+		return NULL;
 	}
 
 	struct trie_leaf *leaf = trie_leaf_alloc(trie, key, length);
@@ -590,7 +602,7 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 		}
 		offset += node->offset;
 
-		unsigned char nibble = trie_key_nibble(key, offset);
+		unsigned char nibble = trie_leaf_nibble(leaf, offset);
 		unsigned int bit = 1U << nibble;
 		if (node->bitmap & bit) {
 			bfs_assert(offset < mismatch);
@@ -603,7 +615,7 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 	}
 
 	while (mismatch - offset > OFFSET_MAX) {
-		ptr = trie_jump(trie, ptr, key, &offset);
+		ptr = trie_jump(trie, ptr, &offset);
 		if (!ptr) {
 			trie_leaf_free(trie, leaf);
 			return NULL;
@@ -674,9 +686,8 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	while (!trie_is_leaf(*child)) {
 		struct trie_node *node = trie_decode_node(*child);
 		offset += node->offset;
-		bfs_assert((offset >> 1) < leaf->length);
 
-		unsigned char nibble = trie_key_nibble(leaf->key, offset);
+		unsigned char nibble = trie_leaf_nibble(leaf, offset);
 		unsigned int bit = 1U << nibble;
 		unsigned int bitmap = node->bitmap;
 		bfs_assert(bitmap & bit);
