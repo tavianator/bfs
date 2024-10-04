@@ -132,34 +132,34 @@ struct trie_node {
 	uintptr_t children[];
 };
 
-/** Check if an encoded pointer is to a leaf. */
-static bool trie_is_leaf(uintptr_t ptr) {
+/** Check if an encoded pointer is to an internal node. */
+static bool trie_is_node(uintptr_t ptr) {
 	return ptr & 1;
-}
-
-/** Decode a pointer to a leaf. */
-static struct trie_leaf *trie_decode_leaf(uintptr_t ptr) {
-	bfs_assert(trie_is_leaf(ptr));
-	return (struct trie_leaf *)(ptr ^ 1);
-}
-
-/** Encode a pointer to a leaf. */
-static uintptr_t trie_encode_leaf(const struct trie_leaf *leaf) {
-	uintptr_t ptr = (uintptr_t)leaf ^ 1;
-	bfs_assert(trie_is_leaf(ptr));
-	return ptr;
 }
 
 /** Decode a pointer to an internal node. */
 static struct trie_node *trie_decode_node(uintptr_t ptr) {
-	bfs_assert(!trie_is_leaf(ptr));
-	return (struct trie_node *)ptr;
+	bfs_assert(trie_is_node(ptr));
+	return (struct trie_node *)(ptr - 1);
 }
 
 /** Encode a pointer to an internal node. */
 static uintptr_t trie_encode_node(const struct trie_node *node) {
-	uintptr_t ptr = (uintptr_t)node;
-	bfs_assert(!trie_is_leaf(ptr));
+	uintptr_t ptr = (uintptr_t)node + 1;
+	bfs_assert(trie_is_node(ptr));
+	return ptr;
+}
+
+/** Decode a pointer to a leaf. */
+static struct trie_leaf *trie_decode_leaf(uintptr_t ptr) {
+	bfs_assert(!trie_is_node(ptr));
+	return (struct trie_leaf *)ptr;
+}
+
+/** Encode a pointer to a leaf. */
+static uintptr_t trie_encode_leaf(const struct trie_leaf *leaf) {
+	uintptr_t ptr = (uintptr_t)leaf;
+	bfs_assert(!trie_is_node(ptr));
 	return ptr;
 }
 
@@ -201,12 +201,9 @@ static unsigned char trie_leaf_nibble(const struct trie_leaf *leaf, size_t offse
 _trie_clones
 static struct trie_leaf *trie_representative(const struct trie *trie, const void *key, size_t length) {
 	uintptr_t ptr = trie->root;
-	if (!ptr) {
-		return NULL;
-	}
 
 	size_t offset = 0;
-	while (!trie_is_leaf(ptr)) {
+	while (trie_is_node(ptr)) {
 		struct trie_node *node = trie_decode_node(ptr);
 		offset += node->offset;
 
@@ -269,10 +266,10 @@ static struct trie_leaf *trie_terminal_leaf(const struct trie_node *node) {
 		}
 
 		uintptr_t ptr = node->children[0];
-		if (trie_is_leaf(ptr)) {
-			return trie_decode_leaf(ptr);
-		} else {
+		if (trie_is_node(ptr)) {
 			node = trie_decode_node(ptr);
+		} else {
+			return trie_decode_leaf(ptr);
 		}
 	}
 
@@ -300,7 +297,7 @@ static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const ch
 	size_t length = strlen(key) + 1;
 
 	size_t offset = 0;
-	while (!trie_is_leaf(ptr)) {
+	while (trie_is_node(ptr)) {
 		struct trie_node *node = trie_decode_node(ptr);
 		offset += node->offset;
 		if ((offset >> 1) >= length) {
@@ -552,7 +549,7 @@ static struct trie_leaf *trie_split(struct trie *trie, uintptr_t *ptr, struct tr
 	node->bitmap = (1 << key_nibble) | (1 << rep_nibble);
 
 	size_t delta = mismatch - offset;
-	if (!trie_is_leaf(*ptr)) {
+	if (trie_is_node(*ptr)) {
 		struct trie_node *child = trie_decode_node(*ptr);
 		child->offset -= delta;
 	}
@@ -595,7 +592,7 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 
 	size_t offset = 0;
 	uintptr_t *ptr = &trie->root;
-	while (!trie_is_leaf(*ptr)) {
+	while (trie_is_node(*ptr)) {
 		struct trie_node *node = trie_decode_node(*ptr);
 		if (offset + node->offset > mismatch) {
 			break;
@@ -631,7 +628,7 @@ struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t len
 
 /** Free a chain of singleton nodes. */
 static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
-	while (!trie_is_leaf(ptr)) {
+	while (trie_is_node(ptr)) {
 		struct trie_node *node = trie_decode_node(ptr);
 
 		// Make sure the bitmap is a power of two, i.e. it has just one child
@@ -663,7 +660,7 @@ static void trie_free_singletons(struct trie *trie, uintptr_t ptr) {
  */
 static int trie_collapse_node(struct trie *trie, uintptr_t *parent, struct trie_node *parent_node, unsigned int child_index) {
 	uintptr_t other = parent_node->children[child_index ^ 1];
-	if (!trie_is_leaf(other)) {
+	if (trie_is_node(other)) {
 		struct trie_node *other_node = trie_decode_node(other);
 		if (other_node->offset + parent_node->offset <= OFFSET_MAX) {
 			other_node->offset += parent_node->offset;
@@ -683,7 +680,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	uintptr_t *parent = NULL;
 	unsigned int child_bit = 0, child_index = 0;
 	size_t offset = 0;
-	while (!trie_is_leaf(*child)) {
+	while (trie_is_node(*child)) {
 		struct trie_node *node = trie_decode_node(*child);
 		offset += node->offset;
 
