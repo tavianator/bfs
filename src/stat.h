@@ -126,7 +126,7 @@ struct bfs_stat {
  *         itself.
  * @flags
  *         Flags that affect the lookup.
- * @buf (out)
+ * @buf[out]
  *         A place to store the stat buffer, if successful.
  * @return
  *         0 on success, -1 on error.

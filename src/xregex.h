@@ -42,7 +42,7 @@ enum bfs_regexec_flags {
 /**
  * Wrapper for regcomp() that supports additional regex types.
  *
- * @preg (out)
+ * @preg[out]
  *         Will hold the compiled regex.
  * @pattern
  *         The regular expression to compile.

@@ -434,7 +434,7 @@ static const struct esc_seq *get_ext(const struct colors *colors, const char *fi
  *         The value to parse.
  * @end
  *         The character that marks the end of the chunk.
- * @next (out)
+ * @next[out]
  *         Will be set to the next chunk.
  * @return
  *         0 on success, -1 on failure.

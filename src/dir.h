@@ -141,7 +141,7 @@ int bfs_polldir(struct bfs_dir *dir);
  *
  * @dir
  *         The directory to read.
- * @dirent (out)
+ * @dirent[out]
  *         The directory entry to populate.
  * @return
  *         1 on success, 0 on EOF, or -1 on failure.
