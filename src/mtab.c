@@ -15,12 +15,14 @@
 #include <string.h>
 #include <sys/types.h>
 
-#if !defined(BFS_USE_MNTENT) && BFS_HAS_GETMNTENT_1
-#  define BFS_USE_MNTENT true
-#elif !defined(BFS_USE_MNTINFO) && BFS_HAS_GETMNTINFO
-#  define BFS_USE_MNTINFO true
-#elif !defined(BFS_USE_MNTTAB) && BFS_HAS_GETMNTENT_2
-#  define BFS_USE_MNTTAB true
+#ifndef BFS_USE_MNTENT
+#  define BFS_USE_MNTENT BFS_HAS_GETMNTENT_1
+#endif
+#ifndef BFS_USE_MNTINFO
+#  define BFS_USE_MNTINFO (!BFS_USE_MNTENT && BFS_HAS_GETMNTINFO)
+#endif
+#ifndef BFS_USE_MNTTAB
+#  define BFS_USE_MNTTAB (!BFS_USE_MNTINFO && BFS_HAS_GETMNTENT_2)
 #endif
 
 #if BFS_USE_MNTENT

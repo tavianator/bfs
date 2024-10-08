@@ -19,6 +19,8 @@
 
 #if __has_include(<sys/extattr.h>) || __has_include(<sys/xattr.h>)
 #  define BFS_CAN_CHECK_XATTRS true
+#else
+#  define BFS_CAN_CHECK_XATTRS false
 #endif
 
 struct BFTW;

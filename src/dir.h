@@ -21,6 +21,8 @@
 #    define BFS_USE_GETDENTS true
 #  elif __linux__ || __FreeBSD__
 #    define BFS_USE_GETDENTS (BFS_HAS_GETDENTS || BFS_HAS_GETDENTS64 | BFS_HAS_GETDENTS64_SYSCALL)
+#  else
+#    define BFS_USE_GETDENTS false
 #  endif
 #endif
 

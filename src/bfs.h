@@ -204,6 +204,8 @@ extern const char bfs_ldlibs[];
 #ifndef BFS_USE_TARGET_CLONES
 #  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__) && !__SANITIZE_THREAD__
 #    define BFS_USE_TARGET_CLONES true
+#  else
+#    define BFS_USE_TARGET_CLONES false
 #  endif
 #endif
 
