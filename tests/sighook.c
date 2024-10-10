@@ -4,14 +4,14 @@
 #include "tests.h"
 
 #include "atomic.h"
-#include "thread.h"
 #include "sighook.h"
+#include "thread.h"
+#include "xtime.h"
 
 #include <stddef.h>
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
-#include <sys/time.h>
 
 /** Counts SIGALRM deliveries. */
 static atomic size_t count = 0;
@@ -61,10 +61,9 @@ void check_sighook(void) {
 	}
 
 	// Create a timer that sends SIGALRM every 100 microseconds
-	struct itimerval ival = {0};
-	ival.it_value.tv_usec = 100;
-	ival.it_interval.tv_usec = 100;
-	if (!bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0)) {
+	struct timespec ival = { .tv_nsec = 100 * 1000 };
+	struct timer *timer = xtimer_start(&ival);
+	if (!bfs_echeck(timer)) {
 		goto unhook;
 	}
 
@@ -104,8 +103,7 @@ void check_sighook(void) {
 	bfs_echeck(errno == 0, "pthread_sigmask()");
 untime:
 	// Stop the timer
-	ival.it_value.tv_usec = 0;
-	bfs_echeck(setitimer(ITIMER_REAL, &ival, NULL) == 0);
+	xtimer_stop(timer);
 unhook:
 	// Unregister the SIGALRM hook
 	sigunhook(hook);
