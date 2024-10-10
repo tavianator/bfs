@@ -28,6 +28,7 @@
 #include "stat.h"
 #include "trie.h"
 #include "xregex.h"
+#include "xtime.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -42,6 +43,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -1146,20 +1148,7 @@ bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
 }
 
 /** Update the status bar. */
-static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct timespec *last_status, size_t count) {
-	struct timespec now;
-	if (eval_gettime(state, &now) == 0) {
-		struct timespec elapsed = {0};
-		timespec_elapsed(&elapsed, last_status, &now);
-
-		// Update every 0.1s
-		if (elapsed.tv_sec > 0 || elapsed.tv_nsec >= 100000000L) {
-			*last_status = now;
-		} else {
-			return;
-		}
-	}
-
+static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, size_t count) {
 	size_t width = bfs_bar_width(bar);
 	if (width < 3) {
 		return;
@@ -1389,9 +1378,13 @@ struct callback_args {
 
 	/** The status bar. */
 	struct bfs_bar *bar;
-	/** The time of the last status update. */
-	struct timespec last_status;
-	/** Flag set by SIGINFO hook. */
+	/** The SIGALRM hook. */
+	struct sighook *alrm_hook;
+	/** The interval timer. */
+	struct timer *timer;
+	/** Flag set by SIGALRM. */
+	atomic bool alrm_flag;
+	/** Flag set by SIGINFO. */
 	atomic bool info_flag;
 
 	/** The number of files visited so far. */
@@ -1405,6 +1398,64 @@ struct callback_args {
 	/** Eventual return value from bfs_eval(). */
 	int ret;
 };
+
+/** Update the status bar in response to SIGALRM. */
+static void eval_sigalrm(int sig, siginfo_t *info, void *ptr) {
+	struct callback_args *args = ptr;
+	store(&args->alrm_flag, true, relaxed);
+}
+
+/** Show/hide the bar in response to SIGINFO. */
+static void eval_siginfo(int sig, siginfo_t *info, void *ptr) {
+	struct callback_args *args = ptr;
+	store(&args->info_flag, true, relaxed);
+}
+
+/** Show the status bar. */
+static void eval_show_bar(struct callback_args *args) {
+	args->alrm_hook = sighook(SIGALRM, eval_sigalrm, args, SH_CONTINUE);
+	if (!args->alrm_hook) {
+		goto fail;
+	}
+
+	args->bar = bfs_bar_show();
+	if (!args->bar) {
+		goto fail;
+	}
+
+	// Update the bar every 0.1s
+	struct timespec ival = { .tv_nsec = 100 * 1000 * 1000 };
+	args->timer = xtimer_start(&ival);
+	if (!args->timer) {
+		goto fail;
+	}
+
+	// Update the bar immediately
+	store(&args->alrm_flag, true, relaxed);
+
+	return;
+
+fail:
+	bfs_warning(args->ctx, "Couldn't show status bar: %s.\n\n", errstr());
+
+	bfs_bar_hide(args->bar);
+	args->bar = NULL;
+
+	sigunhook(args->alrm_hook);
+	args->alrm_hook = NULL;
+}
+
+/** Hide the status bar. */
+static void eval_hide_bar(struct callback_args *args) {
+	xtimer_stop(args->timer);
+	args->timer = NULL;
+
+	sigunhook(args->alrm_hook);
+	args->alrm_hook = NULL;
+
+	bfs_bar_hide(args->bar);
+	args->bar = NULL;
+}
 
 /**
  * bftw() callback.
@@ -1426,18 +1477,14 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	// Check whether SIGINFO was delivered and show/hide the bar
 	if (exchange(&args->info_flag, false, relaxed)) {
 		if (args->bar) {
-			bfs_bar_hide(args->bar);
-			args->bar = NULL;
+			eval_hide_bar(args);
 		} else {
-			args->bar = bfs_bar_show();
-			if (!args->bar) {
-				bfs_warning(ctx, "Couldn't show status bar: %s.\n", errstr());
-			}
+			eval_show_bar(args);
 		}
 	}
 
-	if (args->bar) {
-		eval_status(&state, args->bar, &args->last_status, args->count);
+	if (exchange(&args->alrm_flag, false, relaxed)) {
+		eval_status(&state, args->bar, args->count);
 	}
 
 	if (ftwbuf->type == BFS_ERROR) {
@@ -1507,12 +1554,6 @@ done:
 	}
 
 	return state.action;
-}
-
-/** Show/hide the bar in response to SIGINFO. */
-static void eval_siginfo(int sig, siginfo_t *info, void *ptr) {
-	struct callback_args *args = ptr;
-	store(&args->info_flag, true, relaxed);
 }
 
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
@@ -1671,10 +1712,7 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	};
 
 	if (ctx->status) {
-		args.bar = bfs_bar_show();
-		if (!args.bar) {
-			bfs_warning(ctx, "Couldn't show status bar: %s.\n\n", errstr());
-		}
+		eval_show_bar(&args);
 	}
 
 #ifdef SIGINFO
@@ -1752,7 +1790,9 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	}
 
 	sigunhook(info_hook);
-	bfs_bar_hide(args.bar);
+	if (args.bar) {
+		eval_hide_bar(&args);
+	}
 
 	if (ctx->ignore_errors && args.nerrors > 0) {
 		bfs_warning(ctx, "Suppressed errors: %zu\n", args.nerrors);
