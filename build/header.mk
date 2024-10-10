@@ -52,6 +52,7 @@ HEADERS := \
     gen/has/strtofflags.h \
     gen/has/tcgetwinsize.h \
     gen/has/timegm.h \
+    gen/has/timer-create.h \
     gen/has/tm-gmtoff.h \
     gen/has/uselocale.h
 

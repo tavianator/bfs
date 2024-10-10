@@ -3,9 +3,11 @@
 
 #include "xtime.h"
 
+#include "alloc.h"
 #include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
+#include "sanity.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -350,4 +352,99 @@ invalid:
 	errno = EINVAL;
 error:
 	return -1;
+}
+
+#if defined(_POSIX_TIMERS) && BFS_HAS_TIMER_CREATE
+#  define BFS_POSIX_TIMERS _POSIX_TIMERS
+#else
+#  define BFS_POSIX_TIMERS (-1)
+#endif
+
+struct timer {
+#if BFS_POSIX_TIMERS >= 0
+	/** The POSIX timer. */
+	timer_t timer;
+#endif
+	/** Whether to use timer_create() or setitimer(). */
+	bool legacy;
+};
+
+struct timer *xtimer_start(const struct timespec *interval) {
+	struct timer *timer = ALLOC(struct timer);
+	if (!timer) {
+		return NULL;
+	}
+
+#if BFS_POSIX_TIMERS >= 0
+	if (sysoption(TIMERS)) {
+		clockid_t clock = CLOCK_REALTIME;
+
+#if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
+		if (sysoption(MONOTONIC_CLOCK) > 0) {
+			clock = CLOCK_MONOTONIC;
+		}
+#endif
+
+		if (timer_create(clock, NULL, &timer->timer) != 0) {
+			goto fail;
+		}
+
+		// https://github.com/llvm/llvm-project/issues/111847
+		sanitize_init(&timer->timer);
+
+		struct itimerspec spec = {
+			.it_value = *interval,
+			.it_interval = *interval,
+		};
+		if (timer_settime(timer->timer, 0, &spec, NULL) != 0) {
+			timer_delete(timer->timer);
+			goto fail;
+		}
+
+		timer->legacy = false;
+		return timer;
+	}
+#endif
+
+#if BFS_POSIX_TIMERS <= 0
+	struct timeval tv = {
+		.tv_sec = interval->tv_sec,
+		.tv_usec = (interval->tv_nsec + 999) / 1000,
+	};
+	struct itimerval ival = {
+		.it_value = tv,
+		.it_interval = tv,
+	};
+	if (setitimer(ITIMER_REAL, &ival, NULL) != 0) {
+		goto fail;
+	}
+
+	timer->legacy = true;
+	return timer;
+#endif
+
+fail:
+	free(timer);
+	return NULL;
+}
+
+void xtimer_stop(struct timer *timer) {
+	if (!timer) {
+		return;
+	}
+
+	if (timer->legacy) {
+#if BFS_POSIX_TIMERS <= 0
+		struct itimerval ival = {0};
+		int ret = setitimer(ITIMER_REAL, &ival, NULL);
+		bfs_everify(ret == 0, "setitimer()");
+#endif
+	} else {
+#if BFS_POSIX_TIMERS >= 0
+		int ret = timer_delete(timer->timer);
+		bfs_everify(ret == 0, "timer_delete()");
+#endif
+	}
+
+	free(timer);
 }

@@ -46,4 +46,27 @@ int xtimegm(struct tm *tm, time_t *timep);
  */
 int xgetdate(const char *str, struct timespec *result);
 
+/**
+ * A timer.
+ */
+struct timer;
+
+/**
+ * Start a timer.
+ *
+ * @interval
+ *         The regular interval at which to send SIGALRM.
+ * @return
+ *         The new timer on success, otherwise NULL.
+ */
+struct timer *xtimer_start(const struct timespec *interval);
+
+/**
+ * Stop a timer.
+ *
+ * @timer
+ *         The timer to stop.
+ */
+void xtimer_stop(struct timer *timer);
+
 #endif // BFS_XTIME_H
