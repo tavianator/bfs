@@ -20,9 +20,11 @@ static const char *keys[] = {
 	"quuuux",
 
 	"pre",
-	"pref",
 	"prefi",
+	"pref",
 	"prefix",
+	"p",
+	"pRefix",
 
 	"AAAA",
 	"AADD",
@@ -75,6 +77,7 @@ void check_trie(void) {
 		size_t i = 0;
 		for_trie (leaf, &trie) {
 			bfs_check(leaf == trie_find_str(&trie, keys[i]));
+			bfs_check(leaf == trie_insert_str(&trie, keys[i]));
 			bfs_check(!leaf->prev || leaf->prev->next == leaf);
 			bfs_check(!leaf->next || leaf->next->prev == leaf);
 			++i;
