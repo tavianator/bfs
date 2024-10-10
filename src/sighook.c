@@ -291,6 +291,8 @@ static void sigpop(struct siglist *list, struct sighook *hook) {
 	rcu_update(hook->self, next);
 	if (next) {
 		next->self = hook->self;
+	} else {
+		list->tail = &list->head;
 	}
 }
 

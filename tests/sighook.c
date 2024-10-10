@@ -60,6 +60,13 @@ void check_sighook(void) {
 		return;
 	}
 
+	// Check that we can unregister and re-register a hook
+	sigunhook(hook);
+	hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
+	if (!bfs_echeck(hook, "sighook(SIGALRM)")) {
+		return;
+	}
+
 	// Create a timer that sends SIGALRM every 100 microseconds
 	struct timespec ival = { .tv_nsec = 100 * 1000 };
 	struct timer *timer = xtimer_start(&ival);
