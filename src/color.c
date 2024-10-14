@@ -998,22 +998,25 @@ static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, 
 		goto out;
 	}
 
+	size_t len = dstrlen(at_path);
 	while (ret > 0) {
+		dstresize(&at_path, len);
 		if (xfaccessat(at_fd, at_path, F_OK) == 0) {
 			break;
 		}
 
-		size_t len = dstrlen(at_path);
-		while (ret && at_path[len - 1] == '/') {
-			--len, --ret;
-		}
-		if (errno != ENOTDIR) {
-			while (ret && at_path[len - 1] != '/') {
+		// Try without trailing slashes, to distinguish "notdir/" from "notdir"
+		if (at_path[len - 1] == '/') {
+			do {
 				--len, --ret;
-			}
+			} while (ret > 0 && at_path[len - 1] == '/');
+			continue;
 		}
 
-		dstresize(&at_path, len);
+		// Remove the last component and try again
+		do {
+			--len, --ret;
+		} while (ret > 0 && at_path[len - 1] != '/');
 	}
 
 out_path:
