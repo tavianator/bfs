@@ -369,9 +369,8 @@ static int build_iext_trie(struct colors *colors) {
 /**
  * Find a color by an extension.
  */
-static const struct esc_seq *get_ext(const struct colors *colors, const char *filename) {
+static const struct esc_seq *get_ext(const struct colors *colors, const char *filename, size_t name_len) {
 	size_t ext_len = colors->ext_len;
-	size_t name_len = strlen(filename);
 	if (name_len < ext_len) {
 		ext_len = name_len;
 	}
@@ -380,7 +379,8 @@ static const struct esc_seq *get_ext(const struct colors *colors, const char *fi
 	char buf[256];
 	char *copy;
 	if (ext_len < sizeof(buf)) {
-		copy = memcpy(buf, suffix, ext_len + 1);
+		copy = memcpy(buf, suffix, ext_len);
+		copy[ext_len] = '\0';
 	} else {
 		copy = strndup(suffix, ext_len);
 		if (!copy) {
@@ -781,34 +781,207 @@ int cfclose(CFILE *cfile) {
 	return ret;
 }
 
-/** Check if a symlink is broken. */
-static bool is_link_broken(const struct BFTW *ftwbuf) {
-	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
-		return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0;
-	} else {
-		return true;
-	}
-}
-
 bool colors_need_stat(const struct colors *colors) {
 	return colors->setuid || colors->setgid || colors->executable || colors->multi_hard
 		|| colors->sticky_other_writable || colors->other_writable || colors->sticky;
 }
 
+/** A colorable file path. */
+struct cpath {
+	/** The full path to color. */
+	const char *path;
+	/** The basename offset of the last valid component. */
+	size_t nameoff;
+	/** The end offset of the last valid component. */
+	size_t valid;
+	/** The total length of the path. */
+	size_t len;
+
+	/** The bftw() buffer. */
+	const struct BFTW *ftwbuf;
+	/** bfs_stat() flags for the final component. */
+	enum bfs_stat_flags flags;
+	/** A bfs_stat() buffer, filled in when 0 < valid < len. */
+	struct bfs_stat statbuf;
+};
+
+/** Move the valid range of a path backwards. */
+static void cpath_retreat(struct cpath *cpath) {
+	const char *path = cpath->path;
+	size_t nameoff = cpath->nameoff;
+	size_t valid = cpath->valid;
+
+	if (valid > 0 && path[valid - 1] == '/') {
+		// Try without trailing slashes, to distinguish "notdir/" from "notdir"
+		do {
+			--valid;
+		} while (valid > 0 && path[valid - 1] == '/');
+
+		nameoff = valid;
+		while (nameoff > 0 && path[nameoff - 1] != '/') {
+			--nameoff;
+		}
+	} else {
+		// Remove the last component and try again
+		valid = nameoff;
+	}
+
+	cpath->nameoff = nameoff;
+	cpath->valid = valid;
+}
+
+/** Initialize a struct cpath. */
+static int cpath_init(struct cpath *cpath, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
+	// Normally there are only two components to color:
+	//
+	//          nameoff  valid
+	//             v       v
+	//     path/to/filename
+	//     --------+-------
+	//     ${di}   ${fi}
+	//
+	// Error cases also usually have two components:
+	//
+	//           valid,
+	//          nameoff
+	//             v
+	//     path/to/nowhere
+	//     --------+------
+	//     ${di}   ${mi}
+	//
+	// But with ENOTDIR, there may be three:
+	//
+	//          nameoff  valid
+	//             v       v
+	//     path/to/filename/nowhere
+	//     --------+-------+-------
+	//     ${di}   ${fi}   ${mi}
+
+	cpath->path = path;
+	cpath->len = strlen(path);
+	cpath->ftwbuf = ftwbuf;
+	cpath->flags = flags;
+
+	cpath->valid = cpath->len;
+	if (path == ftwbuf->path) {
+		cpath->nameoff = ftwbuf->nameoff;
+	} else {
+		cpath->nameoff = xbaseoff(path);
+	}
+
+	if (bftw_type(ftwbuf, flags) != BFS_ERROR) {
+		return 0;
+	}
+
+	cpath_retreat(cpath);
+
+	// Find the base path.  For symlinks like
+	//
+	//     path/to/symlink -> nested/file
+	//
+	// this will be something like
+	//
+	//     path/to/nested/file
+	int at_fd = AT_FDCWD;
+	dchar *at_path = NULL;
+	if (path == ftwbuf->path) {
+		if (ftwbuf->depth > 0) {
+			// The parent must have existed to get here
+			return 0;
+		}
+	} else {
+		// We're in print_link_target(), so resolve relative to the link's parent directory
+		at_fd = ftwbuf->at_fd;
+		if (at_fd == (int)AT_FDCWD && path[0] != '/') {
+			at_path = dstrxdup(ftwbuf->path, ftwbuf->nameoff);
+			if (!at_path) {
+				return -1;
+			}
+		}
+	}
+
+	if (!at_path) {
+		at_path = dstralloc(cpath->valid);
+		if (!at_path) {
+			return -1;
+		}
+	}
+	if (dstrxcat(&at_path, path, cpath->valid) != 0) {
+		dstrfree(at_path);
+		return -1;
+	}
+
+	size_t at_off = dstrlen(at_path) - cpath->valid;
+
+	// Find the longest valid path prefix
+	while (cpath->valid > 0) {
+		if (bfs_stat(at_fd, at_path, BFS_STAT_FOLLOW, &cpath->statbuf) == 0) {
+			break;
+		}
+
+		cpath_retreat(cpath);
+		dstresize(&at_path, at_off + cpath->valid);
+	}
+
+	dstrfree(at_path);
+	return 0;
+}
+
+/** Get the bfs_stat() buffer for the last valid component. */
+static const struct bfs_stat *cpath_stat(const struct cpath *cpath) {
+	if (cpath->valid == cpath->len) {
+		return bftw_stat(cpath->ftwbuf, cpath->flags);
+	} else {
+		return &cpath->statbuf;
+	}
+}
+
+/** Check if a path has non-trivial capabilities. */
+static bool cpath_has_capabilities(const struct cpath *cpath) {
+	if (cpath->valid == cpath->len) {
+		return bfs_check_capabilities(cpath->ftwbuf);
+	} else {
+		// TODO: implement capability checks for arbitrary paths
+		return false;
+	}
+}
+
+/** Check if a symlink is broken. */
+static bool cpath_is_broken(const struct cpath *cpath) {
+	if (cpath->valid < cpath->len) {
+		// A valid parent can't be a broken link
+		return false;
+	}
+
+	const struct BFTW *ftwbuf = cpath->ftwbuf;
+	if (ftwbuf->stat_flags & BFS_STAT_NOFOLLOW) {
+		return xfaccessat(ftwbuf->at_fd, ftwbuf->at_path, F_OK) != 0;
+	} else {
+		// A link encountered with BFS_STAT_TRYFOLLOW must be broken
+		return true;
+	}
+}
+
 /** Get the color for a file. */
-static const struct esc_seq *file_color(const struct colors *colors, const char *filename, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	enum bfs_type type = bftw_type(ftwbuf, flags);
+static const struct esc_seq *file_color(const struct colors *colors, const struct cpath *cpath) {
+	enum bfs_type type;
+	if (cpath->valid == cpath->len) {
+		type = bftw_type(cpath->ftwbuf, cpath->flags);
+	} else {
+		type = bfs_mode_to_type(cpath->statbuf.mode);
+	}
+
 	if (type == BFS_ERROR) {
 		goto error;
 	}
 
-	const struct bfs_stat *statbuf = NULL;
+	const struct bfs_stat *statbuf;
 	const struct esc_seq *color = NULL;
 
 	switch (type) {
 	case BFS_REG:
 		if (colors->setuid || colors->setgid || colors->executable || colors->multi_hard) {
-			statbuf = bftw_stat(ftwbuf, flags);
+			statbuf = cpath_stat(cpath);
 			if (!statbuf) {
 				goto error;
 			}
@@ -818,7 +991,7 @@ static const struct esc_seq *file_color(const struct colors *colors, const char 
 			color = colors->setuid;
 		} else if (colors->setgid && (statbuf->mode & 02000)) {
 			color = colors->setgid;
-		} else if (colors->capable && bfs_check_capabilities(ftwbuf) > 0) {
+		} else if (colors->capable && cpath_has_capabilities(cpath)) {
 			color = colors->capable;
 		} else if (colors->executable && (statbuf->mode & 00111)) {
 			color = colors->executable;
@@ -827,7 +1000,9 @@ static const struct esc_seq *file_color(const struct colors *colors, const char 
 		}
 
 		if (!color) {
-			color = get_ext(colors, filename);
+			const char *name = cpath->path + cpath->nameoff;
+			size_t namelen = cpath->valid - cpath->nameoff;
+			color = get_ext(colors, name, namelen);
 		}
 
 		if (!color) {
@@ -838,7 +1013,7 @@ static const struct esc_seq *file_color(const struct colors *colors, const char 
 
 	case BFS_DIR:
 		if (colors->sticky_other_writable || colors->other_writable || colors->sticky) {
-			statbuf = bftw_stat(ftwbuf, flags);
+			statbuf = cpath_stat(cpath);
 			if (!statbuf) {
 				goto error;
 			}
@@ -857,7 +1032,7 @@ static const struct esc_seq *file_color(const struct colors *colors, const char 
 		break;
 
 	case BFS_LNK:
-		if (colors->orphan && is_link_broken(ftwbuf)) {
+		if (colors->orphan && cpath_is_broken(cpath)) {
 			color = colors->orphan;
 		} else {
 			color = colors->link;
@@ -944,6 +1119,10 @@ static int print_wordesc(CFILE *cfile, const char *str, size_t n, enum wesc_flag
 
 /** Print a string with an optional color. */
 static int print_colored(CFILE *cfile, const struct esc_seq *esc, const char *str, size_t len) {
+	if (len == 0) {
+		return 0;
+	}
+
 	if (print_esc(cfile, esc) != 0) {
 		return -1;
 	}
@@ -960,115 +1139,42 @@ static int print_colored(CFILE *cfile, const struct esc_seq *esc, const char *st
 	return 0;
 }
 
-/** Find the offset of the first broken path component. */
-static ssize_t first_broken_offset(const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags, size_t max) {
-	ssize_t ret = max;
-	bfs_assert(ret >= 0);
-
-	if (bftw_type(ftwbuf, flags) != BFS_ERROR) {
-		goto out;
-	}
-
-	dchar *at_path;
-	int at_fd;
-	if (path == ftwbuf->path) {
-		if (ftwbuf->depth == 0) {
-			at_fd = AT_FDCWD;
-			at_path = dstrxdup(path, max);
-		} else {
-			// The parent must have existed to get here
-			goto out;
-		}
-	} else {
-		// We're in print_link_target(), so resolve relative to the link's parent directory
-		at_fd = ftwbuf->at_fd;
-		if (at_fd == (int)AT_FDCWD && path[0] != '/') {
-			at_path = dstrxdup(ftwbuf->path, ftwbuf->nameoff);
-			if (at_path && dstrxcat(&at_path, path, max) != 0) {
-				ret = -1;
-				goto out_path;
-			}
-		} else {
-			at_path = dstrxdup(path, max);
-		}
-	}
-
-	if (!at_path) {
-		ret = -1;
-		goto out;
-	}
-
-	size_t len = dstrlen(at_path);
-	while (ret > 0) {
-		dstresize(&at_path, len);
-		if (xfaccessat(at_fd, at_path, F_OK) == 0) {
-			break;
-		}
-
-		// Try without trailing slashes, to distinguish "notdir/" from "notdir"
-		if (at_path[len - 1] == '/') {
-			do {
-				--len, --ret;
-			} while (ret > 0 && at_path[len - 1] == '/');
-			continue;
-		}
-
-		// Remove the last component and try again
-		do {
-			--len, --ret;
-		} while (ret > 0 && at_path[len - 1] != '/');
-	}
-
-out_path:
-	dstrfree(at_path);
-out:
-	return ret;
-}
-
 /** Print a path with colors. */
 static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	size_t nameoff;
-	if (path == ftwbuf->path) {
-		nameoff = ftwbuf->nameoff;
-	} else {
-		nameoff = xbaseoff(path);
-	}
-
-	const char *name = path + nameoff;
-	size_t pathlen = nameoff + strlen(name);
-
-	ssize_t broken = first_broken_offset(path, ftwbuf, flags, nameoff);
-	if (broken < 0) {
+	struct cpath cpath;
+	if (cpath_init(&cpath, path, ftwbuf, flags) != 0) {
 		return -1;
 	}
-	size_t split = broken;
 
 	const struct colors *colors = cfile->colors;
 	const struct esc_seq *dirs_color = colors->directory;
-	const struct esc_seq *name_color;
+	const struct esc_seq *name_color = NULL;
+	const struct esc_seq *err_color = colors->missing;
+	if (!err_color) {
+		err_color = colors->orphan;
+	}
 
-	if (split < nameoff) {
-		name_color = colors->missing;
-		if (!name_color) {
-			name_color = colors->orphan;
-		}
-	} else {
-		name_color = file_color(cfile->colors, path + nameoff, ftwbuf, flags);
+	if (cpath.nameoff < cpath.valid) {
+		name_color = file_color(colors, &cpath);
 		if (name_color == dirs_color) {
-			split = pathlen;
+			cpath.nameoff = cpath.valid;
 		}
 	}
 
-	if (split > 0) {
-		if (print_colored(cfile, dirs_color, path, split) != 0) {
-			return -1;
-		}
+	if (print_colored(cfile, dirs_color, path, cpath.nameoff) != 0) {
+		return -1;
 	}
 
-	if (split < pathlen) {
-		if (print_colored(cfile, name_color, path + split, pathlen - split) != 0) {
-			return -1;
-		}
+	const char *name = path + cpath.nameoff;
+	size_t name_len = cpath.valid - cpath.nameoff;
+	if (print_colored(cfile, name_color, name, name_len) != 0) {
+		return -1;
+	}
+
+	const char *tail = path + cpath.valid;
+	size_t tail_len = cpath.len - cpath.valid;
+	if (print_colored(cfile, err_color, tail, tail_len) != 0) {
+		return -1;
 	}
 
 	return 0;
@@ -1076,8 +1182,18 @@ static int print_path_colored(CFILE *cfile, const char *path, const struct BFTW 
 
 /** Print a file name with colors. */
 static int print_name_colored(CFILE *cfile, const char *name, const struct BFTW *ftwbuf, enum bfs_stat_flags flags) {
-	const struct esc_seq *esc = file_color(cfile->colors, name, ftwbuf, flags);
-	return print_colored(cfile, esc, name, strlen(name));
+	size_t len = strlen(name);
+	const struct cpath cpath = {
+		.path = name,
+		.nameoff = 0,
+		.valid = len,
+		.len = len,
+		.ftwbuf = ftwbuf,
+		.flags = flags,
+	};
+
+	const struct esc_seq *esc = file_color(cfile->colors, &cpath);
+	return print_colored(cfile, esc, name, cpath.len);
 }
 
 /** Print the name of a file with the appropriate colors. */
