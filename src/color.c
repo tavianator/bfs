@@ -920,7 +920,7 @@ static int cpath_init(struct cpath *cpath, const char *path, const struct BFTW *
 		}
 
 		cpath_retreat(cpath);
-		dstresize(&at_path, at_off + cpath->valid);
+		dstrshrink(at_path, at_off + cpath->valid);
 	}
 
 	dstrfree(at_path);
@@ -1518,7 +1518,7 @@ int cvfprintf(CFILE *cfile, const char *format, va_list args) {
 		}
 	}
 
-	dstresize(&cfile->buffer, 0);
+	dstrshrink(cfile->buffer, 0);
 	return ret;
 }
 

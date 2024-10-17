@@ -46,6 +46,13 @@ static dchar *dstrdata(struct dstring *header) {
 	return (char *)header + DSTR_OFFSET;
 }
 
+/** Set the length of a dynamic string. */
+static void dstrsetlen(struct dstring *header, size_t len) {
+	bfs_assert(len < header->cap);
+	header->len = len;
+	header->str[len] = '\0';
+}
+
 /** Allocate a dstring with the given contents. */
 static dchar *dstralloc_impl(size_t cap, size_t len, const char *str) {
 	// Avoid reallocations for small strings
@@ -59,11 +66,10 @@ static dchar *dstralloc_impl(size_t cap, size_t len, const char *str) {
 	}
 
 	header->cap = cap;
-	header->len = len;
+	dstrsetlen(header, len);
 
-	char *ret = dstrdata(header);
+	dchar *ret = dstrdata(header);
 	memcpy(ret, str, len);
-	ret[len] = '\0';
 	return ret;
 }
 
@@ -121,9 +127,14 @@ int dstresize(dchar **dstr, size_t len) {
 	}
 
 	struct dstring *header = dstrheader(*dstr);
-	header->len = len;
-	header->str[len] = '\0';
+	dstrsetlen(header, len);
 	return 0;
+}
+
+void dstrshrink(dchar *dstr, size_t len) {
+	struct dstring *header = dstrheader(dstr);
+	bfs_assert(len <= header->len);
+	dstrsetlen(header, len);
 }
 
 int dstrcat(dchar **dest, const char *src) {

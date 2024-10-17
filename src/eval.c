@@ -1164,7 +1164,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, size_t coun
 
 	size_t rhslen = xstrwidth(rhs);
 	if (3 + rhslen > width) {
-		dstresize(&rhs, 0);
+		dstrshrink(rhs, 0);
 		rhslen = 0;
 	}
 
@@ -1208,7 +1208,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, size_t coun
 		}
 		pathwidth += cwidth;
 	}
-	dstresize(&status, lhslen);
+	dstrshrink(status, lhslen);
 
 	if (dstrcat(&status, "...") != 0) {
 		goto out;

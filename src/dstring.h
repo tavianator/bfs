@@ -117,7 +117,18 @@ int dstreserve(dchar **dstr, size_t cap);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstresize(dchar **dstr, size_t len);
+
+/**
+ * Shrink a dynamic string.
+ *
+ * @dstr
+ *         The dynamic string to shrink.
+ * @len
+ *         The new length.  Must not be greater than the current length.
+ */
+void dstrshrink(dchar *dstr, size_t len);
 
 /**
  * Append to a dynamic string.
@@ -128,6 +139,7 @@ int dstresize(dchar **dstr, size_t len);
  *         The string to append.
  * @return 0 on success, -1 on failure.
  */
+_nodiscard
 int dstrcat(dchar **dest, const char *src);
 
 /**
@@ -142,6 +154,7 @@ int dstrcat(dchar **dest, const char *src);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrncat(dchar **dest, const char *src, size_t n);
 
 /**
@@ -154,6 +167,7 @@ int dstrncat(dchar **dest, const char *src, size_t n);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrdcat(dchar **dest, const dchar *src);
 
 /**
@@ -168,6 +182,7 @@ int dstrdcat(dchar **dest, const dchar *src);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrxcat(dchar **dest, const char *src, size_t len);
 
 /**
@@ -180,6 +195,7 @@ int dstrxcat(dchar **dest, const char *src, size_t len);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrapp(dchar **str, char c);
 
 /**
@@ -192,6 +208,7 @@ int dstrapp(dchar **str, char c);
  * @returns
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrcpy(dchar **dest, const char *str);
 
 /**
@@ -204,6 +221,7 @@ int dstrcpy(dchar **dest, const char *str);
  * @returns
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrdcpy(dchar **dest, const dchar *str);
 
 /**
@@ -218,6 +236,7 @@ int dstrdcpy(dchar **dest, const dchar *str);
  * @returns
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrncpy(dchar **dest, const char *str, size_t n);
 
 /**
@@ -232,6 +251,7 @@ int dstrncpy(dchar **dest, const char *str, size_t n);
  * @returns
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrxcpy(dchar **dest, const char *str, size_t len);
 
 /**
@@ -244,6 +264,7 @@ int dstrxcpy(dchar **dest, const char *str, size_t len);
  * @return
  *         The created string, or NULL on failure.
  */
+_nodiscard
 _printf(1, 2)
 dchar *dstrprintf(const char *format, ...);
 
@@ -257,6 +278,7 @@ dchar *dstrprintf(const char *format, ...);
  * @return
  *         The created string, or NULL on failure.
  */
+_nodiscard
 _printf(1, 0)
 dchar *dstrvprintf(const char *format, va_list args);
 
@@ -272,6 +294,7 @@ dchar *dstrvprintf(const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 _printf(2, 3)
 int dstrcatf(dchar **str, const char *format, ...);
 
@@ -287,6 +310,7 @@ int dstrcatf(dchar **str, const char *format, ...);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 _printf(2, 0)
 int dstrvcatf(dchar **str, const char *format, va_list args);
 
@@ -302,6 +326,7 @@ int dstrvcatf(dchar **str, const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
 
 /**
@@ -318,11 +343,13 @@ int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
  * @return
  *         0 on success, -1 on failure.
  */
+_nodiscard
 int dstrnescat(dchar **dest, const char *str, size_t n, enum wesc_flags flags);
 
 /**
  * Repeat a string n times.
  */
+_nodiscard
 dchar *dstrepeat(const char *str, size_t n);
 
 #endif // BFS_DSTRING_H
