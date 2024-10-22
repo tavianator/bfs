@@ -225,7 +225,17 @@ ${OBJS}: gen/config.mk
 # Include any generated dependency files
 -include ${OBJS:.o=.d}
 
-## Packaging (`make install`)
+## Packaging (`make dist`, `make install`)
+
+TARBALL = bfs-$$(build/version.sh).tar.gz
+
+dist:
+	${MSG} "[DIST] ${TARBALL}" git archive HEAD -o ${TARBALL}
+
+distsign: dist
+	${MSG} "[SIGN] ${TARBALL}" ssh-keygen -Y sign -q -f $$(git config user.signingkey) -n file ${TARBALL}
+
+.PHONY: dist distsign
 
 DEST_PREFIX := ${DESTDIR}${PREFIX}
 DEST_MANDIR := ${DESTDIR}${MANDIR}
