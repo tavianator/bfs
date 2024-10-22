@@ -1,6 +1,24 @@
 4.*
 ===
 
+4.0.3
+-----
+
+**October 22, 2024**
+
+### Bug fixes
+
+- Fixed an assertion failure when `$LS_COLORS` contained escaped NUL bytes like `*\0.gz=`
+  ([`f5eaadb9`](https://github.com/tavianator/bfs/commit/f5eaadb96fb94b2d3666e53a99495840a3099aec))
+
+- Fixed a use-after-free bug introduced in bfs 4.0 when unregistering and re-registering signal hooks.
+  This could be reproduced with `bfs -nocolor` by repeatedly sending `SIGINFO`/`SIGUSR1` to toggle the status bar.
+  ([`39ff273`](https://github.com/tavianator/bfs/commit/39ff273df97e51b1285358b9e6808b117ea8adb1))
+
+- Fixed a hang present since bfs 3.0 colorizing paths like `notdir/file`, where `notdir` is a symlink pointing to a non-directory file.
+  ([`b89f22cb`](https://github.com/tavianator/bfs/commit/b89f22cbf250958a802915eb7b6bf0e5f38376ca))
+
+
 4.0.2
 -----
 
