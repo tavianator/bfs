@@ -81,6 +81,13 @@ void check_bit(void) {
 	check_eq(bswap((uint32_t)0x12345678), 0x78563412);
 	check_eq(bswap((uint64_t)0x1234567812345678), 0x7856341278563412);
 
+	// Make sure we can bswap() every unsigned type
+	(void)bswap((unsigned char)0);
+	(void)bswap((unsigned short)0);
+	(void)bswap(0U);
+	(void)bswap(0UL);
+	(void)bswap(0ULL);
+
 	check_eq(count_ones(0x0U), 0);
 	check_eq(count_ones(0x1U), 1);
 	check_eq(count_ones(0x2U), 1);

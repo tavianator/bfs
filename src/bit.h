@@ -198,15 +198,35 @@ static inline uint8_t bswap_u8(uint8_t n) {
 	return n;
 }
 
-/**
- * Reverse the byte order of an integer.
- */
-#define bswap(n) \
-	_Generic((n), \
-		uint8_t: bswap_u8, \
-		uint16_t: bswap_u16, \
-		uint32_t: bswap_u32, \
-		uint64_t: bswap_u64)(n)
+#if UCHAR_WIDTH == 8
+#  define bswap_uc bswap_u8
+#endif
+
+#if USHRT_WIDTH == 16
+#  define bswap_us bswap_u16
+#elif USHRT_WIDTH == 32
+#  define bswap_us bswap_u32
+#elif USHRT_WIDTH == 64
+#  define bswap_us bswap_u64
+#endif
+
+#if UINT_WIDTH == 16
+#  define bswap_ui bswap_u16
+#elif UINT_WIDTH == 32
+#  define bswap_ui bswap_u32
+#elif UINT_WIDTH == 64
+#  define bswap_ui bswap_u64
+#endif
+
+#if ULONG_WIDTH == 32
+#  define bswap_ul bswap_u32
+#elif ULONG_WIDTH == 64
+#  define bswap_ul bswap_u64
+#endif
+
+#if ULLONG_WIDTH == 64
+#  define bswap_ull bswap_u64
+#endif
 
 // Define an overload for each unsigned type
 #define UINT_OVERLOADS(macro) \
@@ -224,6 +244,11 @@ static inline uint8_t bswap_u8(uint8_t n) {
 		unsigned int:       name##_ui, \
 		unsigned long:      name##_ul, \
 		unsigned long long: name##_ull)
+
+/**
+ * Reverse the byte order of an integer.
+ */
+#define bswap(n) UINT_SELECT(n, bswap)(n)
 
 // C23 polyfill: bit utilities
 
