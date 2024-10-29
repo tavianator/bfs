@@ -20,24 +20,22 @@
 #  define ALLOC_MAX (SIZE_MAX / 2)
 #endif
 
-/** Portable aligned_alloc()/posix_memalign(). */
+/** posix_memalign() wrapper. */
 static void *xmemalign(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert(align >= sizeof(void *));
-	bfs_assert(is_aligned(align, size));
 
-#if BFS_HAS_ALIGNED_ALLOC
-	return aligned_alloc(align, size);
-#else
+	// Since https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2072.htm,
+	// aligned_alloc() doesn't require the size to be a multiple of align.
+	// But the sanitizers don't know about that yet, so always use
+	// posix_memalign().
 	void *ptr = NULL;
 	errno = posix_memalign(&ptr, align, size);
 	return ptr;
-#endif
 }
 
 void *alloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert(is_aligned(align, size));
 
 	if (size > ALLOC_MAX) {
 		errno = EOVERFLOW;
@@ -53,7 +51,6 @@ void *alloc(size_t align, size_t size) {
 
 void *zalloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert(is_aligned(align, size));
 
 	if (size > ALLOC_MAX) {
 		errno = EOVERFLOW;
@@ -73,8 +70,6 @@ void *zalloc(size_t align, size_t size) {
 
 void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert(is_aligned(align, old_size));
-	bfs_assert(is_aligned(align, new_size));
 
 	if (new_size == 0) {
 		free(ptr);

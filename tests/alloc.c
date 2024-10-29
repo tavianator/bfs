@@ -11,6 +11,14 @@
 #include <stdint.h>
 
 void check_alloc(void) {
+	// Check aligned allocation
+	void *ptr;
+	bfs_everify((ptr = zalloc(64, 129)));
+	bfs_check((uintptr_t)ptr % 64 == 0);
+	bfs_echeck((ptr = xrealloc(ptr, 64, 129, 65)));
+	bfs_check((uintptr_t)ptr % 64 == 0);
+	free(ptr);
+
 	// Check sizeof_flex()
 	struct flexible {
 		alignas(64) int foo[8];

@@ -18,7 +18,6 @@ HEADERS := \
     gen/has/acl-get-tag-type.h \
     gen/has/acl-is-trivial-np.h \
     gen/has/acl-trivial.h \
-    gen/has/aligned-alloc.h \
     gen/has/builtin-riscv-pause.h \
     gen/has/confstr.h \
     gen/has/extattr-get-file.h \

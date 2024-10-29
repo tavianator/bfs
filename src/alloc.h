@@ -30,25 +30,24 @@ static inline size_t align_ceil(size_t align, size_t size) {
 }
 
 /**
- * Saturating array size.
- *
- * @align
- *         Array element alignment.
- * @size
- *         Array element size.
- * @count
- *         Array element count.
- * @return
- *         size * count, saturating to the maximum aligned value on overflow.
+ * Saturating size addition.
  */
-static inline size_t array_size(size_t align, size_t size, size_t count) {
+static inline size_t size_add(size_t lhs, size_t rhs) {
+	size_t ret = lhs + rhs;
+	return ret >= lhs ? ret : (size_t)-1;
+}
+
+/**
+ * Saturating size multiplication.
+ */
+static inline size_t size_mul(size_t size, size_t count) {
 	size_t ret = size * count;
-	return ret / size == count ? ret : ~(align - 1);
+	return ret / size == count ? ret : (size_t)-1;
 }
 
 /** Saturating array sizeof. */
 #define sizeof_array(type, count) \
-	array_size(alignof(type), sizeof(type), count)
+	size_mul(sizeof(type), count)
 
 /** Size of a struct/union field. */
 #define sizeof_member(type, member) \
@@ -72,13 +71,8 @@ static inline size_t array_size(size_t align, size_t size, size_t count) {
  *         to the maximum aligned value on overflow.
  */
 static inline size_t flex_size(size_t align, size_t min, size_t offset, size_t size, size_t count) {
-	size_t ret = size * count;
-	size_t overflow = ret / size != count;
-
-	size_t extra = offset + align - 1;
-	ret += extra;
-	overflow |= ret < extra;
-	ret |= -overflow;
+	size_t ret = size_mul(size, count);
+	ret = size_add(ret, offset + align - 1);
 	ret = align_floor(align, ret);
 
 	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
