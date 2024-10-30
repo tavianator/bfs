@@ -796,7 +796,7 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 
 	bftw_stat_recycle(cache, file);
 
-	varena_free(&cache->files, file, file->namelen + 1);
+	varena_free(&cache->files, file);
 }
 
 /**

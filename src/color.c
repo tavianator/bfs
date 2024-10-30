@@ -128,7 +128,7 @@ static struct esc_seq *new_esc(struct colors *colors, const char *seq, size_t le
 
 /** Free an escape sequence. */
 static void free_esc(struct colors *colors, struct esc_seq *seq) {
-	varena_free(&colors->esc_arena, seq, seq->len);
+	varena_free(&colors->esc_arena, seq);
 }
 
 /** Initialize a color in the table. */
@@ -280,7 +280,7 @@ fail:
 	if (ext->esc) {
 		free_esc(colors, ext->esc);
 	}
-	varena_free(&colors->ext_arena, ext, len + 1);
+	varena_free(&colors->ext_arena, ext);
 	return -1;
 }
 

@@ -352,7 +352,7 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 /** Free a leaf. */
 static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
 	LIST_REMOVE(trie, leaf);
-	varena_free(&trie->leaves, leaf, leaf->length);
+	varena_free(&trie->leaves, leaf);
 }
 
 /** Create a new node. */
@@ -362,16 +362,15 @@ static struct trie_node *trie_node_alloc(struct trie *trie, size_t size) {
 }
 
 /** Reallocate a trie node. */
-static struct trie_node *trie_node_realloc(struct trie *trie, struct trie_node *node, size_t old_size, size_t new_size) {
-	bfs_assert(has_single_bit(old_size));
-	bfs_assert(has_single_bit(new_size));
-	return varena_realloc(&trie->nodes, node, old_size, new_size);
+static struct trie_node *trie_node_realloc(struct trie *trie, struct trie_node *node, size_t size) {
+	bfs_assert(has_single_bit(size));
+	return varena_realloc(&trie->nodes, node, size);
 }
 
 /** Free a node. */
 static void trie_node_free(struct trie *trie, struct trie_node *node, size_t size) {
 	bfs_assert(size == (size_t)count_ones(node->bitmap));
-	varena_free(&trie->nodes, node, size);
+	varena_free(&trie->nodes, node);
 }
 
 #if ENDIAN_NATIVE == ENDIAN_LITTLE
@@ -450,7 +449,7 @@ static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, str
 
 	// Double the capacity every power of two
 	if (has_single_bit(size)) {
-		node = trie_node_realloc(trie, node, size, 2 * size);
+		node = trie_node_realloc(trie, node, 2 * size);
 		if (!node) {
 			trie_leaf_free(trie, leaf);
 			return NULL;
@@ -724,7 +723,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	--parent_size;
 
 	if (has_single_bit(parent_size)) {
-		node = trie_node_realloc(trie, node, 2 * parent_size, parent_size);
+		node = trie_node_realloc(trie, node, parent_size);
 		if (node) {
 			*parent = trie_encode_node(node);
 		}

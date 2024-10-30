@@ -338,10 +338,8 @@ void varena_init(struct varena *varena, size_t align, size_t offset, size_t size
  *         The that allocated the object.
  * @ptr
  *         The object to free.
- * @count
- *         The length of the flexible array.
  */
-void varena_free(struct varena *varena, void *ptr, size_t count);
+void varena_free(struct varena *varena, void *ptr);
 
 /**
  * Arena-allocate a flexible struct.
@@ -363,15 +361,13 @@ void *varena_alloc(struct varena *varena, size_t count);
  *         The varena to allocate from.
  * @ptr
  *         The object to resize.
- * @old_count
- *         The old array length.
- * @new_count
+ * @count
  *         The new array length.
  * @return
  *         The resized struct, or NULL on failure.
  */
 _nodiscard
-void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t new_count);
+void *varena_realloc(struct varena *varena, void *ptr, size_t count);
 
 /**
  * Grow a flexible struct by an arbitrary amount.
@@ -380,7 +376,7 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
  *         The varena to allocate from.
  * @ptr
  *         The object to resize.
- * @count
+ * @count[in,out]
  *         Pointer to the flexible array length.
  * @return
  *         The resized struct, or NULL on failure.

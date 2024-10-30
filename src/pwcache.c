@@ -52,7 +52,7 @@ static void *bfs_getent(bfs_getent_fn *fn, const void *key, struct trie_leaf *le
 		}
 	}
 
-	varena_free(varena, ptr, bufsize);
+	varena_free(varena, ptr);
 	return NULL;
 }
 

@@ -17,7 +17,7 @@ struct flexible {
 
 /** Check varena_realloc() poisoning for a size combination. */
 static struct flexible *check_varena_realloc(struct varena *varena, struct flexible *flexy, size_t old_count, size_t new_count) {
-	flexy = varena_realloc(varena, flexy, old_count, new_count);
+	flexy = varena_realloc(varena, flexy, new_count);
 	bfs_everify(flexy);
 
 	for (size_t i = 0; i < new_count; ++i) {

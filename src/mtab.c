@@ -101,7 +101,7 @@ static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *typ
 shrink:
 	--mtab->nmounts;
 free:
-	varena_free(&mtab->varena, mount, size);
+	varena_free(&mtab->varena, mount);
 	return -1;
 }
 

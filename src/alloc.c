@@ -172,9 +172,8 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 	arena->size = size;
 }
 
-/** Allocate a new slab. */
-_cold
-static int slab_alloc(struct arena *arena) {
+/** Get the size of the ith slab. */
+static size_t slab_size(const struct arena *arena, size_t i) {
 	// Make the initial allocation size ~4K
 	size_t size = 4096;
 	if (size < arena->size) {
@@ -183,7 +182,14 @@ static int slab_alloc(struct arena *arena) {
 	// Trim off the excess
 	size -= size % arena->size;
 	// Double the size for every slab
-	size <<= arena->nslabs;
+	size <<= i;
+	return size;
+}
+
+/** Allocate a new slab. */
+_cold
+static int slab_alloc(struct arena *arena) {
+	size_t size = slab_size(arena, arena->nslabs);
 
 	// Allocate the slab
 	void *slab = zalloc(arena->align, size);
@@ -224,7 +230,24 @@ void *arena_alloc(struct arena *arena) {
 	return chunk;
 }
 
+/** Check if a pointer comes from this arena. */
+static bool arena_contains(const struct arena *arena, void *ptr) {
+	uintptr_t addr = (uintptr_t)ptr;
+
+	for (size_t i = 0; i < arena->nslabs; ++i) {
+		uintptr_t start = (uintptr_t)arena->slabs[i];
+		uintptr_t end = start + slab_size(arena, i);
+		if (addr >= start && addr < end) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void arena_free(struct arena *arena, void *ptr) {
+	bfs_assert(arena_contains(arena, ptr));
+
 	union chunk *chunk = ptr;
 	chunk_set_next(arena, chunk, arena->chunks);
 	arena->chunks = chunk;
@@ -292,6 +315,18 @@ static struct arena *varena_get(struct varena *varena, size_t count) {
 	return &varena->arenas[i];
 }
 
+/** Get the arena containing a given pointer. */
+static struct arena *varena_find(struct varena *varena, void *ptr) {
+	for (size_t i = 0; i < varena->narenas; ++i) {
+		struct arena *arena = &varena->arenas[i];
+		if (arena_contains(arena, ptr)) {
+			return arena;
+		}
+	}
+
+	bfs_abort("No arena contains %p", ptr);
+}
+
 void *varena_alloc(struct varena *varena, size_t count) {
 	struct arena *arena = varena_get(varena, count);
 	if (!arena) {
@@ -310,26 +345,23 @@ void *varena_alloc(struct varena *varena, size_t count) {
 	return ret;
 }
 
-void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t new_count) {
-	struct arena *new_arena = varena_get(varena, new_count);
-	struct arena *old_arena = varena_get(varena, old_count);
+void *varena_realloc(struct varena *varena, void *ptr, size_t count) {
+	struct arena *new_arena = varena_get(varena, count);
+	struct arena *old_arena = varena_find(varena, ptr);
 	if (!new_arena) {
 		return NULL;
 	}
 
-	size_t new_exact_size = varena_exact_size(varena, new_count);
-	size_t old_exact_size = varena_exact_size(varena, old_count);
+	size_t new_size = new_arena->size;
+	size_t new_exact_size = varena_exact_size(varena, count);
 
+	void *ret;
 	if (new_arena == old_arena) {
-		if (new_count < old_count) {
-			sanitize_free((char *)ptr + new_exact_size, old_exact_size - new_exact_size);
-		} else if (new_count > old_count) {
-			sanitize_alloc((char *)ptr + old_exact_size, new_exact_size - old_exact_size);
-		}
-		return ptr;
+		ret = ptr;
+		goto done;
 	}
 
-	void *ret = arena_alloc(new_arena);
+	ret = arena_alloc(new_arena);
 	if (!ret) {
 		return NULL;
 	}
@@ -337,12 +369,11 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 	size_t old_size = old_arena->size;
 	sanitize_alloc(ptr, old_size);
 
-	size_t new_size = new_arena->size;
 	size_t min_size = new_size < old_size ? new_size : old_size;
 	memcpy(ret, ptr, min_size);
 
 	arena_free(old_arena, ptr);
-
+done:
 	sanitize_free(ret, new_size);
 	sanitize_alloc(ret, new_exact_size);
 	return ret;
@@ -356,15 +387,15 @@ void *varena_grow(struct varena *varena, void *ptr, size_t *count) {
 	size_t new_shift = varena_size_class(varena, old_count + 1) + varena->shift;
 	size_t new_count = (size_t)1 << new_shift;
 
-	ptr = varena_realloc(varena, ptr, old_count, new_count);
+	ptr = varena_realloc(varena, ptr, new_count);
 	if (ptr) {
 		*count = new_count;
 	}
 	return ptr;
 }
 
-void varena_free(struct varena *varena, void *ptr, size_t count) {
-	struct arena *arena = varena_get(varena, count);
+void varena_free(struct varena *varena, void *ptr) {
+	struct arena *arena = varena_find(varena, ptr);
 	arena_free(arena, ptr);
 }
 
