@@ -14,19 +14,28 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#define IS_ALIGNED(align, size) \
+	(((size) & ((align) - 1)) == 0)
+
 /** Check if a size is properly aligned. */
 static inline bool is_aligned(size_t align, size_t size) {
-	return (size & (align - 1)) == 0;
+	return IS_ALIGNED(align, size);
 }
+
+#define ALIGN_FLOOR(align, size) \
+	((size) & ~((align) - 1))
 
 /** Round down to a multiple of an alignment. */
 static inline size_t align_floor(size_t align, size_t size) {
-	return size & ~(align - 1);
+	return ALIGN_FLOOR(align, size);
 }
+
+#define ALIGN_CEIL(align, size) \
+	((((size) - 1) | ((align) - 1)) + 1)
 
 /** Round up to a multiple of an alignment. */
 static inline size_t align_ceil(size_t align, size_t size) {
-	return align_floor(align, size + align - 1);
+	return ALIGN_CEIL(align, size);
 }
 
 /**
