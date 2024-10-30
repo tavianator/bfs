@@ -30,10 +30,6 @@ void check_alloc(void) {
 	size_t too_many = SIZE_MAX / sizeof(int) + 1;
 	bfs_check(sizeof_flex(struct flexible, bar, too_many) == align_floor(alignof(struct flexible), SIZE_MAX));
 
-	// Corner case: sizeof(type) > align_ceil(alignof(type), offsetof(type, member))
-	// Doesn't happen in typical ABIs
-	bfs_check(flex_size(8, 16, 4, 4, 1) == 16);
-
 	// Make sure we detect allocation size overflows
 #if __GNUC__ && !__clang__
 #  pragma GCC diagnostic ignored "-Walloc-size-larger-than="

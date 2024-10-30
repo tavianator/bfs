@@ -247,7 +247,7 @@ void arena_destroy(struct arena *arena) {
 	sanitize_uninit(arena);
 }
 
-void varena_init(struct varena *varena, size_t align, size_t min, size_t offset, size_t size) {
+void varena_init(struct varena *varena, size_t align, size_t offset, size_t size) {
 	varena->align = align;
 	varena->offset = offset;
 	varena->size = size;
@@ -256,7 +256,7 @@ void varena_init(struct varena *varena, size_t align, size_t min, size_t offset,
 
 	// The smallest size class is at least as many as fit in the smallest
 	// aligned allocation size
-	size_t min_count = (flex_size(align, min, offset, size, 1) - offset + size - 1) / size;
+	size_t min_count = (flex_size(align, offset, size, 1) - offset + size - 1) / size;
 	varena->shift = bit_width(min_count - 1);
 }
 
@@ -269,7 +269,7 @@ static size_t varena_size_class(struct varena *varena, size_t count) {
 
 /** Get the exact size of a flexible struct. */
 static size_t varena_exact_size(const struct varena *varena, size_t count) {
-	return flex_size(varena->align, 0, varena->offset, varena->size, count);
+	return flex_size(varena->align, varena->offset, varena->size, count);
 }
 
 /** Get the arena for the given array length. */

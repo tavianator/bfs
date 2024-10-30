@@ -63,12 +63,30 @@ static inline size_t size_mul(size_t size, size_t count) {
 	sizeof(((type *)NULL)->member)
 
 /**
+ * @internal
+ * Our flexible struct size calculations assume that structs have the minimum
+ * trailing padding to align the type properly.  A pathological ABI that adds
+ * extra padding would result in us under-allocating space for those structs,
+ * so we static_assert() that no such padding exists.
+ */
+#define ASSERT_FLEX_ABI(type, member) \
+	ASSERT_FLEX_ABI_( \
+		ALIGN_CEIL(alignof(type), offsetof(type, member)) >= sizeof(type), \
+		"Unexpected tail padding in " #type)
+
+/**
+ * @internal
+ * The contortions here allow static_assert() to be used in expressions, rather
+ * than just declarations.
+ */
+#define ASSERT_FLEX_ABI_(...) \
+	((void)sizeof(struct { char _; static_assert(__VA_ARGS__); }))
+
+/**
  * Saturating flexible struct size.
  *
  * @align
  *         Struct alignment.
- * @min
- *         Minimum struct size.
  * @offset
  *         Flexible array member offset.
  * @size
@@ -79,17 +97,10 @@ static inline size_t size_mul(size_t size, size_t count) {
  *         The size of the struct with count flexible array elements.  Saturates
  *         to the maximum aligned value on overflow.
  */
-static inline size_t flex_size(size_t align, size_t min, size_t offset, size_t size, size_t count) {
+static inline size_t flex_size(size_t align, size_t offset, size_t size, size_t count) {
 	size_t ret = size_mul(size, count);
 	ret = size_add(ret, offset + align - 1);
 	ret = align_floor(align, ret);
-
-	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
-	// type has more padding than necessary for alignment
-	if (min > align_ceil(align, offset)) {
-		ret = ret < min ? min : ret;
-	}
-
 	return ret;
 }
 
@@ -107,7 +118,8 @@ static inline size_t flex_size(size_t align, size_t min, size_t offset, size_t s
  *         to the maximum aligned value on overflow.
  */
 #define sizeof_flex(type, member, count) \
-	flex_size(alignof(type), sizeof(type), offsetof(type, member), sizeof_member(type, member[0]), count)
+	(ASSERT_FLEX_ABI(type, member), flex_size( \
+		alignof(type), offsetof(type, member), sizeof_member(type, member[0]), count))
 
 /**
  * General memory allocator.
@@ -298,14 +310,12 @@ struct varena {
  *         The varena to initialize.
  * @align
  *         alignof(type)
- * @min
- *         sizeof(type)
  * @offset
  *         offsetof(type, flexible_array)
  * @size
  *         sizeof(flexible_array[i])
  */
-void varena_init(struct varena *varena, size_t align, size_t min, size_t offset, size_t size);
+void varena_init(struct varena *varena, size_t align, size_t offset, size_t size);
 
 /**
  * Initialize a varena for the given type and flexible array.
@@ -318,7 +328,8 @@ void varena_init(struct varena *varena, size_t align, size_t min, size_t offset,
  *         The name of the flexible array member.
  */
 #define VARENA_INIT(varena, type, member) \
-	varena_init(varena, alignof(type), sizeof(type), offsetof(type, member), sizeof_member(type, member[0]))
+	(ASSERT_FLEX_ABI(type, member), varena_init( \
+		varena, alignof(type), offsetof(type, member), sizeof_member(type, member[0])))
 
 /**
  * Free an arena-allocated flexible struct.
