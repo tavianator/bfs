@@ -228,6 +228,7 @@ void arena_free(struct arena *arena, void *ptr) {
 	union chunk *chunk = ptr;
 	chunk_set_next(arena, chunk, arena->chunks);
 	arena->chunks = chunk;
+	sanitize_uninit(chunk, arena->size);
 	sanitize_free(chunk, arena->size);
 }
 
@@ -334,15 +335,16 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 	}
 
 	size_t old_size = old_arena->size;
-	sanitize_alloc((char *)ptr + old_exact_size, old_size - old_exact_size);
+	sanitize_alloc(ptr, old_size);
 
 	size_t new_size = new_arena->size;
 	size_t min_size = new_size < old_size ? new_size : old_size;
 	memcpy(ret, ptr, min_size);
 
 	arena_free(old_arena, ptr);
-	sanitize_free((char *)ret + new_exact_size, new_size - new_exact_size);
 
+	sanitize_free(ret, new_size);
+	sanitize_alloc(ret, new_exact_size);
 	return ret;
 }
 

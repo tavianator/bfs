@@ -20,6 +20,11 @@
 #define SANITIZE_CALL__(macro, ptr, size, ...) \
 	macro(ptr, size)
 
+/**
+ * Squelch unused variable warnings when not sanitizing.
+ */
+#define sanitize_ignore(ptr, size) ((void)(ptr), (void)(size))
+
 #if __SANITIZE_ADDRESS__
 #  include <sanitizer/asan_interface.h>
 
@@ -38,8 +43,8 @@
 #define sanitize_free(...) SANITIZE_CALL(__asan_poison_memory_region, __VA_ARGS__)
 
 #else
-#  define sanitize_alloc sanitize_uninit
-#  define sanitize_free sanitize_uninit
+#  define sanitize_alloc(...) SANITIZE_CALL(sanitize_ignore, __VA_ARGS__)
+#  define sanitize_free(...) SANITIZE_CALL(sanitize_ignore, __VA_ARGS__)
 #endif
 
 #if __SANITIZE_MEMORY__
@@ -63,11 +68,6 @@
 #  define sanitize_init(...) SANITIZE_CALL(sanitize_ignore, __VA_ARGS__)
 #  define sanitize_uninit(...) SANITIZE_CALL(sanitize_ignore, __VA_ARGS__)
 #endif
-
-/**
- * Squelch unused variable warnings when not sanitizing.
- */
-#define sanitize_ignore(ptr, size) ((void)(ptr), (void)(size))
 
 /**
  * Initialize a variable, unless sanitizers would detect uninitialized uses.
