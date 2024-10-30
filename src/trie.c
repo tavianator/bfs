@@ -670,7 +670,7 @@ static int trie_collapse_node(struct trie *trie, uintptr_t *parent, struct trie_
 	}
 
 	*parent = other;
-	trie_node_free(trie, parent_node, 1);
+	trie_node_free(trie, parent_node, 2);
 	return 0;
 }
 
@@ -709,19 +709,19 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	}
 
 	struct trie_node *node = trie_decode_node(*parent);
-	child = node->children + child_index;
-	trie_free_singletons(trie, *child);
+	trie_free_singletons(trie, node->children[child_index]);
 
-	node->bitmap ^= child_bit;
 	unsigned int parent_size = count_ones(node->bitmap);
-	bfs_assert(parent_size > 0);
-	if (parent_size == 1 && trie_collapse_node(trie, parent, node, child_index) == 0) {
+	bfs_assert(parent_size > 1);
+	if (parent_size == 2 && trie_collapse_node(trie, parent, node, child_index) == 0) {
 		return;
 	}
 
-	if (child_index < parent_size) {
-		memmove(child, child + 1, (parent_size - child_index) * sizeof(*child));
+	for (size_t i = child_index; i + 1 < parent_size; ++i) {
+		node->children[i] = node->children[i + 1];
 	}
+	node->bitmap &= ~child_bit;
+	--parent_size;
 
 	if (has_single_bit(parent_size)) {
 		node = trie_node_realloc(trie, node, 2 * parent_size, parent_size);
