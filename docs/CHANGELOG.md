@@ -1,6 +1,24 @@
 4.*
 ===
 
+4.0.4
+-----
+
+**October 31, 2024**
+
+
+## Bug fixes
+
+- Fixed a man page typo
+  ([#144](https://github.com/tavianator/bfs/pull/144))
+
+- Fixed the build on PowerPC macOS
+  ([#145](https://github.com/tavianator/bfs/issues/145))
+
+- Fixed a bug introduced in bfs 4.0.3 that colorized every file as if it had capabilities on non-Linux systems
+  ([#146](https://github.com/tavianator/bfs/pull/146))
+
+
 4.0.3
 -----
 
