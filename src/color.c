@@ -939,7 +939,7 @@ static const struct bfs_stat *cpath_stat(const struct cpath *cpath) {
 /** Check if a path has non-trivial capabilities. */
 static bool cpath_has_capabilities(const struct cpath *cpath) {
 	if (cpath->valid == cpath->len) {
-		return bfs_check_capabilities(cpath->ftwbuf);
+		return bfs_check_capabilities(cpath->ftwbuf) > 0;
 	} else {
 		// TODO: implement capability checks for arbitrary paths
 		return false;
