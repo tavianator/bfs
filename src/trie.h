@@ -14,8 +14,6 @@
  * A leaf of a trie.
  */
 struct trie_leaf {
-	/** Linked list of leaves, in insertion order. */
-	struct trie_leaf *prev, *next;
 	/** An arbitrary value associated with this leaf. */
 	void *value;
 	/** The length of the key in bytes. */
@@ -30,8 +28,6 @@ struct trie_leaf {
 struct trie {
 	/** Pointer to the root node/leaf. */
 	uintptr_t root;
-	/** Linked list of leaves. */
-	struct trie_leaf *head, *tail;
 	/** Node allocator. */
 	struct varena nodes;
 	/** Leaf allocator. */
@@ -143,6 +139,6 @@ void trie_destroy(struct trie *trie);
  * Iterate over the leaves of a trie.
  */
 #define for_trie(leaf, trie) \
-	for_list (struct trie_leaf, leaf, trie)
+	for_varena (struct trie_leaf, leaf, &(trie)->leaves)
 
 #endif // BFS_TRIE_H

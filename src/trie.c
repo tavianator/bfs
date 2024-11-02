@@ -87,7 +87,6 @@
 #include "bfs.h"
 #include "bit.h"
 #include "diag.h"
-#include "list.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -165,7 +164,6 @@ static uintptr_t trie_encode_leaf(const struct trie_leaf *leaf) {
 
 void trie_init(struct trie *trie) {
 	trie->root = 0;
-	LIST_INIT(trie);
 	VARENA_INIT(&trie->nodes, struct trie_node, children);
 	VARENA_INIT(&trie->leaves, struct trie_leaf, key);
 }
@@ -339,9 +337,6 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 		return NULL;
 	}
 
-	LIST_ITEM_INIT(leaf);
-	LIST_APPEND(trie, leaf);
-
 	leaf->value = NULL;
 	leaf->length = length;
 	memcpy(leaf->key, key, length);
@@ -351,7 +346,6 @@ static struct trie_leaf *trie_leaf_alloc(struct trie *trie, const void *key, siz
 
 /** Free a leaf. */
 static void trie_leaf_free(struct trie *trie, struct trie_leaf *leaf) {
-	LIST_REMOVE(trie, leaf);
 	varena_free(&trie->leaves, leaf);
 }
 
@@ -736,8 +730,6 @@ void trie_remove(struct trie *trie, struct trie_leaf *leaf) {
 
 void trie_clear(struct trie *trie) {
 	trie->root = 0;
-	LIST_INIT(trie);
-
 	varena_clear(&trie->leaves);
 	varena_clear(&trie->nodes);
 }
