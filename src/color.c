@@ -110,6 +110,8 @@ struct colors {
 	size_t ext_count;
 	/** Longest extension. */
 	size_t ext_len;
+	/** Array of extensions. */
+	struct ext_color **exts;
 	/** Case-sensitive extension trie. */
 	struct trie ext_trie;
 	/** Case-insensitive extension trie. */
@@ -217,10 +219,15 @@ static void ext_tolower(char *ext, size_t len) {
 }
 
 /** Insert an extension into a trie. */
-static int insert_ext(struct trie *trie, struct ext_color *ext) {
+static int insert_ext(struct colors *colors, struct trie *trie, struct ext_color *ext) {
 	// A later *.x should override any earlier *.x, *.y.x, etc.
 	struct trie_leaf *leaf;
 	while ((leaf = trie_find_postfix(trie, ext->ext))) {
+		struct ext_color *dead = leaf->value;
+		size_t i = dead->priority;
+		bfs_assert(colors->exts[i] == dead);
+		colors->exts[i] = NULL;
+
 		trie_remove(trie, leaf);
 	}
 
@@ -249,15 +256,22 @@ static int set_ext(struct colors *colors, dchar *key, dchar *value) {
 
 	struct ext_color *ext = varena_alloc(&colors->ext_arena, len + 1);
 	if (!ext) {
-		return -1;
+		goto fail;
 	}
 
-	ext->priority = colors->ext_count++;
+	struct ext_color **pext = RESERVE(struct ext_color *, &colors->exts, &colors->ext_count);
+	if (pext) {
+		*pext = ext;
+	} else {
+		goto fail_ext;
+	}
+
+	ext->priority = colors->ext_count - 1;
 	ext->len = len;
 	ext->case_sensitive = false;
 	ext->esc = new_esc(colors, value, dstrlen(value));
 	if (!ext->esc) {
-		goto fail;
+		goto fail_pext;
 	}
 
 	memcpy(ext->ext, key, len + 1);
@@ -266,8 +280,8 @@ static int set_ext(struct colors *colors, dchar *key, dchar *value) {
 	ext_reverse(ext->ext, len);
 
 	// Insert the extension into the case-sensitive trie
-	if (insert_ext(&colors->ext_trie, ext) != 0) {
-		goto fail;
+	if (insert_ext(colors, &colors->ext_trie, ext) != 0) {
+		goto fail_esc;
 	}
 
 	if (colors->ext_len < len) {
@@ -276,11 +290,13 @@ static int set_ext(struct colors *colors, dchar *key, dchar *value) {
 
 	return 0;
 
-fail:
-	if (ext->esc) {
-		free_esc(colors, ext->esc);
-	}
+fail_esc:
+	free_esc(colors, ext->esc);
+fail_pext:
+	--colors->ext_count;
+fail_ext:
 	varena_free(&colors->ext_arena, ext);
+fail:
 	return -1;
 }
 
@@ -326,8 +342,11 @@ static bool ext_case_sensitive(struct ext_color *ext, struct ext_color *iext) {
 /** Build the case-insensitive trie, after all extensions have been parsed. */
 static int build_iext_trie(struct colors *colors) {
 	// Find which extensions should be case-sensitive
-	for_trie (leaf, &colors->ext_trie) {
-		struct ext_color *ext = leaf->value;
+	for (size_t i = 0; i < colors->ext_count; ++i) {
+		struct ext_color *ext = colors->exts[i];
+		if (!ext) {
+			continue;
+		}
 
 		// "Smart case": if the same extension is given with two different
 		// capitalizations (e.g. `*.y.x=31:*.Y.Z=32:`), make it case-sensitive
@@ -351,14 +370,14 @@ static int build_iext_trie(struct colors *colors) {
 	// Rebuild the trie with only the case-insensitive ones
 	trie_clear(&colors->iext_trie);
 
-	for_trie (leaf, &colors->ext_trie) {
-		struct ext_color *ext = leaf->value;
-		if (ext->case_sensitive) {
+	for (size_t i = 0; i < colors->ext_count; ++i) {
+		struct ext_color *ext = colors->exts[i];
+		if (!ext || ext->case_sensitive) {
 			continue;
 		}
 
 		// We already lowercased the extension above
-		if (insert_ext(&colors->iext_trie, ext) != 0) {
+		if (insert_ext(colors, &colors->iext_trie, ext) != 0) {
 			return -1;
 		}
 	}
@@ -631,6 +650,7 @@ struct colors *parse_colors(void) {
 	trie_init(&colors->names);
 	colors->ext_count = 0;
 	colors->ext_len = 0;
+	colors->exts = NULL;
 	trie_init(&colors->ext_trie);
 	trie_init(&colors->iext_trie);
 
@@ -730,6 +750,7 @@ void free_colors(struct colors *colors) {
 		return;
 	}
 
+	free(colors->exts);
 	trie_destroy(&colors->iext_trie);
 	trie_destroy(&colors->ext_trie);
 	trie_destroy(&colors->names);
