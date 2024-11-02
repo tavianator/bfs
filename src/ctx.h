@@ -39,10 +39,8 @@ struct bfs_ctx {
 	struct bfs_expr *expr;
 	/** An expression for files to filter out. */
 	struct bfs_expr *exclude;
-	/** A list of allocated expressions. */
-	struct bfs_exprs expr_list;
 	/** bfs_expr arena. */
-	struct arena expr_arena;
+	struct arena exprs;
 
 	/** -mindepth option. */
 	int mindepth;

@@ -17,7 +17,7 @@
 struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t argc, char **argv, enum bfs_kind kind) {
 	bfs_assert(kind != BFS_PATH);
 
-	struct bfs_expr *expr = arena_alloc(&ctx->expr_arena);
+	struct bfs_expr *expr = arena_alloc(&ctx->exprs);
 	if (!expr) {
 		return NULL;
 	}
@@ -28,7 +28,6 @@ struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t 
 	expr->argv = argv;
 	expr->kind = kind;
 	expr->probability = 0.5;
-	SLIST_PREPEND(&ctx->expr_list, expr, freelist);
 
 	if (bfs_expr_is_parent(expr)) {
 		SLIST_INIT(&expr->children);

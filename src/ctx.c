@@ -44,8 +44,7 @@ struct bfs_ctx *bfs_ctx_new(void) {
 		return NULL;
 	}
 
-	SLIST_INIT(&ctx->expr_list);
-	ARENA_INIT(&ctx->expr_arena, struct bfs_expr);
+	ARENA_INIT(&ctx->exprs, struct bfs_expr);
 
 	ctx->maxdepth = INT_MAX;
 	ctx->flags = BFTW_RECOVER;
@@ -285,10 +284,10 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		cfclose(cerr);
 		free_colors(ctx->colors);
 
-		for_slist (struct bfs_expr, expr, &ctx->expr_list, freelist) {
+		for_arena (struct bfs_expr, expr, &ctx->exprs) {
 			bfs_expr_clear(expr);
 		}
-		arena_destroy(&ctx->expr_arena);
+		arena_destroy(&ctx->exprs);
 
 		for (size_t i = 0; i < ctx->npaths; ++i) {
 			free((char *)ctx->paths[i]);

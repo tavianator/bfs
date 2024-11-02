@@ -108,8 +108,6 @@ struct bfs_exprs {
 struct bfs_expr {
 	/** This expression's next sibling, if any. */
 	struct bfs_expr *next;
-	/** The next allocated expression. */
-	struct { struct bfs_expr *next; } freelist;
 
 	/** The function that evaluates this expression. */
 	bfs_eval_fn *eval_fn;
