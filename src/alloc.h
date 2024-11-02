@@ -241,12 +241,10 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count);
  * Arena allocators are intentionally not thread safe.
  */
 struct arena {
-	/** The list of free chunks. */
-	void *chunks;
 	/** The number of allocated slabs. */
 	size_t nslabs;
 	/** The array of slabs. */
-	void **slabs;
+	struct slab **slabs;
 	/** Chunk alignment. */
 	size_t align;
 	/** Chunk size. */

@@ -127,117 +127,290 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count) {
 }
 
 /**
- * An arena allocator chunk.
+ * A single contiguous slab in an arena.
+ *
+ * The allocatable chunks in a slab start at the beginning of the allocation,
+ * so they can take advantage of the allocation's alignment.  A struct slab *
+ * points to the metadata immediately after these chunks.  The metadata includes
+ * a bitmap followed by a Fenwick tree[1] used to quickly find both free and
+ * used chunks. Fenwick trees compute prefix sums efficiently:
+ *
+ *     query(i) = sum(bits[0:i])
+ *
+ * We use it to find the first free chunk:
+ *
+ *     min i such that query(i) < i
+ *
+ * as well as the next allocated chunk:
+ *
+ *     next(i) = min j such that query(i) < query(j)
+ *
+ * We actually store the tree with the granularity of N-bit words, so a full
+ * bitmap has query(i) == N * i.
+ *
+ * [1]: https://en.wikipedia.org/wiki/Fenwick_tree
  */
-union chunk {
-	/**
-	 * Free chunks are stored in a singly linked list.  The pointer to the
-	 * next chunk is represented by an offset from the chunk immediately
-	 * after this one in memory, so that zalloc() correctly initializes a
-	 * linked list of chunks (except for the last one).
-	 */
-	uintptr_t next;
-
-	// char object[];
+struct slab {
+	/** The beginning of the slab. */
+	void *chunks;
+	/** The size of each chunk. */
+	size_t size;
+	/** The number of words in the bitmap. */
+	size_t length;
+	/** The bitmap and the Fenwick tree. */
+	size_t words[];
+	// size_t bitmap[length];
+	// size_t tree[length];
 };
 
-/** Decode the next chunk. */
-static union chunk *chunk_next(const struct arena *arena, const union chunk *chunk) {
-	uintptr_t base = (uintptr_t)chunk + arena->size;
-	return (union chunk *)(base + chunk->next);
+/** Poison a memory region. */
+#define poison(...) \
+	sanitize_uninit(__VA_ARGS__); \
+	sanitize_free(__VA_ARGS__)
+
+/** Unpoison a memory region. */
+#define unpoison(...) \
+	sanitize_alloc(__VA_ARGS__); \
+	sanitize_init(__VA_ARGS__)
+
+/** Allocate a new slab of the given height. */
+_cold
+static struct slab *slab_create(size_t align, size_t size, size_t order) {
+	size_t length = ((size_t)1 << order) - 1;
+	size_t chunks = length * SIZE_WIDTH;
+	size_t nwords = 2 * length;
+
+	size_t data_size = size_mul(size, chunks);
+
+	size_t meta_offset = size_add(data_size, alignof(struct slab) - 1);
+	meta_offset = align_floor(alignof(struct slab), meta_offset);
+
+	size_t meta_size = sizeof_flex(struct slab, words, nwords);
+	size_t total = size_add(meta_offset, meta_size);
+	char *ptr = alloc(align, total);
+	if (!ptr) {
+		return NULL;
+	}
+
+	struct slab *slab = (struct slab *)(ptr + meta_offset);
+	slab->chunks = ptr;
+	slab->size = size;
+	slab->length = length;
+	for (size_t i = 0; i < nwords; ++i) {
+		slab->words[i] = 0;
+	}
+
+	// Poison the whole slab so only the allocator can use it
+	poison(ptr, total);
+	return slab;
 }
 
-/** Encode the next chunk. */
-static void chunk_set_next(const struct arena *arena, union chunk *chunk, union chunk *next) {
-	uintptr_t base = (uintptr_t)chunk + arena->size;
-	chunk->next = (uintptr_t)next - base;
+/** Get the first chunk in a slab. */
+static void *slab_chunks(const struct slab *slab) {
+	unpoison(&slab->chunks);
+	void *ret = slab->chunks;
+	poison(&slab->chunks);
+	return ret;
+}
+
+/** Get the chunk size for a slab. */
+static size_t slab_size(const struct slab *slab) {
+	unpoison(&slab->size);
+	size_t ret = slab->size;
+	poison(&slab->size);
+	return ret;
+}
+
+/** Get the length of the bitmap array. */
+static size_t slab_length(const struct slab *slab) {
+	unpoison(&slab->length);
+	size_t ret = slab->length;
+	poison(&slab_length);
+	return ret;
+}
+
+/** Check if a chunk is from this slab. */
+static bool slab_contains(const struct slab *slab, void *ptr) {
+	// Avoid comparing pointers into different allocations
+	uintptr_t addr = (uintptr_t)ptr;
+	uintptr_t start = (uintptr_t)slab_chunks(slab);
+	uintptr_t end = (uintptr_t)slab;
+	return addr >= start && addr < end;
+}
+
+/** Get a word from a slab bitmap. */
+static size_t bitmap_word(const struct slab *slab, size_t i) {
+	bfs_assert(i < slab_length(slab));
+
+	const size_t *word = &slab->words[i];
+	unpoison(word);
+	size_t ret = *word;
+	poison(word);
+	return ret;
+}
+
+/** Set a bit in a slab bitmap. */
+static void bitmap_set(struct slab *slab, size_t i, size_t j) {
+	bfs_assert(i < slab_length(slab));
+
+	size_t *word = &slab->words[i];
+	size_t bit = (size_t)1 << j;
+	unpoison(word);
+	bfs_assert(!(*word & bit));
+	*word |= bit;
+	poison(word);
+}
+
+/** Clear a bit in a slab bitmap. */
+static void bitmap_clear(struct slab *slab, size_t i, size_t j) {
+	bfs_assert(i < slab_length(slab));
+
+	size_t *word = &slab->words[i];
+	size_t bit = (size_t)1 << j;
+	unpoison(word);
+	bfs_assert(*word & bit);
+	*word &= ~bit;
+	poison(word);
+}
+
+/** Get the nth node of the Fenwick tree. */
+static size_t fenwick_node(const struct slab *slab, size_t i) {
+	size_t length = slab_length(slab);
+	// Fenwick trees use 1-based indexing conventionally
+	const size_t *tree = slab->words + length - 1;
+
+	bfs_assert(i > 0 && i <= length);
+	unpoison(&tree[i]);
+	size_t ret = tree[i];
+	poison(&tree[i]);
+	return ret;
+}
+
+/** Update the Fenwick tree. */
+static void fenwick_update(struct slab *slab, size_t i, ptrdiff_t delta) {
+	size_t length = slab_length(slab);
+	size_t *tree = slab->words + length - 1;
+
+	// https://en.wikipedia.org/wiki/Fenwick_tree#The_update_tree
+	for (++i; i <= length; i += i & -i) {
+		unpoison(&tree[i]);
+		tree[i] += delta;
+		poison(&tree[i]);
+	}
+}
+
+/** Binary search the Fenwick tree for the first free chunk. */
+static size_t fenwick_search_free(struct slab *slab) {
+	size_t low = 0;
+	size_t bit = slab_length(slab) + 1;
+	bfs_assert(has_single_bit(bit));
+
+	// https://en.wikipedia.org/wiki/Fenwick_tree#The_search_tree
+	do {
+		bit >>= 1;
+		size_t mid = low + bit;
+
+		// tree[mid] == sum(bits[N*low:N*mid]), so a full node will have
+		// tree[mid] == N * (mid - low) == N * bit
+		size_t node = fenwick_node(slab, mid);
+		if (node >= bit * SIZE_WIDTH) {
+			low = mid;
+		}
+	} while (bit > 1);
+
+	return low;
+}
+
+/** Get the chunk for a bitmap index. */
+static void *nth_chunk(struct slab *slab, size_t i, size_t j) {
+	bfs_assert(i < slab_length(slab));
+	char *chunks = slab_chunks(slab);
+	size_t size = slab_size(slab);
+	return chunks + (SIZE_WIDTH * i + j) * size;
+}
+
+/** Allocate a chunk from a slab. */
+static void *slab_alloc(struct slab *slab) {
+	size_t i = fenwick_search_free(slab);
+	if (i >= slab_length(slab)) {
+		return NULL;
+	}
+
+	size_t word = bitmap_word(slab, i);
+	bfs_assume(word != SIZE_MAX);
+	size_t j = trailing_ones(word);
+	bitmap_set(slab, i, j);
+	fenwick_update(slab, i, 1);
+
+	void *ret = nth_chunk(slab, i, j);
+	sanitize_alloc(ret, slab_size(slab));
+	return ret;
+}
+
+/** Get the bitmap index for a chunk. */
+static size_t chunk_index(struct slab *slab, void *ptr) {
+	bfs_assert(slab_contains(slab, ptr));
+	char *start = slab_chunks(slab);
+	size_t size = slab_size(slab);
+	return ((char *)ptr - start) / size;
+}
+
+/** Free a chunk in a slab. */
+static void slab_free(struct slab *slab, void *ptr) {
+	size_t i = chunk_index(slab, ptr);
+	size_t j = i % SIZE_WIDTH;
+	i /= SIZE_WIDTH;
+
+	bitmap_clear(slab, i, j);
+	fenwick_update(slab, i, -1);
+
+	poison(ptr, slab_size(slab));
+}
+
+/** Free a whole slab. */
+static void slab_destroy(struct slab *slab) {
+	unpoison(&slab->chunks);
+	free(slab->chunks);
 }
 
 void arena_init(struct arena *arena, size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert(is_aligned(align, size));
 
-	if (align < alignof(union chunk)) {
-		align = alignof(union chunk);
-	}
-	if (size < sizeof(union chunk)) {
-		size = sizeof(union chunk);
-	}
-	bfs_assert(is_aligned(align, size));
-
-	arena->chunks = NULL;
 	arena->nslabs = 0;
 	arena->slabs = NULL;
 	arena->align = align;
 	arena->size = size;
 }
 
-/** Get the size of the ith slab. */
-static size_t slab_size(const struct arena *arena, size_t i) {
-	// Make the initial allocation size ~4K
-	size_t size = 4096;
-	if (size < arena->size) {
-		size = arena->size;
-	}
-	// Trim off the excess
-	size -= size % arena->size;
-	// Double the size for every slab
-	size <<= i;
-	return size;
-}
-
-/** Allocate a new slab. */
-_cold
-static int slab_alloc(struct arena *arena) {
-	size_t size = slab_size(arena, arena->nslabs);
-
-	// Allocate the slab
-	void *slab = zalloc(arena->align, size);
-	if (!slab) {
-		return -1;
-	}
-
-	// Grow the slab array
-	void **pslab = RESERVE(void *, &arena->slabs, &arena->nslabs);
-	if (!pslab) {
-		free(slab);
-		return -1;
-	}
-
-	// Fix the last chunk->next offset
-	void *last = (char *)slab + size - arena->size;
-	chunk_set_next(arena, last, arena->chunks);
-
-	// We can rely on zero-initialized slabs, but others shouldn't
-	sanitize_uninit(slab, size);
-
-	arena->chunks = *pslab = slab;
-	return 0;
-}
-
 void *arena_alloc(struct arena *arena) {
-	if (!arena->chunks && slab_alloc(arena) != 0) {
+	// Try the largest slab first
+	for (size_t i = arena->nslabs; i-- > 0;) {
+		void *ret = slab_alloc(arena->slabs[i]);
+		if (ret) {
+			return ret;
+		}
+	}
+
+	// All slabs are full, make a new one
+	struct slab **slab = RESERVE(struct slab *, &arena->slabs, &arena->nslabs);
+	if (!slab) {
 		return NULL;
 	}
 
-	union chunk *chunk = arena->chunks;
-	sanitize_alloc(chunk, arena->size);
+	*slab = slab_create(arena->align, arena->size, arena->nslabs);
+	if (!*slab) {
+		--arena->nslabs;
+		return NULL;
+	}
 
-	sanitize_init(chunk);
-	arena->chunks = chunk_next(arena, chunk);
-	sanitize_uninit(chunk, arena->size);
-
-	return chunk;
+	return slab_alloc(*slab);
 }
 
 /** Check if a pointer comes from this arena. */
 static bool arena_contains(const struct arena *arena, void *ptr) {
-	uintptr_t addr = (uintptr_t)ptr;
-
-	for (size_t i = 0; i < arena->nslabs; ++i) {
-		uintptr_t start = (uintptr_t)arena->slabs[i];
-		uintptr_t end = start + slab_size(arena, i);
-		if (addr >= start && addr < end) {
+	for (size_t i = arena->nslabs; i-- > 0;) {
+		if (slab_contains(arena->slabs[i], ptr)) {
 			return true;
 		}
 	}
@@ -248,20 +421,21 @@ static bool arena_contains(const struct arena *arena, void *ptr) {
 void arena_free(struct arena *arena, void *ptr) {
 	bfs_assert(arena_contains(arena, ptr));
 
-	union chunk *chunk = ptr;
-	chunk_set_next(arena, chunk, arena->chunks);
-	arena->chunks = chunk;
-	sanitize_uninit(chunk, arena->size);
-	sanitize_free(chunk, arena->size);
+	for (size_t i = arena->nslabs; i-- > 0;) {
+		struct slab *slab = arena->slabs[i];
+		if (slab_contains(slab, ptr)) {
+			slab_free(slab, ptr);
+			break;
+		}
+	}
 }
 
 void arena_clear(struct arena *arena) {
 	for (size_t i = 0; i < arena->nslabs; ++i) {
-		free(arena->slabs[i]);
+		slab_destroy(arena->slabs[i]);
 	}
 	free(arena->slabs);
 
-	arena->chunks = NULL;
 	arena->nslabs = 0;
 	arena->slabs = NULL;
 }
