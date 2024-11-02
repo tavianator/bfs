@@ -4,11 +4,69 @@
 #include "tests.h"
 
 #include "alloc.h"
+#include "bit.h"
 #include "diag.h"
 
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
+
+/** Check for_arena() iteration. */
+static void check_for_arena(void) {
+	// Check all 2^bits patterns of allocated/free objects.  Every 2 bits of
+	// the pattern corresponds to a different chunk type:
+	//
+	//     0b00:  000...000
+	//     0b01:  100...000
+	//     0b10:  011...111
+	//     0b11:  111...111
+	const size_t bits = 8;
+	const size_t patterns = 1 << bits;
+	const size_t chunk = SIZE_WIDTH;
+	const size_t count = chunk * bits;
+
+	int **ptrs = ALLOC_ARRAY(int *, count);
+	bfs_everify(ptrs);
+
+	struct arena arena;
+	ARENA_INIT(&arena, int);
+
+	for (size_t mask = 0; mask < patterns; ++mask) {
+		arena_clear(&arena);
+
+		// Allocate count objects
+		for (size_t i = 0; i < count; ++i) {
+			ptrs[i] = arena_alloc(&arena);
+			bfs_everify(ptrs[i]);
+			*ptrs[i] = i;
+		}
+
+		// Create holes according to the mask
+		size_t remaining = count;
+		for (size_t bit = 0; bit < bits; bit += 2) {
+			size_t start = chunk * bit / 2;
+			size_t end = start + chunk;
+			for (size_t i = start; i < end; ++i) {
+				bool keep = (mask >> bit) & (i == start ? 0x1 : 0x2);
+				if (!keep) {
+					arena_free(&arena, ptrs[i]);
+					ptrs[i] = NULL;
+					--remaining;
+				}
+			}
+		}
+
+		// Check the remaining objects
+		for_arena (int, p, &arena) {
+			bfs_check(ptrs[*p] == p);
+			--remaining;
+		}
+		bfs_check(remaining == 0);
+	}
+
+	arena_destroy(&arena);
+	free(ptrs);
+}
 
 struct flexible {
 	alignas(64) int foo[8];
@@ -53,6 +111,9 @@ void check_alloc(void) {
 	bfs_check(ZALLOC_ARRAY(int, too_many) == NULL && errno == EOVERFLOW);
 	bfs_check(ALLOC_FLEX(struct flexible, bar, too_many) == NULL && errno == EOVERFLOW);
 	bfs_check(ZALLOC_FLEX(struct flexible, bar, too_many) == NULL && errno == EOVERFLOW);
+
+	// arena tests
+	check_for_arena();
 
 	// varena tests
 	struct varena varena;

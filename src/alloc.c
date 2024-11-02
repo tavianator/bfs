@@ -286,6 +286,17 @@ static size_t fenwick_node(const struct slab *slab, size_t i) {
 	return ret;
 }
 
+/** Query the Fenwick tree.  Returns sum(bits[0:N*i]). */
+static size_t fenwick_query(const struct slab *slab, size_t i) {
+	// (i & -i) isolates the least-significant bit in i.
+	// https://en.wikipedia.org/wiki/Fenwick_tree#The_interrogation_tree
+	size_t ret = 0;
+	for (; i > 0; i -= i & -i) {
+		ret += fenwick_node(slab, i);
+	}
+	return ret;
+}
+
 /** Update the Fenwick tree. */
 static void fenwick_update(struct slab *slab, size_t i, ptrdiff_t delta) {
 	size_t length = slab_length(slab);
@@ -315,6 +326,25 @@ static size_t fenwick_search_free(struct slab *slab) {
 		size_t node = fenwick_node(slab, mid);
 		if (node >= bit * SIZE_WIDTH) {
 			low = mid;
+		}
+	} while (bit > 1);
+
+	return low;
+}
+
+/** Binary search the Fenwick tree for a specific rank. */
+static size_t fenwick_search_next(struct slab *slab, size_t n) {
+	size_t low = 0;
+	size_t bit = slab_length(slab) + 1;
+	bfs_assert(has_single_bit(bit));
+
+	do {
+		bit >>= 1;
+		size_t mid = low + bit;
+		size_t node = fenwick_node(slab, mid);
+		if (node <= n) {
+			low = mid;
+			n -= node;
 		}
 	} while (bit > 1);
 
@@ -365,6 +395,41 @@ static void slab_free(struct slab *slab, void *ptr) {
 	fenwick_update(slab, i, -1);
 
 	poison(ptr, slab_size(slab));
+}
+
+void *slab_next(struct slab *slab, void *ptr) {
+	// Find an allocated chunk after the given pointer
+	size_t min = 0;
+	if (ptr) {
+		min = 1 + chunk_index(slab, ptr);
+	}
+
+	size_t i = min / SIZE_WIDTH;
+	size_t j = min % SIZE_WIDTH;
+	size_t length = slab_length(slab);
+	if (i >= length) {
+		return NULL;
+	}
+
+	// Check for a 1 at bit j or higher
+	size_t word = bitmap_word(slab, i);
+	size_t bit = (size_t)1 << j;
+	j = trailing_zeros(word & -bit);
+
+	if (j >= SIZE_WIDTH) {
+		// None in the same word, query the Fenwick tree
+		size_t rank = fenwick_query(slab, i + 1);
+		i = fenwick_search_next(slab, rank);
+		if (i >= length) {
+			return NULL;
+		}
+
+		word = bitmap_word(slab, i);
+		j = trailing_zeros(word);
+		bfs_assert(j < SIZE_WIDTH);
+	}
+
+	return nth_chunk(slab, i, j);
 }
 
 /** Free a whole slab. */

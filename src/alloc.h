@@ -284,6 +284,29 @@ void arena_clear(struct arena *arena);
 void arena_destroy(struct arena *arena);
 
 /**
+ * Loop over every allocated object in an arena.
+ *
+ * @type
+ *         The object type.
+ * @item
+ *         The induction variable name.
+ * @arena
+ *         The arena to loop over.
+ */
+#define for_arena(type, item, arena) \
+	for_arena_ (type, _i_##item, item, (arena))
+
+#define for_arena_(type, i, item, arena) \
+	for (size_t i = 0; i < arena->nslabs; ++i) \
+		for (type *item = NULL; (item = slab_next(arena->slabs[i], item));)
+
+/**
+ * @internal
+ * Get the next allocated object in a slab.
+ */
+void *slab_next(struct slab *slab, void *ptr);
+
+/**
  * An arena allocator for flexibly-sized types.
  */
 struct varena {
@@ -391,5 +414,22 @@ void varena_clear(struct varena *varena);
  * Destroy a varena, freeing all allocations.
  */
 void varena_destroy(struct varena *varena);
+
+/**
+ * Loop over every allocated object in a varena.
+ *
+ * @type
+ *         The object type.
+ * @item
+ *         The induction variable name.
+ * @varena
+ *         The varena to loop over.
+ */
+#define for_varena(type, item, varena) \
+	for_varena_ (type, _j_##item, item, (varena))
+
+#define for_varena_(type, j, item, varena) \
+	for (size_t j = 0; j < varena->narenas; ++j) \
+		for_arena (type, item, &varena->arenas[j])
 
 #endif // BFS_ALLOC_H
