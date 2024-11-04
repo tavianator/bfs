@@ -12,6 +12,7 @@
 #include "bfstd.h"
 
 #include <stdarg.h>
+#include <stddef.h>
 
 /**
  * A source code location.
@@ -124,6 +125,37 @@ void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
 #else
 #  define bfs_assert bfs_verify
 #  define bfs_eassert bfs_everify
+#endif
+
+/** @internal Wrapper for unreachable(). */
+#ifdef unreachable
+#  define bfs_unreachable_ unreachable
+#elif __has_builtin(__builtin_unreachable)
+#  define bfs_unreachable_ __builtin_unreachable
+#else
+_noreturn
+static inline void bfs_unreachable_(void) {
+}
+#endif
+
+/**
+ * Abort in debug builds; unreachable in release builds.
+ */
+#ifdef NDEBUG
+#  define bfs_unreachable(...) bfs_unreachable_()
+#else
+#  define bfs_unreachable bfs_abort
+#endif
+
+/**
+ * Assert in debug builds; assume in release builds.
+ */
+#ifdef NDEBUG
+#  define bfs_assume(...) bfs_assume_(__VA_ARGS__, )
+#  define bfs_assume_(cond, ...) \
+	((cond) ? (void)0 : bfs_unreachable_())
+#else
+#  define bfs_assume bfs_assert
 #endif
 
 struct bfs_ctx;
