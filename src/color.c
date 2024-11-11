@@ -975,7 +975,7 @@ static const struct esc_seq *file_color(const struct colors *colors, const struc
 		goto error;
 	}
 
-	const struct bfs_stat *statbuf;
+	const struct bfs_stat *statbuf = NULL;
 	const struct esc_seq *color = NULL;
 
 	switch (type) {
