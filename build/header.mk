@@ -33,6 +33,7 @@ HEADERS := \
     gen/has/getmntinfo.h \
     gen/has/getprogname-gnu.h \
     gen/has/getprogname.h \
+    gen/has/io-uring-max-workers.h \
     gen/has/pipe2.h \
     gen/has/posix-getdents.h \
     gen/has/posix-spawn-addfchdir-np.h \

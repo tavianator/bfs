@@ -878,6 +878,7 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 		return -1;
 	}
 
+#if BFS_HAS_IO_URING_MAX_WORKERS
 	// Limit the number of io_uring workers
 	unsigned int values[] = {
 		ioq->nthreads, // [IO_WQ_BOUND]
@@ -885,6 +886,8 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 	};
 	io_uring_register_iowq_max_workers(&thread->ring, values);
 #endif
+
+#endif // BFS_WITH_LIBURING
 
 	return 0;
 }
