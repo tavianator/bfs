@@ -29,7 +29,7 @@ jobs:
           make -j$(nproc) check TEST_FLAGS="--sudo"
           gcov -abcfpu obj/*/*.o
 
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
