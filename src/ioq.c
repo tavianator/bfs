@@ -836,16 +836,32 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 		return -1;
 	}
 
-	// Share io-wq workers between rings
 	struct io_uring_params params = {0};
+
+#ifdef IORING_SETUP_SUBMIT_ALL
+	// Don't abort submission just because an inline request fails
+	params.flags |= IORING_SETUP_SUBMIT_ALL;
+#endif
+
+	// Share io-wq workers between rings
 	if (prev) {
-		params.flags |= IORING_SETUP_ATTACH_WQ;
+		params.flags = prev->ring.flags | IORING_SETUP_ATTACH_WQ;
 		params.wq_fd = prev->ring.ring_fd;
 	}
 
 	// Use a page for each SQE ring
 	size_t entries = 4096 / sizeof(struct io_uring_sqe);
 	thread->ring_err = -io_uring_queue_init_params(entries, &thread->ring, &params);
+
+#ifdef IORING_SETUP_SUBMIT_ALL
+	if (thread->ring_err == EINVAL && (params.flags & IORING_SETUP_SUBMIT_ALL)) {
+		// IORING_SETUP_SUBMIT_ALL is only supported since Linux 5.18,
+		// so try again without it
+		params.flags &= ~IORING_SETUP_SUBMIT_ALL;
+		thread->ring_err = -io_uring_queue_init_params(entries, &thread->ring, &params);
+	}
+#endif
+
 	if (thread->ring_err) {
 		return -1;
 	}
