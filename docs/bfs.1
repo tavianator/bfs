@@ -90,7 +90,9 @@ Follow all symbolic links.
 Never follow symbolic links (the default).
 .TP
 .B \-E
-Use extended regular expressions (same as \fB\-regextype \fIposix-extended\fR).
+Use extended regular expressions (same as
+.B \-regextype
+.IR posix-extended ).
 .TP
 .B \-X
 Filter out files with
@@ -109,19 +111,20 @@ The sorting takes place within each directory separately, which makes it differe
 but still provides a deterministic ordering.
 .TP
 .B \-x
-Don't descend into other mount points (same as \fB\-xdev\fR).
+Don't descend into other mount points (same as
+.BR \-xdev ).
 .TP
-\fB\-f \fIPATH\fR
+.BI "\-f " PATH
 Treat
 .I PATH
 as a path to search (useful if it begins with a dash).
 .TP
-\fB\-D \fIFLAG\fR
+.BI "\-D " FLAG
 Turn on a debugging flag (see
 .B \-D
 .IR help ).
 .PP
-\fB\-O\fIN\fR
+.BI \-O N
 .RS
 Enable optimization level
 .I N
@@ -177,14 +180,14 @@ Typically far faster than
 .IR ids .
 .RE
 .TP
-\fB\-j\fIN\fR
+.BI \-j N
 Search with
 .I N
 threads in parallel (default: number of CPUs, up to
 .IR 8 ).
 .SH OPERATORS
 .TP
-\fB( \fIexpression \fB)\fR
+.BI "( " expression " )"
 Parentheses are used for grouping expressions together.
 You'll probably have to write
 .B \e(
@@ -194,18 +197,25 @@ to avoid the parentheses being interpreted by the shell.
 .PP
 \fB! \fIexpression\fR
 .br
-\fB\-not \fIexpression\fR
+.B \-not
+.I expression
 .RS
 The "not" operator: returns the negation of the truth value of the
 .IR expression .
-You may have to write \fB\e! \fIexpression\fR to avoid \fB!\fR being interpreted by the shell.
+You may have to write \fB\e! \fIexpression\fR to avoid
+.B !
+being interpreted by the shell.
 .RE
 .PP
-\fIexpression\fR \fIexpression\fR
+.I expression expression
 .br
-\fIexpression \fB\-a \fIexpression\fR
+.I expression
+.B \-a
+.I expression
 .br
-\fIexpression \fB\-and \fIexpression\fR
+.I expression
+.B \-and
+.I expression
 .RS
 Short-circuiting "and" operator: if the left-hand
 .I expression
@@ -217,9 +227,13 @@ otherwise, returns
 .BR false .
 .RE
 .PP
-\fIexpression \fB\-o \fIexpression\fR
+.I expression
+.B \-o
+.I expression
 .br
-\fIexpression \fB\-or \fIexpression\fR
+.I expression
+.B \-or
+.I expression
 .RS
 Short-circuiting "or" operator: if the left-hand
 .I expression
@@ -231,14 +245,14 @@ otherwise, returns
 .BR true .
 .RE
 .TP
-\fIexpression \fB, \fIexpression\fR
+.IB "expression " , " expression"
 The "comma" operator: evaluates the left-hand
 .I expression
 but discards the result, returning the right-hand
 .IR expression .
 .SH SPECIAL FORMS
 .TP
-\fB\-exclude \fIexpression\fR
+.BI "\-exclude " expression
 Exclude all paths matching the
 .I expression
 from the search.
@@ -286,7 +300,7 @@ Search in post-order (descendents first).
 Follow all symbolic links (same as
 .BR \-L ).
 .TP
-\fB\-files0\-from \fIFILE\fR
+.BI "\-files0\-from " FILE
 Treat the NUL ('\e0')-separated paths in
 .I FILE
 as starting points for the search.
@@ -295,9 +309,9 @@ Pass
 .I \-
 to read the paths from standard input.
 .PP
-\fB\-ignore_readdir_race\fR
+.B \-ignore_readdir_race
 .br
-\fB\-noignore_readdir_race\fR
+.B \-noignore_readdir_race
 .RS
 Whether to report an error if
 .B bfs
@@ -305,9 +319,11 @@ detects that the file tree is modified during the search (default:
 .BR \-noignore_readdir_race ).
 .RE
 .PP
-\fB\-maxdepth \fIN\fR
+.B \-maxdepth
+.I N
 .br
-\fB\-mindepth \fIN\fR
+.B \-mindepth
+.I N
 .RS
 Ignore files deeper/shallower than
 .IR N .
@@ -325,7 +341,7 @@ Exclude hidden files and directories.
 .B \-noleaf
 Ignored; for compatibility with GNU find.
 .TP
-\fB\-regextype \fITYPE\fR
+.BI "\-regextype " TYPE
 Use
 .IR TYPE -flavored
 regular expressions.
@@ -403,13 +419,17 @@ Find files
 minutes ago.
 .RE
 .PP
-\fB\-anewer \fIFILE\fR
+.B \-anewer
+.I FILE
 .br
-\fB\-Bnewer \fIFILE\fR
+.B \-Bnewer
+.I FILE
 .br
-\fB\-cnewer \fIFILE\fR
+.B \-cnewer
+.I FILE
 .br
-\fB\-mnewer \fIFILE\fR
+.B \-mnewer
+.I FILE
 .RS
 Find files
 .BR a ccessed/ B irthed/ c hanged/ m odified
@@ -418,13 +438,17 @@ more recently than
 was modified.
 .RE
 .PP
-\fB\-asince \fITIME\fR
+.B \-asince
+.I TIME
 .br
-\fB\-Bsince \fITIME\fR
+.B \-Bsince
+.I TIME
 .br
-\fB\-csince \fITIME\fR
+.B \-csince
+.I TIME
 .br
-\fB\-msince \fITIME\fR
+.B \-msince
+.I TIME
 .RS
 Find files
 .BR a ccessed/ B irthed/ c hanged/ m odified
@@ -454,7 +478,7 @@ Find files with POSIX.1e
 .BR capabilities (7)
 set.
 .TP
-\fB\-context \fIGLOB\fR
+.BI "\-context " GLOB
 Find files whose SELinux context matches the
 .IR GLOB .
 .TP
@@ -485,7 +509,7 @@ Always false/true.
 Find files with matching inode
 .BR FLAGS .
 .TP
-\fB\-fstype \fITYPE\fR
+.BI "\-fstype " TYPE
 Find files on file systems with the given
 .IR TYPE .
 .PP
@@ -497,9 +521,11 @@ Find files owned by group/user ID
 .IR N .
 .RE
 .PP
-\fB\-group \fINAME\fR
+.B \-group
+.I NAME
 .br
-\fB\-user \fINAME\fR
+.B \-user
+.I NAME
 .RS
 Find files owned by the group/user
 .IR NAME .
@@ -509,15 +535,20 @@ Find files owned by the group/user
 Find hidden files (those beginning with
 .IR . ).
 .PP
-\fB\-ilname \fIGLOB\fR
+.B \-ilname
+.I GLOB
 .br
-\fB\-iname \fIGLOB\fR
+.B \-iname
+.I GLOB
 .br
-\fB\-ipath \fIGLOB\fR
+.B \-ipath
+.I GLOB
 .br
-\fB\-iregex \fIREGEX\fR
+.B \-iregex
+.I REGEX
 .br
-\fB\-iwholename \fIGLOB\fR
+.B \-iwholename
+.I GLOB
 .RS
 Case-insensitive versions of
 .BR \-lname / \-name / \-path / \-regex / \-wholename .
@@ -532,19 +563,19 @@ Find files with
 .I N
 hard links.
 .TP
-\fB\-lname \fIGLOB\fR
+.BI "\-lname " GLOB
 Find symbolic links whose target matches the
 .IR GLOB .
 .TP
-\fB\-name \fIGLOB\fR
+.BI "\-name " GLOB
 Find files whose name matches the
 .IR GLOB .
 .TP
-\fB\-newer \fIFILE\fR
+.BI "\-newer " FILE
 Find files newer than
 .IR FILE .
 .TP
-\fB\-newer\fIXY \fIREFERENCE\fR
+.BI \-newer "XY REFERENCE"
 Find files whose
 .I X
 time is newer than the
@@ -580,9 +611,11 @@ as an ISO 8601-style timestamp.  For example:
 Find files owned by nonexistent groups/users.
 .RE
 .PP
-\fB\-path \fIGLOB\fR
+.B \-path
+.I GLOB
 .br
-\fB\-wholename \fIGLOB\fR
+.B \-wholename
+.I GLOB
 .RS
 Find files whose entire path matches the
 .IR GLOB .
@@ -591,15 +624,15 @@ Find files whose entire path matches the
 \fB\-perm\fR [\fI\-+/\fR]\fIMODE\fR
 Find files with a matching mode.
 .TP
-\fB\-regex \fIREGEX\fR
+.BI "\-regex " REGEX
 Find files whose entire path matches the regular expression
 .IR REGEX .
 .TP
-\fB\-samefile \fIFILE\fR
+.BI "\-samefile " FILE
 Find hard links to
 .IR FILE .
 .TP
-\fB\-since \fITIME\fR
+.BI "\-since " TIME
 Find files modified since the ISO 8601-style timestamp
 .IR TIME .
 See
@@ -678,7 +711,7 @@ days after they were changed.
 Find files with extended attributes
 .RB ( xattr (7)).
 .TP
-\fB\-xattrname\fR \fINAME\fR
+.BI "\-xattrname " NAME
 Find files with the extended attribute
 .IR NAME .
 .TP
@@ -691,23 +724,27 @@ would not, and vice versa.
 .br
 .B \-rm
 .RS
-Delete any found files (implies \fB-depth\fR).
+Delete any found files (implies
+.BR \-depth ).
 .RE
 .TP
-\fB\-exec \fIcommand ... {} ;\fR
+.BI "\-exec " "command ... {} ;"
 Execute a command.
 .TP
-\fB\-exec \fIcommand ... {} +\fR
+.BI "\-exec " "command ... {} +"
 Execute a command with multiple files at once.
 .TP
-\fB\-ok \fIcommand ... {} ;\fR
+.BI "\-ok " "command ... {} ;"
 Prompt the user whether to execute a command.
 .PP
-\fB\-execdir \fIcommand ... {} ;\fR
+.B \-execdir
+.I command ... {} ;
 .br
-\fB\-execdir \fIcommand ... {} +\fR
+.B \-execdir
+.I command ... {} +
 .br
-\fB\-okdir \fIcommand ... {} ;\fR
+.B \-okdir
+.I command ... {} ;
 .RS
 Like
 .BR \-exec / \-ok ,
@@ -719,13 +756,17 @@ Exit immediately with the given status
 .RI ( 0
 if unspecified).
 .PP
-\fB\-fls \fIFILE\fR
+.B \-fls
+.I FILE
 .br
-\fB\-fprint \fIFILE\fR
+.B \-fprint
+.I FILE
 .br
-\fB\-fprint0 \fIFILE\fR
+.B \-fprint0
+.I FILE
 .br
-\fB\-fprintf \fIFILE FORMAT\fR
+.B \-fprintf
+.I FILE FORMAT
 .RS
 Like
 .BR \-ls / \-print / \-print0 / \-printf ,
@@ -734,7 +775,7 @@ but write to
 instead of standard output.
 .RE
 .TP
-\fB\-limit \fIN\fR
+.BI "\-limit " N
 Quit once this action is evaluated
 .I N
 times.
@@ -755,7 +796,7 @@ Useful in conjunction with
 .B xargs
 .IR \-0 .
 .TP
-\fB\-printf \fIFORMAT\fR
+.BI "\-printf " FORMAT
 Print according to a format string (see
 .BR find (1)).
 These additional format directives are supported:
@@ -901,7 +942,7 @@ is quoted to ensure the glob is processed by
 .B bfs
 rather than the shell.
 .TP
-\fBbfs \-name access_log \-L \fI/var\fR
+.BI "bfs \-name access_log \-L " /var
 Finds all files named
 .B access_log
 under
@@ -910,7 +951,7 @@ following symbolic links.
 .B bfs
 allows flags and paths to appear anywhere on the command line.
 .TP
-\fBbfs \fI~ \fB\-not \-user $USER\fR
+.BI "bfs " ~ " \-not \-user $USER"
 Prints all files in your home directory not owned by you.
 .TP
 .B bfs \-xtype l
