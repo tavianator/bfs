@@ -62,6 +62,11 @@
 #  define _POSIX_PTHREAD_SEMANTICS 1
 #endif
 
+/** QNX extensions. */
+#if __QNX__
+#  define _QNX_SOURCE 1
+#endif
+
 // Get the convenience macros that became standard spellings in C23
 #if __STDC_VERSION__ < 202311L
 
