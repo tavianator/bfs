@@ -482,7 +482,9 @@ int rlim_cmp(rlim_t a, rlim_t b) {
 }
 
 dev_t xmakedev(int ma, int mi) {
-#ifdef makedev
+#if __QNX__
+	return makedev(0, ma, mi);
+#elif defined(makedev)
 	return makedev(ma, mi);
 #else
 	return (ma << 8) | mi;
