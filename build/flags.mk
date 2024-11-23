@@ -8,7 +8,7 @@ include gen/vars.mk
 
 # Internal flags
 _CPPFLAGS := -Isrc -Igen -include src/prelude.h
-_CFLAGS := -std=c17 -pthread
+_CFLAGS := -std=c17
 _LDFLAGS :=
 _LDLIBS :=
 
@@ -16,6 +16,7 @@ _LDLIBS :=
 LDLIBS,DragonFly := -lposix1e
 LDLIBS,Linux := -lrt
 LDLIBS,NetBSD := -lutil
+LDLIBS,QNX := -lregex -lsocket
 LDLIBS,SunOS := -lsec -lsocket -lnsl
 _LDLIBS += ${LDLIBS,${OS}}
 
@@ -90,7 +91,8 @@ AUTO_FLAGS := \
     gen/flags/Wstrict-prototypes.mk \
     gen/flags/Wundef-prefix.mk \
     gen/flags/bind-now.mk \
-    gen/flags/deps.mk
+    gen/flags/deps.mk \
+    gen/flags/pthread.mk
 
 gen/flags.mk: ${AUTO_FLAGS}
 	${MSG} "[ GEN] $@"
