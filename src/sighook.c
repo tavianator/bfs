@@ -460,9 +460,15 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 
 /** Make sure our signal handler is installed for a given signal. */
 static int siginit(int sig) {
+#ifdef SA_RESTART
+#  define BFS_SA_RESTART SA_RESTART
+#else
+#  define BFS_SA_RESTART 0
+#endif
+
 	static struct sigaction action = {
 		.sa_sigaction = sigdispatch,
-		.sa_flags = SA_RESTART | SA_SIGINFO,
+		.sa_flags = BFS_SA_RESTART | SA_SIGINFO,
 	};
 
 	static sigset_t signals;
