@@ -356,6 +356,14 @@ static bool ioq_slot_push(struct ioqq *ioqq, ioq_slot *slot, struct ioq_ent *ent
 static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool block) {
 	uintptr_t prev = load(slot, relaxed);
 	while (true) {
+#if __has_builtin(__builtin_prefetch)
+		// Optimistically prefetch the pointer in this slot.  If this
+		// slot is not full, this will prefetch an invalid address, but
+		// experimentally this is worth it on both Intel (Alder Lake)
+		// and AMD (Zen 2).
+		__builtin_prefetch((void *)(prev << 1));
+#endif
+
 		// empty     → skip(1)
 		// skip(n)   → skip(n + 1)
 		// full(ptr) → full(ptr - 1)
