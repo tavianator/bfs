@@ -9,6 +9,10 @@
 #include <errno.h>
 #include <pthread.h>
 
+#if __has_include(<pthread_np.h>)
+#  include <pthread_np.h>
+#endif
+
 #define THREAD_FALLIBLE(expr) \
 	do { \
 		int err = expr; \
@@ -30,6 +34,14 @@
 
 int thread_create(pthread_t *thread, const pthread_attr_t *attr, thread_fn *fn, void *arg) {
 	THREAD_FALLIBLE(pthread_create(thread, attr, fn, arg));
+}
+
+void thread_setname(pthread_t thread, const char *name) {
+#if BFS_HAS_PTHREAD_SETNAME_NP
+	pthread_setname_np(thread, name);
+#elif BFS_HAS_PTHREAD_SET_NAME_NP
+	pthread_set_name_np(thread, name);
+#endif
 }
 
 void thread_join(pthread_t thread, void **ret) {

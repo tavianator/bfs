@@ -38,6 +38,8 @@ HEADERS := \
     gen/has/posix-getdents.h \
     gen/has/posix-spawn-addfchdir-np.h \
     gen/has/posix-spawn-addfchdir.h \
+    gen/has/pthread-set-name-np.h \
+    gen/has/pthread-setname-np.h \
     gen/has/st-acmtim.h \
     gen/has/st-acmtimespec.h \
     gen/has/st-birthtim.h \

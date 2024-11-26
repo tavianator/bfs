@@ -22,6 +22,11 @@ typedef void *thread_fn(void *arg);
 int thread_create(pthread_t *thread, const pthread_attr_t *attr, thread_fn *fn, void *arg);
 
 /**
+ * Set the name of a thread.
+ */
+void thread_setname(pthread_t thread, const char *name);
+
+/**
  * Wrapper for pthread_join().
  */
 void thread_join(pthread_t thread, void **ret);
