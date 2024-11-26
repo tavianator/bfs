@@ -918,7 +918,8 @@ static void ioq_ring_exit(struct ioq_thread *thread) {
 }
 
 /** Create an I/O queue thread. */
-static int ioq_thread_create(struct ioq *ioq, struct ioq_thread *thread) {
+static int ioq_thread_create(struct ioq *ioq, size_t i) {
+	struct ioq_thread *thread = &ioq->threads[i];
 	thread->parent = ioq;
 
 	ioq_ring_init(ioq, thread);
@@ -926,6 +927,11 @@ static int ioq_thread_create(struct ioq *ioq, struct ioq_thread *thread) {
 	if (thread_create(&thread->id, NULL, ioq_work, thread) != 0) {
 		ioq_ring_exit(thread);
 		return -1;
+	}
+
+	char name[16];
+	if (snprintf(name, sizeof(name), "ioq-%zu", i) >= 0) {
+		thread_setname(thread->id, name);
 	}
 
 	return 0;
@@ -962,7 +968,7 @@ struct ioq *ioq_create(size_t depth, size_t nthreads) {
 
 	ioq->nthreads = nthreads;
 	for (size_t i = 0; i < nthreads; ++i) {
-		if (ioq_thread_create(ioq, &ioq->threads[i]) != 0) {
+		if (ioq_thread_create(ioq, i) != 0) {
 			ioq->nthreads = i;
 			goto fail;
 		}
