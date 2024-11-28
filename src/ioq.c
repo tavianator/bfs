@@ -277,10 +277,26 @@ static struct ioq_monitor *ioq_slot_monitor(struct ioqq *ioqq, ioq_slot *slot) {
 /** Atomically wait for a slot to change. */
 _noinline
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
+	// Try spinning a few times before blocking
+	uintptr_t ret;
+	for (int i = 0; i < 10; ++i) {
+		// Exponential backoff
+		for (int j = 0; j < (1 << i); ++j) {
+			spin_loop();
+		}
+
+		// Check if the slot changed
+		ret = load(slot, relaxed);
+		if (ret != value) {
+			return ret;
+		}
+	}
+
+	// Nothing changed, start blocking
 	struct ioq_monitor *monitor = ioq_slot_monitor(ioqq, slot);
 	mutex_lock(&monitor->mutex);
 
-	uintptr_t ret = load(slot, relaxed);
+	ret = load(slot, relaxed);
 	if (ret != value) {
 		goto done;
 	}
