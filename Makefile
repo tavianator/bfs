@@ -45,7 +45,8 @@ BINS := \
     bin/tests/mksock \
     bin/tests/units \
     bin/tests/xspawnee \
-    bin/tests/xtouch
+    bin/tests/xtouch \
+    bin/bench/ioq
 
 all: ${BINS}
 .PHONY: all
@@ -214,6 +215,14 @@ ${DISTCHECKS}::
 	    && ../configure MAKE="${MAKE}" ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
 	    && ${MAKE} check TEST_FLAGS="--sudo --verbose=skipped"
 	@test "$${GITHUB_ACTIONS-}" != true || printf '::endgroup::\n'
+
+## Benchmarks (`make bench`)
+
+bench: bin/bench/ioq
+.PHONY: bench
+
+bin/bench/ioq: obj/bench/ioq.o ${LIBBFS}
+OBJS += obj/bench/ioq.o
 
 ## Automatic dependency tracking
 
