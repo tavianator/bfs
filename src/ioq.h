@@ -22,6 +22,8 @@ struct ioq;
  * I/O queue operations.
  */
 enum ioq_op {
+	/** ioq_nop(). */
+	IOQ_NOP,
 	/** ioq_close(). */
 	IOQ_CLOSE,
 	/** ioq_opendir(). */
@@ -30,6 +32,16 @@ enum ioq_op {
 	IOQ_CLOSEDIR,
 	/** ioq_stat(). */
 	IOQ_STAT,
+};
+
+/**
+ * ioq_nop() types.
+ */
+enum ioq_nop_type {
+	/** A lightweight nop that avoids syscalls. */
+	IOQ_NOP_LIGHT,
+	/** A heavyweight nop that involves a syscall. */
+	IOQ_NOP_HEAVY,
 };
 
 /**
@@ -54,6 +66,10 @@ struct ioq_ent {
 
 	/** Operation-specific arguments. */
 	union {
+		/** ioq_nop() args. */
+		struct ioq_nop {
+			enum ioq_nop_type type;
+		} nop;
 		/** ioq_close() args. */
 		struct ioq_close {
 			int fd;
@@ -96,6 +112,20 @@ struct ioq *ioq_create(size_t depth, size_t nthreads);
  * Check the remaining capacity of a queue.
  */
 size_t ioq_capacity(const struct ioq *ioq);
+
+/**
+ * A no-op, for benchmarking.
+ *
+ * @ioq
+ *         The I/O queue.
+ * @type
+ *         The type of operation to perform.
+ * @ptr
+ *         An arbitrary pointer to associate with the request.
+ * @return
+ *         0 on success, or -1 on failure.
+ */
+int ioq_nop(struct ioq *ioq, enum ioq_nop_type type, void *ptr);
 
 /**
  * Asynchronous close().

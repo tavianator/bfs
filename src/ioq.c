@@ -136,6 +136,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #if BFS_WITH_LIBURING
 #  include <liburing.h>
@@ -532,6 +533,14 @@ static bool ioq_check_cancel(struct ioq *ioq, struct ioq_ent *ent) {
 /** Dispatch a single request synchronously. */
 static void ioq_dispatch_sync(struct ioq *ioq, struct ioq_ent *ent) {
 	switch (ent->op) {
+		case IOQ_NOP:
+			if (ent->nop.type == IOQ_NOP_HEAVY) {
+				// A fast, no-op syscall
+				getpid();
+			}
+			ent->result = 0;
+			return;
+
 		case IOQ_CLOSE:
 			ent->result = try(xclose(ent->close.fd));
 			return;
@@ -587,6 +596,13 @@ static struct io_uring_sqe *ioq_dispatch_async(struct ioq_ring_state *state, str
 	struct io_uring_sqe *sqe = NULL;
 
 	switch (ent->op) {
+	case IOQ_NOP:
+		if (ent->nop.type == IOQ_NOP_HEAVY) {
+			sqe = io_uring_get_sqe(ring);
+			io_uring_prep_nop(sqe);
+		}
+		return sqe;
+
 	case IOQ_CLOSE:
 		if (ops & IOQ_RING_CLOSE) {
 			sqe = io_uring_get_sqe(ring);
@@ -1008,6 +1024,18 @@ static struct ioq_ent *ioq_request(struct ioq *ioq, enum ioq_op op, void *ptr) {
 	ent->ptr = ptr;
 	++ioq->size;
 	return ent;
+}
+
+int ioq_nop(struct ioq *ioq, enum ioq_nop_type type, void *ptr) {
+	struct ioq_ent *ent = ioq_request(ioq, IOQ_NOP, ptr);
+	if (!ent) {
+		return -1;
+	}
+
+	ent->nop.type = type;
+
+	ioqq_push(ioq->pending, ent);
+	return 0;
 }
 
 int ioq_close(struct ioq *ioq, int fd, void *ptr) {

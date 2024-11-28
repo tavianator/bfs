@@ -1051,6 +1051,10 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 
 		bftw_queue_attach(&state->fileq, file, true);
 		break;
+
+	default:
+		bfs_bug("Unexpected ioq op %d", (int)op);
+		break;
 	}
 
 	ioq_free(ioq, ent);
