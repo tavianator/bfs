@@ -137,11 +137,9 @@ static const struct bfs_stat *eval_stat(struct bfs_eval *state) {
  * Get the difference (in seconds) between two struct timespecs.
  */
 static time_t timespec_diff(const struct timespec *lhs, const struct timespec *rhs) {
-	time_t ret = lhs->tv_sec - rhs->tv_sec;
-	if (lhs->tv_nsec < rhs->tv_nsec) {
-		--ret;
-	}
-	return ret;
+	struct timespec diff = *lhs;
+	timespec_sub(&diff, rhs);
+	return diff.tv_sec;
 }
 
 bool bfs_expr_cmp(const struct bfs_expr *expr, long long n) {
@@ -260,8 +258,7 @@ bool eval_newer(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	return time->tv_sec > expr->reftime.tv_sec
-		|| (time->tv_sec == expr->reftime.tv_sec && time->tv_nsec > expr->reftime.tv_nsec);
+	return timespec_cmp(time, &expr->reftime) > 0;
 }
 
 /**
@@ -1047,21 +1044,6 @@ static int eval_gettime(struct bfs_eval *state, struct timespec *ts) {
 }
 
 /**
- * Record an elapsed time.
- */
-static void timespec_elapsed(struct timespec *elapsed, const struct timespec *start, const struct timespec *end) {
-	elapsed->tv_sec += end->tv_sec - start->tv_sec;
-	elapsed->tv_nsec += end->tv_nsec - start->tv_nsec;
-	if (elapsed->tv_nsec < 0) {
-		elapsed->tv_nsec += 1000000000L;
-		--elapsed->tv_sec;
-	} else if (elapsed->tv_nsec >= 1000000000L) {
-		elapsed->tv_nsec -= 1000000000L;
-		++elapsed->tv_sec;
-	}
-}
-
-/**
  * Evaluate an expression.
  */
 static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
@@ -1079,7 +1061,8 @@ static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
 
 	if (time) {
 		if (eval_gettime(state, &end) == 0) {
-			timespec_elapsed(&expr->elapsed, &start, &end);
+			timespec_sub(&end, &start);
+			timespec_add(&expr->elapsed, &end);
 		}
 	}
 

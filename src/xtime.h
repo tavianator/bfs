@@ -47,6 +47,42 @@ int xtimegm(struct tm *tm, time_t *timep);
 int xgetdate(const char *str, struct timespec *result);
 
 /**
+ * Add to a timespec.
+ */
+void timespec_add(struct timespec *lhs, const struct timespec *rhs);
+
+/**
+ * Subtract from a timespec.
+ */
+void timespec_sub(struct timespec *lhs, const struct timespec *rhs);
+
+/**
+ * Compare two timespecs.
+ *
+ * @return
+ *         An integer with the sign of (*lhs - *rhs).
+ */
+int timespec_cmp(const struct timespec *lhs, const struct timespec *rhs);
+
+/**
+ * Update a minimum timespec.
+ */
+void timespec_min(struct timespec *dest, const struct timespec *src);
+
+/**
+ * Update a maximum timespec.
+ */
+void timespec_max(struct timespec *dest, const struct timespec *src);
+
+/**
+ * Convert a timespec to floating point.
+ *
+ * @return
+ *         The value in nanoseconds.
+ */
+double timespec_ns(const struct timespec *ts);
+
+/**
  * A timer.
  */
 struct timer;

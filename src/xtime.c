@@ -354,6 +354,59 @@ error:
 	return -1;
 }
 
+/** One nanosecond. */
+static const long NS = 1000L * 1000 * 1000;
+
+void timespec_add(struct timespec *lhs, const struct timespec *rhs) {
+	lhs->tv_sec += rhs->tv_sec;
+	lhs->tv_nsec += rhs->tv_nsec;
+	if (lhs->tv_nsec >= NS) {
+		lhs->tv_nsec -= NS;
+		lhs->tv_sec += 1;
+	}
+}
+
+void timespec_sub(struct timespec *lhs, const struct timespec *rhs) {
+	lhs->tv_sec -= rhs->tv_sec;
+	lhs->tv_nsec -= rhs->tv_nsec;
+	if (lhs->tv_nsec < 0) {
+		lhs->tv_nsec += NS;
+		lhs->tv_sec -= 1;
+	}
+}
+
+int timespec_cmp(const struct timespec *lhs, const struct timespec *rhs) {
+	if (lhs->tv_sec < rhs->tv_sec) {
+		return -1;
+	} else if (lhs->tv_sec > rhs->tv_sec) {
+		return 1;
+	}
+
+	if (lhs->tv_nsec < rhs->tv_nsec) {
+		return -1;
+	} else if (lhs->tv_nsec > rhs->tv_nsec) {
+		return 1;
+	}
+
+	return 0;
+}
+
+void timespec_min(struct timespec *dest, const struct timespec *src) {
+	if (timespec_cmp(src, dest) < 0) {
+		*dest = *src;
+	}
+}
+
+void timespec_max(struct timespec *dest, const struct timespec *src) {
+	if (timespec_cmp(src, dest) > 0) {
+		*dest = *src;
+	}
+}
+
+double timespec_ns(const struct timespec *ts) {
+	return 1.0e9 * ts->tv_sec + ts->tv_nsec;
+}
+
 #if defined(_POSIX_TIMERS) && BFS_HAS_TIMER_CREATE
 #  define BFS_POSIX_TIMERS _POSIX_TIMERS
 #else
