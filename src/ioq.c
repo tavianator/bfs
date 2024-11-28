@@ -260,7 +260,17 @@ static struct ioqq *ioqq_create(size_t size) {
 
 /** Get the monitor associated with a slot. */
 static struct ioq_monitor *ioq_slot_monitor(struct ioqq *ioqq, ioq_slot *slot) {
-	size_t i = slot - ioqq->slots;
+	uint32_t i = slot - ioqq->slots;
+
+	// Hash the index to de-correlate waiters
+	// https://nullprogram.com/blog/2018/07/31/
+	// https://github.com/skeeto/hash-prospector/issues/19#issuecomment-1120105785
+	i ^= i >> 16;
+	i *= UINT32_C(0x21f0aaad);
+	i ^= i >> 15;
+	i *= UINT32_C(0x735a2d97);
+	i ^= i >> 15;
+
 	return &ioqq->monitors[i & ioqq->monitor_mask];
 }
 
