@@ -254,6 +254,8 @@ struct sighook {
 	sighook_fn *fn;
 	/** An argument to pass to the function. */
 	void *arg;
+	/** Flag for SH_ONESHOT. */
+	atomic bool armed;
 
 	/** The RCU pointer to this hook. */
 	struct rcu *self;
@@ -402,6 +404,21 @@ fail:
 	abort();
 }
 
+/** Check whether we should run a hook. */
+static bool should_run(int sig, struct sighook *hook) {
+	if (hook->sig != sig && hook->sig != 0) {
+		return false;
+	}
+
+	if (hook->flags & SH_ONESHOT) {
+		if (!exchange(&hook->armed, false, relaxed)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 /** Find any matching hooks and run them. */
 static enum sigflags run_hooks(struct siglist *list, int sig, siginfo_t *info) {
 	enum sigflags ret = 0;
@@ -409,7 +426,7 @@ static enum sigflags run_hooks(struct siglist *list, int sig, siginfo_t *info) {
 	struct arc *slot = NULL;
 	struct sighook *hook = rcu_read(&list->head, &slot);
 	while (hook) {
-		if (hook->sig == sig || hook->sig == 0) {
+		if (should_run(sig, hook)) {
 			hook->fn(sig, info, hook->arg);
 			ret |= hook->flags;
 		}
@@ -522,6 +539,7 @@ static struct sighook *sighook_impl(int sig, sighook_fn *fn, void *arg, enum sig
 	hook->flags = flags;
 	hook->fn = fn;
 	hook->arg = arg;
+	atomic_init(&hook->armed, true);
 
 	struct siglist *list = siglist(sig);
 	sigpush(list, hook);

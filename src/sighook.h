@@ -21,6 +21,8 @@ struct sighook;
 enum sigflags {
 	/** Suppress the default action for this signal. */
 	SH_CONTINUE = 1 << 0,
+	/** Only run this hook once. */
+	SH_ONESHOT = 1 << 1,
 };
 
 /**
