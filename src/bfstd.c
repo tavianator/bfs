@@ -211,33 +211,75 @@ const char *xgetprogname(void) {
 	return cmd;
 }
 
-int xstrtoll(const char *str, char **end, int base, long long *value) {
-	// strtoll() skips leading spaces, but we want to reject them
+/** Common prologue for xstrto*() wrappers. */
+static int xstrtox_prologue(const char *str) {
+	// strto*() skips leading spaces, but we want to reject them
 	if (xisspace(str[0])) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	// If end is NULL, make sure the entire string is valid
-	bool entire = !end;
-	char *endp;
-	if (!end) {
-		end = &endp;
-	}
-
 	errno = 0;
-	long long result = strtoll(str, end, base);
+	return 0;
+}
+
+/** Common epilogue for xstrto*() wrappers. */
+static int xstrtox_epilogue(const char *str, char **end, char *endp) {
 	if (errno != 0) {
 		return -1;
 	}
 
-	if (*end == str || (entire && **end != '\0')) {
+	if (end) {
+		*end = endp;
+	}
+
+	// If end is NULL, make sure the entire string is valid
+	if (endp == str || (!end && *endp != '\0')) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	*value = result;
 	return 0;
+}
+
+int xstrtol(const char *str, char **end, int base, long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtol(str, &endp, base);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtoll(const char *str, char **end, int base, long long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtoll(str, &endp, base);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtof(const char *str, char **end, float *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtof(str, &endp);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtod(const char *str, char **end, double *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtod(str, &endp);
+	return xstrtox_epilogue(str, end, endp);
 }
 
 /** Compile and execute a regular expression for xrpmatch(). */
