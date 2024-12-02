@@ -1008,6 +1008,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		return -1;
 	}
 
+	ioq_submit(ioq);
 	struct ioq_ent *ent = ioq_pop(ioq, block);
 	if (!ent) {
 		return -1;
@@ -1957,6 +1958,10 @@ static void bftw_flush(struct bftw_state *state) {
 
 	bftw_queue_flush(&state->dirq);
 	bftw_ioq_opendirs(state);
+
+	if (state->ioq) {
+		ioq_submit(state->ioq);
+	}
 }
 
 /** Close the current directory. */

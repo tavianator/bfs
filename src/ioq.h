@@ -190,6 +190,11 @@ int ioq_closedir(struct ioq *ioq, struct bfs_dir *dir, void *ptr);
 int ioq_stat(struct ioq *ioq, int dfd, const char *path, enum bfs_stat_flags flags, struct bfs_stat *buf, void *ptr);
 
 /**
+ * Submit any buffered requests.
+ */
+void ioq_submit(struct ioq *ioq);
+
+/**
  * Pop a response from the queue.
  *
  * @ioq

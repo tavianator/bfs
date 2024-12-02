@@ -49,6 +49,7 @@ static void check_ioq_push_block(void) {
 		int ret = ioq_opendir(ioq, dir, AT_FDCWD, ".", 0, NULL);
 		bfs_everify(ret == 0, "ioq_opendir()");
 	}
+	ioq_submit(ioq);
 	bfs_verify(ioq_capacity(ioq) == 0);
 
 	// Now cancel the queue, pushing an additional IOQ_STOP message

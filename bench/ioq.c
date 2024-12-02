@@ -304,6 +304,7 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 		}
+		ioq_submit(ioq);
 	}
 
 	while (pop(ioq, &lap, true));
