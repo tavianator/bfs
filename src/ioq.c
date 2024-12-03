@@ -885,10 +885,20 @@ static bool ioq_ring_prep(struct ioq_ring_state *state) {
 }
 
 /** io_uring worker loop. */
-static void ioq_ring_work(struct ioq_thread *thread) {
+static int ioq_ring_work(struct ioq_thread *thread) {
+	struct io_uring *ring = &thread->ring;
+
+#ifdef IORING_SETUP_R_DISABLED
+	if (ring->flags & IORING_SETUP_R_DISABLED) {
+		if (io_uring_enable_rings(ring) != 0) {
+			return -1;
+		}
+	}
+#endif
+
 	struct ioq_ring_state state = {
 		.ioq = thread->parent,
-		.ring = &thread->ring,
+		.ring = ring,
 		.ops = thread->ring_ops,
 	};
 
@@ -897,6 +907,7 @@ static void ioq_ring_work(struct ioq_thread *thread) {
 	}
 
 	ioq_ring_drain(&state, state.submitted);
+	return 0;
 }
 
 #endif // BFS_WITH_LIBURING
@@ -936,14 +947,34 @@ static void *ioq_work(void *ptr) {
 
 #if BFS_WITH_LIBURING
 	if (thread->ring_err == 0) {
-		ioq_ring_work(thread);
-		return NULL;
+		if (ioq_ring_work(thread) == 0) {
+			return NULL;
+		}
 	}
 #endif
 
 	ioq_sync_work(thread);
 	return NULL;
 }
+
+#if BFS_WITH_LIBURING
+/** Test whether some io_uring setup flags are supported. */
+static bool ioq_ring_probe_flags(unsigned int *flags, unsigned int new_flags) {
+	struct io_uring ring;
+
+	int ret = io_uring_queue_init(2, &ring, *flags | new_flags);
+	if (ret == 0) {
+		io_uring_queue_exit(&ring);
+	}
+
+	if (ret != -EINVAL) {
+		*flags |= new_flags;
+		return true;
+	}
+
+	return false;
+}
+#endif
 
 /** Initialize io_uring thread state. */
 static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
@@ -960,30 +991,34 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 
 	struct io_uring_params params = {0};
 
-#ifdef IORING_SETUP_SUBMIT_ALL
-	// Don't abort submission just because an inline request fails
-	params.flags |= IORING_SETUP_SUBMIT_ALL;
-#endif
-
-	// Share io-wq workers between rings
 	if (prev) {
+		// Share io-wq workers between rings
 		params.flags = prev->ring.flags | IORING_SETUP_ATTACH_WQ;
 		params.wq_fd = prev->ring.ring_fd;
+	} else {
+#ifdef IORING_SETUP_SUBMIT_ALL
+		// Don't abort submission just because an inline request fails
+		ioq_ring_probe_flags(&params.flags, IORING_SETUP_SUBMIT_ALL);
+#endif
+
+#ifdef IORING_SETUP_R_DISABLED
+		// Don't enable the ring yet (needed for SINGLE_ISSUER)
+		if (ioq_ring_probe_flags(&params.flags, IORING_SETUP_R_DISABLED)) {
+#  ifdef IORING_SETUP_SINGLE_ISSUER
+			// Allow optimizations assuming only one task submits SQEs
+			ioq_ring_probe_flags(&params.flags, IORING_SETUP_SINGLE_ISSUER);
+#  endif
+#  ifdef IORING_SETUP_DEFER_TASKRUN
+			// Don't interrupt us aggresively with completion events
+			ioq_ring_probe_flags(&params.flags, IORING_SETUP_DEFER_TASKRUN);
+#  endif
+		}
+#endif
 	}
 
 	// Use a page for each SQE ring
 	size_t entries = 4096 / sizeof(struct io_uring_sqe);
 	thread->ring_err = -io_uring_queue_init_params(entries, &thread->ring, &params);
-
-#ifdef IORING_SETUP_SUBMIT_ALL
-	if (thread->ring_err == EINVAL && (params.flags & IORING_SETUP_SUBMIT_ALL)) {
-		// IORING_SETUP_SUBMIT_ALL is only supported since Linux 5.18,
-		// so try again without it
-		params.flags &= ~IORING_SETUP_SUBMIT_ALL;
-		thread->ring_err = -io_uring_queue_init_params(entries, &thread->ring, &params);
-	}
-#endif
-
 	if (thread->ring_err) {
 		return -1;
 	}
