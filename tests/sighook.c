@@ -26,6 +26,14 @@ static void alrm_hook(int sig, siginfo_t *info, void *arg) {
 	fetch_add(&count, 1, relaxed);
 }
 
+/** SH_ONESHOT counter. */
+static atomic size_t shots = 0;
+
+/** SH_ONESHOT hook. */
+static void alrm_oneshot(int sig, siginfo_t *info, void *arg) {
+	fetch_add(&shots, 1, relaxed);
+}
+
 /** Background thread that receives signals. */
 static void *hook_thread(void *ptr) {
 	mutex_lock(&mutex);
@@ -67,6 +75,12 @@ void check_sighook(void) {
 		return;
 	}
 
+	// Test SH_ONESHOT
+	struct sighook *oneshot_hook = sighook(SIGALRM, alrm_oneshot, NULL, SH_ONESHOT);
+	if (!bfs_echeck(oneshot_hook, "sighook(SH_ONESHOT)")) {
+		goto unhook;
+	}
+
 	// Create a timer that sends SIGALRM every 100 microseconds
 	struct timespec ival = { .tv_nsec = 100 * 1000 };
 	struct timer *timer = xtimer_start(&ival);
@@ -88,7 +102,18 @@ void check_sighook(void) {
 	}
 
 	// Rapidly register/unregister SIGALRM hooks
-	while (load(&count, relaxed) < 1000) {
+	size_t alarms;
+	while (alarms = load(&count, relaxed), alarms < 1000) {
+		size_t nshots = load(&shots, relaxed);
+		bfs_echeck(nshots <= 1);
+		if (alarms > 1) {
+			bfs_echeck(nshots == 1);
+		}
+		if (alarms >= 500) {
+			sigunhook(oneshot_hook);
+			oneshot_hook = NULL;
+		}
+
 		struct sighook *next = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
 		if (!bfs_echeck(next, "sighook(SIGALRM)")) {
 			break;
@@ -112,6 +137,7 @@ untime:
 	// Stop the timer
 	xtimer_stop(timer);
 unhook:
-	// Unregister the SIGALRM hook
+	// Unregister the SIGALRM hooks
+	sigunhook(oneshot_hook);
 	sigunhook(hook);
 }
