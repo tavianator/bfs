@@ -982,20 +982,22 @@ static void *ioq_work(void *ptr) {
 
 #if BFS_WITH_LIBURING
 /** Test whether some io_uring setup flags are supported. */
-static bool ioq_ring_probe_flags(unsigned int *flags, unsigned int new_flags) {
-	struct io_uring ring;
+static bool ioq_ring_probe_flags(struct io_uring_params *params, unsigned int flags) {
+	unsigned int saved = params->flags;
+	params->flags |= flags;
 
-	int ret = io_uring_queue_init(2, &ring, *flags | new_flags);
+	struct io_uring ring;
+	int ret = io_uring_queue_init_params(2, &ring, params);
 	if (ret == 0) {
 		io_uring_queue_exit(&ring);
 	}
 
-	if (ret != -EINVAL) {
-		*flags |= new_flags;
-		return true;
+	if (ret == -EINVAL) {
+		params->flags = saved;
+		return false;
 	}
 
-	return false;
+	return true;
 }
 #endif
 
@@ -1021,19 +1023,19 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 	} else {
 #ifdef IORING_SETUP_SUBMIT_ALL
 		// Don't abort submission just because an inline request fails
-		ioq_ring_probe_flags(&params.flags, IORING_SETUP_SUBMIT_ALL);
+		ioq_ring_probe_flags(&params, IORING_SETUP_SUBMIT_ALL);
 #endif
 
 #ifdef IORING_SETUP_R_DISABLED
 		// Don't enable the ring yet (needed for SINGLE_ISSUER)
-		if (ioq_ring_probe_flags(&params.flags, IORING_SETUP_R_DISABLED)) {
+		if (ioq_ring_probe_flags(&params, IORING_SETUP_R_DISABLED)) {
 #  ifdef IORING_SETUP_SINGLE_ISSUER
 			// Allow optimizations assuming only one task submits SQEs
-			ioq_ring_probe_flags(&params.flags, IORING_SETUP_SINGLE_ISSUER);
+			ioq_ring_probe_flags(&params, IORING_SETUP_SINGLE_ISSUER);
 #  endif
 #  ifdef IORING_SETUP_DEFER_TASKRUN
 			// Don't interrupt us aggresively with completion events
-			ioq_ring_probe_flags(&params.flags, IORING_SETUP_DEFER_TASKRUN);
+			ioq_ring_probe_flags(&params, IORING_SETUP_DEFER_TASKRUN);
 #  endif
 		}
 #endif
