@@ -78,7 +78,7 @@ jobs:
         uses: cross-platform-actions/action@v0.26.0
         with:
           operating_system: freebsd
-          version: "14.1"
+          version: "14.2"
 
           run: |
             sudo pkg install -y \
@@ -107,7 +107,7 @@ jobs:
         uses: cross-platform-actions/action@v0.26.0
         with:
           operating_system: openbsd
-          version: "7.5"
+          version: "7.6"
 
           run: |
             sudo pkg_add \
@@ -201,7 +201,7 @@ jobs:
       - name: Run tests
         uses: vmactions/omnios-vm@v1
         with:
-          release: "r151048"
+          release: "r151052"
           usesh: true
 
           prepare: |
