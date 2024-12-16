@@ -106,7 +106,7 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count) {
 	// If we stayed within the same size class, reuse ptr.
 	if (count & (count - 1)) {
 		// Tell sanitizers about the new array element
-		sanitize_alloc((char *)ptr + old_size, size);
+		sanitize_resize(ptr, old_size, old_size + size, bit_ceil(count) * size);
 		errno = 0;
 		return ptr;
 	}
@@ -121,7 +121,7 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count) {
 	}
 
 	// Pretend we only allocated one more element
-	sanitize_free((char *)ret + old_size + size, new_size - old_size - size);
+	sanitize_resize(ret, new_size, old_size + size, new_size);
 	errno = 0;
 	return ret;
 }
@@ -304,8 +304,7 @@ void *varena_alloc(struct varena *varena, size_t count) {
 	}
 
 	// Tell the sanitizers the exact size of the allocated struct
-	sanitize_free(ret, arena->size);
-	sanitize_alloc(ret, varena_exact_size(varena, count));
+	sanitize_resize(ret, arena->size, varena_exact_size(varena, count), arena->size);
 
 	return ret;
 }
@@ -317,15 +316,14 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 		return NULL;
 	}
 
-	_maybe_unused size_t new_exact_size = varena_exact_size(varena, new_count);
-	_maybe_unused size_t old_exact_size = varena_exact_size(varena, old_count);
+	size_t old_size = old_arena->size;
+	size_t new_size = new_arena->size;
 
 	if (new_arena == old_arena) {
-		if (new_count < old_count) {
-			sanitize_free((char *)ptr + new_exact_size, old_exact_size - new_exact_size);
-		} else if (new_count > old_count) {
-			sanitize_alloc((char *)ptr + old_exact_size, new_exact_size - old_exact_size);
-		}
+		sanitize_resize(ptr,
+			varena_exact_size(varena, old_count),
+			varena_exact_size(varena, new_count),
+			new_size);
 		return ptr;
 	}
 
@@ -334,17 +332,18 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 		return NULL;
 	}
 
-	size_t old_size = old_arena->size;
-	sanitize_alloc(ptr, old_size);
+	// Non-sanitized builds don't bother computing exact sizes, and just use
+	// the potentially-larger arena size for each size class instead.  To
+	// allow the below memcpy() to work with the less-precise sizes, expand
+	// the old allocation to its full capacity.
+	sanitize_resize(ptr, varena_exact_size(varena, old_count), old_size, old_size);
 
-	size_t new_size = new_arena->size;
 	size_t min_size = new_size < old_size ? new_size : old_size;
 	memcpy(ret, ptr, min_size);
 
 	arena_free(old_arena, ptr);
 
-	sanitize_free(ret, new_size);
-	sanitize_alloc(ret, new_exact_size);
+	sanitize_resize(ret, new_size, varena_exact_size(varena, new_count), new_size);
 	return ret;
 }
 

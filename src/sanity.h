@@ -37,9 +37,27 @@
  */
 #define sanitize_free(...) SANITIZE_CALL(__asan_poison_memory_region, __VA_ARGS__)
 
+/**
+ * Adjust the size of an allocated region, for things like dynamic arrays.
+ *
+ * @ptr
+ *         The memory region.
+ * @old
+ *         The previous usable size of the region.
+ * @new
+ *         The new usable size of the region.
+ * @cap
+ *         The total allocated capacity of the region.
+ */
+static inline void sanitize_resize(const void *ptr, size_t old, size_t new, size_t cap) {
+	const char *beg = ptr;
+	__sanitizer_annotate_contiguous_container(beg, beg + cap, beg + old, beg + new);
+}
+
 #else
 #  define sanitize_alloc(...) ((void)0)
 #  define sanitize_free(...) ((void)0)
+#  define sanitize_resize(ptr, old, new, cap) ((void)0)
 #endif
 
 #if __SANITIZE_MEMORY__
