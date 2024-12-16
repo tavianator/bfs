@@ -317,8 +317,8 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 		return NULL;
 	}
 
-	size_t new_exact_size = varena_exact_size(varena, new_count);
-	size_t old_exact_size = varena_exact_size(varena, old_count);
+	_maybe_unused size_t new_exact_size = varena_exact_size(varena, new_count);
+	_maybe_unused size_t old_exact_size = varena_exact_size(varena, old_count);
 
 	if (new_arena == old_arena) {
 		if (new_count < old_count) {
