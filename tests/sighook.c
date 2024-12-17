@@ -4,14 +4,17 @@
 #include "tests.h"
 
 #include "atomic.h"
+#include "bfstd.h"
 #include "sighook.h"
 #include "thread.h"
 #include "xtime.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <unistd.h>
 
 /** Counts SIGALRM deliveries. */
 static atomic size_t count = 0;
@@ -62,7 +65,8 @@ static int block_signal(int sig, sigset_t *old) {
 	return 0;
 }
 
-void check_sighook(void) {
+/** Tests for sighook(). */
+static void check_hooks(void) {
 	struct sighook *hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
 	if (!bfs_echeck(hook, "sighook(SIGALRM)")) {
 		return;
@@ -140,4 +144,76 @@ unhook:
 	// Unregister the SIGALRM hooks
 	sigunhook(oneshot_hook);
 	sigunhook(hook);
+}
+
+/** atsigexit() hook. */
+static void exit_hook(int sig, siginfo_t *info, void *arg) {
+	// Write the signal that's killing us to the pipe
+	int *pipes = arg;
+	if (xwrite(pipes[1], &sig, sizeof(sig)) != sizeof(sig)) {
+		abort();
+	}
+}
+
+/** Tests for atsigexit(). */
+static void check_sigexit(int sig) {
+	// To wait for the child to call atsigexit()
+	int ready[2];
+	bfs_everify(pipe(ready) == 0);
+
+	// Written in the atsigexit() handler
+	int killed[2];
+	bfs_everify(pipe(killed) == 0);
+
+	pid_t pid;
+	bfs_everify((pid = fork()) >= 0);
+
+	if (pid > 0) {
+		// Parent
+		xclose(ready[1]);
+		xclose(killed[1]);
+
+		// Wait for the child to call atsigexit()
+		char c;
+		bfs_everify(xread(ready[0], &c, 1) == 1);
+
+		// Kill the child with the signal
+		bfs_everify(kill(pid, sig) == 0);
+
+		// Check that the child died to the right signal
+		int wstatus;
+		if (bfs_echeck(xwaitpid(pid, &wstatus, 0) == pid)) {
+			bfs_check(WIFSIGNALED(wstatus) && WTERMSIG(wstatus) == sig);
+		}
+
+		// Check that the signal hook wrote the signal number to the pipe
+		int hsig;
+		if (bfs_echeck(xread(killed[0], &hsig, sizeof(hsig)) == sizeof(hsig))) {
+			bfs_check(hsig == sig);
+		}
+	} else {
+		// Child
+		xclose(ready[0]);
+		xclose(killed[0]);
+
+		// exit_hook() will write to killed[1]
+		bfs_everify(atsigexit(exit_hook, killed) != NULL);
+
+		// Tell the parent we're ready
+		bfs_everify(xwrite(ready[1], "A", 1) == 1);
+
+		// Wait until we're killed
+		while (true) {
+			pause();
+		}
+	}
+}
+
+void check_sighook(void) {
+	check_hooks();
+
+	check_sigexit(SIGINT);
+	check_sigexit(SIGQUIT);
+	check_sigexit(SIGPIPE);
+	check_sigexit(SIGSEGV);
 }
