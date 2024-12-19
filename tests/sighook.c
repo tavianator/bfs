@@ -9,11 +9,12 @@
 #include "thread.h"
 #include "xtime.h"
 
-#include <stddef.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 /** Counts SIGALRM deliveries. */
