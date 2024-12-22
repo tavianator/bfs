@@ -216,5 +216,9 @@ void check_sighook(void) {
 	check_sigexit(SIGINT);
 	check_sigexit(SIGQUIT);
 	check_sigexit(SIGPIPE);
+
+	// macOS cannot distinguish between sync and async SIG{BUS,ILL,SEGV}
+#if !__APPLE__
 	check_sigexit(SIGSEGV);
+#endif
 }

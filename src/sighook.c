@@ -452,9 +452,16 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	// to die "correctly" (e.g. with a core dump pointing at the faulting
 	// instruction, not reraise()).
 	if (is_fault(info)) {
+		// On macOS, we cannot reliably distinguish between faults and
+		// asynchronous signals.  For example, pkill -SEGV bfs will
+		// result in si_code == SEGV_ACCERR.  So we always re-raise the
+		// signal, because just returning would cause us to ignore
+		// asynchronous SIG{BUS,ILL,SEGV}.
+#if !__APPLE__
 		if (signal(sig, SIG_DFL) != SIG_ERR) {
 			return;
 		}
+#endif
 		reraise(sig);
 	}
 
