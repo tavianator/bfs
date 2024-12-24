@@ -342,22 +342,31 @@ static const int FATAL_SIGNALS[] = {
 	SIGHUP,
 	SIGILL,
 	SIGINT,
+#ifdef SIGIO
+	SIGIO,
+#endif
 	SIGPIPE,
-	SIGQUIT,
-	SIGSEGV,
-	SIGTERM,
-	SIGUSR1,
-	SIGUSR2,
 #ifdef SIGPOLL
 	SIGPOLL,
 #endif
 #ifdef SIGPROF
 	SIGPROF,
 #endif
+#ifdef SIGPWR
+	SIGPWR,
+#endif
+	SIGQUIT,
+	SIGSEGV,
+#ifdef SIGSTKFLT
+	SIGSTKFLT,
+#endif
 #ifdef SIGSYS
 	SIGSYS,
 #endif
+	SIGTERM,
 	SIGTRAP,
+	SIGUSR1,
+	SIGUSR2,
 #ifdef SIGVTALRM
 	SIGVTALRM,
 #endif
