@@ -32,6 +32,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#if __linux__
+#  include <sys/syscall.h>
+#endif
+
 // NetBSD opens a file descriptor for each sem_init()
 #if defined(_POSIX_SEMAPHORES) && !__NetBSD__
 #  define BFS_POSIX_SEMAPHORES _POSIX_SEMAPHORES
@@ -385,7 +389,9 @@ static bool is_fatal(int sig) {
 
 /** Reraise a fatal signal. */
 _noreturn
-static void reraise(int sig) {
+static void reraise(siginfo_t *info) {
+	int sig = info->si_signo;
+
 	// Restore the default signal action
 	if (signal(sig, SIG_DFL) == SIG_ERR) {
 		goto fail;
@@ -398,6 +404,13 @@ static void reraise(int sig) {
 	    || pthread_sigmask(SIG_UNBLOCK, &mask, NULL) != 0) {
 		goto fail;
 	}
+
+#if __linux__
+	// On Linux, try to re-raise the exact siginfo_t (since 3.9, a process can
+	// signal itself with any siginfo_t)
+	pid_t tid = syscall(SYS_gettid);
+	syscall(SYS_rt_tgsigqueueinfo, getpid(), tid, sig, info);
+#endif
 
 	raise(sig);
 fail:
@@ -462,7 +475,7 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 			return;
 		}
 #endif
-		reraise(sig);
+		reraise(info);
 	}
 
 	// https://pubs.opengroup.org/onlinepubs/9799919799/functions/V2_chap02.html#tag_16_04_04
@@ -482,7 +495,7 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	if (!(flags & SH_CONTINUE) && is_fatal(sig)) {
 		list = siglist(0);
 		run_hooks(list, sig, info);
-		reraise(sig);
+		reraise(info);
 	}
 
 	errno = error;
