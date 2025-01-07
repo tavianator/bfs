@@ -27,7 +27,7 @@ struct bfs_loc {
 /**
  * Get the current source code location.
  */
-#if __STDC_VERSION__ >= C23
+#if BFS_HAS_COMPOUND_LITERAL_STORAGE
 #  define bfs_location() (&(static const struct bfs_loc)BFS_LOC_INIT)
 #else
 #  define bfs_location() (&(const struct bfs_loc)BFS_LOC_INIT)
