@@ -88,7 +88,7 @@ nproc() {
 }
 
 # Save the ./configure command line for bfs --version
-export CONFFLAGS="$*"
+export CONFFLAGS=""
 
 # Default to `make`
 MAKE="${MAKE-make}"
@@ -96,6 +96,13 @@ MAKE="${MAKE-make}"
 # Parse the command-line arguments
 for arg; do
     shift
+
+    # Only add --options to CONFFLAGS, so we don't print FLAG=values twice in bfs --version
+    case "$arg" in
+        -*)
+            CONFFLAGS="${CONFFLAGS}${CONFFLAGS:+ }${arg}"
+            ;;
+    esac
 
     # --[(enable|disable|with|without)-]$name[=$value]
     value="${arg#*=}"
