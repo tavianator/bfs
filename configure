@@ -189,6 +189,25 @@ for arg; do
             MAKE="$value"
             ;;
 
+        # Warn about MAKE variables that have documented configure flags
+        RELEASE=*|ASAN=*|LSAN=*|MSAN=*|TSAN=*|UBSAN=*|LINT=*|GCOV=*)
+            name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
+            printf 'warning: "%s" is deprecated; use --enable-%s\n' "$arg" "$name" >&2
+            set -- "$@" "$arg"
+            ;;
+
+        PREFIX=*|MANDIR=*|VERSION=*)
+            name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
+            printf 'warning: "%s" is deprecated; use --%s=%s\n' "$arg" "$name" "$value" >&2
+            set -- "$@" "$arg"
+            ;;
+
+        WITH_*=*)
+            name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
+            printf 'warning: "%s" is deprecated; use --%s\n' "$arg" "$name" >&2
+            set -- "$@" "$arg"
+            ;;
+
         # make flag (-j2) or variable (CC=clang)
         -*|*=*)
             set -- "$@" "$arg"
