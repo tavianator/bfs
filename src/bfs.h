@@ -218,4 +218,15 @@ extern const char bfs_ldlibs[];
 #  define _target_clones(...)
 #endif
 
+/**
+ * Optimization hint to not unroll a loop.
+ */
+#if __clang__
+#  define _nounroll _Pragma("nounroll")
+#elif __GNUC__
+#  define _nounroll _Pragma("GCC unroll 0")
+#else
+#  define _nounroll
+#endif
+
 #endif // BFS_H

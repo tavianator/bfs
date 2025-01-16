@@ -277,10 +277,13 @@ static struct ioq_monitor *ioq_slot_monitor(struct ioqq *ioqq, ioq_slot *slot) {
 /** Atomically wait for a slot to change. */
 _noinline
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
-	// Try spinning a few times before blocking
 	uintptr_t ret;
+
+	// Try spinning a few times before blocking
+	_nounroll
 	for (int i = 0; i < 10; ++i) {
 		// Exponential backoff
+		_nounroll
 		for (int j = 0; j < (1 << i); ++j) {
 			spin_loop();
 		}
