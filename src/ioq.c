@@ -387,7 +387,7 @@ static struct ioq_ent *ioq_slot_pop(struct ioqq *ioqq, ioq_slot *slot, bool bloc
 		// slot is not full, this will prefetch an invalid address, but
 		// experimentally this is worth it on both Intel (Alder Lake)
 		// and AMD (Zen 2).
-		__builtin_prefetch((void *)(prev << 1));
+		__builtin_prefetch((void *)(prev << 1), 1 /* write */);
 #endif
 
 		// empty     → skip(1)
