@@ -36,6 +36,7 @@ HEADERS := \
     gen/has/getprogname.h \
     gen/has/io-uring-max-workers.h \
     gen/has/pipe2.h \
+    gen/has/pragma-nounroll.h \
     gen/has/posix-getdents.h \
     gen/has/posix-spawn-addfchdir-np.h \
     gen/has/posix-spawn-addfchdir.h \

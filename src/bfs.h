@@ -221,9 +221,9 @@ extern const char bfs_ldlibs[];
 /**
  * Optimization hint to not unroll a loop.
  */
-#if __clang__
+#if BFS_HAS_PRAGMA_NOUNROLL
 #  define _nounroll _Pragma("nounroll")
-#elif __GNUC__
+#elif __GNUC__ && !__clang__
 #  define _nounroll _Pragma("GCC unroll 0")
 #else
 #  define _nounroll
