@@ -573,26 +573,32 @@ static int siginit(int sig) {
 		return 0;
 	}
 
+	sigset_t updated = signals;
+	if (sigaddset(&updated, sig) != 0) {
+		return -1;
+	}
+
+	struct sigaction original;
+	if (sigaction(sig, NULL, &original) != 0) {
+		return -1;
+	}
+
 	struct sigsave *save = ALLOC(struct sigsave);
 	if (!save) {
 		return -1;
 	}
 
 	save->sig = sig;
-	if (sigaction(sig, NULL, &save->action) != 0) {
-		free(save);
-		return -1;
-	}
+	save->action = original;
 	rcu_list_append(&saved, &save->node);
 
 	if (sigaction(sig, &action, NULL) != 0) {
+		rcu_list_remove(&saved, &save->node);
+		free(save);
 		return -1;
 	}
 
-	if (sigaddset(&signals, sig) != 0) {
-		return -1;
-	}
-
+	signals = updated;
 	return 0;
 }
 
