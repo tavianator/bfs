@@ -249,7 +249,69 @@ static void *rcu_update(struct rcu *rcu, void *ptr) {
 	return rcu_decode(arc_wait(prev));
 }
 
+/**
+ * An RCU-protected linked list.
+ */
+struct rcu_list {
+	/** The first node in the list. */
+	struct rcu head;
+	/** &last->next */
+	struct rcu *tail;
+};
+
+/**
+ * An rcu_list node.
+ */
+struct rcu_node {
+	/** The RCU pointer to this node. */
+	struct rcu *self;
+	/** The next node in the list. */
+	struct rcu next;
+};
+
+/** Initialize an rcu_list. */
+static void rcu_list_init(struct rcu_list *list) {
+	rcu_init(&list->head, NULL);
+	list->tail = &list->head;
+}
+
+/** Append to an rcu_list. */
+static void rcu_list_append(struct rcu_list *list, struct rcu_node *node) {
+	node->self = list->tail;
+	list->tail = &node->next;
+	rcu_init(&node->next, NULL);
+	rcu_update(node->self, node);
+}
+
+/** Remove from an rcu_list. */
+static void rcu_list_remove(struct rcu_list *list, struct rcu_node *node) {
+	struct rcu_node *next = rcu_peek(&node->next);
+	rcu_update(node->self, next);
+	if (next) {
+		next->self = node->self;
+	} else {
+		list->tail = &list->head;
+	}
+	rcu_destroy(&node->next);
+}
+
+/** Iterate over an rcu_list. */
+#define for_rcu(type, node, list) \
+	for_rcu_(type, node, (list), node##_slot_, node##_prev_, node##_done_)
+
+#define for_rcu_(type, node, list, slot, prev, done) \
+	/* This outer loop is just for declaring variables; it iterates once. */ \
+	for (struct arc *slot, *prev, **done = NULL; !done && (done = &slot); ) \
+		for (type *node = rcu_read(&list->head, &slot); \
+		     node || (arc_put(slot), false); \
+		     (prev = slot, \
+		      node = rcu_read(&((struct rcu_node *)node)->next, &slot), \
+		      arc_put(prev)))
+
 struct sighook {
+	/** The RCU list node (must be the first field). */
+	struct rcu_node node;
+
 	/** The signal being hooked, or 0 for atsigexit(). */
 	int sig;
 	/** Signal hook flags. */
@@ -260,53 +322,13 @@ struct sighook {
 	void *arg;
 	/** Flag for SH_ONESHOT. */
 	atomic bool armed;
-
-	/** The RCU pointer to this hook. */
-	struct rcu *self;
-	/** The next hook in the list. */
-	struct rcu next;
 };
-
-/**
- * An RCU-protected linked list of signal hooks.
- */
-struct siglist {
-	/** The first hook in the list. */
-	struct rcu head;
-	/** &last->next */
-	struct rcu *tail;
-};
-
-/** Initialize a siglist. */
-static void siglist_init(struct siglist *list) {
-	rcu_init(&list->head, NULL);
-	list->tail = &list->head;
-}
-
-/** Append a hook to a linked list. */
-static void sigpush(struct siglist *list, struct sighook *hook) {
-	hook->self = list->tail;
-	list->tail = &hook->next;
-	rcu_init(&hook->next, NULL);
-	rcu_update(hook->self, hook);
-}
-
-/** Remove a hook from the linked list. */
-static void sigpop(struct siglist *list, struct sighook *hook) {
-	struct sighook *next = rcu_peek(&hook->next);
-	rcu_update(hook->self, next);
-	if (next) {
-		next->self = hook->self;
-	} else {
-		list->tail = &list->head;
-	}
-}
 
 /** The lists of signal hooks. */
-static struct siglist sighooks[64];
+static struct rcu_list sighooks[64];
 
 /** Get the hook list for a particular signal. */
-static struct siglist *siglist(int sig) {
+static struct rcu_list *siglist(int sig) {
 	return &sighooks[sig % countof(sighooks)];
 }
 
@@ -442,23 +464,16 @@ static bool should_run(int sig, struct sighook *hook) {
 }
 
 /** Find any matching hooks and run them. */
-static enum sigflags run_hooks(struct siglist *list, int sig, siginfo_t *info) {
+static enum sigflags run_hooks(struct rcu_list *list, int sig, siginfo_t *info) {
 	enum sigflags ret = 0;
 
-	struct arc *slot = NULL;
-	struct sighook *hook = rcu_read(&list->head, &slot);
-	while (hook) {
+	for_rcu (struct sighook, hook, list) {
 		if (should_run(sig, hook)) {
 			hook->fn(sig, info, hook->arg);
 			ret |= hook->flags;
 		}
-
-		struct arc *prev = slot;
-		hook = rcu_read(&hook->next, &slot);
-		arc_put(prev);
 	}
 
-	arc_put(slot);
 	return ret;
 }
 
@@ -497,7 +512,7 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	int error = errno;
 
 	// Run the normal hooks
-	struct siglist *list = siglist(sig);
+	struct rcu_list *list = siglist(sig);
 	enum sigflags flags = run_hooks(list, sig, info);
 
 	// Run the atsigexit() hooks, if we're exiting
@@ -533,7 +548,7 @@ static int siginit(int sig) {
 		}
 
 		for (size_t i = 0; i < countof(sighooks); ++i) {
-			siglist_init(&sighooks[i]);
+			rcu_list_init(&sighooks[i]);
 		}
 
 		initialized = true;
@@ -570,8 +585,8 @@ static struct sighook *sighook_impl(int sig, sighook_fn *fn, void *arg, enum sig
 	hook->arg = arg;
 	atomic_init(&hook->armed, true);
 
-	struct siglist *list = siglist(sig);
-	sigpush(list, hook);
+	struct rcu_list *list = siglist(sig);
+	rcu_list_append(list, &hook->node);
 	return hook;
 }
 
@@ -617,11 +632,10 @@ void sigunhook(struct sighook *hook) {
 
 	mutex_lock(&sigmutex);
 
-	struct siglist *list = siglist(hook->sig);
-	sigpop(list, hook);
+	struct rcu_list *list = siglist(hook->sig);
+	rcu_list_remove(list, &hook->node);
 
 	mutex_unlock(&sigmutex);
 
-	rcu_destroy(&hook->next);
 	free(hook);
 }
