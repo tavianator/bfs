@@ -671,6 +671,10 @@ void sigunhook(struct sighook *hook) {
 }
 
 int sigreset(void) {
+	if (!load(&initialized, acquire)) {
+		return 0;
+	}
+
 	for_rcu (struct sigsave, save, &saved) {
 		if (sigaction(save->sig, &save->action, NULL) != 0) {
 			return -1;
