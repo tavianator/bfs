@@ -1,11 +1,29 @@
 4.*
 ===
 
+4.0.5
+-----
+
+**January 18, 2025**
+
+### Bug fixes
+
+- Fixed a bug that could cause child processes (e.g. from `-exec`) to run with all signals blocked.
+  The bug was introduced in version 3.3.
+  ([`af207e7`](https://github.com/tavianator/bfs/commit/af207e702148e5c9ae08047d7a2dce6394653b62))
+
+### Changes
+
+- Fixed the build against old liburing versions
+  ([#147](https://github.com/tavianator/bfs/issues/147))
+
+- Async I/O performance optimizations
+
+
 4.0.4
 -----
 
 **October 31, 2024**
-
 
 ## Bug fixes
 
