@@ -525,6 +525,18 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	errno = error;
 }
 
+/** A saved signal handler, for sigreset() to restore. */
+struct sigsave {
+	struct rcu_node node;
+	int sig;
+	struct sigaction action;
+};
+
+/** The list of saved signal handlers. */
+static struct rcu_list saved;
+/** `saved` initialization status (since rcu_list_init() isn't atomic). */
+static atomic bool initialized = false;
+
 /** Make sure our signal handler is installed for a given signal. */
 static int siginit(int sig) {
 #ifdef SA_RESTART
@@ -539,9 +551,8 @@ static int siginit(int sig) {
 	};
 
 	static sigset_t signals;
-	static bool initialized = false;
 
-	if (!initialized) {
+	if (!load(&initialized, relaxed)) {
 		if (sigemptyset(&signals) != 0
 		    || sigemptyset(&action.sa_mask) != 0) {
 			return -1;
@@ -551,7 +562,8 @@ static int siginit(int sig) {
 			rcu_list_init(&sighooks[i]);
 		}
 
-		initialized = true;
+		rcu_list_init(&saved);
+		store(&initialized, true, release);
 	}
 
 	int installed = sigismember(&signals, sig);
@@ -560,6 +572,18 @@ static int siginit(int sig) {
 	} else if (installed) {
 		return 0;
 	}
+
+	struct sigsave *save = ALLOC(struct sigsave);
+	if (!save) {
+		return -1;
+	}
+
+	save->sig = sig;
+	if (sigaction(sig, NULL, &save->action) != 0) {
+		free(save);
+		return -1;
+	}
+	rcu_list_append(&saved, &save->node);
 
 	if (sigaction(sig, &action, NULL) != 0) {
 		return -1;
@@ -638,4 +662,14 @@ void sigunhook(struct sighook *hook) {
 	mutex_unlock(&sigmutex);
 
 	free(hook);
+}
+
+int sigreset(void) {
+	for_rcu (struct sigsave, save, &saved) {
+		if (sigaction(save->sig, &save->action, NULL) != 0) {
+			return -1;
+		}
+	}
+
+	return 0;
 }

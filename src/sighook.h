@@ -72,4 +72,12 @@ struct sighook *atsigexit(sighook_fn *fn, void *arg);
  */
 void sigunhook(struct sighook *hook);
 
+/**
+ * Restore all signal handlers to their original dispositions (e.g. after fork()).
+ *
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int sigreset(void);
+
 #endif // BFS_SIGHOOK_H
