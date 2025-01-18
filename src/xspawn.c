@@ -8,6 +8,7 @@
 #include "bfstd.h"
 #include "diag.h"
 #include "list.h"
+#include "sighook.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -535,7 +536,7 @@ static bool bfs_use_posix_spawn(const struct bfs_resolver *res, const struct bfs
 
 /** Actually exec() the new process. */
 _noreturn
-static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
+static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, const sigset_t *mask, int pipefd[2]) {
 	xclose(pipefd[0]);
 
 	for_slist (const struct bfs_spawn_action, action, ctx) {
@@ -596,6 +597,18 @@ static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx
 		goto fail;
 	}
 
+	// Reset signal handlers to their original values before we unblock
+	// signals, so that handlers don't run in both the parent and the child
+	if (sigreset() != 0) {
+		goto fail;
+	}
+
+	// Restore the original signal mask for the child process
+	errno = pthread_sigmask(SIG_SETMASK, mask, NULL);
+	if (errno != 0) {
+		goto fail;
+	}
+
 	execve(res->exe, argv, envp);
 
 fail:;
@@ -635,7 +648,7 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 #endif
 	if (pid == 0) {
 		// Child
-		bfs_spawn_exec(res, ctx, argv, envp, pipefd);
+		bfs_spawn_exec(res, ctx, argv, envp, &old_mask, pipefd);
 	}
 
 	// Restore the original signal mask
