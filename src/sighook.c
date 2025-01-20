@@ -295,18 +295,22 @@ static void rcu_list_remove(struct rcu_list *list, struct rcu_node *node) {
 	rcu_destroy(&node->next);
 }
 
-/** Iterate over an rcu_list. */
+/**
+ * Iterate over an rcu_list.
+ *
+ * It is save to `break` out of this loop, but `return` or `goto` will lead to
+ * a missed arc_put().
+ */
 #define for_rcu(type, node, list) \
 	for_rcu_(type, node, (list), node##_slot_, node##_prev_, node##_done_)
 
 #define for_rcu_(type, node, list, slot, prev, done) \
-	/* This outer loop is just for declaring variables; it iterates once. */ \
-	for (struct arc *slot, *prev, **done = NULL; !done && (done = &slot); ) \
+	for (struct arc *slot, *prev, **done = NULL; !done; arc_put(slot), done = &slot) \
 		for (type *node = rcu_read(&list->head, &slot); \
-		     node || (arc_put(slot), false); \
-		     (prev = slot, \
-		      node = rcu_read(&((struct rcu_node *)node)->next, &slot), \
-		      arc_put(prev)))
+		     node; \
+		     prev = slot, \
+		     node = rcu_read(&((struct rcu_node *)node)->next, &slot), \
+		     arc_put(prev))
 
 struct sighook {
 	/** The RCU list node (must be the first field). */
@@ -675,11 +679,14 @@ int sigreset(void) {
 		return 0;
 	}
 
+	int ret = 0;
+
 	for_rcu (struct sigsave, save, &saved) {
 		if (sigaction(save->sig, &save->action, NULL) != 0) {
-			return -1;
+			ret = -1;
+			break;
 		}
 	}
 
-	return 0;
+	return ret;
 }
