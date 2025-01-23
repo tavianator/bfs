@@ -50,16 +50,14 @@ jobs:
   macos:
     name: macOS
 
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          brew install \
-              bash \
-              expect
+          brew install bash
 
       - name: Run tests
         run: |
