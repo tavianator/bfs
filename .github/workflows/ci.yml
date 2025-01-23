@@ -35,8 +35,6 @@ jobs:
           sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
           sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
           sudo ln -s libonig.so.5 /lib/i386-linux-gnu/libonig.so
-          # Work around https://github.com/actions/runner-images/issues/9491
-          sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Run tests
         run: |
