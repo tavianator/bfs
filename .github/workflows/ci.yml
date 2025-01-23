@@ -3,8 +3,8 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  linux:
-    name: Linux
+  linux-x86:
+    name: Linux (x86)
 
     runs-on: ubuntu-24.04
 
@@ -42,7 +42,38 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-config.log
+          name: linux-x86-config.log
+          path: distcheck-*/gen/config.log
+
+  linux-arm:
+    name: Linux (Arm64)
+
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+              expect \
+              mandoc \
+              acl \
+              libacl1-dev \
+              attr \
+              libcap2-bin \
+              libcap-dev \
+              libonig-dev \
+              liburing-dev
+
+      - name: Run tests
+        run: |
+          .github/diag.sh make -j$(nproc) distcheck
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm-config.log
           path: distcheck-*/gen/config.log
 
   macos:
