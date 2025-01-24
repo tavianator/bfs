@@ -9,8 +9,7 @@
 set -eu
 
 filter() {
-    sed -E 's/^(([^:]*):([^:]*):([^:]*): (warning|error): (.*))$/::\5 file=\2,line=\3,col=\4,title=Compiler \5::\6\
-\1/'
+    sed -En 'p; s/^([^:]*):([^:]*):([^:]*): (warning|error): (.*)$/::\4 file=\1,line=\2,col=\3,title=Compiler \4::\5/p'
 }
 
 exec "$@" > >(filter) 2> >(filter >&2)
