@@ -102,7 +102,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        uses: cross-platform-actions/action@v0.26.0
+        uses: cross-platform-actions/action@v0.27.0
         with:
           operating_system: freebsd
           version: "14.2"
@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        uses: cross-platform-actions/action@v0.26.0
+        uses: cross-platform-actions/action@v0.27.0
         with:
           operating_system: openbsd
           version: "7.6"
@@ -160,7 +160,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        uses: cross-platform-actions/action@v0.26.0
+        uses: cross-platform-actions/action@v0.27.0
         with:
           operating_system: netbsd
           version: "10.0"
