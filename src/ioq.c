@@ -279,12 +279,11 @@ _noinline
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
 	uintptr_t ret;
 
-	// Try spinning a few times before blocking
+	// Try spinning a few times (with exponential backoff) before blocking
 	_nounroll
-	for (int i = 0; i < 10; ++i) {
-		// Exponential backoff
+	for (int i = 1; i < 1024; i *= 2) {
 		_nounroll
-		for (int j = 0; j < (1 << i); ++j) {
+		for (int j = 0; j < i; ++j) {
 			spin_loop();
 		}
 
