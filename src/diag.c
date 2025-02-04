@@ -14,13 +14,26 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+/**
+ * Print an error using dprintf() if possible, because it's more likely to be
+ * async-signal-safe in practice.
+ */
+#if BFS_HAS_DPRINTF
+#  define eprintf(...) dprintf(STDERR_FILENO, __VA_ARGS__)
+#  define veprintf(...) vdprintf(STDERR_FILENO, __VA_ARGS__)
+#else
+#  define eprintf(...) fprintf(stderr, __VA_ARGS__)
+#  define veprintf(...) vfprintf(stderr, __VA_ARGS__)
+#endif
 
 /** bfs_diagf() implementation. */
 _printf(2, 0)
 static void bfs_vdiagf(const struct bfs_loc *loc, const char *format, va_list args) {
-	fprintf(stderr, "%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
-	vfprintf(stderr, format, args);
-	fprintf(stderr, "\n");
+	eprintf("%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
+	veprintf(format, args);
+	eprintf("\n");
 }
 
 void bfs_diagf(const struct bfs_loc *loc, const char *format, ...) {

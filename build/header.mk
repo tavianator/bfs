@@ -21,6 +21,7 @@ HEADERS := \
     gen/has/builtin-riscv-pause.h \
     gen/has/compound-literal-storage.h \
     gen/has/confstr.h \
+    gen/has/dprintf.h \
     gen/has/extattr-get-file.h \
     gen/has/extattr-get-link.h \
     gen/has/extattr-list-file.h \
