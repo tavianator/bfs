@@ -256,7 +256,7 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 			continue;
 		}
 
-		if (trie_set_mem(&mtab->types, &sb.dev, sizeof(sb.dev), mount->type) != 0) {
+		if (trie_set_mem(&mtab->types, &sb.mnt_id, sizeof(sb.mnt_id), mount->type) != 0) {
 			goto fail;
 		}
 	}
@@ -279,7 +279,7 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 		}
 	}
 
-	const char *type = trie_get_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));
+	const char *type = trie_get_mem(&mtab->types, &statbuf->mnt_id, sizeof(statbuf->mnt_id));
 	if (type) {
 		return type;
 	} else {
