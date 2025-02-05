@@ -70,6 +70,32 @@ struct trie_leaf *trie_find_str(const struct trie *trie, const char *key);
 struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t length);
 
 /**
+ * Get the value associated with a string key.
+ *
+ * @trie
+ *         The trie to search.
+ * @key
+ *         The key to look up.
+ * @return
+ *         The found value, or NULL if the key is not present.
+ */
+void *trie_get_str(const struct trie *trie, const char *key);
+
+/**
+ * Get the value associated with a fixed-size key.
+ *
+ * @trie
+ *         The trie to search.
+ * @key
+ *         The key to look up.
+ * @length
+ *         The length of the key in bytes.
+ * @return
+ *         The found value, or NULL if the key is not present.
+ */
+void *trie_get_mem(const struct trie *trie, const void *key, size_t length);
+
+/**
  * Find the shortest leaf that starts with a given key.
  *
  * @trie
@@ -118,6 +144,36 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key);
  *         The inserted leaf, or NULL on failure.
  */
 struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length);
+
+/**
+ * Set the value for a string key.
+ *
+ * @trie
+ *         The trie to modify.
+ * @key
+ *         The key to insert.
+ * @value
+ *         The value to set.
+ * @return
+ *         0 on success, -1 on error.
+ */
+int trie_set_str(struct trie *trie, const char *key, const void *value);
+
+/**
+ * Set the value for a fixed-size key.
+ *
+ * @trie
+ *         The trie to modify.
+ * @key
+ *         The key to insert.
+ * @length
+ *         The length of the key in bytes.
+ * @value
+ *         The value to set.
+ * @return
+ *         0 on success, -1 on error.
+ */
+int trie_set_mem(struct trie *trie, const void *key, size_t length, const void *value);
 
 /**
  * Remove a leaf from a trie.

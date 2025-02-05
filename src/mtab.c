@@ -256,10 +256,7 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 			continue;
 		}
 
-		struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
-		if (leaf) {
-			leaf->value = mount->type;
-		} else {
+		if (trie_set_mem(&mtab->types, &sb.dev, sizeof(sb.dev), mount->type) != 0) {
 			goto fail;
 		}
 	}
@@ -282,9 +279,9 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 		}
 	}
 
-	const struct trie_leaf *leaf = trie_find_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));
-	if (leaf) {
-		return leaf->value;
+	const char *type = trie_get_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));
+	if (type) {
+		return type;
 	} else {
 		return "unknown";
 	}

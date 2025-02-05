@@ -240,6 +240,16 @@ struct trie_leaf *trie_find_mem(const struct trie *trie, const void *key, size_t
 	return trie_find_mem_impl(trie, key, length);
 }
 
+void *trie_get_str(const struct trie *trie, const char *key) {
+	const struct trie_leaf *leaf = trie_find_str(trie, key);
+	return leaf ? leaf->value : NULL;
+}
+
+void *trie_get_mem(const struct trie *trie, const void *key, size_t length) {
+	const struct trie_leaf *leaf = trie_find_mem(trie, key, length);
+	return leaf ? leaf->value : NULL;
+}
+
 _trie_clones
 static struct trie_leaf *trie_find_postfix_impl(const struct trie *trie, const char *key) {
 	size_t length = strlen(key);
@@ -624,6 +634,26 @@ static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key
 
 struct trie_leaf *trie_insert_mem(struct trie *trie, const void *key, size_t length) {
 	return trie_insert_mem_impl(trie, key, length);
+}
+
+int trie_set_str(struct trie *trie, const char *key, const void *value) {
+	struct trie_leaf *leaf = trie_insert_str(trie, key);
+	if (leaf) {
+		leaf->value = (void *)value;
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
+int trie_set_mem(struct trie *trie, const void *key, size_t length, const void *value) {
+	struct trie_leaf *leaf = trie_insert_mem(trie, key, length);
+	if (leaf) {
+		leaf->value = (void *)value;
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 /** Free a chain of singleton nodes. */

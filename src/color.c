@@ -143,13 +143,7 @@ static int init_esc(struct colors *colors, const char *name, const char *value, 
 
 	*field = esc;
 
-	struct trie_leaf *leaf = trie_insert_str(&colors->names, name);
-	if (!leaf) {
-		return -1;
-	}
-
-	leaf->value = field;
-	return 0;
+	return trie_set_str(&colors->names, name, field);
 }
 
 /** Check if an escape sequence is equal to a string. */
@@ -159,8 +153,7 @@ static bool esc_eq(const struct esc_seq *esc, const char *str, size_t len) {
 
 /** Get an escape sequence from the table. */
 static struct esc_seq **get_esc(const struct colors *colors, const char *name) {
-	const struct trie_leaf *leaf = trie_find_str(&colors->names, name);
-	return leaf ? leaf->value : NULL;
+	return trie_get_str(&colors->names, name);
 }
 
 /** Append an escape sequence to a string. */
@@ -225,13 +218,7 @@ static int insert_ext(struct trie *trie, struct ext_color *ext) {
 	}
 
 	size_t len = ext->len + 1;
-	leaf = trie_insert_mem(trie, ext->ext, len);
-	if (!leaf) {
-		return -1;
-	}
-
-	leaf->value = ext;
-	return 0;
+	return trie_set_mem(trie, ext->ext, len, ext);
 }
 
 /** Set the color for an extension. */
