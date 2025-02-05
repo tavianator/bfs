@@ -14,6 +14,7 @@
 
 #include "bfs.h"
 
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -56,6 +57,7 @@ enum bfs_stat_field {
 	BFS_STAT_BTIME  = 1 << 11,
 	BFS_STAT_CTIME  = 1 << 12,
 	BFS_STAT_MTIME  = 1 << 13,
+	BFS_STAT_MNT_ID = 1 << 14,
 };
 
 /**
@@ -102,6 +104,8 @@ struct bfs_stat {
 	blkcnt_t blocks;
 	/** The device ID represented by this file. */
 	dev_t rdev;
+	/** The ID of the mount point containing this file. */
+	uint64_t mnt_id;
 
 	/** Attributes/flags set on the file. */
 	unsigned long long attrs;
@@ -148,6 +152,11 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src);
  * Convert bfs_stat_flags to statx() flags.
  */
 int bfs_statx_flags(enum bfs_stat_flags flags);
+
+/**
+ * Get the default statx() mask.
+ */
+unsigned int bfs_statx_mask(void);
 
 /**
  * Convert struct statx to struct bfs_stat.

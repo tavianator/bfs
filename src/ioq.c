@@ -846,7 +846,7 @@ static struct io_uring_sqe *ioq_dispatch_async(struct ioq_ring_state *state, str
 			sqe = ioq_get_sqe(state);
 			struct ioq_stat *args = &ent->stat;
 			int flags = bfs_statx_flags(args->flags);
-			unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
+			unsigned int mask = bfs_statx_mask();
 			io_uring_prep_statx(sqe, args->dfd, args->path, flags, mask, args->xbuf);
 		}
 #endif
