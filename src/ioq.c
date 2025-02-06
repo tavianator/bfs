@@ -617,7 +617,7 @@ static void ioq_dispatch_sync(struct ioq *ioq, struct ioq_ent *ent) {
 		case IOQ_NOP:
 			if (ent->nop.type == IOQ_NOP_HEAVY) {
 				// A fast, no-op syscall
-				getpid();
+				getppid();
 			}
 			ent->result = 0;
 			return;
