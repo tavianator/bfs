@@ -46,9 +46,7 @@ show_bar() {
 
     # Name the pipe deterministically based on the ttyname, so that concurrent
     # tests.sh runs on the same terminal (e.g. make -jN check) cooperate
-    local pipe
-    pipe=$(printf '%s' "$TTY" | tr '/' '-')
-    pipe="${TMPDIR:-/tmp}/bfs$pipe.bar"
+    local pipe="${TMPDIR:-/tmp}/bfs${TTY//\//-}.bar"
 
     if mkfifo "$pipe" 2>/dev/null; then
         # We won the race, create the background process to manage the bar
