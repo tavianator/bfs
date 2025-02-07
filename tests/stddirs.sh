@@ -151,7 +151,7 @@ make_stddirs() {
     if ((CLEAN)); then
         defer clean_stddirs
     else
-        printf "Test files saved to ${BLD}%s${RST}\n" "$TMP"
+        color printf "Test files saved to ${BLD}%s${RST}\n" "$TMP"
     fi
 
     chown "$(id -u):$(id -g)" "$TMP"
