@@ -700,6 +700,34 @@ static int print_owner(FILE *file, const char *name, uintmax_t id, int *width) {
 	}
 }
 
+/** Print a file's modification time. */
+static int print_time(FILE *file, time_t time, time_t now) {
+	struct tm tm;
+	if (!localtime_r(&time, &tm)) {
+		goto error;
+	}
+
+	char time_str[256];
+	size_t time_ret;
+
+	time_t six_months_ago = now - 6 * 30 * 24 * 60 * 60;
+	time_t tomorrow = now + 24 * 60 * 60;
+	if (time <= six_months_ago || time >= tomorrow) {
+		time_ret = strftime(time_str, sizeof(time_str), "%b %e  %Y", &tm);
+	} else {
+		time_ret = strftime(time_str, sizeof(time_str), "%b %e %H:%M", &tm);
+	}
+
+	if (time_ret == 0) {
+		goto error;
+	}
+
+	return fprintf(file, " %s", time_str);
+
+error:
+	return fprintf(file, " %jd", (intmax_t)time);
+}
+
 /**
  * -f?ls action.
  */
@@ -756,28 +784,11 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 
 	time_t time = statbuf->mtime.tv_sec;
 	time_t now = ctx->now.tv_sec;
-	time_t six_months_ago = now - 6 * 30 * 24 * 60 * 60;
-	time_t tomorrow = now + 24 * 60 * 60;
-	struct tm tm;
-	if (!localtime_r(&time, &tm)) {
-		goto error;
-	}
-	char time_str[256];
-	size_t time_ret;
-	if (time <= six_months_ago || time >= tomorrow) {
-		time_ret = strftime(time_str, sizeof(time_str), "%b %e  %Y", &tm);
-	} else {
-		time_ret = strftime(time_str, sizeof(time_str), "%b %e %H:%M", &tm);
-	}
-	if (time_ret == 0) {
-		errno = EOVERFLOW;
-		goto error;
-	}
-	if (cfprintf(cfile, " %s${rs}", time_str) < 0) {
+	if (print_time(file, time, now) < 0) {
 		goto error;
 	}
 
-	if (cfprintf(cfile, " %pP", ftwbuf) < 0) {
+	if (cfprintf(cfile, "${rs} %pP", ftwbuf) < 0) {
 		goto error;
 	}
 
