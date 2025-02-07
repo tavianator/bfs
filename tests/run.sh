@@ -415,8 +415,13 @@ make_xattrs() {
 
 # Get the Unix epoch time in seconds
 epoch_time() {
-    # https://stackoverflow.com/a/12746260/502399
-    awk 'BEGIN { srand(); print srand(); }'
+    if [ "${EPOCHSECONDS:-}" ]; then
+        # Added in bash 5
+        printf '%d' "$EPOCHSECONDS"
+    else
+        # https://stackoverflow.com/a/12746260/502399
+        awk 'BEGIN { srand(); print srand(); }'
+    fi
 }
 
 ## Snapshot testing
