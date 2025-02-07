@@ -78,7 +78,7 @@ hide_bar() {
 # The background process that muxes multiple status bars for one TTY
 bar_proc() {
     # Read from the pipe, write to the TTY
-    exec <"$1" >"$TTY"
+    exec <"$1" >/dev/tty
 
     # Delete the pipe when done
     defer rm "$1"
@@ -133,7 +133,7 @@ bar_proc() {
 # Resize the status bar
 resize_bar() {
     # Bash gets $LINES from stderr, so if it's redirected use tput instead
-    TTY_HEIGHT="${LINES:-$(tput lines 2>"$TTY")}"
+    TTY_HEIGHT="${LINES:-$(tput lines 2>/dev/tty)}"
 
     if ((BAR_HEIGHT == 0)); then
         return
