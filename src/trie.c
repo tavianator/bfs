@@ -173,7 +173,7 @@ void trie_init(struct trie *trie) {
 /** Extract the nibble at a certain offset from a byte sequence. */
 static unsigned char trie_key_nibble(const void *key, size_t length, size_t offset) {
 	const unsigned char *bytes = key;
-	size_t byte = offset >> 1;
+	size_t byte = offset / 2;
 	bfs_assert(byte < length);
 
 	// A branchless version of
@@ -202,13 +202,13 @@ _trie_clones
 static struct trie_leaf *trie_representative(const struct trie *trie, const void *key, size_t length) {
 	uintptr_t ptr = trie->root;
 
-	size_t offset = 0;
+	size_t offset = 0, limit = 2 * length;
 	while (trie_is_node(ptr)) {
 		struct trie_node *node = trie_decode_node(ptr);
 		offset += node->offset;
 
 		unsigned int index = 0;
-		if ((offset >> 1) < length) {
+		if (offset < limit) {
 			unsigned char nibble = trie_key_nibble(key, length, offset);
 			unsigned int bit = 1U << nibble;
 			unsigned int map = node->bitmap;
@@ -307,18 +307,18 @@ static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const ch
 	size_t skip = 0;
 	size_t length = strlen(key) + 1;
 
-	size_t offset = 0;
+	size_t offset = 0, limit = 2 * length;
 	while (trie_is_node(ptr)) {
 		struct trie_node *node = trie_decode_node(ptr);
 		offset += node->offset;
-		if ((offset >> 1) >= length) {
+		if (offset >= limit) {
 			return best;
 		}
 
 		struct trie_leaf *leaf = trie_terminal_leaf(node);
 		if (trie_check_prefix(leaf, skip, key, length)) {
 			best = leaf;
-			skip = offset >> 1;
+			skip = offset / 2;
 		}
 
 		unsigned char nibble = trie_key_nibble(key, length, offset);
