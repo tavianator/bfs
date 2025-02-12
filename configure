@@ -70,9 +70,16 @@ Any other arguments will be passed directly to the $MAKE invocation, e.g.
 EOF
 }
 
+# Report a warning
+warn() {
+    fmt="$1"
+    shift
+    printf "%s: warning: $fmt\\n" "$0" "$@" >&2
+}
+
 # Report an argument parsing error
 invalid() {
-    printf 'error: Unrecognized option "%s"\n\n' "$1" >&2
+    printf '%s: error: Unrecognized option "%s"\n\n' "$0" "$1" >&2
     printf 'Run %s --help for more information.\n' "$0" >&2
     exit 1
 }
@@ -143,7 +150,7 @@ for arg; do
                         --enable-*) arg="--with-${arg#--*-}" ;;
                         --disable-*) arg="--without-${arg#--*-}" ;;
                     esac
-                    printf 'warning: Treating "%s" like "%s"\n' "$old" "$arg" >&2
+                    warn 'Treating "%s" like "%s"' "$old" "$arg"
                     ;;
             esac
             ;;
@@ -182,7 +189,7 @@ for arg; do
             ;;
 
         --infodir=*|--build=*|--host=*|--target=*)
-            printf 'warning: Ignoring option "%s"\n' "$arg" >&2
+            warn 'Ignoring option "%s"' "$arg"
             ;;
 
         MAKE=*)
@@ -192,19 +199,19 @@ for arg; do
         # Warn about MAKE variables that have documented configure flags
         RELEASE=*|ASAN=*|LSAN=*|MSAN=*|TSAN=*|UBSAN=*|LINT=*|GCOV=*)
             name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
-            printf 'warning: "%s" is deprecated; use --enable-%s\n' "$arg" "$name" >&2
+            warn '"%s" is deprecated; use --enable-%s' "$arg" "$name"
             set -- "$@" "$arg"
             ;;
 
         PREFIX=*|MANDIR=*|VERSION=*)
             name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
-            printf 'warning: "%s" is deprecated; use --%s=%s\n' "$arg" "$name" "$value" >&2
+            warn '"%s" is deprecated; use --%s=%s' "$arg" "$name" "$value"
             set -- "$@" "$arg"
             ;;
 
         WITH_*=*)
             name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
-            printf 'warning: "%s" is deprecated; use --%s\n' "$arg" "$name" >&2
+            warn '"%s" is deprecated; use --%s' "$arg" "$name"
             set -- "$@" "$arg"
             ;;
 
