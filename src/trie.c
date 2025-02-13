@@ -391,12 +391,6 @@ static void trie_node_free(struct trie *trie, struct trie_node *node, size_t siz
 	varena_free(&trie->nodes, node, size);
 }
 
-#if ENDIAN_NATIVE == ENDIAN_LITTLE
-#  define TRIE_BSWAP(n) bswap(n)
-#elif ENDIAN_NATIVE == ENDIAN_BIG
-#  define TRIE_BSWAP(n) (n)
-#endif
-
 /** Find the offset of the first nibble that differs between two keys. */
 static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t length) {
 	if (!rep) {
@@ -410,32 +404,32 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 	const char *rep_bytes = rep->key;
 	const char *key_bytes = key;
 
-	size_t i = 0;
-	for (size_t chunk = sizeof(chunk); i + chunk <= length; i += chunk) {
-		size_t rep_chunk, key_chunk;
-		memcpy(&rep_chunk, rep_bytes + i, sizeof(rep_chunk));
-		memcpy(&key_chunk, key_bytes + i, sizeof(key_chunk));
+	size_t ret = 0, i = 0;
 
-		if (rep_chunk != key_chunk) {
-#ifdef TRIE_BSWAP
-			size_t diff = TRIE_BSWAP(rep_chunk ^ key_chunk);
-			i *= 2;
-			i += leading_zeros(diff) / 4;
-			return i;
-#else
-			break;
+#define CHUNK(n) CHUNK_(uint##n##_t, load8_beu##n)
+#define CHUNK_(type, load8) \
+	while (length - i >= sizeof(type)) { \
+		type rep_chunk = load8(rep_bytes + i); \
+		type key_chunk = load8(key_bytes + i); \
+		type diff = rep_chunk ^ key_chunk; \
+		ret += leading_zeros(diff) / 4; \
+		if (diff) { \
+			return ret; \
+		} \
+		i += sizeof(type); \
+	}
+
+#if SIZE_WIDTH >= 64
+	CHUNK(64);
 #endif
-		}
-	}
+	CHUNK(32);
+	CHUNK(16);
+	CHUNK(8);
 
-	for (; i < length; ++i) {
-		unsigned char diff = rep_bytes[i] ^ key_bytes[i];
-		if (diff) {
-			return 2 * i + !(diff >> 4);
-		}
-	}
+#undef CHUNK_
+#undef CHUNK
 
-	return 2 * i;
+	return ret;
 }
 
 /**
