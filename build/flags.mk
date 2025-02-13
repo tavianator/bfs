@@ -30,6 +30,9 @@ _GCOV := ${TRUTHY,${GCOV}}
 _LINT := ${TRUTHY,${LINT}}
 _RELEASE := ${TRUTHY,${RELEASE}}
 
+LTO ?= ${RELEASE}
+_LTO := ${TRUTHY,${LTO}}
+
 ASAN_CFLAGS,y := -fsanitize=address
 LSAN_CFLAGS,y := -fsanitize=leak
 MSAN_CFLAGS,y := -fsanitize=memory -fsanitize-memory-track-origins
@@ -62,10 +65,13 @@ _CPPFLAGS += ${LINT_CPPFLAGS,${_LINT}}
 _CFLAGS += ${LINT_CFLAGS,${_LINT}}
 
 RELEASE_CPPFLAGS,y := -DNDEBUG
-RELEASE_CFLAGS,y := -O3 -flto=auto
+RELEASE_CFLAGS,y := -O3
 
 _CPPFLAGS += ${RELEASE_CPPFLAGS,${_RELEASE}}
 _CFLAGS += ${RELEASE_CFLAGS,${_RELEASE}}
+
+LTO_CFLAGS,y := -flto=auto
+_CFLAGS += ${LTO_CFLAGS,${_LTO}}
 
 # Configurable flags
 CFLAGS ?= -g -Wall
