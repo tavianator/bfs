@@ -148,7 +148,7 @@
 #  define INTMAX_WIDTH UINTMAX_WIDTH
 #endif
 
-// C23 polyfill: byte order
+// N3022 polyfill: byte order
 
 #ifdef __STDC_ENDIAN_LITTLE__
 #  define ENDIAN_LITTLE __STDC_ENDIAN_LITTLE__
@@ -249,6 +249,58 @@ static inline uint8_t bswap_u8(uint8_t n) {
  * Reverse the byte order of an integer.
  */
 #define bswap(n) UINT_SELECT(n, bswap)(n)
+
+#define LOAD8_LEU8(ptr, i, n) ((uint##n##_t)((const unsigned char *)ptr)[(i) / 8] << (i))
+#define LOAD8_BEU8(ptr, i, n) ((uint##n##_t)((const unsigned char *)ptr)[(i) / 8] << (n - (i) - 8))
+
+/** Load a little-endian 8-bit word. */
+static inline uint8_t load8_leu8(const void *ptr) {
+	return LOAD8_LEU8(ptr, 0, 8);
+}
+
+/** Load a big-endian 8-bit word. */
+static inline uint8_t load8_beu8(const void *ptr) {
+	return LOAD8_BEU8(ptr, 0, 8);
+}
+
+#define LOAD8_LEU16(ptr, i, n) (LOAD8_LEU8(ptr, i, n) | LOAD8_LEU8(ptr, i + 8, n))
+#define LOAD8_BEU16(ptr, i, n) (LOAD8_BEU8(ptr, i, n) | LOAD8_BEU8(ptr, i + 8, n))
+
+/** Load a little-endian 16-bit word. */
+static inline uint16_t load8_leu16(const void *ptr) {
+	return LOAD8_LEU16(ptr, 0, 16);
+}
+
+/** Load a big-endian 16-bit word. */
+static inline uint16_t load8_beu16(const void *ptr) {
+	return LOAD8_BEU16(ptr, 0, 16);
+}
+
+#define LOAD8_LEU32(ptr, i, n) (LOAD8_LEU16(ptr, i, n) | LOAD8_LEU16(ptr, i + 16, n))
+#define LOAD8_BEU32(ptr, i, n) (LOAD8_BEU16(ptr, i, n) | LOAD8_BEU16(ptr, i + 16, n))
+
+/** Load a little-endian 32-bit word. */
+static inline uint32_t load8_leu32(const void *ptr) {
+	return LOAD8_LEU32(ptr, 0, 32);
+}
+
+/** Load a big-endian 32-bit word. */
+static inline uint32_t load8_beu32(const void *ptr) {
+	return LOAD8_BEU32(ptr, 0, 32);
+}
+
+#define LOAD8_LEU64(ptr, i, n) (LOAD8_LEU32(ptr, i, n) | LOAD8_LEU32(ptr, i + 32, n))
+#define LOAD8_BEU64(ptr, i, n) (LOAD8_BEU32(ptr, i, n) | LOAD8_BEU32(ptr, i + 32, n))
+
+/** Load a little-endian 64-bit word. */
+static inline uint64_t load8_leu64(const void *ptr) {
+	return LOAD8_LEU64(ptr, 0, 64);
+}
+
+/** Load a big-endian 64-bit word. */
+static inline uint64_t load8_beu64(const void *ptr) {
+	return LOAD8_BEU64(ptr, 0, 64);
+}
 
 // C23 polyfill: bit utilities
 

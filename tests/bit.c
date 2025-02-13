@@ -64,7 +64,7 @@ static_assert(INTMAX_MAX == IWIDTH_MAX(INTMAX_WIDTH));
 	bfs_check((a) == (b), "(0x%jX) %s != %s (0x%jX)", (uintmax_t)(a), #a, #b, (uintmax_t)(b))
 
 void check_bit(void) {
-	const char *str = "\x1\x2\x3\x4";
+	const char *str = "\x1\x2\x3\x4\x5\x6\x7\x8";
 	uint32_t word;
 	memcpy(&word, str, sizeof(word));
 
@@ -87,6 +87,15 @@ void check_bit(void) {
 	(void)bswap(0U);
 	(void)bswap(0UL);
 	(void)bswap(0ULL);
+
+	check_eq(load8_beu8(str), 0x01);
+	check_eq(load8_leu8(str), 0x01);
+	check_eq(load8_beu16(str), 0x0102);
+	check_eq(load8_leu16(str), 0x0201);
+	check_eq(load8_beu32(str), 0x01020304);
+	check_eq(load8_leu32(str), 0x04030201);
+	check_eq(load8_beu64(str), 0x0102030405060708ULL);
+	check_eq(load8_leu64(str), 0x0807060504030201ULL);
 
 	check_eq(count_ones(0x0U), 0);
 	check_eq(count_ones(0x1U), 1);
