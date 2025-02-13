@@ -217,11 +217,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (marg) {
-		char *end;
-		long mode = strtol(marg, &end, 8);
-		// https://github.com/llvm/llvm-project/issues/64946
-		sanitize_init(&end);
-		if (*marg && !*end && mode >= 0 && mode < 01000) {
+		long mode;
+		if (xstrtol(marg, NULL, 8, &mode) == 0 && mode >= 0 && mode < 01000) {
 			args.fmode = args.dmode = mode;
 		} else {
 			fprintf(stderr, "%s: Invalid mode '%s'\n", cmd, marg);
