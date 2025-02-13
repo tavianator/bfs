@@ -191,6 +191,12 @@ static unsigned char trie_leaf_nibble(const struct trie_leaf *leaf, size_t offse
 	return trie_key_nibble(leaf->key, leaf->length, offset);
 }
 
+/** Get the number of children of an internal node. */
+_trie_clones
+static unsigned int trie_node_size(const struct trie_node *node) {
+	return count_ones((unsigned int)node->bitmap);
+}
+
 /**
  * Finds a leaf in the trie that matches the key at every branch.  If the key
  * exists in the trie, the representative will match the searched key.  But
@@ -381,7 +387,7 @@ static struct trie_node *trie_node_realloc(struct trie *trie, struct trie_node *
 
 /** Free a node. */
 static void trie_node_free(struct trie *trie, struct trie_node *node, size_t size) {
-	bfs_assert(size == (size_t)count_ones(node->bitmap));
+	bfs_assert(size == trie_node_size(node));
 	varena_free(&trie->nodes, node, size);
 }
 
@@ -457,7 +463,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 _trie_clones
 static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, unsigned char nibble) {
 	struct trie_node *node = trie_decode_node(*ptr);
-	unsigned int size = count_ones(node->bitmap);
+	unsigned int size = trie_node_size(node);
 
 	// Double the capacity every power of two
 	if (has_single_bit(size)) {
@@ -742,7 +748,7 @@ static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	struct trie_node *node = trie_decode_node(*parent);
 	trie_free_singletons(trie, node->children[child_index]);
 
-	unsigned int parent_size = count_ones(node->bitmap);
+	unsigned int parent_size = trie_node_size(node);
 	bfs_assert(parent_size > 1);
 	if (parent_size == 2 && trie_collapse_node(trie, parent, node, child_index) == 0) {
 		return;
