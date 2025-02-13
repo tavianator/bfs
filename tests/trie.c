@@ -39,6 +39,10 @@ static const char *keys[] = {
 	">>>>>>",
 	">>><<<",
 	">>>",
+
+	"AAAAAAA",
+	"AAAAAAAB",
+	"AAAAAAAa",
 };
 
 static const size_t nkeys = countof(keys);

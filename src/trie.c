@@ -178,11 +178,11 @@ static unsigned char trie_key_nibble(const void *key, size_t length, size_t offs
 
 	// A branchless version of
 	// if (offset & 1) {
-	//         return bytes[byte] >> 4;
-	// } else {
 	//         return bytes[byte] & 0xF;
+	// } else {
+	//         return bytes[byte] >> 4;
 	// }
-	unsigned int shift = (offset & 1) << 2;
+	unsigned int shift = 4 * ((offset + 1) % 2);
 	return (bytes[byte] >> shift) & 0xF;
 }
 
@@ -392,9 +392,9 @@ static void trie_node_free(struct trie *trie, struct trie_node *node, size_t siz
 }
 
 #if ENDIAN_NATIVE == ENDIAN_LITTLE
-#  define TRIE_BSWAP(n) (n)
-#elif ENDIAN_NATIVE == ENDIAN_BIG
 #  define TRIE_BSWAP(n) bswap(n)
+#elif ENDIAN_NATIVE == ENDIAN_BIG
+#  define TRIE_BSWAP(n) (n)
 #endif
 
 /** Find the offset of the first nibble that differs between two keys. */
@@ -420,7 +420,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 #ifdef TRIE_BSWAP
 			size_t diff = TRIE_BSWAP(rep_chunk ^ key_chunk);
 			i *= 2;
-			i += trailing_zeros(diff) / 4;
+			i += leading_zeros(diff) / 4;
 			return i;
 #else
 			break;
@@ -431,7 +431,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 	for (; i < length; ++i) {
 		unsigned char diff = rep_bytes[i] ^ key_bytes[i];
 		if (diff) {
-			return 2 * i + !(diff & 0xF);
+			return 2 * i + !(diff >> 4);
 		}
 	}
 
