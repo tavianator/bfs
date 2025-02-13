@@ -780,35 +780,31 @@ size_t asciilen(const char *str) {
 }
 
 size_t asciinlen(const char *str, size_t n) {
+	const unsigned char *ustr = (const unsigned char *)str;
 	size_t i = 0;
 
-#if SIZE_WIDTH % 8 == 0
 	// Word-at-a-time isascii()
-	for (size_t word; i + sizeof(word) <= n; i += sizeof(word)) {
-		memcpy(&word, str + i, sizeof(word));
-
-		const size_t mask = (SIZE_MAX / 0xFF) << 7; // 0x808080...
-		word &= mask;
-		if (!word) {
-			continue;
-		}
-
-#if ENDIAN_NATIVE == ENDIAN_BIG
-		word = bswap(word);
-#elif ENDIAN_NATIVE != ENDIAN_LITTLE
-		break;
-#endif
-
-		size_t first = trailing_zeros(word) / 8;
-		return i + first;
+#define CHUNK(n) CHUNK_(uint##n##_t, load8_leu##n)
+#define CHUNK_(type, load8) \
+	while (n - i >= sizeof(type)) { \
+		type word = load8(ustr + i); \
+		type mask = (((type)-1) / 0xFF) << 7; /* 0x808080.. */ \
+		word &= mask; \
+		i += trailing_zeros(word) / 8; \
+		if (word) { \
+			return i; \
+		} \
 	}
-#endif
 
-	for (; i < n; ++i) {
-		if (!xisascii(str[i])) {
-			break;
-		}
-	}
+#if SIZE_WIDTH >= 64
+	CHUNK(64);
+#endif
+	CHUNK(32);
+	CHUNK(16);
+	CHUNK(8);
+
+#undef CHUNK_
+#undef CHUNK
 
 	return i;
 }
