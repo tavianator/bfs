@@ -50,6 +50,55 @@ fail:
 	return NULL;
 }
 
+/** Add an entry to $PATH. */
+static int add_path(const char *entry, char **old_path) {
+	int ret = -1;
+	const char *new_path = NULL;
+
+	*old_path = getenv("PATH");
+	if (*old_path) {
+		*old_path = strdup(*old_path);
+		if (!*old_path) {
+			goto done;
+		}
+
+		new_path = dstrprintf("%s:%s", entry, *old_path);
+		if (!new_path) {
+			goto done;
+		}
+	} else {
+		new_path = entry;
+	}
+
+	ret = setenv("PATH", new_path, true);
+
+done:
+	if (new_path && new_path != entry) {
+		dstrfree((dchar *)new_path);
+	}
+
+	if (ret != 0) {
+		free(*old_path);
+		*old_path = NULL;
+	}
+
+	return ret;
+}
+
+/** Undo add_path(). */
+static int reset_path(char *old_path) {
+	int ret;
+
+	if (old_path) {
+		ret = setenv("PATH", old_path, true);
+		free(old_path);
+	} else {
+		ret = unsetenv("PATH");
+	}
+
+	return ret;
+}
+
 /** Check that we resolve executables in $PATH correctly. */
 static void check_use_path(bool use_posix) {
 	struct bfs_spawn spawn;
@@ -78,29 +127,15 @@ static void check_use_path(bool use_posix) {
 	}
 
 	// Check that $PATH is resolved after the file actions
-	char *old_path = getenv("PATH");
-	dchar *new_path = NULL;
-	if (old_path) {
-		old_path = strdup(old_path);
-		if (!bfs_echeck(old_path, "strdup()")) {
-			goto env;
-		}
-		new_path = dstrprintf("tests:%s", old_path);
-	} else {
-		new_path = dstrdup("tests");
-	}
-	if (!bfs_check(new_path)) {
-		goto path;
-	}
-
-	if (!bfs_echeck(setenv("PATH", new_path, true) == 0)) {
-		goto path;
+	char *old_path;
+	if (!bfs_echeck(add_path("tests", &old_path) == 0)) {
+		goto env;
 	}
 
 	char *argv[] = {"xspawnee", old_path, NULL};
 	pid_t pid = bfs_spawn("xspawnee", &spawn, argv, envp);
 	if (!bfs_echeck(pid >= 0, "bfs_spawn()")) {
-		goto unset;
+		goto path;
 	}
 
 	int wstatus;
@@ -111,15 +146,8 @@ static void check_use_path(bool use_posix) {
 		bfs_check(wexit == EXIT_SUCCESS, "xspawnee: exit(%d)", wexit);
 	}
 
-unset:
-	if (old_path) {
-		bfs_echeck(setenv("PATH", old_path, true) == 0);
-	} else {
-		bfs_echeck(unsetenv("PATH") == 0);
-	}
 path:
-	dstrfree(new_path);
-	free(old_path);
+	bfs_echeck(reset_path(old_path) == 0);
 env:
 	for (char **var = envp; *var; ++var) {
 		free(*var);
@@ -166,6 +194,14 @@ static void check_resolve(void) {
 	bfs_echeck(!bfs_spawn_resolve("eW6f5RM9Qi") && errno == ENOENT);
 
 	bfs_echeck(!bfs_spawn_resolve("bin/eW6f5RM9Qi") && errno == ENOENT);
+
+	char *old_path;
+	if (bfs_echeck(add_path("bin/tests", &old_path) == 0)) {
+		exe = bfs_spawn_resolve("xspawnee");
+		bfs_echeck(exe && strcmp(exe, "bin/tests/xspawnee") == 0);
+		free(exe);
+		bfs_echeck(reset_path(old_path) == 0);
+	}
 }
 
 void check_xspawn(void) {
