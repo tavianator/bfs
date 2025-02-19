@@ -1036,7 +1036,7 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 			ioq_ring_probe_flags(&params, IORING_SETUP_SINGLE_ISSUER);
 #  endif
 #  ifdef IORING_SETUP_DEFER_TASKRUN
-			// Don't interrupt us aggresively with completion events
+			// Don't interrupt us aggressively with completion events
 			ioq_ring_probe_flags(&params, IORING_SETUP_DEFER_TASKRUN);
 #  endif
 		}
