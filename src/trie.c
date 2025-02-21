@@ -408,7 +408,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 
 #define CHUNK(n) CHUNK_(uint##n##_t, load8_beu##n)
 #define CHUNK_(type, load8) \
-	while (length - i >= sizeof(type)) { \
+	(length - i >= sizeof(type)) { \
 		type rep_chunk = load8(rep_bytes + i); \
 		type key_chunk = load8(key_bytes + i); \
 		type diff = rep_chunk ^ key_chunk; \
@@ -420,11 +420,13 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
 	}
 
 #if SIZE_WIDTH >= 64
-	CHUNK(64);
+	while CHUNK(64);
+	if CHUNK(32);
+#else
+	while CHUNK(32);
 #endif
-	CHUNK(32);
-	CHUNK(16);
-	CHUNK(8);
+	if CHUNK(16);
+	if CHUNK(8);
 
 #undef CHUNK_
 #undef CHUNK

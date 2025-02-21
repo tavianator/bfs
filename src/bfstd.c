@@ -786,7 +786,7 @@ size_t asciinlen(const char *str, size_t n) {
 	// Word-at-a-time isascii()
 #define CHUNK(n) CHUNK_(uint##n##_t, load8_leu##n)
 #define CHUNK_(type, load8) \
-	while (n - i >= sizeof(type)) { \
+	(n - i >= sizeof(type)) { \
 		type word = load8(ustr + i); \
 		type mask = (((type)-1) / 0xFF) << 7; /* 0x808080.. */ \
 		word &= mask; \
@@ -797,11 +797,13 @@ size_t asciinlen(const char *str, size_t n) {
 	}
 
 #if SIZE_WIDTH >= 64
-	CHUNK(64);
+	while CHUNK(64);
+	if CHUNK(32);
+#else
+	while CHUNK(32);
 #endif
-	CHUNK(32);
-	CHUNK(16);
-	CHUNK(8);
+	if CHUNK(16);
+	if CHUNK(8);
 
 #undef CHUNK_
 #undef CHUNK
