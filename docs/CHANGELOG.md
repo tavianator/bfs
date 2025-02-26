@@ -1,6 +1,26 @@
 4.*
 ===
 
+4.0.6
+-----
+
+**February 26, 2025**
+
+### Bug fixes
+
+- Fixed `-fstype` with btrfs subvolumes (requires Linux 5.8+)
+  ([`0dccdae`](https://github.com/tavianator/bfs/commit/0dccdae4510ff5603247be871e64a6119647ea2a))
+
+- Fixed `-ls` with timestamps very far in the future
+  ([`dd5df1f`](https://github.com/tavianator/bfs/commit/dd5df1f8997550c5bf49205578027715b957bd01))
+
+- Fixed the `posix/exec_sigmask` test on mips64el Linux
+  ([`532dec0`](https://github.com/tavianator/bfs/commit/532dec0849dcdc3e15e530ac40a8168f146a41cd))
+
+- Fixed time-related tests with `mawk 1.3.4 20250131`
+  ([#152](https://github.com/tavianator/bfs/issues/152))
+
+
 4.0.5
 -----
 
