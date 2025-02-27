@@ -463,6 +463,11 @@ long xsysconf(int name);
 #define sysoption(name) \
 	(_POSIX_##name == 0 ? xsysconf(_SC_##name) : _POSIX_##name)
 
+/**
+ * Get the number of CPU threads available to the current process.
+ */
+long nproc(void);
+
 #include <wchar.h>
 
 /**

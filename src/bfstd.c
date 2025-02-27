@@ -775,6 +775,16 @@ long xsysconf(int name) {
 	return ret;
 }
 
+long nproc(void) {
+	long nproc = xsysconf(_SC_NPROCESSORS_ONLN);
+
+	if (nproc < 1) {
+		return 1;
+	} else {
+		return nproc;
+	}
+}
+
 size_t asciilen(const char *str) {
 	return asciinlen(str, strlen(str));
 }
