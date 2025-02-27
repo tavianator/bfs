@@ -775,14 +775,57 @@ long xsysconf(int name) {
 	return ret;
 }
 
-long nproc(void) {
-	long nproc = xsysconf(_SC_NPROCESSORS_ONLN);
+#if BFS_HAS_SCHED_GETAFFINITY
+/** Get the CPU count in an affinity mask of the given size. */
+static long bfs_sched_getaffinity(size_t size) {
+	cpu_set_t set, *pset = &set;
 
-	if (nproc < 1) {
-		return 1;
-	} else {
-		return nproc;
+	if (size > sizeof(set)) {
+		pset = malloc(size);
+		if (!pset) {
+			return -1;
+		}
 	}
+
+	long ret = -1;
+	if (sched_getaffinity(0, size, pset) == 0) {
+		ret = CPU_COUNT_S(size, pset);
+	}
+
+	if (pset != &set) {
+		free(pset);
+	}
+	return ret;
+}
+#endif
+
+long nproc(void) {
+	long ret = 0;
+
+#if BFS_HAS_SCHED_GETAFFINITY
+	size_t size = sizeof(cpu_set_t);
+	do {
+		// sched_getaffinity(2) says:
+		//
+		//     When working on systems with large kernel CPU affinity masks, one must
+		//     dynamically allocate the mask argument (see CPU_ALLOC(3)).  Currently,
+		//     the only way to do this is by probing for the size of the required mask
+		//     using sched_getaffinity() calls with increasing mask sizes (until the
+		//     call does not fail with the error EINVAL).
+		ret = bfs_sched_getaffinity(size);
+		size *= 2;
+	} while (ret < 0 && errno == EINVAL);
+#endif
+
+	if (ret < 1) {
+		ret = xsysconf(_SC_NPROCESSORS_ONLN);
+	}
+
+	if (ret < 1) {
+		ret = 1;
+	}
+
+	return ret;
 }
 
 size_t asciilen(const char *str) {

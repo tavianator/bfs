@@ -43,6 +43,7 @@ HEADERS := \
     gen/has/posix-spawn-addfchdir.h \
     gen/has/pthread-set-name-np.h \
     gen/has/pthread-setname-np.h \
+    gen/has/sched-getaffinity.h \
     gen/has/st-acmtim.h \
     gen/has/st-acmtimespec.h \
     gen/has/st-birthtim.h \
