@@ -21,33 +21,23 @@
  * async-signal-safe in practice.
  */
 #if BFS_HAS_DPRINTF
-#  define eprintf(...) dprintf(STDERR_FILENO, __VA_ARGS__)
 #  define veprintf(...) vdprintf(STDERR_FILENO, __VA_ARGS__)
 #else
-#  define eprintf(...) fprintf(stderr, __VA_ARGS__)
 #  define veprintf(...) vfprintf(stderr, __VA_ARGS__)
 #endif
 
-/** bfs_diagf() implementation. */
-_printf(2, 0)
-static void bfs_vdiagf(const struct bfs_loc *loc, const char *format, va_list args) {
-	eprintf("%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
-	veprintf(format, args);
-	eprintf("\n");
-}
-
-void bfs_diagf(const struct bfs_loc *loc, const char *format, ...) {
+void bfs_diagf(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bfs_vdiagf(loc, format, args);
+	veprintf(format, args);
 	va_end(args);
 }
 
 _noreturn
-void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
+void bfs_abortf(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bfs_vdiagf(loc, format, args);
+	veprintf(format, args);
 	va_end(args);
 
 	abort();

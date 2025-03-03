@@ -19,7 +19,6 @@ HEADERS := \
     gen/has/acl-is-trivial-np.h \
     gen/has/acl-trivial.h \
     gen/has/builtin-riscv-pause.h \
-    gen/has/compound-literal-storage.h \
     gen/has/confstr.h \
     gen/has/dprintf.h \
     gen/has/extattr-get-file.h \

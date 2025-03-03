@@ -45,26 +45,30 @@ bool bfs_check_impl(bool result);
  * Check a condition, logging a message on failure but continuing.
  */
 #define bfs_check(...) \
-	bfs_check_impl(bfs_check_(#__VA_ARGS__, __VA_ARGS__, "", ""))
+	bfs_check_(#__VA_ARGS__, __VA_ARGS__, "", )
 
 #define bfs_check_(str, cond, format, ...) \
-	((cond) ? true : (bfs_diag( \
-		sizeof(format) > 1 \
-			? "%.0s" format "%s%s" \
-			: "Check failed: `%s`%s", \
-		str, __VA_ARGS__), false))
+	bfs_check_impl((cond) || (bfs_check__(str, format, __VA_ARGS__), false))
+
+#define bfs_check__(str, format, ...) \
+	bfs_diagf(sizeof(format) > 1 \
+			? BFS_DIAG_FORMAT_("%.0s" format "%s") \
+			: BFS_DIAG_FORMAT_("Check failed: `%s`"), \
+		BFS_DIAG_ARGS_(str, __VA_ARGS__))
 
 /**
  * Check a condition, logging the current error string on failure.
  */
 #define bfs_echeck(...) \
-	bfs_check_impl(bfs_echeck_(#__VA_ARGS__, __VA_ARGS__, "", errstr()))
+	bfs_echeck_(#__VA_ARGS__, __VA_ARGS__, "", )
 
 #define bfs_echeck_(str, cond, format, ...) \
-	((cond) ? true : (bfs_diag( \
-		sizeof(format) > 1 \
-			? "%.0s" format "%s: %s" \
-			: "Check failed: `%s`: %s", \
-		str, __VA_ARGS__), false))
+	bfs_check_impl((cond) || (bfs_echeck__(str, format, __VA_ARGS__), false))
+
+#define bfs_echeck__(str, format, ...) \
+	bfs_diagf(sizeof(format) > 1 \
+			? BFS_DIAG_FORMAT_("%.0s" format "%s: %s") \
+			: BFS_DIAG_FORMAT_("Check failed: `%s`: %s"), \
+		BFS_DIAG_ARGS_(str, __VA_ARGS__ errstr(), ))
 
 #endif // BFS_TESTS_H

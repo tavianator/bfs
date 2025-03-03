@@ -14,69 +14,68 @@
 #include <stdarg.h>
 
 /**
- * A source code location.
- */
-struct bfs_loc {
-	const char *file;
-	int line;
-	const char *func;
-};
-
-#define BFS_LOC_INIT { .file = __FILE__, .line = __LINE__, .func = __func__ }
-
-/**
- * Get the current source code location.
- */
-#if BFS_HAS_COMPOUND_LITERAL_STORAGE
-#  define bfs_location() (&(static const struct bfs_loc)BFS_LOC_INIT)
-#else
-#  define bfs_location() (&(const struct bfs_loc)BFS_LOC_INIT)
-#endif
-
-/**
- * Print a low-level diagnostic message to standard error, formatted like
+ * Wrap a diagnostic format string so it looks like
  *
  *     bfs: func@src/file.c:0: Message
  */
-_printf(2, 3)
-void bfs_diagf(const struct bfs_loc *loc, const char *format, ...);
+#define BFS_DIAG_FORMAT_(format) \
+	((format) ? "%s: %s@%s:%d: " format "%s" : "")
+
+/**
+ * Add arguments to match a BFS_DIAG_FORMAT string.
+ */
+#define BFS_DIAG_ARGS_(...) \
+	xgetprogname(), __func__, __FILE__, __LINE__, __VA_ARGS__ "\n"
+
+/**
+ * Print a low-level diagnostic message to standard error.
+ */
+_printf(1, 2)
+void bfs_diagf(const char *format, ...);
 
 /**
  * Unconditional diagnostic message.
  */
-#define bfs_diag(...) bfs_diagf(bfs_location(), __VA_ARGS__)
+#define bfs_diag(...) \
+	bfs_diag_(__VA_ARGS__, )
+
+#define bfs_diag_(format, ...) \
+	bfs_diagf(BFS_DIAG_FORMAT_(format), BFS_DIAG_ARGS_(__VA_ARGS__))
 
 /**
  * Print a diagnostic message including the last error.
  */
 #define bfs_ediag(...) \
-	bfs_ediag_("" __VA_ARGS__, errstr())
+	bfs_ediag_(__VA_ARGS__, )
 
 #define bfs_ediag_(format, ...) \
-	bfs_diag(sizeof(format) > 1 ? format ": %s" : "%s", __VA_ARGS__)
+	bfs_diag_(format "%s%s", __VA_ARGS__ (sizeof("" format) > 1 ? ": " : ""), errstr(), )
 
 /**
  * Print a message to standard error and abort.
  */
 _cold
-_printf(2, 3)
+_printf(1, 2)
 _noreturn
-void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
+void bfs_abortf(const char *format, ...);
 
 /**
  * Unconditional abort with a message.
  */
 #define bfs_abort(...) \
-	bfs_abortf(bfs_location(), __VA_ARGS__)
+	bfs_abort_(__VA_ARGS__, )
+
+#define bfs_abort_(format, ...) \
+	bfs_abortf(BFS_DIAG_FORMAT_(format), BFS_DIAG_ARGS_(__VA_ARGS__))
 
 /**
  * Abort with a message including the last error.
  */
 #define bfs_eabort(...) \
-	bfs_eabort_("" __VA_ARGS__, errstr())
+	bfs_eabort_(__VA_ARGS__, )
 
 #define bfs_eabort_(format, ...) \
-	bfs_abort(sizeof(format) > 1 ? format ": %s" : "%s", __VA_ARGS__)
+	((format) ? bfs_abort_(format ": %s", __VA_ARGS__ errstr(), ) : (void)0)
 
 /**
  * Abort in debug builds; no-op in release builds.
@@ -93,27 +92,27 @@ void bfs_abortf(const struct bfs_loc *loc, const char *format, ...);
  * Unconditional assert.
  */
 #define bfs_verify(...) \
-	bfs_verify_(#__VA_ARGS__, __VA_ARGS__, "", "")
+	bfs_verify_(#__VA_ARGS__, __VA_ARGS__, "", )
 
 #define bfs_verify_(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_abort( \
+	((cond) ? (void)0 : bfs_abortf( \
 		sizeof(format) > 1 \
-			? "%.0s" format "%s%s" \
-			: "Assertion failed: `%s`%s", \
-		str, __VA_ARGS__))
+			? BFS_DIAG_FORMAT_("%.0s" format "%s") \
+			: BFS_DIAG_FORMAT_("Assertion failed: `%s`"), \
+		BFS_DIAG_ARGS_(str, __VA_ARGS__)))
 
 /**
  * Unconditional assert, including the last error.
  */
 #define bfs_everify(...) \
-	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", errstr())
+	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", )
 
 #define bfs_everify_(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_abort( \
+	((cond) ? (void)0 : bfs_abortf( \
 		sizeof(format) > 1 \
-			? "%.0s" format "%s: %s" \
-			: "Assertion failed: `%s`: %s", \
-		str, __VA_ARGS__))
+			? BFS_DIAG_FORMAT_("%.0s" format "%s: %s") \
+			: BFS_DIAG_FORMAT_("Assertion failed: `%s`: %s"), \
+		BFS_DIAG_ARGS_(str, __VA_ARGS__ errstr(), )))
 
 /**
  * Assert in debug builds; no-op in release builds.
