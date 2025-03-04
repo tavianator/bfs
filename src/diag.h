@@ -89,17 +89,26 @@ void bfs_abortf(const char *format, ...);
 #endif
 
 /**
+ * Get the default assertion message, if no format string was specified.
+ */
+#define BFS_DIAG_MSG_(format, str) \
+	(sizeof(format) > 1 ? "" : str)
+
+/**
  * Unconditional assert.
  */
 #define bfs_verify(...) \
 	bfs_verify_(#__VA_ARGS__, __VA_ARGS__, "", )
 
 #define bfs_verify_(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_abortf( \
+	((cond) ? (void)0 : bfs_verify__(format, BFS_DIAG_MSG_(format, str), __VA_ARGS__))
+
+#define bfs_verify__(format, ...) \
+	bfs_abortf( \
 		sizeof(format) > 1 \
-			? BFS_DIAG_FORMAT_("%.0s" format "%s") \
+			? BFS_DIAG_FORMAT_("%s" format "%s") \
 			: BFS_DIAG_FORMAT_("Assertion failed: `%s`"), \
-		BFS_DIAG_ARGS_(str, __VA_ARGS__)))
+		BFS_DIAG_ARGS_(__VA_ARGS__))
 
 /**
  * Unconditional assert, including the last error.
@@ -107,12 +116,16 @@ void bfs_abortf(const char *format, ...);
 #define bfs_everify(...) \
 	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", )
 
+
 #define bfs_everify_(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_abortf( \
+	((cond) ? (void)0 : bfs_everify__(format, BFS_DIAG_MSG_(format, str), __VA_ARGS__))
+
+#define bfs_everify__(format, ...) \
+	bfs_abortf( \
 		sizeof(format) > 1 \
-			? BFS_DIAG_FORMAT_("%.0s" format "%s: %s") \
+			? BFS_DIAG_FORMAT_("%s" format "%s: %s") \
 			: BFS_DIAG_FORMAT_("Assertion failed: `%s`: %s"), \
-		BFS_DIAG_ARGS_(str, __VA_ARGS__ errstr(), )))
+		BFS_DIAG_ARGS_(__VA_ARGS__ errstr(), ))
 
 /**
  * Assert in debug builds; no-op in release builds.
