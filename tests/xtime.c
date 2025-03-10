@@ -154,6 +154,14 @@ static void check_xtimegm(void) {
 		.tm_isdst = -1,
 	};
 
+#if BFS_HAS_TIMEGM
+	// Check that xtimegm(-1) isn't an error
+	for (time_t time = -10; time <= 10; ++time) {
+		if (bfs_check(gmtime_r(&time, &tm), "gmtime_r(%jd)", (intmax_t)time)) {
+			check_one_xtimegm(&tm);
+		}
+	}
+#else
 	// Check equivalence with mktime()
 	for (tm.tm_year =  10; tm.tm_year <= 200; tm.tm_year += 10)
 	for (tm.tm_mon  =  -3; tm.tm_mon  <=  15; tm.tm_mon  +=  3)
@@ -164,13 +172,12 @@ static void check_xtimegm(void) {
 		check_one_xtimegm(&tm);
 	}
 
-#if !BFS_HAS_TIMEGM
 	// Check integer overflow cases
 	check_xtimegm_overflow(&(struct tm) { .tm_sec = INT_MAX, .tm_min = INT_MAX });
 	check_xtimegm_overflow(&(struct tm) { .tm_min = INT_MAX, .tm_hour = INT_MAX });
 	check_xtimegm_overflow(&(struct tm) { .tm_hour = INT_MAX, .tm_mday = INT_MAX });
 	check_xtimegm_overflow(&(struct tm) { .tm_mon = INT_MAX, .tm_year = INT_MAX });
-#endif
+#endif // !BFS_HAS_TIMEGM
 }
 
 void check_xtime(void) {
