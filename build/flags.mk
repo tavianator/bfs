@@ -14,6 +14,7 @@ _LDLIBS :=
 
 # Platform-specific system libraries
 LDLIBS,DragonFly := -lposix1e
+LDLIBS,FreeBSD := -lrt
 LDLIBS,Linux := -lrt
 LDLIBS,NetBSD := -lutil
 LDLIBS,QNX := -lregex -lsocket
