@@ -17,6 +17,7 @@
 #include <locale.h>
 #include <nl_types.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -789,7 +790,12 @@ static long bfs_sched_getaffinity(size_t size) {
 
 	long ret = -1;
 	if (sched_getaffinity(0, size, pset) == 0) {
+#  ifdef CPU_COUNT_S
 		ret = CPU_COUNT_S(size, pset);
+#  else
+		bfs_assert(size <= sizeof(set));
+		ret = CPU_COUNT(pset);
+# endif
 	}
 
 	if (pset != &set) {
@@ -805,15 +811,21 @@ long nproc(void) {
 #if BFS_HAS_SCHED_GETAFFINITY
 	size_t size = sizeof(cpu_set_t);
 	do {
-		// sched_getaffinity(2) says:
+		ret = bfs_sched_getaffinity(size);
+
+#  ifdef CPU_COUNT_S
+		// On Linux, sched_getaffinity(2) says:
 		//
 		//     When working on systems with large kernel CPU affinity masks, one must
 		//     dynamically allocate the mask argument (see CPU_ALLOC(3)).  Currently,
 		//     the only way to do this is by probing for the size of the required mask
 		//     using sched_getaffinity() calls with increasing mask sizes (until the
 		//     call does not fail with the error EINVAL).
-		ret = bfs_sched_getaffinity(size);
 		size *= 2;
+#  else
+		// No support for dynamically-sized CPU masks
+		break;
+#  endif
 	} while (ret < 0 && errno == EINVAL);
 #endif
 
