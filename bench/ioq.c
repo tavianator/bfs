@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (threads <= 0) {
-		threads = xsysconf(_SC_NPROCESSORS_ONLN);
+		threads = nproc();
 		if (threads > 8) {
 			threads = 8;
 		}
