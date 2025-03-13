@@ -1,0 +1,1 @@
+Fixes: 90791fc ("list: Make SLIST_REMOVE() more type-safe")
