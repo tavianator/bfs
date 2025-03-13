@@ -1,0 +1,1 @@
+Fixes: 1aefb83 ("tests/units: Run each test in a separate process")
