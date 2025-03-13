@@ -1,0 +1,1 @@
+Fixes: a36774b ("bfstd: Take sched_getaffinity() into account in nproc()")
