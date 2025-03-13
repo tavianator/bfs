@@ -1,0 +1,1 @@
+Fixes: 4859d49 ("tests: Add a test for sigmask restoration")
