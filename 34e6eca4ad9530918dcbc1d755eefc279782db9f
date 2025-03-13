@@ -1,0 +1,1 @@
+Fixes: 62928dd ("sighook: New sigreset() function to reset all handlers")
