@@ -82,11 +82,9 @@
 #ifndef BFS_LIST_H
 #define BFS_LIST_H
 
-#include "bfs.h"
 #include "diag.h"
 
 #include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 
 /**
@@ -374,24 +372,19 @@
 #define SLIST_REMOVE_(list, cursor, ...) \
 	SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__))
 
-// Scratch variables for the type-safe SLIST_REMOVE() implementation.
-// Not a pointer type due to https://github.com/llvm/llvm-project/issues/109718.
-_maybe_unused
-static thread_local uintptr_t slist_prev_, slist_next_;
-
-/** Suppress -Wunused-value. */
-_maybe_unused
-static inline void *slist_cast_(uintptr_t ptr) {
-	return (void *)ptr;
-}
-
 #define SLIST_REMOVE__(list, cursor, next) \
-	(slist_prev_ = (uintptr_t)(void *)*cursor, \
-	 slist_next_ = (uintptr_t)(void *)(*cursor)->next, \
-	 (*cursor)->next = NULL, \
-	 *cursor = (void *)slist_next_, \
-	 list->tail = *cursor ? list->tail : cursor, \
-	 slist_cast_(slist_prev_))
+	(list->tail = (*cursor)->next ? list->tail : cursor, \
+	 slist_remove_(*cursor, cursor, &(*cursor)->next, sizeof(*cursor)))
+
+// Helper for SLIST_REMOVE()
+static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t size) {
+	// ret = *cursor;
+	// *cursor = ret->next;
+	memcpy(cursor, next, size);
+	// ret->next = NULL;
+	memset(next, 0, size);
+	return ret;
+}
 
 /**
  * Pop the head off a singly-linked list.
