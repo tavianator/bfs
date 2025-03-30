@@ -95,20 +95,18 @@ struct bfs_parser {
 
 	/** The last non-path argument. */
 	char **last_arg;
-	/** A "-depth"-type argument, if any. */
-	char **depth_arg;
-	/** A "-limit" argument, if any. */
-	char **limit_arg;
-	/** A "-prune" argument, if any. */
-	char **prune_arg;
-	/** A "-mount" argument, if any. */
-	char **mount_arg;
-	/** An "-xdev" argument, if any. */
-	char **xdev_arg;
-	/** A "-files0-from -" argument, if any. */
-	char **files0_stdin_arg;
-	/** An "-ok"-type expression, if any. */
-	const struct bfs_expr *ok_expr;
+	/** A "-depth"-type expression, if any. */
+	const struct bfs_expr *depth_expr;
+	/** A "-limit" expression, if any. */
+	const struct bfs_expr *limit_expr;
+	/** A "-prune" expression, if any. */
+	const struct bfs_expr *prune_expr;
+	/** A "-mount" expression, if any. */
+	const struct bfs_expr *mount_expr;
+	/** An "-xdev" expression, if any. */
+	const struct bfs_expr *xdev_expr;
+	/** An expression that consumes stdin, if any. */
+	const struct bfs_expr *stdin_expr;
 
 	/** The current time (maybe modified by -daystart). */
 	struct timespec now;
@@ -176,14 +174,14 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
 /**
  * Print an error about conflicting command line arguments.
  */
-_printf(6, 7)
-static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
+_printf(4, 5)
+static void parse_conflict_error(const struct bfs_parser *parser, const struct bfs_expr *expr1, const struct bfs_expr *expr2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
 	init_highlight(ctx, highlight);
-	highlight_args(ctx, argv1, argc1, highlight);
-	highlight_args(ctx, argv2, argc2, highlight);
+	highlight_args(ctx, expr1->argv, expr1->argc, highlight);
+	highlight_args(ctx, expr2->argv, expr2->argc, highlight);
 	bfs_argv_error(ctx, highlight);
 
 	va_list args;
@@ -231,14 +229,14 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
 /**
  * Print a warning about conflicting command line arguments.
  */
-_printf(6, 7)
-static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
+_printf(4, 5)
+static bool parse_conflict_warning(const struct bfs_parser *parser, const struct bfs_expr *expr1, const struct bfs_expr *expr2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
 	init_highlight(ctx, highlight);
-	highlight_args(ctx, argv1, argc1, highlight);
-	highlight_args(ctx, argv2, argc2, highlight);
+	highlight_args(ctx, expr1->argv, expr1->argc, highlight);
+	highlight_args(ctx, expr2->argv, expr2->argc, highlight);
 	if (!bfs_argv_warning(ctx, highlight)) {
 		return false;
 	}
@@ -266,6 +264,20 @@ static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs
 	bool ret = bfs_vwarning(ctx, format, args);
 	va_end(args);
 	return ret;
+}
+
+/**
+ * Report an error if stdin is already consumed, then consume it.
+ */
+static bool consume_stdin(struct bfs_parser *parser, const struct bfs_expr *expr) {
+	if (parser->stdin_expr) {
+		parse_conflict_error(parser, parser->stdin_expr, expr,
+			"Both expressions attempted to consume standard input.\n");
+		return false;
+	}
+
+	parser->stdin_expr = expr;
+	return true;
 }
 
 /**
@@ -1158,22 +1170,31 @@ static struct bfs_expr *parse_daystart(struct bfs_parser *parser, int arg1, int 
  * Parse -delete.
  */
 static struct bfs_expr *parse_delete(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_action(parser, eval_delete);
+	if (!expr) {
+		return NULL;
+	}
+
 	struct bfs_ctx *ctx = parser->ctx;
 	ctx->flags |= BFTW_POST_ORDER;
 	ctx->dangerous = true;
 
-	parser->depth_arg = parser->argv;
-
-	return parse_nullary_action(parser, eval_delete);
+	parser->depth_expr = expr;
+	return expr;
 }
 
 /**
  * Parse -d.
  */
 static struct bfs_expr *parse_depth(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_flag(parser);
+	if (!expr) {
+		return NULL;
+	}
+
 	parser->ctx->flags |= BFTW_POST_ORDER;
-	parser->depth_arg = parser->argv;
-	return parse_nullary_flag(parser);
+	parser->depth_expr = expr;
+	return expr;
 }
 
 /**
@@ -1273,7 +1294,9 @@ static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg
 	}
 
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
-		parser->ok_expr = expr;
+		if (!consume_stdin(parser, expr)) {
+			return NULL;
+		}
 	} else {
 		ctx->dangerous = true;
 	}
@@ -1329,6 +1352,9 @@ static struct bfs_expr *parse_files0_from(struct bfs_parser *parser, int arg1, i
 
 	FILE *file;
 	if (strcmp(from, "-") == 0) {
+		if (!consume_stdin(parser, expr)) {
+			return NULL;
+		}
 		file = stdin;
 	} else {
 		file = xfopen(from, O_RDONLY | O_CLOEXEC);
@@ -1355,9 +1381,7 @@ static struct bfs_expr *parse_files0_from(struct bfs_parser *parser, int arg1, i
 		}
 	}
 
-	if (file == stdin) {
-		parser->files0_stdin_arg = expr->argv;
-	} else {
+	if (file != stdin) {
 		fclose(file);
 	}
 
@@ -1642,7 +1666,7 @@ static struct bfs_expr *parse_limit(struct bfs_parser *parser, int arg1, int arg
 		return NULL;
 	}
 
-	parser->limit_arg = expr->argv;
+	parser->limit_expr = expr;
 	return expr;
 }
 
@@ -1676,7 +1700,7 @@ static struct bfs_expr *parse_mount(struct bfs_parser *parser, int arg1, int arg
 	}
 
 	parser->ctx->flags |= BFTW_SKIP_MOUNTS;
-	parser->mount_arg = expr->argv;
+	parser->mount_expr = expr;
 	return expr;
 }
 
@@ -2193,8 +2217,13 @@ static struct bfs_expr *parse_printx(struct bfs_parser *parser, int arg1, int ar
  * Parse -prune.
  */
 static struct bfs_expr *parse_prune(struct bfs_parser *parser, int arg1, int arg2) {
-	parser->prune_arg = parser->argv;
-	return parse_nullary_action(parser, eval_prune);
+	struct bfs_expr *expr = parse_nullary_action(parser, eval_prune);
+	if (!expr) {
+		return NULL;
+	}
+
+	parser->prune_expr = expr;
+	return expr;
 }
 
 /**
@@ -2572,9 +2601,14 @@ static struct bfs_expr *parse_xattrname(struct bfs_parser *parser, int arg1, int
  * Parse -xdev.
  */
 static struct bfs_expr *parse_xdev(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_option(parser);
+	if (!expr) {
+		return NULL;
+	}
+
 	parser->ctx->flags |= BFTW_PRUNE_MOUNTS;
-	parser->xdev_arg = parser->argv;
-	return parse_nullary_option(parser);
+	parser->xdev_expr = expr;
+	return expr;
 }
 
 /**
@@ -3529,11 +3563,11 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 	}
 
 	if (parser->implicit_print) {
-		char **limit = parser->limit_arg;
+		const struct bfs_expr *limit = parser->limit_expr;
 		if (limit) {
-			parse_argv_error(parser, parser->limit_arg, 2,
+			parse_expr_error(parser, limit,
 				"With ${blu}%s${rs}, you must specify an action explicitly; for example, ${blu}-print${rs} ${blu}%s${rs} ${bld}%s${rs}.\n",
-				limit[0], limit[0], limit[1]);
+				limit->argv[0], limit->argv[0], limit->argv[1]);
 			return NULL;
 		}
 
@@ -3549,16 +3583,16 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 		}
 	}
 
-	if (parser->mount_arg && parser->xdev_arg) {
-		parse_conflict_warning(parser, parser->mount_arg, 1, parser->xdev_arg, 1,
+	if (parser->mount_expr && parser->xdev_expr) {
+		parse_conflict_warning(parser, parser->mount_expr, parser->xdev_expr,
 			"${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n",
-			parser->xdev_arg[0], parser->mount_arg[0]);
+			parser->xdev_expr->argv[0], parser->mount_expr->argv[0]);
 	}
 
-	if (ctx->warn && parser->depth_arg && parser->prune_arg) {
-		parse_conflict_warning(parser, parser->depth_arg, 1, parser->prune_arg, 1,
+	if (ctx->warn && parser->depth_expr && parser->prune_expr) {
+		parse_conflict_warning(parser, parser->depth_expr, parser->prune_expr,
 			"${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n",
-			parser->prune_arg[0], parser->depth_arg[0]);
+			parser->prune_expr->argv[0], parser->depth_expr->argv[0]);
 
 		if (ctx->interactive) {
 			bfs_warning(ctx, "Do you want to continue? ");
@@ -3568,13 +3602,6 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 		}
 
 		fprintf(stderr, "\n");
-	}
-
-	if (parser->ok_expr && parser->files0_stdin_arg) {
-		parse_conflict_error(parser, parser->ok_expr->argv, parser->ok_expr->argc, parser->files0_stdin_arg, 2,
-			"${blu}%s${rs} conflicts with ${blu}%s${rs} ${bld}%s${rs}.\n",
-			parser->ok_expr->argv[0], parser->files0_stdin_arg[0], parser->files0_stdin_arg[1]);
-		return NULL;
 	}
 
 	return expr;
@@ -3810,12 +3837,11 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.just_info = false,
 		.excluding = false,
 		.last_arg = NULL,
-		.depth_arg = NULL,
-		.prune_arg = NULL,
-		.mount_arg = NULL,
-		.xdev_arg = NULL,
-		.files0_stdin_arg = NULL,
-		.ok_expr = NULL,
+		.depth_expr = NULL,
+		.prune_expr = NULL,
+		.mount_expr = NULL,
+		.xdev_expr = NULL,
+		.stdin_expr = NULL,
 		.now = ctx->now,
 	};
 
