@@ -272,7 +272,8 @@ static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs
 static bool consume_stdin(struct bfs_parser *parser, const struct bfs_expr *expr) {
 	if (parser->stdin_expr) {
 		parse_conflict_error(parser, parser->stdin_expr, expr,
-			"Both expressions attempted to consume standard input.\n");
+			"%pX and %pX can't both use standard input.\n",
+			parser->stdin_expr, expr);
 		return false;
 	}
 
@@ -1186,8 +1187,10 @@ static struct bfs_expr *parse_delete(struct bfs_parser *parser, int arg1, int ar
 /**
  * Parse -d.
  */
-static struct bfs_expr *parse_depth(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_flag(parser);
+static struct bfs_expr *parse_depth(struct bfs_parser *parser, int flag, int arg2) {
+	struct bfs_expr *expr = flag
+		? parse_nullary_flag(parser)
+		: parse_nullary_option(parser);
 	if (!expr) {
 		return NULL;
 	}
@@ -1662,7 +1665,7 @@ static struct bfs_expr *parse_limit(struct bfs_parser *parser, int arg1, int arg
 	}
 
 	if (expr->num <= 0) {
-		parse_expr_error(parser, expr, "The ${blu}%s${rs} must be at least ${bld}1${rs}.\n", expr->argv[0]);
+		parse_expr_error(parser, expr, "The %pX must be at least ${bld}1${rs}.\n", expr);
 		return NULL;
 	}
 
@@ -1879,9 +1882,15 @@ static struct bfs_expr *parse_nohidden(struct bfs_parser *parser, int arg1, int 
  * Parse -noleaf.
  */
 static struct bfs_expr *parse_noleaf(struct bfs_parser *parser, int arg1, int arg2) {
-	parse_warning(parser, "${ex}%s${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n",
-		BFS_COMMAND, parser->argv[0]);
-	return parse_nullary_option(parser);
+	struct bfs_expr *expr = parse_nullary_option(parser);
+	if (!expr) {
+		return NULL;
+	}
+
+	parse_expr_warning(parser, expr,
+		"${ex}%s${rs} does not apply the optimization that %px inhibits.\n\n",
+		BFS_COMMAND, expr);
+	return expr;
 }
 
 /**
@@ -3082,10 +3091,10 @@ static const struct table_entry parse_table[] = {
 	{"-context", BFS_TEST, parse_context, true},
 	{"-csince", BFS_TEST, parse_since, BFS_STAT_CTIME},
 	{"-ctime", BFS_TEST, parse_time, BFS_STAT_CTIME},
-	{"-d", BFS_FLAG, parse_depth},
+	{"-d", BFS_FLAG, parse_depth, true},
 	{"-daystart", BFS_OPTION, parse_daystart},
 	{"-delete", BFS_ACTION, parse_delete},
-	{"-depth", BFS_OPTION, parse_depth_n},
+	{"-depth", BFS_OPTION, parse_depth_n, false},
 	{"-empty", BFS_TEST, parse_empty},
 	{"-exclude", BFS_OPERATOR},
 	{"-exec", BFS_ACTION, parse_exec, 0},
@@ -3566,8 +3575,8 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 		const struct bfs_expr *limit = parser->limit_expr;
 		if (limit) {
 			parse_expr_error(parser, limit,
-				"With ${blu}%s${rs}, you must specify an action explicitly; for example, ${blu}-print${rs} ${blu}%s${rs} ${bld}%s${rs}.\n",
-				limit->argv[0], limit->argv[0], limit->argv[1]);
+				"With %pX, you must specify an action explicitly; for example, ${blu}-print${rs} %px.\n",
+				limit, limit);
 			return NULL;
 		}
 
@@ -3585,14 +3594,14 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 
 	if (parser->mount_expr && parser->xdev_expr) {
 		parse_conflict_warning(parser, parser->mount_expr, parser->xdev_expr,
-			"${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n",
-			parser->xdev_expr->argv[0], parser->mount_expr->argv[0]);
+			"%px is redundant in the presence of %px.\n\n",
+			parser->xdev_expr, parser->mount_expr);
 	}
 
 	if (ctx->warn && parser->depth_expr && parser->prune_expr) {
 		parse_conflict_warning(parser, parser->depth_expr, parser->prune_expr,
-			"${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n",
-			parser->prune_expr->argv[0], parser->depth_expr->argv[0]);
+			"%px does not work in the presence of %px.\n",
+			parser->prune_expr, parser->depth_expr);
 
 		if (ctx->interactive) {
 			bfs_warning(ctx, "Do you want to continue? ");

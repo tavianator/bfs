@@ -408,7 +408,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 	if (expr->eval_fn == eval_exec) {
 		if (bfs_exec_finish(expr->exec) != 0) {
 			if (errno != 0) {
-				bfs_error(ctx, "%s %s: %s.\n", expr->argv[0], expr->argv[1], errstr());
+				bfs_error(ctx, "${blu}%pq${rs} ${bld}%pq${rs}: %s.\n", expr->argv[0], expr->argv[1], errstr());
 			}
 			ret = -1;
 		}
@@ -429,7 +429,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 bool eval_exec(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret = bfs_exec(expr->exec, state->ftwbuf) == 0;
 	if (errno != 0) {
-		eval_error(state, "%s %s: %s.\n", expr->argv[0], expr->argv[1], errstr());
+		eval_error(state, "${blu}%pq${rs} ${bld}%pq${rs}: %s.\n", expr->argv[0], expr->argv[1], errstr());
 	}
 	return ret;
 }

@@ -1240,6 +1240,33 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 _printf(2, 3)
 static int cbuff(CFILE *cfile, const char *format, ...);
 
+/** Print an expression's name, for diagnostics. */
+static int print_expr_name(CFILE *cfile, const struct bfs_expr *expr) {
+	switch (expr->kind) {
+	case BFS_FLAG:
+		return cbuff(cfile, "${cyn}%pq${rs}", expr->argv[0]);
+	case BFS_OPERATOR:
+		return cbuff(cfile, "${red}%pq${rs}", expr->argv[0]);
+	default:
+		return cbuff(cfile, "${blu}%pq${rs}", expr->argv[0]);
+	}
+}
+
+/** Print an expression's args, for diagnostics. */
+static int print_expr_args(CFILE *cfile, const struct bfs_expr *expr) {
+	if (print_expr_name(cfile, expr) != 0) {
+		return -1;
+	}
+
+	for (size_t i = 1; i < expr->argc; ++i) {
+		if (cbuff(cfile, " ${bld}%pq${rs}", expr->argv[i]) < 0) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 /** Dump a parsed expression tree, for debugging. */
 static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, int depth) {
 	if (depth >= 2) {
@@ -1254,26 +1281,8 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, i
 		return -1;
 	}
 
-	int ret;
-	switch (expr->kind) {
-	case BFS_FLAG:
-		ret = cbuff(cfile, "${cyn}%pq${rs}", expr->argv[0]);
-		break;
-	case BFS_OPERATOR:
-		ret = cbuff(cfile, "${red}%pq${rs}", expr->argv[0]);
-		break;
-	default:
-		ret = cbuff(cfile, "${blu}%pq${rs}", expr->argv[0]);
-		break;
-	}
-	if (ret < 0) {
+	if (print_expr_args(cfile, expr) != 0) {
 		return -1;
-	}
-
-	for (size_t i = 1; i < expr->argc; ++i) {
-		if (cbuff(cfile, " ${bld}%pq${rs}", expr->argv[i]) < 0) {
-			return -1;
-		}
 	}
 
 	if (verbose) {
@@ -1410,6 +1419,16 @@ static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 					break;
 				case 'E':
 					if (print_expr(cfile, va_arg(args, const struct bfs_expr *), true, 0) != 0) {
+						return -1;
+					}
+					break;
+				case 'x':
+					if (print_expr_args(cfile, va_arg(args, const struct bfs_expr *)) != 0) {
+						return -1;
+					}
+					break;
+				case 'X':
+					if (print_expr_name(cfile, va_arg(args, const struct bfs_expr *)) != 0) {
 						return -1;
 					}
 					break;

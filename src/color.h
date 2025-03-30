@@ -95,6 +95,8 @@ int cfclose(CFILE *cfile);
  *         %pL: A colored link target, from a const struct BFTW * argument
  *         %pe: Dump a const struct bfs_expr *, for debugging.
  *         %pE: Dump a const struct bfs_expr * in verbose form, for debugging.
+ *         %px: Print a const struct bfs_expr * with syntax highlighting.
+ *         %pX: Print the name of a const struct bfs_expr *, without arguments.
  *         %%: A literal '%'
  *         ${cc}: Change the color to 'cc'
  *         $$: A literal '$'
