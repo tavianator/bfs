@@ -84,8 +84,6 @@ struct bfs_parser {
 	enum use_color use_color;
 	/** Whether a -print action is implied. */
 	bool implicit_print;
-	/** Whether the default root "." should be used. */
-	bool implicit_root;
 	/** Whether the expression has started. */
 	bool expr_started;
 	/** Whether an information option like -help or -version was passed. */
@@ -105,6 +103,8 @@ struct bfs_parser {
 	const struct bfs_expr *mount_expr;
 	/** An "-xdev" expression, if any. */
 	const struct bfs_expr *xdev_expr;
+	/** A "-files0-from" expression, if any. */
+	const struct bfs_expr *files0_expr;
 	/** An expression that consumes stdin, if any. */
 	const struct bfs_expr *stdin_expr;
 
@@ -427,7 +427,6 @@ static int parse_root(struct bfs_parser *parser, const char *path) {
 		return -1;
 	}
 
-	parser->implicit_root = false;
 	return 0;
 }
 
@@ -1351,51 +1350,14 @@ static struct bfs_expr *parse_files0_from(struct bfs_parser *parser, int arg1, i
 		return NULL;
 	}
 
-	const char *from = expr->argv[1];
-
-	FILE *file;
-	if (strcmp(from, "-") == 0) {
-		if (!consume_stdin(parser, expr)) {
-			return NULL;
-		}
-		file = stdin;
-	} else {
-		file = xfopen(from, O_RDONLY | O_CLOEXEC);
-	}
-	if (!file) {
-		parse_expr_error(parser, expr, "%s.\n", errstr());
-		return NULL;
-	}
-
-	while (true) {
-		char *path = xgetdelim(file, '\0');
-		if (!path) {
-			if (errno) {
-				goto fail;
-			} else {
-				break;
-			}
-		}
-
-		int ret = parse_root(parser, path);
-		free(path);
-		if (ret != 0) {
-			goto fail;
-		}
-	}
-
-	if (file != stdin) {
-		fclose(file);
-	}
-
-	parser->implicit_root = false;
+	// For compatibility with GNU find,
+	//
+	//     bfs -files0-from a -files0-from b
+	//
+	// should *only* use b, not a.  So stash the expression here and only
+	// process the last one at the end of parsing.
+	parser->files0_expr = expr;
 	return expr;
-
-fail:
-	if (file != stdin) {
-		fclose(file);
-	}
-	return NULL;
 }
 
 /**
@@ -3546,6 +3508,55 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser) {
 	return expr;
 }
 
+/** Handle -files0-from after parsing. */
+static int parse_files0_roots(struct bfs_parser *parser) {
+	const struct bfs_expr *expr = parser->files0_expr;
+	const char *from = expr->argv[1];
+
+	FILE *file;
+	if (strcmp(from, "-") == 0) {
+		if (!consume_stdin(parser, expr)) {
+			return -1;
+		}
+		file = stdin;
+	} else {
+		file = xfopen(from, O_RDONLY | O_CLOEXEC);
+	}
+	if (!file) {
+		parse_expr_error(parser, expr, "%s.\n", errstr());
+		return -1;
+	}
+
+	while (true) {
+		char *path = xgetdelim(file, '\0');
+		if (!path) {
+			if (errno) {
+				goto fail;
+			} else {
+				break;
+			}
+		}
+
+		int ret = parse_root(parser, path);
+		free(path);
+		if (ret != 0) {
+			goto fail;
+		}
+	}
+
+	if (file != stdin) {
+		fclose(file);
+	}
+
+	return 0;
+
+fail:
+	if (file != stdin) {
+		fclose(file);
+	}
+	return -1;
+}
+
 /**
  * Parse the top-level expression.
  */
@@ -3569,6 +3580,16 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 	if (parser->argv[0]) {
 		parse_error(parser, "Unexpected argument.\n");
 		return NULL;
+	}
+
+	if (parser->files0_expr) {
+		if (parse_files0_roots(parser) != 0) {
+			return NULL;
+		}
+	} else if (ctx->npaths == 0) {
+		if (parse_root(parser, ".") != 0) {
+			return NULL;
+		}
 	}
 
 	if (parser->implicit_print) {
@@ -3842,7 +3863,6 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.stdout_tty = stdout_tty,
 		.use_color = use_color,
 		.implicit_print = true,
-		.implicit_root = true,
 		.just_info = false,
 		.excluding = false,
 		.last_arg = NULL,
@@ -3877,12 +3897,6 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 			bfs_perror(ctx, "bfs_optimize()");
 		}
 		goto fail;
-	}
-
-	if (ctx->npaths == 0 && parser.implicit_root) {
-		if (parse_root(&parser, ".") != 0) {
-			goto fail;
-		}
 	}
 
 	if ((ctx->flags & BFTW_FOLLOW_ALL) && !ctx->unique) {
