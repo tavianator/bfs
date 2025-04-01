@@ -29,6 +29,8 @@ struct bfs_ctx {
 	size_t argc;
 	/** The unparsed command line arguments. */
 	char **argv;
+	/** The argument token kinds. */
+	enum bfs_kind *kinds;
 
 	/** The root paths. */
 	const char **paths;

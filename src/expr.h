@@ -19,6 +19,9 @@
  * Argument/token/expression kinds.
  */
 enum bfs_kind {
+	/** A regular argument. */
+	BFS_ARG,
+
 	/** A flag (-H, -L, etc.). */
 	BFS_FLAG,
 

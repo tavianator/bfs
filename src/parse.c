@@ -396,6 +396,8 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser);
  * Advance by a single token.
  */
 static char **parser_advance(struct bfs_parser *parser, enum bfs_kind kind, size_t argc) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	if (kind != BFS_FLAG && kind != BFS_PATH) {
 		parser->expr_started = true;
 	}
@@ -403,6 +405,9 @@ static char **parser_advance(struct bfs_parser *parser, enum bfs_kind kind, size
 	if (kind != BFS_PATH) {
 		parser->last_arg = parser->argv;
 	}
+
+	size_t i = parser->argv - ctx->argv;
+	ctx->kinds[i] = kind;
 
 	char **argv = parser->argv;
 	parser->argv += argc;
@@ -1329,10 +1334,16 @@ static struct bfs_expr *parse_exit(struct bfs_parser *parser, int arg1, int arg2
  * Parse -f PATH.
  */
 static struct bfs_expr *parse_f(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	struct bfs_expr *expr = parse_unary_flag(parser);
 	if (!expr) {
 		return NULL;
 	}
+
+	// Mark the path as a path, not a regular argument
+	size_t i = expr->argv - ctx->argv;
+	ctx->kinds[i + 1] = BFS_PATH;
 
 	if (parse_root(parser, expr->argv[1]) != 0) {
 		return NULL;
@@ -3812,6 +3823,12 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	ctx->argv = xmemdup(argv, sizeof_array(char *, argc + 1));
 	if (!ctx->argv) {
 		perror("xmemdup()");
+		goto fail;
+	}
+
+	ctx->kinds = ZALLOC_ARRAY(enum bfs_kind, argc);
+	if (!ctx->kinds) {
+		perror("zalloc()");
 		goto fail;
 	}
 
