@@ -3521,7 +3521,25 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser) {
 
 /** Handle -files0-from after parsing. */
 static int parse_files0_roots(struct bfs_parser *parser) {
+	const struct bfs_ctx *ctx = parser->ctx;
 	const struct bfs_expr *expr = parser->files0_expr;
+
+	if (ctx->npaths > 0) {
+		bool highlight[ctx->argc];
+		init_highlight(ctx, highlight);
+		highlight_args(ctx, expr->argv, expr->argc, highlight);
+
+		for (size_t i = 0; i < ctx->argc; ++i) {
+			if (ctx->kinds[i] == BFS_PATH) {
+				highlight[i] = true;
+			}
+		}
+
+		bfs_argv_error(ctx, highlight);
+		bfs_error(ctx, "Cannot combine %pX with explicit root paths.\n", expr);
+		return -1;
+	}
+
 	const char *from = expr->argv[1];
 
 	FILE *file;
