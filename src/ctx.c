@@ -286,6 +286,7 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 		}
 		free(ctx->paths);
 
+		free(ctx->kinds);
 		free(ctx->argv);
 		free(ctx);
 	}
