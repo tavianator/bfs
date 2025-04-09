@@ -227,7 +227,7 @@ for arg; do
 done
 
 # Set up symbolic links for out-of-tree builds
-for f in Makefile build completions docs src tests; do
+for f in Makefile bench build completions docs src tests; do
     test -e "$f" || ln -s "$DIR/$f" "$f"
 done
 
