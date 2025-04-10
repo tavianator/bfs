@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 		if (action && target != &action) {
 			bfs_expr_error(ctx, expr);
 			bfs_error(ctx, "${ex}fd${rs} doesn't support this ...\n");
-			bfs_expr_error(ctx, *target);
+			bfs_expr_error(ctx, action);
 			bfs_error(ctx, "... after this.\n");
 			return EXIT_FAILURE;
 		}
