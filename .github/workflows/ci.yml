@@ -16,7 +16,6 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update -y
           sudo apt-get install -y \
-              expect \
               mandoc \
               gcc-multilib \
               libgcc-s1:i386 \
@@ -57,7 +56,6 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
-              expect \
               mandoc \
               acl \
               libacl1-dev \
@@ -110,10 +108,8 @@ jobs:
           run: |
             sudo pkg install -y \
                 bash \
-                expect \
                 oniguruma \
-                pkgconf \
-                tcl-wrapper
+                pkgconf
             sudo mount -t fdescfs none /dev/fd
             .github/diag.sh make -j$(nproc) distcheck
 
@@ -139,7 +135,6 @@ jobs:
           run: |
             sudo pkg_add \
                 bash \
-                expect \
                 gmake \
                 oniguruma
             jobs=$(sysctl -n hw.ncpu)
@@ -170,8 +165,7 @@ jobs:
             sudo pkgin -y install \
                 bash \
                 oniguruma \
-                pkgconf \
-                tcl-expect
+                pkgconf
             jobs=$(sysctl -n hw.ncpu)
             ./configure
             .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
@@ -198,11 +192,9 @@ jobs:
           prepare: |
             pkg install -y \
                 bash \
-                expect \
                 oniguruma \
                 pkgconf \
-                sudo \
-                tcl-wrapper
+                sudo
             pw useradd -n action -m -G wheel -s /usr/local/bin/bash
             echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
 
@@ -235,7 +227,6 @@ jobs:
             pkg install \
                 bash \
                 build-essential \
-                expect \
                 gnu-make \
                 onig \
                 sudo

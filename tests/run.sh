@@ -362,20 +362,12 @@ invoke_bfs() {
     fi
 }
 
-if command -v unbuffer &>/dev/null; then
-    UNBUFFER=unbuffer
-elif command -v expect_unbuffer &>/dev/null; then
-    UNBUFFER=expect_unbuffer
-fi
-
 # Run bfs with a pseudo-terminal attached
 bfs_pty() {
-    test -n "${UNBUFFER:-}" || skip
-
     bfs_verbose "$@"
 
     local ret=0
-    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@" </dev/null' bash "${BFS[@]}" "$@" || ret=$?
+    "$PTYX" -w80 -h24 -- "${BFS[@]}" "$@" || ret=$?
 
     if ((ret > 125)); then
         exit $ret

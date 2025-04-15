@@ -16,6 +16,7 @@ ROOT=$(_realpath "$(dirname -- "$TESTS")")
 TESTS="$ROOT/tests"
 BIN="$ROOT/bin"
 MKSOCK="$BIN/tests/mksock"
+PTYX="$BIN/tests/ptyx"
 XTOUCH="$BIN/tests/xtouch"
 UNAME=$(uname)
 
