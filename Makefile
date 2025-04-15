@@ -43,6 +43,7 @@ bfs: bin/bfs
 BINS := \
     bin/bfs \
     bin/tests/mksock \
+    bin/tests/ptyx \
     bin/tests/units \
     bin/tests/xspawnee \
     bin/tests/xtouch \
@@ -119,6 +120,7 @@ UTEST_BINS := \
 # Integration test binaries
 ITEST_BINS := \
     bin/tests/mksock \
+    bin/tests/ptyx \
     bin/tests/xtouch
 
 # Build (but don't run) test binaries
@@ -178,6 +180,9 @@ integration-tests: ${INTEGRATION_TESTS}
 
 bin/tests/mksock: obj/tests/mksock.o ${LIBBFS}
 OBJS += obj/tests/mksock.o
+
+bin/tests/ptyx: obj/tests/ptyx.o ${LIBBFS}
+OBJS += obj/tests/ptyx.o
 
 bin/tests/xtouch: obj/tests/xtouch.o ${LIBBFS}
 OBJS += obj/tests/xtouch.o
