@@ -568,6 +568,14 @@ int xtcgetwinsize(int fd, struct winsize *ws) {
 #endif
 }
 
+int xtcsetwinsize(int fd, const struct winsize *ws) {
+#if BFS_HAS_TCSETWINSIZE
+	return tcsetwinsize(fd, ws);
+#else
+	return ioctl(fd, TIOCSWINSZ, ws);
+#endif
+}
+
 int dup_cloexec(int fd) {
 #ifdef F_DUPFD_CLOEXEC
 	return fcntl(fd, F_DUPFD_CLOEXEC, 0);

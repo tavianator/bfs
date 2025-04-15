@@ -350,6 +350,11 @@ int open_cterm(int flags);
  */
 int xtcgetwinsize(int fd, struct winsize *ws);
 
+/**
+ * tcsetwinsize()/ioctl(TIOCSWINSZ) wrapper.
+ */
+int xtcsetwinsize(int fd, const struct winsize *ws);
+
 // #include <unistd.h>
 
 /**

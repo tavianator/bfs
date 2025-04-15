@@ -56,6 +56,7 @@ HEADERS := \
     gen/has/string-to-flags.h \
     gen/has/strtofflags.h \
     gen/has/tcgetwinsize.h \
+    gen/has/tcsetwinsize.h \
     gen/has/timegm.h \
     gen/has/timer-create.h \
     gen/has/tm-gmtoff.h \
