@@ -23,10 +23,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
 #include <wchar.h>
 
@@ -185,16 +187,6 @@ char *xgetdelim(FILE *file, char delim) {
 		}
 		return NULL;
 	}
-}
-
-int open_cterm(int flags) {
-	char path[L_ctermid];
-	if (ctermid(path) == NULL || strlen(path) == 0) {
-		errno = ENOTTY;
-		return -1;
-	}
-
-	return open(path, flags);
 }
 
 const char *xgetprogname(void) {
@@ -556,6 +548,24 @@ pid_t xwaitpid(pid_t pid, int *status, int flags) {
 		ret = waitpid(pid, status, flags);
 	} while (ret < 0 && errno == EINTR);
 	return ret;
+}
+
+int open_cterm(int flags) {
+	char path[L_ctermid];
+	if (ctermid(path) == NULL || strlen(path) == 0) {
+		errno = ENOTTY;
+		return -1;
+	}
+
+	return open(path, flags);
+}
+
+int xtcgetwinsize(int fd, struct winsize *ws) {
+#if BFS_HAS_TCGETWINSIZE
+	return tcgetwinsize(fd, ws);
+#else
+	return ioctl(fd, TIOCGWINSZ, ws);
+#endif
 }
 
 int dup_cloexec(int fd) {

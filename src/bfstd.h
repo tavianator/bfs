@@ -158,16 +158,6 @@ FILE *xfopen(const char *path, int flags);
  */
 char *xgetdelim(FILE *file, char delim);
 
-/**
- * Open the controlling terminal.
- *
- * @flags
- *         The open() flags.
- * @return
- *         An open file descriptor, or -1 on failure.
- */
-int open_cterm(int flags);
-
 // #include <stdlib.h>
 
 /**
@@ -341,6 +331,24 @@ int xminor(dev_t dev);
  * waitpid() wrapper that handles EINTR.
  */
 pid_t xwaitpid(pid_t pid, int *status, int flags);
+
+#include <sys/ioctl.h> // May be necessary for struct winsize
+#include <termios.h>
+
+/**
+ * Open the controlling terminal.
+ *
+ * @flags
+ *         The open() flags.
+ * @return
+ *         An open file descriptor, or -1 on failure.
+ */
+int open_cterm(int flags);
+
+/**
+ * tcgetwinsize()/ioctl(TIOCGWINSZ) wrapper.
+ */
+int xtcgetwinsize(int fd, struct winsize *ws);
 
 // #include <unistd.h>
 

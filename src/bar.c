@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -33,25 +32,14 @@ struct bfs_bar {
 
 /** Get the terminal size, if possible. */
 static int bfs_bar_getsize(struct bfs_bar *bar) {
-#if BFS_HAS_TCGETWINSIZE || defined(TIOCGWINSZ)
 	struct winsize ws;
-
-#  if BFS_HAS_TCGETWINSIZE
-	int ret = tcgetwinsize(bar->fd, &ws);
-#  else
-	int ret = ioctl(bar->fd, TIOCGWINSZ, &ws);
-#  endif
-	if (ret != 0) {
-		return ret;
+	if (xtcgetwinsize(bar->fd, &ws) != 0) {
+		return -1;
 	}
 
 	store(&bar->width, ws.ws_col, relaxed);
 	store(&bar->height, ws.ws_row, relaxed);
 	return 0;
-#else
-	errno = ENOTSUP;
-	return -1;
-#endif
 }
 
 /** Write a string to the status bar (async-signal-safe). */
