@@ -87,7 +87,9 @@ invalid() {
 # Get the number of cores to use
 nproc() {
     {
-        command nproc \
+        # Run command nproc in a subshell to work around a bash 3 bug
+        # https://stackoverflow.com/q/68143965
+        (command nproc) \
             || sysctl -n hw.ncpu \
             || getconf _NPROCESSORS_ONLN \
             || echo 1
