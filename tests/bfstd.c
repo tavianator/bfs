@@ -4,9 +4,13 @@
 #include "tests.h"
 
 #include "bfstd.h"
+#include "bit.h"
 #include "diag.h"
 
+#include <errno.h>
 #include <langinfo.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -89,6 +93,66 @@ static void check_wordescs(void) {
 	}
 }
 
+/** xstrto*() test cases. */
+static void check_strtox(void) {
+	long l;
+	long long ll;
+	char *end;
+
+#define check_strtoerr(err, str, end, base) \
+	bfs_echeck(xstrtol(str, end, base, &l) != 0 && errno == err); \
+	bfs_echeck(xstrtoll(str, end, base, &ll) != 0 && errno == err)
+
+	check_strtoerr(EINVAL, "", NULL, 0);
+	check_strtoerr(EINVAL, "", &end, 0);
+	check_strtoerr(EINVAL, " 1 ", &end, 0);
+	check_strtoerr(EINVAL, " 123", NULL, 0);
+	check_strtoerr(EINVAL, "123 ", NULL, 0);
+	check_strtoerr(EINVAL, "0789", NULL, 0);
+	check_strtoerr(EINVAL, "789A", NULL, 0);
+	check_strtoerr(EINVAL, "0x", NULL, 0);
+	check_strtoerr(EINVAL, "0x789A", NULL, 10);
+
+	if (LLONG_WIDTH == 64) {
+		check_strtoerr(ERANGE, "9223372036854775808", NULL, 0);
+	}
+
+#define check_strtoint(str, base, n) \
+	if ((n) >= LONG_MIN && (n) <= LONG_MAX) { \
+		bfs_echeck(xstrtol(str, NULL, base, &l) == 0); \
+		bfs_check(l == (n), "xstrtol('%s') == %ld (!= %ld)", str, l, (long)(n)); \
+	} else { \
+		bfs_echeck(xstrtol(str, NULL, base, &l) != 0 && errno == ERANGE); \
+	} \
+	bfs_echeck(xstrtoll(str, NULL, base, &ll) == 0); \
+	bfs_check(ll == (n), "xstrtoll('%s') == %lld (!= %lld)", str, ll, (long long)(n)) \
+
+	check_strtoint("123", 0, 123);
+	check_strtoint("+123", 0, 123);
+	check_strtoint("-123", 0, -123);
+
+	check_strtoint("0123", 0, 0123);
+	check_strtoint("0x789A", 0, 0x789A);
+
+	check_strtoint("0123", 10, 123);
+	check_strtoint("0789", 10, 789);
+
+	check_strtoint("123", 16, 0x123);
+
+	check_strtoint("9223372036854775807", 0, 9223372036854775807LL);
+	check_strtoint("-9223372036854775808", 0, -9223372036854775807LL - 1);
+
+#define check_strtoend(str, estr, base, n) \
+	bfs_echeck(xstrtoll(str, &end, base, &ll) == 0); \
+	bfs_check(ll == (n), "xstrtoll('%s') == %lld (!= %lld)", str, ll, (long long)(n)); \
+	bfs_check(strcmp(end, estr) == 0, "xstrtoll('%s'): end == '%s' (!= '%s')", str, end, estr) \
+
+	check_strtoend("123 ", " ", 0, 123);
+	check_strtoend("0789", "89", 0, 07);
+	check_strtoend("789A", "A", 0, 789);
+	check_strtoend("0xDEFG", "G", 0, 0xDEF);
+}
+
 /** xstrwidth() test cases. */
 static void check_strwidth(void) {
 	bfs_check(xstrwidth("Hello world") == 11);
@@ -99,5 +163,6 @@ void check_bfstd(void) {
 	check_asciilen();
 	check_basedirs();
 	check_wordescs();
+	check_strtox();
 	check_strwidth();
 }
