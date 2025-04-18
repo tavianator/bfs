@@ -4,7 +4,6 @@
 #include "tests.h"
 
 #include "bfstd.h"
-#include "bit.h"
 #include "diag.h"
 
 #include <errno.h>
@@ -95,37 +94,74 @@ static void check_wordescs(void) {
 
 /** xstrto*() test cases. */
 static void check_strtox(void) {
+	short s;
+	unsigned short us;
+	int i;
+	unsigned int ui;
 	long l;
+	unsigned long ul;
 	long long ll;
+	unsigned long long ull;
 	char *end;
 
+#define check_strtouerr(err, str, end, base) \
+	do { \
+		bfs_echeck(xstrtous(str, end, base, &us) != 0 && errno == err); \
+		bfs_echeck(xstrtoui(str, end, base, &ui) != 0 && errno == err); \
+		bfs_echeck(xstrtoul(str, end, base, &ul) != 0 && errno == err); \
+		bfs_echeck(xstrtoull(str, end, base, &ull) != 0 && errno == err); \
+	} while (0)
+
+	check_strtouerr(ERANGE, "-1", NULL, 0);
+	check_strtouerr(ERANGE, "-0x1", NULL, 0);
+
+	check_strtouerr(EINVAL, "-", NULL, 0);
+	check_strtouerr(EINVAL, "-q", NULL, 0);
+	check_strtouerr(EINVAL, "-1q", NULL, 0);
+	check_strtouerr(EINVAL, "-0x", NULL, 0);
+
 #define check_strtoerr(err, str, end, base) \
-	bfs_echeck(xstrtol(str, end, base, &l) != 0 && errno == err); \
-	bfs_echeck(xstrtoll(str, end, base, &ll) != 0 && errno == err)
+	do { \
+		bfs_echeck(xstrtos(str, end, base, &s) != 0 && errno == err); \
+		bfs_echeck(xstrtoi(str, end, base, &i) != 0 && errno == err); \
+		bfs_echeck(xstrtol(str, end, base, &l) != 0 && errno == err); \
+		bfs_echeck(xstrtoll(str, end, base, &ll) != 0 && errno == err); \
+		check_strtouerr(err, str, end, base); \
+	} while (0)
 
 	check_strtoerr(EINVAL, "", NULL, 0);
 	check_strtoerr(EINVAL, "", &end, 0);
 	check_strtoerr(EINVAL, " 1 ", &end, 0);
+	check_strtoerr(EINVAL, " -1", NULL, 0);
 	check_strtoerr(EINVAL, " 123", NULL, 0);
 	check_strtoerr(EINVAL, "123 ", NULL, 0);
 	check_strtoerr(EINVAL, "0789", NULL, 0);
 	check_strtoerr(EINVAL, "789A", NULL, 0);
 	check_strtoerr(EINVAL, "0x", NULL, 0);
 	check_strtoerr(EINVAL, "0x789A", NULL, 10);
+	check_strtoerr(EINVAL, "0x-1", NULL, 0);
 
-	if (LLONG_WIDTH == 64) {
-		check_strtoerr(ERANGE, "9223372036854775808", NULL, 0);
-	}
+#define check_strtotype(type, min, max, fmt, fn, str, base, v, n) \
+	do { \
+		if ((n) >= min && (n) <= max) { \
+			bfs_echeck(fn(str, NULL, base, &v) == 0); \
+			bfs_check(v == (type)(n), "%s('%s') == " fmt " (!= " fmt ")", #fn, str, v, (type)(n)); \
+		} else { \
+			bfs_echeck(fn(str, NULL, base, &v) != 0 && errno == ERANGE); \
+		} \
+	} while (0)
 
 #define check_strtoint(str, base, n) \
-	if ((n) >= LONG_MIN && (n) <= LONG_MAX) { \
-		bfs_echeck(xstrtol(str, NULL, base, &l) == 0); \
-		bfs_check(l == (n), "xstrtol('%s') == %ld (!= %ld)", str, l, (long)(n)); \
-	} else { \
-		bfs_echeck(xstrtol(str, NULL, base, &l) != 0 && errno == ERANGE); \
-	} \
-	bfs_echeck(xstrtoll(str, NULL, base, &ll) == 0); \
-	bfs_check(ll == (n), "xstrtoll('%s') == %lld (!= %lld)", str, ll, (long long)(n)) \
+	do { \
+		check_strtotype(  signed short,      SHRT_MIN,   SHRT_MAX, "%d",   xstrtos,   str, base,  s,  n); \
+		check_strtotype(  signed int,         INT_MIN,    INT_MAX, "%d",   xstrtoi,   str, base,  i,  n); \
+		check_strtotype(  signed long,       LONG_MIN,   LONG_MAX, "%ld",  xstrtol,   str, base,  l,  n); \
+		check_strtotype(  signed long long, LLONG_MIN,  LLONG_MAX, "%lld", xstrtoll,  str, base, ll,  n); \
+		check_strtotype(unsigned short,             0,  USHRT_MAX, "%u",   xstrtous,  str, base, us,  n); \
+		check_strtotype(unsigned int,               0,   UINT_MAX, "%u",   xstrtoui,  str, base, ui,  n); \
+		check_strtotype(unsigned long,              0,  ULONG_MAX, "%lu",  xstrtoul,  str, base, ul,  n); \
+		check_strtotype(unsigned long long,         0, ULLONG_MAX, "%llu", xstrtoull, str, base, ull, n); \
+	} while (0)
 
 	check_strtoint("123", 0, 123);
 	check_strtoint("+123", 0, 123);
@@ -139,13 +175,21 @@ static void check_strtox(void) {
 
 	check_strtoint("123", 16, 0x123);
 
-	check_strtoint("9223372036854775807", 0, 9223372036854775807LL);
-	check_strtoint("-9223372036854775808", 0, -9223372036854775807LL - 1);
+	check_strtoint("0x7FFF", 0, 0x7FFF);
+	check_strtoint("-0x8000", 0, -0x8000);
+
+	check_strtoint("0x7FFFFFFF", 0, 0x7FFFFFFFL);
+	check_strtoint("-0x80000000", 0, -0x7FFFFFFFL - 1);
+
+	check_strtoint("0x7FFFFFFFFFFFFFFF", 0, 0x7FFFFFFFFFFFFFFFLL);
+	check_strtoint("-0x8000000000000000", 0, -0x7FFFFFFFFFFFFFFFLL - 1);
 
 #define check_strtoend(str, estr, base, n) \
-	bfs_echeck(xstrtoll(str, &end, base, &ll) == 0); \
-	bfs_check(ll == (n), "xstrtoll('%s') == %lld (!= %lld)", str, ll, (long long)(n)); \
-	bfs_check(strcmp(end, estr) == 0, "xstrtoll('%s'): end == '%s' (!= '%s')", str, end, estr) \
+	do { \
+		bfs_echeck(xstrtoll(str, &end, base, &ll) == 0); \
+		bfs_check(ll == (n), "xstrtoll('%s') == %lld (!= %lld)", str, ll, (long long)(n)); \
+		bfs_check(strcmp(end, estr) == 0, "xstrtoll('%s'): end == '%s' (!= '%s')", str, end, estr); \
+	} while (0)
 
 	check_strtoend("123 ", " ", 0, 123);
 	check_strtoend("0789", "89", 0, 07);

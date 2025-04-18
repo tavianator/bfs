@@ -222,15 +222,15 @@ int main(int argc, char *argv[]) {
 	}
 	tzset();
 
-	long jobs = 0;
+	unsigned int jobs = 0;
 
 	const char *cmd = argc > 0 ? argv[0] : "units";
 	int c;
 	while (c = getopt(argc, argv, ":j:"), c != -1) {
 		switch (c) {
 		case 'j':
-			if (xstrtol(optarg, NULL, 10, &jobs) != 0 || jobs <= 0) {
-				fprintf(stderr, "%s: Bad job count '%s'\n", cmd, optarg);
+			if (xstrtoui(optarg, NULL, 10, &jobs) != 0) {
+				fprintf(stderr, "%s: Bad job count '%s': %s\n", cmd, optarg, errstr());
 				return EXIT_FAILURE;
 			}
 			break;
@@ -243,7 +243,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (jobs == 0) {
+	if (!jobs) {
 		jobs = nproc();
 	}
 

@@ -235,6 +235,36 @@ static int xstrtox_epilogue(const char *str, char **end, char *endp) {
 	return 0;
 }
 
+int xstrtos(const char *str, char **end, int base, short *value) {
+	long n;
+	if (xstrtol(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n < SHRT_MIN || n > SHRT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+int xstrtoi(const char *str, char **end, int base, int *value) {
+	long n;
+	if (xstrtol(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n < INT_MIN || n > INT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
 int xstrtol(const char *str, char **end, int base, long *value) {
 	if (xstrtox_prologue(str) != 0) {
 		return -1;
@@ -273,6 +303,70 @@ int xstrtod(const char *str, char **end, double *value) {
 	char *endp;
 	*value = strtod(str, &endp);
 	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtous(const char *str, char **end, int base, unsigned short *value) {
+	unsigned long n;
+	if (xstrtoul(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n > USHRT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+int xstrtoui(const char *str, char **end, int base, unsigned int *value) {
+	unsigned long n;
+	if (xstrtoul(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n > UINT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+/** Common epilogue for xstrtou*() wrappers. */
+static int xstrtoux_epilogue(const char *str, char **end, char *endp) {
+	if (xstrtox_epilogue(str, end, endp) != 0) {
+		return -1;
+	}
+
+	if (str[0] == '-') {
+		errno = ERANGE;
+		return -1;
+	}
+
+	return 0;
+}
+
+int xstrtoul(const char *str, char **end, int base, unsigned long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtoul(str, &endp, base);
+	return xstrtoux_epilogue(str, end, endp);
+}
+
+int xstrtoull(const char *str, char **end, int base, unsigned long long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtoull(str, &endp, base);
+	return xstrtoux_epilogue(str, end, endp);
 }
 
 /** Compile and execute a regular expression for xrpmatch(). */

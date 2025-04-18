@@ -65,25 +65,21 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE); \
 	} while (0)
 
-	long width = -1;
-	long height = -1;
+	unsigned short width = 0;
+	unsigned short height = 0;
 
 	// Parse the command line
 	int c;
 	while (c = getopt(argc, argv, "+:w:h:"), c != -1) {
 		switch (c) {
 		case 'w':
-			if (xstrtol(optarg, NULL, 10, &width) != 0) {
+			if (xstrtous(optarg, NULL, 10, &width) != 0) {
 				edie("Bad width '%s'", optarg);
-			} else if (width < 0 || width > (long)USHRT_MAX) {
-				die("Bad width '%s'", optarg);
 			}
 			break;
 		case 'h':
-			if (xstrtol(optarg, NULL, 10, &height) != 0) {
+			if (xstrtous(optarg, NULL, 10, &height) != 0) {
 				edie("Bad height '%s'", optarg);
-			} else if (height < 0 || height > (long)USHRT_MAX) {
-				die("Bad height '%s'", optarg);
 			}
 			break;
 		case ':':
@@ -135,36 +131,36 @@ int main(int argc, char *argv[]) {
 
 	// A new pty starts at 0x0, which is not very useful.  Instead, grab the
 	// default size from the current controlling terminal, if possible.
-	if (width < 0 || height < 0) {
+	if (!width || !height) {
 		int tty = open_cterm(O_RDONLY | O_CLOEXEC);
 		if (tty >= 0) {
 			struct winsize ws;
 			if (xtcgetwinsize(tty, &ws) != 0) {
 				edie("tcgetwinsize()");
 			}
-			if (width < 0) {
+			if (!width) {
 				width = ws.ws_col;
 			}
-			if (height < 0) {
+			if (!height) {
 				height = ws.ws_row;
 			}
 			xclose(tty);
 		}
 	}
+	if (!width) {
+		width = 80;
+	}
+	if (!height) {
+		height = 24;
+	}
 
-	// Get the current pty size
+	// Update the pty size
 	struct winsize ws;
 	if (xtcgetwinsize(pts, &ws) != 0) {
 		edie("tcgetwinsize()");
 	}
-
-	// Apply our options
-	if (width >= 0) {
-		ws.ws_col = width;
-	}
-	if (height >= 0) {
-		ws.ws_row = height;
-	}
+	ws.ws_col = width;
+	ws.ws_row = height;
 	if (xtcsetwinsize(pts, &ws) != 0) {
 		edie("tcsetwinsize()");
 	}

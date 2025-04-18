@@ -217,8 +217,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (marg) {
-		long mode;
-		if (xstrtol(marg, NULL, 8, &mode) == 0 && mode >= 0 && mode < 01000) {
+		unsigned int mode;
+		if (xstrtoui(marg, NULL, 8, &mode) == 0 && mode < 01000) {
 			args.fmode = args.dmode = mode;
 		} else {
 			fprintf(stderr, "%s: Invalid mode '%s'\n", cmd, marg);

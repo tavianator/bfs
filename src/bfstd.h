@@ -169,6 +169,16 @@ char *xgetdelim(FILE *file, char delim);
 const char *xgetprogname(void);
 
 /**
+ * Like xstrtol(), but for short.
+ */
+int xstrtos(const char *str, char **end, int base, short *value);
+
+/**
+ * Like xstrtol(), but for int.
+ */
+int xstrtoi(const char *str, char **end, int base, int *value);
+
+/**
  * Wrapper for strtol() that forbids leading spaces.
  */
 int xstrtol(const char *str, char **end, int base, long *value);
@@ -177,6 +187,26 @@ int xstrtol(const char *str, char **end, int base, long *value);
  * Wrapper for strtoll() that forbids leading spaces.
  */
 int xstrtoll(const char *str, char **end, int base, long long *value);
+
+/**
+ * Like xstrtoul(), but for unsigned short.
+ */
+int xstrtous(const char *str, char **end, int base, unsigned short *value);
+
+/**
+ * Like xstrtoul(), but for unsigned int.
+ */
+int xstrtoui(const char *str, char **end, int base, unsigned int *value);
+
+/**
+ * Wrapper for strtoul() that forbids leading spaces, negatives.
+ */
+int xstrtoul(const char *str, char **end, int base, unsigned long *value);
+
+/**
+ * Wrapper for strtoull() that forbids leading spaces, negatives.
+ */
+int xstrtoull(const char *str, char **end, int base, unsigned long long *value);
 
 /**
  * Wrapper for strtof() that forbids leading spaces.

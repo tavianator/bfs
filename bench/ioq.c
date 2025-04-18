@@ -177,9 +177,9 @@ int main(int argc, char *argv[]) {
 	setlocale(LC_ALL, "");
 
 	// -d: queue depth
-	long depth = 4096;
+	unsigned int depth = 4096;
 	// -j: threads
-	long threads = 0;
+	unsigned int threads = 0;
 	// -t: timeout
 	double timeout = 5.0;
 	// -L|-H: ioq_nop() type
@@ -190,13 +190,13 @@ int main(int argc, char *argv[]) {
 	while (c = getopt(argc, argv, ":d:j:t:LH"), c != -1) {
 		switch (c) {
 		case 'd':
-			if (xstrtol(optarg, NULL, 10, &depth) != 0) {
+			if (xstrtoui(optarg, NULL, 10, &depth) != 0) {
 				fprintf(stderr, "%s: Bad depth '%s': %s\n", cmd, optarg, errstr());
 				return EXIT_FAILURE;
 			}
 			break;
 		case 'j':
-			if (xstrtol(optarg, NULL, 10, &threads) != 0) {
+			if (xstrtoui(optarg, NULL, 10, &threads) != 0) {
 				fprintf(stderr, "%s: Bad thread count '%s': %s\n", cmd, optarg, errstr());
 				return EXIT_FAILURE;
 			}
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (threads <= 0) {
+	if (!threads) {
 		threads = nproc();
 		if (threads > 8) {
 			threads = 8;
@@ -238,8 +238,8 @@ int main(int argc, char *argv[]) {
 
 	printf("I/O queue benchmark (%s)\n\n", bfs_version);
 
-	printf("[-d] depth:   %ld\n", depth);
-	printf("[-j] threads: %ld (including main)\n", threads + 1);
+	printf("[-d] depth:   %u\n", depth);
+	printf("[-j] threads: %u (including main)\n", threads + 1);
 	if (type == IOQ_NOP_HEAVY) {
 		printf("[-H] type:    heavy (with syscalls)\n");
 	} else {
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 
 	struct ioq *ioq = ioq_create(depth, threads);
-	bfs_everify(ioq, "ioq_create(%ld, %ld)", depth, threads);
+	bfs_everify(ioq, "ioq_create(%u, %u)", depth, threads);
 
 	// Pre-allocate all the requests
 	while (ioq_capacity(ioq) > 0) {
