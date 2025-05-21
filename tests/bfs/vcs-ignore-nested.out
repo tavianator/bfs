@@ -1,0 +1,12 @@
+./outer-keep
+./repo
+./repo/.gitignore
+./repo/.gitmodules
+./repo/dir_content_ignore
+./repo/outer-keep
+./repo/subrepo
+./repo/subrepo/.gitignore
+./repo/subrepo/subrepo-keep
+./subrepo
+./subrepo/.gitignore
+./subrepo/subrepo-keep

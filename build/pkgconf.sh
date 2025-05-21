@@ -71,6 +71,9 @@ for LIB; do
         libcap)
             LDLIB=-lcap
             ;;
+        libgit2)
+            LDLIB=-lgit2
+            ;;
         libselinux)
             LDLIB=-lselinux
             ;;

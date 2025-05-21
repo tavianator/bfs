@@ -39,6 +39,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#if BFS_WITH_LIBGIT2
+#  include <git2.h>
+#endif
+
 /** Initialize a bftw_stat cache. */
 static void bftw_stat_init(struct bftw_stat *bufs, struct bfs_stat *stat_buf, struct bfs_stat *lstat_buf) {
 	bufs->stat_buf = stat_buf;
@@ -247,6 +251,8 @@ struct bftw_file {
 
 	/** Cached bfs_stat() info. */
 	struct bftw_stat stat_bufs;
+	/** Structured path metadata. */
+	struct bfs_path path;
 
 	/** The offset of this file in the full path. */
 	size_t nameoff;
@@ -755,6 +761,7 @@ static struct bftw_file *bftw_file_new(struct bftw_cache *cache, struct bftw_fil
 
 	file->namelen = namelen;
 	memcpy(file->name, name, namelen + 1);
+	bfs_path_init(&file->path, parent ? &parent->path : NULL, file->name, namelen);
 
 	return file;
 }
@@ -795,6 +802,7 @@ static void bftw_file_free(struct bftw_cache *cache, struct bftw_file *file) {
 		bftw_file_close(cache, file);
 	}
 
+	bfs_path_reset(&file->path);
 	bftw_stat_recycle(cache, file);
 
 	varena_free(&cache->files, file, file->namelen + 1);
@@ -845,6 +853,8 @@ struct bftw_state {
 	struct bftw_file *file;
 	/** The previous file. */
 	struct bftw_file *previous;
+	/** Temporary path metadata for the current callback. */
+	struct bfs_path pathinfo;
 
 	/** The currently open directory. */
 	struct bfs_dir *dir;
@@ -970,6 +980,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	state->path = NULL;
 	state->file = NULL;
 	state->previous = NULL;
+	bfs_path_init(&state->pathinfo, NULL, NULL, 0);
 
 	state->dir = NULL;
 	state->de = NULL;
@@ -1723,6 +1734,19 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 		ftwbuf->nameoff = xbaseoff(ftwbuf->path);
 	}
 
+	struct bfs_path *ftw_path;
+	if (de || !file) {
+		const struct bfs_path *parent_path = file ? &file->path : NULL;
+		const char *name = ftwbuf->path + ftwbuf->nameoff;
+		size_t namelen = strlen(name);
+		bfs_path_init(&state->pathinfo, parent_path, name, namelen);
+		ftw_path = &state->pathinfo;
+	} else {
+		ftw_path = &file->path;
+	}
+
+	ftwbuf->pathinfo = ftw_path;
+
 	ftwbuf->stat_flags = bftw_stat_flags(state, ftwbuf->depth);
 
 	if (ftwbuf->error != 0) {
@@ -2082,6 +2106,7 @@ static void bftw_drain(struct bftw_state *state, struct bftw_queue *queue) {
  */
 static int bftw_state_destroy(struct bftw_state *state) {
 	dstrfree(state->path);
+	bfs_path_reset(&state->pathinfo);
 
 	struct ioq *ioq = state->ioq;
 	if (ioq) {
@@ -2101,6 +2126,184 @@ static int bftw_state_destroy(struct bftw_state *state) {
 	errno = state->error;
 	return state->error ? -1 : 0;
 }
+
+#if BFS_WITH_LIBGIT2
+
+/** Data for the gitignore feature that gets attached to a bfs_path. */
+struct bfs_git_data {
+	/** The repository this path is in. */
+	struct git_repository *repo;
+	/** The git data for the root of the repository. */
+	struct bfs_git_data *root_data;
+	/** The path associated with this data. */
+	const struct bfs_path *path;
+	/** Whether this path is the owner of the repo pointer. */
+	bool is_owner;
+	/** Whether this path is ignored. */
+	bool is_ignored;
+	/** Whether we have checked the git status of this path. */
+	bool is_checked;
+};
+
+/** Destructor for bfs_git_data. */
+static void bfs_git_data_free(void *ptr) {
+	struct bfs_git_data *data = ptr;
+	if (!data) {
+		return;
+	}
+	if (data->is_owner && data->repo) {
+		git_repository_free(data->repo);
+	}
+	free(data);
+}
+
+/** Get the git data for a path, allocating if necessary. */
+static struct bfs_git_data *bfs_git_data(const struct bfs_path *path) {
+	if (!path) {
+		return NULL;
+	}
+
+	struct bfs_git_data *data = bfs_path_data(path);
+	if (!data) {
+		data = ZALLOC(struct bfs_git_data);
+		if (data) {
+			data->path = path;
+			bfs_path_set_data(path, data, bfs_git_data_free);
+		}
+	}
+	return data;
+}
+
+/** Build the full path string for a bfs_path. */
+static dchar *bfs_path_str(const struct bfs_path *path) {
+	if (!path) {
+		return NULL;
+	}
+
+	dchar *str = bfs_path_str(path->parent);
+	if (!str) {
+		return dstrndup(path->name, path->namelen);
+	}
+
+	if (dstrapp(&str, '/') != 0) {
+		dstrfree(str);
+		return NULL;
+	}
+	if (dstrncat(&str, path->name, path->namelen) != 0) {
+		dstrfree(str);
+		return NULL;
+	}
+
+	return str;
+}
+
+/** Get the path of a file relative to the git repo root. */
+static dchar *bfs_git_relative_path(const struct bfs_path *path, const struct bfs_git_data *data) {
+	dchar *repo_root_str = bfs_path_str(data->root_data->path);
+	if (!repo_root_str) {
+		return NULL;
+	}
+
+	dchar *full_path = bfs_path_str(path);
+	if (!full_path) {
+		dstrfree(repo_root_str);
+		return NULL;
+	}
+
+	const char *relative_path_start = full_path;
+	size_t repo_root_len = strlen(repo_root_str);
+
+	// Strip the repository root directory from the full path to make it relative.
+	if (strcmp(repo_root_str, ".") != 0 && strncmp(full_path, repo_root_str, repo_root_len) == 0) {
+		relative_path_start += repo_root_len;
+		if (*relative_path_start == '/') {
+			relative_path_start++;
+		}
+	}
+
+	// Skip "./" prefix if present.
+	if (strncmp(relative_path_start, "./", 2) == 0) {
+		relative_path_start += 2;
+	}
+
+	dchar *relative_path = dstrdup(relative_path_start);
+	dstrfree(full_path);
+	dstrfree(repo_root_str);
+	return relative_path;
+}
+
+/** Update the is_ignored and is_checked values for a path. Returns is_ignored. */
+static bool bfs_update_gitignore(const struct bfs_path *path, struct bfs_git_data *data, const struct bfs_ctx *ctx) {
+	dchar *git_path = bfs_git_relative_path(path, data);
+	if (!git_path) {
+		return false;
+	}
+
+	int ignored = 0;
+	if (git_ignore_path_is_ignored(&ignored, data->repo, git_path) == 0 && ignored) {
+		data->is_ignored = true;
+	}
+
+	dstrfree(git_path);
+	return data->is_ignored;
+}
+
+/** Recursively check git status for a path and its parents. */
+static void bfs_path_update_git_status(const struct bfs_path *path, const struct bfs_ctx *ctx) {
+	if (!path) {
+		return;
+	}
+
+	struct bfs_git_data *data = bfs_git_data(path);
+	if (!data || data->is_checked) {
+		return;
+	}
+
+	// Recurse to ensure parent is checked first.
+	bfs_path_update_git_status(path->parent, ctx);
+
+	// Inherit from parent
+	if (path->parent) {
+		struct bfs_git_data *parent_data = bfs_path_data(path->parent);
+		if (parent_data) {
+			data->repo = parent_data->repo;
+			data->root_data = parent_data->root_data;
+		}
+	}
+
+	if (data->repo && bfs_update_gitignore(path, data, ctx)) {
+		return;
+	}
+
+	// Check for a new repository at the current path.
+	dchar *search_path_str = bfs_path_str(path);
+	if (search_path_str) {
+		struct git_repository *opened_repo = NULL;
+		// Only the roots of the search need to check for git repos above the search dir.
+		unsigned int repo_open_flags = path->parent ? GIT_REPOSITORY_OPEN_NO_SEARCH : 0;
+		if (git_repository_open_ext(&opened_repo, search_path_str, repo_open_flags, NULL) != 0) {
+			opened_repo = NULL;
+		}
+
+		if (opened_repo) {
+			data->repo = opened_repo;
+			data->is_owner = true;
+			data->root_data = data;
+		}
+	}
+
+	dstrfree(search_path_str);
+
+	data->is_checked = true;
+}
+
+bool bftw_is_gitignored(const struct BFTW *ftwbuf, const struct bfs_ctx *ctx) {
+	bfs_path_update_git_status(ftwbuf->pathinfo, ctx);
+	struct bfs_git_data *data = bfs_git_data(ftwbuf->pathinfo);
+	return data && data->is_ignored;
+}
+
+#endif // BFS_WITH_LIBGIT2
 
 /**
  * Shared implementation for all search strategies.
@@ -2293,7 +2496,7 @@ static int bftw_ids(const struct bftw_args *args) {
 		}
 	}
 
-done:
+	done:
 	return bftw_ids_destroy(&state);
 }
 
@@ -2325,7 +2528,7 @@ static int bftw_eds(const struct bftw_args *args) {
 		bftw_impl(&state.nested);
 	}
 
-done:
+	done:
 	return bftw_ids_destroy(&state);
 }
 

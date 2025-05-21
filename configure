@@ -50,6 +50,7 @@ External dependencies are auto-detected by default, but you can build --with or
 
   --with-libacl      --without-libacl
   --with-libcap      --without-libcap
+  --with-libgit2     --without-libgit2
   --with-libselinux  --without-libselinux
   --with-liburing    --without-liburing
   --with-oniguruma   --without-oniguruma
@@ -144,7 +145,7 @@ for arg; do
     case "$arg" in
         --enable-*|--disable-*)
             case "$name" in
-                libacl|libcap|libselinux|liburing|oniguruma)
+                libacl|libcap|libgit2|libselinux|liburing|oniguruma)
                     old="$arg"
                     case "$arg" in
                         --enable-*) arg="--with-${arg#--*-}" ;;
@@ -175,7 +176,7 @@ for arg; do
 
         --with-*|--without-*)
             case "$name" in
-                libacl|libcap|libselinux|liburing|oniguruma)
+                libacl|libcap|libgit2|libselinux|liburing|oniguruma)
                     set -- "$@" "WITH_$NAME=$yn"
                     ;;
                 *)

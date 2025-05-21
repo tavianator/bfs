@@ -24,6 +24,11 @@
 #include <time.h>
 #include <unistd.h>
 
+#if BFS_WITH_LIBGIT2
+#  include <git2.h>
+
+#endif
+
 struct bfs_ctx *bfs_ctx_new(void) {
 	struct bfs_ctx *ctx = ZALLOC(struct bfs_ctx);
 	if (!ctx) {
@@ -68,6 +73,10 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	if (clock_gettime(CLOCK_REALTIME, &ctx->now) != 0) {
 		goto fail;
 	}
+
+#if BFS_WITH_LIBGIT2
+	git_libgit2_init();
+#endif
 
 	return ctx;
 
@@ -288,6 +297,11 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		free(ctx->kinds);
 		free(ctx->argv);
+
+#if BFS_WITH_LIBGIT2
+		git_libgit2_shutdown();
+#endif
+
 		free(ctx);
 	}
 

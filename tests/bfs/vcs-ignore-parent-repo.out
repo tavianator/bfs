@@ -1,0 +1,5 @@
+./file
+./level2
+./level2/file
+./level2_sibling
+./level2_sibling/file
