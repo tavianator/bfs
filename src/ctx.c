@@ -24,6 +24,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef BFS_WITH_LIBGIT2
+#include <git2.h>
+#endif
+
 struct bfs_ctx *bfs_ctx_new(void) {
 	struct bfs_ctx *ctx = ZALLOC(struct bfs_ctx);
 	if (!ctx) {
@@ -68,6 +72,10 @@ struct bfs_ctx *bfs_ctx_new(void) {
 	if (clock_gettime(CLOCK_REALTIME, &ctx->now) != 0) {
 		goto fail;
 	}
+
+#ifdef BFS_WITH_LIBGIT2
+	git_libgit2_init();
+#endif
 
 	return ctx;
 
@@ -288,8 +296,67 @@ int bfs_ctx_free(struct bfs_ctx *ctx) {
 
 		free(ctx->kinds);
 		free(ctx->argv);
+
+#ifdef BFS_WITH_LIBGIT2
+		if (ctx->git_repo) {
+			git_repository_free(ctx->git_repo);
+		}
+		git_libgit2_shutdown();
+#endif
+
 		free(ctx);
 	}
 
 	return ret;
 }
+
+#ifdef BFS_WITH_LIBGIT2
+/** Find the git repository for a given path. */
+static struct git_repository *bfs_git_repository_open(const struct bfs_ctx *ctx, const char *path) {
+	bfs_debug(ctx, DEBUG_SEARCH, "Opening git repository for '%s'\n", path);
+	struct git_repository *repo = NULL;
+	int error = git_repository_open_ext(&repo, path,
+			GIT_REPOSITORY_OPEN_FROM_ENV,
+			NULL);
+	if (error != 0) {
+		if (error != GIT_ENOTFOUND) {
+			bfs_warning(ctx, "git_repository_open_ext('%s'): %s.\n",
+					path, git_error_last()->message);
+		}
+		bfs_debug(ctx, DEBUG_SEARCH, "Failed to open git repository for '%s': %s\n", path, git_error_last()->message);
+		return NULL;
+	}
+	bfs_debug(ctx, DEBUG_SEARCH, "Successfully opened git repository for '%s'\n", path);
+	return repo;
+}
+
+/** Check if a path is ignored by git. */
+bool bfs_git_ignored(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf) {
+	struct bfs_ctx *mut = (struct bfs_ctx *)ctx;
+	if (strcmp(ftwbuf->path, ".") == 0) {
+		return false;
+	}
+
+	if (!mut->git_repo) {
+		mut->git_repo = bfs_git_repository_open(ctx, ftwbuf->root);
+		if (!mut->git_repo) {
+			return false;
+		}
+	}
+
+	int ignored = 0;
+	const char *git_path = ftwbuf->path;
+	if (git_path[0] == '.' && git_path[1] == '/') {
+	    git_path += 2; // Slice off "./"
+	}
+	int error = git_ignore_path_is_ignored(&ignored, mut->git_repo, git_path);
+	if (error != 0) {
+		bfs_warning(ctx, "%pP: git_ignore_check_path(): %s.\n",
+				ftwbuf, git_error_last()->message);
+		return false;
+	}
+
+	bfs_debug(ctx, DEBUG_SEARCH, "%pP: Ignored by git: %s\n", ftwbuf, ignored ? "true" : "false");
+	return ignored;
+}
+#endif // BFS_WITH_LIBGIT2

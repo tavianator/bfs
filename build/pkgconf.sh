@@ -80,6 +80,9 @@ for LIB; do
         oniguruma)
             LDLIB=-lonig
             ;;
+        libgit2)
+            LDLIB=-lgit2
+            ;;
         *)
             printf 'error: Unknown package %s\n' "$LIB" >&2
             exit 1
