@@ -130,7 +130,7 @@ jobs:
         uses: cross-platform-actions/action@v0.28.0
         with:
           operating_system: openbsd
-          version: "7.6"
+          version: "7.7"
 
           run: |
             sudo pkg_add \
