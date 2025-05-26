@@ -63,14 +63,8 @@ static void times_init(struct times *times) {
 	gettime(&times->start);
 }
 
-/** Start timing a single request. */
-static void start_request(struct times *times) {
-	gettime(&times->req_start);
-	times->timing = true;
-}
-
 /** Finish timing a request. */
-static void finish_request(struct times *times) {
+static void track_latency(struct times *times) {
 	struct timespec elapsed;
 	gettime(&elapsed);
 	timespec_sub(&elapsed, &times->req_start);
@@ -127,8 +121,8 @@ static bool push(struct ioq *ioq, enum ioq_nop_type type, struct times *lap) {
 
 	// Track latency for a small fraction of requests
 	if (!lap->timing && (lap->pushed + 1) % 128 == 0) {
-		start_request(lap);
 		ptr = lap;
+		gettime(&lap->req_start);
 	}
 
 	int ret = ioq_nop(ioq, type, ptr);
@@ -138,6 +132,9 @@ static bool push(struct ioq *ioq, enum ioq_nop_type type, struct times *lap) {
 	}
 
 	++lap->pushed;
+	if (ptr) {
+		lap->timing = true;
+	}
 	return true;
 }
 
@@ -149,7 +146,7 @@ static bool pop(struct ioq *ioq, struct times *lap, bool block) {
 	}
 
 	if (ent->ptr) {
-		finish_request(lap);
+		track_latency(lap);
 	}
 
 	ioq_free(ioq, ent);
