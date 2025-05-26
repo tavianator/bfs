@@ -22,6 +22,7 @@ PRINT_DEFAULT=(linux)
 STRATEGIES_DEFAULT=(rust)
 JOBS_DEFAULT=(rust)
 EXEC_DEFAULT=(linux)
+SORTED_DEFAULT=(chromium)
 
 usage() {
     printf 'Usage: tailfin run %s\n' "${BASH_SOURCE[0]}"
@@ -59,6 +60,10 @@ usage() {
     printf '  --exec[=CORPUS]\n'
     printf '      Process spawning benchmark.\n'
     printf '      Default corpus is --exec=%s\n\n' "${EXEC_DEFAULT[*]}"
+
+    printf '  --sorted[=CORPUS]\n'
+    printf '      Sorted traversal benchmark.\n'
+    printf '      Default corpus is --sorted=%s\n\n' "${SORTED_DEFAULT[*]}"
 
     printf '  --build=COMMIT\n'
     printf '      Build this bfs commit and benchmark it.  Specify multiple times to\n'
@@ -121,6 +126,7 @@ setup() {
     STRATEGIES=()
     JOBS=()
     EXEC=()
+    SORTED=()
 
     for arg; do
         case "$arg" in
@@ -195,6 +201,12 @@ setup() {
             --exec=*)
                 read -ra EXEC <<<"${arg#*=}"
                 ;;
+            --sorted)
+                SORTED=("${SORTED_DEFAULT[@]}")
+                ;;
+            --sorted=*)
+                read -ra SORTED <<<"${arg#*=}"
+                ;;
             --default)
                 COMPLETE=("${COMPLETE_DEFAULT[@]}")
                 EARLY_QUIT=("${EARLY_QUIT_DEFAULT[@]}")
@@ -203,6 +215,7 @@ setup() {
                 STRATEGIES=("${STRATEGIES_DEFAULT[@]}")
                 JOBS=("${JOBS_DEFAULT[@]}")
                 EXEC=("${EXEC_DEFAULT[@]}")
+                SORTED=("${SORTED_DEFAULT[@]}")
                 ;;
             --help)
                 usage
@@ -227,7 +240,7 @@ setup() {
     as-user mkdir -p bench/corpus
 
     declare -A cloned=()
-    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${STAT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}" "${EXEC[@]}"; do
+    for corpus in "${COMPLETE[@]}" "${EARLY_QUIT[@]}" "${STAT[@]}" "${PRINT[@]}" "${STRATEGIES[@]}" "${JOBS[@]}" "${EXEC[@]}" "${SORTED[@]}"; do
         if ((cloned["$corpus"])); then
             continue
         fi
@@ -283,6 +296,7 @@ setup() {
     export_array STRATEGIES
     export_array JOBS
     export_array EXEC
+    export_array SORTED
 
     if ((UID == 0)); then
         turbo-off
@@ -650,6 +664,29 @@ bench-exec() {
     fi
 }
 
+# Benchmark sorted traversal
+bench-sorted-corpus() {
+    subgroup '%s' "$1"
+
+    cmds=()
+    for bfs in "${BFS[@]}"; do
+        cmds+=("$bfs -s $2 -false")
+    done
+
+    do-hyperfine "${cmds[@]}"
+}
+
+# All sorted traversal benchmarks
+bench-sorted() {
+    if (($#)); then
+        group "Sorted traversal"
+
+        for corpus; do
+            bench-sorted-corpus "$corpus ${TAGS[$corpus]}" "bench/corpus/$corpus"
+        done
+    fi
+}
+
 # Print benchmarked versions
 bench-versions() {
     subgroup "Versions"
@@ -698,6 +735,7 @@ bench() {
     import_array STRATEGIES
     import_array JOBS
     import_array EXEC
+    import_array SORTED
 
     bench-complete "${COMPLETE[@]}"
     bench-early-quit "${EARLY_QUIT[@]}"
@@ -706,5 +744,6 @@ bench() {
     bench-strategies "${STRATEGIES[@]}"
     bench-jobs "${JOBS[@]}"
     bench-exec "${EXEC[@]}"
+    bench-sorted "${SORTED[@]}"
     bench-details
 }
