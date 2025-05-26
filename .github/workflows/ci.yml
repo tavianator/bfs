@@ -5,8 +5,10 @@ on: [push, pull_request]
 jobs:
   linux-x86:
     name: Linux (x86)
-
     runs-on: ubuntu-24.04
+
+    # Don't run on both pushes and pull requests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +48,9 @@ jobs:
 
   linux-arm:
     name: Linux (Arm64)
-
     runs-on: ubuntu-24.04-arm
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +79,9 @@ jobs:
 
   macos:
     name: macOS
-
     runs-on: macos-15
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -93,8 +97,9 @@ jobs:
 
   freebsd:
     name: FreeBSD
-
     runs-on: ubuntu-24.04
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -120,8 +125,9 @@ jobs:
 
   openbsd:
     name: OpenBSD
-
     runs-on: ubuntu-24.04
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -148,8 +154,9 @@ jobs:
 
   netbsd:
     name: NetBSD
-
     runs-on: ubuntu-24.04
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -177,8 +184,9 @@ jobs:
 
   dragonflybsd:
     name: DragonFly BSD
-
     runs-on: ubuntu-24.04
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
@@ -211,8 +219,9 @@ jobs:
 
   omnios:
     name: OmniOS
-
     runs-on: ubuntu-24.04
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
       - uses: actions/checkout@v4
