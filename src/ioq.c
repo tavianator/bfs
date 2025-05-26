@@ -203,7 +203,7 @@ struct ioqq {
 	cache_align atomic size_t tail;
 
 	/** The circular buffer itself. */
-	cache_align ioq_slot slots[];
+	cache_align ioq_slot slots[]; // _counted_by(slot_mask + 1)
 };
 
 /** Destroy an I/O command queue. */
@@ -593,7 +593,7 @@ struct ioq {
 	/** The number of background threads. */
 	size_t nthreads;
 	/** The background threads themselves. */
-	struct ioq_thread threads[];
+	struct ioq_thread threads[] _counted_by(nthreads);
 };
 
 /** Cancel a request if we need to. */

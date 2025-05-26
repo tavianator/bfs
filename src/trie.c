@@ -129,7 +129,7 @@ struct trie_node {
 	 * tag to distinguish internal nodes from leaves.  This is safe as long
 	 * as all dynamic allocations are aligned to more than a single byte.
 	 */
-	uintptr_t children[];
+	uintptr_t children[]; // _counted_by(count_ones(bitmap))
 };
 
 /** Check if an encoded pointer is to an internal node. */

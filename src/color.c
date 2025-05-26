@@ -32,7 +32,7 @@ struct esc_seq {
 	/** The length of the escape sequence. */
 	size_t len;
 	/** The escape sequence itself, without a terminating NUL. */
-	char seq[];
+	char seq[] _counted_by(len);
 };
 
 /**
@@ -48,7 +48,7 @@ struct ext_color {
 	/** Whether the comparison should be case-sensitive. */
 	bool case_sensitive;
 	/** The extension to match (NUL-terminated). */
-	char ext[];
+	char ext[]; // _counted_by(len + 1);
 };
 
 struct colors {

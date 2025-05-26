@@ -253,7 +253,7 @@ struct bftw_file {
 	/** The length of the file's name. */
 	size_t namelen;
 	/** The file's name. */
-	char name[];
+	char name[]; // _counted_by(namelen + 1)
 };
 
 /**

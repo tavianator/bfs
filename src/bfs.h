@@ -219,6 +219,15 @@ extern const char bfs_ldlibs[];
 #endif
 
 /**
+ * Mark the size of a flexible array member.
+ */
+#if __has_attribute(counted_by)
+#  define _counted_by(...) __attribute__((counted_by(__VA_ARGS__)))
+#else
+#  define _counted_by(...)
+#endif
+
+/**
  * Optimization hint to not unroll a loop.
  */
 #if BFS_HAS_PRAGMA_NOUNROLL
