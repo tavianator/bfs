@@ -1485,7 +1485,8 @@ fail:
 
 /** Check if we should stat() a file asynchronously. */
 static bool bftw_should_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
-	// To avoid surprising users too much, process the roots in order
+	// POSIX wants the root paths to be processed in order
+	// See https://www.austingroupbugs.net/view.php?id=1859
 	if (file->depth == 0) {
 		return false;
 	}
