@@ -70,9 +70,9 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	@printf '// %s\n' "$@" >$@
 	@printf '#ifndef BFS_CONFIG_H\n' >>$@
 	@printf '#define BFS_CONFIG_H\n' >>$@
-	@cat ${.ALLSRC} >>$@
+	@cat $^ >>$@
 	@printf '#endif // BFS_CONFIG_H\n' >>$@
-	@cat gen/flags.log ${.ALLSRC:%=%.log} >gen/config.log
+	@cat gen/flags.log ${^:%=%.log} >gen/config.log
 	${VCAT} $@
 	@printf '%s' "$$CONFFLAGS" | build/embed.sh >gen/confflags.i
 	@printf '%s' "$$XCC" | build/embed.sh >gen/cc.i

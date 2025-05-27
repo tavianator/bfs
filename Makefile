@@ -92,7 +92,7 @@ OBJS += obj/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${MSG} "[ LD ] $@" ${CC} ${_CFLAGS} ${_LDFLAGS} ${.ALLSRC} ${_LDLIBS} -o $@
+	+${MSG} "[ LD ] $@" ${CC} ${_CFLAGS} ${_LDFLAGS} $^ ${_LDLIBS} -o $@
 	${POSTLINK}
 
 # Get the .c file for a .o file
@@ -105,7 +105,7 @@ gen/version.i.new::
 .SILENT: gen/version.i.new
 
 gen/version.i: gen/version.i.new
-	test -e $@ && cmp -s $@ ${.ALLSRC} && ${RM} ${.ALLSRC} || mv ${.ALLSRC} $@
+	test -e $@ && cmp -s $@ $^ && ${RM} $^ || mv $^ $@
 .SILENT: gen/version.i
 
 obj/src/version.o: gen/version.i

@@ -14,7 +14,7 @@ config: gen/config.mk gen/config.h
 gen/config.mk: gen/vars.mk gen/flags.mk gen/pkgs.mk
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
-	@printf 'include %s\n' ${.ALLSRC} >>$@
+	@printf 'include %s\n' $^ >>$@
 	${VCAT} $@
 .PHONY: gen/config.mk
 

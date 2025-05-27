@@ -9,11 +9,9 @@
 # We don't use any suffix rules
 .SUFFIXES:
 
-# GNU make has $^ for the full list of targets, while BSD make has $> and the
-# long-form ${.ALLSRC}.  We could write $^ $> to get them both, but that would
-# break if one of them implemented support for the other.  So instead, bring
-# BSD's ${.ALLSRC} to GNU.
-.ALLSRC ?= $^
+# GNU make has $^ for the full list of targets, while BSD make has $> (and the
+# long-form ${.ALLSRC}).  We use the GNU version, bringing it to BSD like this:
+^ ?= $>
 
 # Installation paths
 DESTDIR ?=

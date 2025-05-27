@@ -19,7 +19,7 @@ gen/pkgs.mk: ${HEADERS}
 	    printf '_LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
 	    printf '_LDLIBS := %s $${_LDLIBS}\n' "$$(build/pkgconf.sh --ldlibs "$$@")"; \
 	}; \
-	gen $$(grep -l ' true$$' ${.ALLSRC} | sed 's|.*/\(.*\)\.h|\1|') >>$@
+	gen $$(grep -l ' true$$' $^ | sed 's|.*/\(.*\)\.h|\1|') >>$@
 	${VCAT} $@
 
 .PHONY: gen/pkgs.mk
