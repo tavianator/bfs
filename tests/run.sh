@@ -96,16 +96,13 @@ reap_test() {
 wait_test() {
     local pid line ret
 
-    while true; do
+    while :; do
         line=$((LINENO + 1))
-        wait -n -ppid
+        _wait -n -ppid
         ret=$?
 
         if [ "${pid:-}" ]; then
             break
-        elif ((ret > 128)); then
-            # Interrupted by signal
-            continue
         else
             debug "${BASH_SOURCE[0]}" $line "${RED}error $ret${RST}" >&$DUPERR
             exit 1

@@ -202,3 +202,16 @@ nproc() {
             || echo 1
     } 2>/dev/null
 }
+
+# Run wait, looping if interrupted
+_wait() {
+    local ret=130
+
+    # "If wait is interrupted by a signal, the return status will be greater than 128"
+    while ((ret > 128)); do
+	ret=0
+	wait "$@" || ret=$?
+    done
+
+    return $ret
+}
