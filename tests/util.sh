@@ -190,3 +190,15 @@ pop_defers() {
 
     return $ret
 }
+
+## Parallelism
+
+# Get the number of processors
+nproc() {
+    {
+        (command nproc) \
+            || sysctl -n hw.ncpu \
+            || getconf _NPROCESSORS_ONLN \
+            || echo 1
+    } 2>/dev/null
+}

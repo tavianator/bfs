@@ -5,11 +5,7 @@
 
 ## Argument parsing
 
-if command -v nproc &>/dev/null; then
-    JOBS=$(nproc)
-else
-    JOBS=1
-fi
+JOBS=$(nproc)
 MAKE=
 PATTERNS=()
 SUDO=()
