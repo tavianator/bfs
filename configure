@@ -16,7 +16,7 @@ help() {
 Usage:
 
   \$ $0 [--enable-*|--disable-*] [--with-*|--without-*] [CC=...] [...]
-  \$ $MAKE -j$(nproc)
+  \$ $MAKE -j$(_nproc)
 
 Variables set in the environment or on the command line will be picked up:
 
@@ -66,7 +66,7 @@ Packaging:
 This script is a thin wrapper around a makefile-based configuration system.
 Any other arguments will be passed directly to the $MAKE invocation, e.g.
 
-  \$ $0 -j$(nproc) V=1
+  \$ $0 -j$(_nproc) V=1
 EOF
 }
 
@@ -85,11 +85,9 @@ invalid() {
 }
 
 # Get the number of cores to use
-nproc() {
+_nproc() {
     {
-        # Run command nproc in a subshell to work around a bash 3 bug
-        # https://stackoverflow.com/q/68143965
-        (command nproc) \
+        nproc \
             || sysctl -n hw.ncpu \
             || getconf _NPROCESSORS_ONLN \
             || echo 1
@@ -233,7 +231,7 @@ for f in Makefile bench build completions docs src tests; do
     test -e "$f" || ln -s "$DIR/$f" "$f"
 done
 
-# Set MAKEFLAGS to -j$(nproc) if it's unset
-export MAKEFLAGS="${MAKEFLAGS--j$(nproc)}"
+# Set MAKEFLAGS to -j$(_nproc) if it's unset
+export MAKEFLAGS="${MAKEFLAGS--j$(_nproc)}"
 
 $MAKE -rf build/config.mk "$@"

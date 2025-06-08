@@ -5,7 +5,7 @@
 
 ## Argument parsing
 
-JOBS=$(nproc)
+JOBS=$(_nproc)
 MAKE=
 PATTERNS=()
 SUDO=()

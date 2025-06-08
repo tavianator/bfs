@@ -194,9 +194,9 @@ pop_defers() {
 ## Parallelism
 
 # Get the number of processors
-nproc() {
+_nproc() {
     {
-        (command nproc) \
+        nproc \
             || sysctl -n hw.ncpu \
             || getconf _NPROCESSORS_ONLN \
             || echo 1
