@@ -401,18 +401,40 @@ static bool bfs_resolve_relative(const struct bfs_resolver *res) {
 	return false;
 }
 
+/** Check if the actions include fchdir(). */
+static bool bfs_spawn_will_chdir(const struct bfs_spawn *ctx) {
+	if (ctx) {
+		for_slist (const struct bfs_spawn_action, action, ctx) {
+			if (action->op == BFS_SPAWN_FCHDIR) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/** Check if we can call xfaccessat() before file actions. */
+static bool bfs_can_access_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
+	if (res->exe[0] == '/') {
+		return true;
+	}
+
+	if (bfs_spawn_will_chdir(ctx)) {
+		return false;
+	}
+
+	return true;
+}
+
 /** Check if we can resolve the executable before file actions. */
 static bool bfs_can_resolve_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
 	if (!bfs_resolve_relative(res)) {
 		return true;
 	}
 
-	if (ctx) {
-		for_slist (const struct bfs_spawn_action, action, ctx) {
-			if (action->op == BFS_SPAWN_FCHDIR) {
-				return false;
-			}
-		}
+	if (bfs_spawn_will_chdir(ctx)) {
+		return false;
 	}
 
 	return true;
@@ -442,17 +464,19 @@ static int bfs_resolve_early(struct bfs_resolver *res, const char *exe, const st
 	};
 
 	if (bfs_can_skip_resolve(res, ctx)) {
-		// Do this check eagerly, even though posix_spawn()/execv() also
-		// would, because:
-		//
-		//     - faccessat() is faster than fork()/clone() + execv()
-		//     - posix_spawn() is not guaranteed to report ENOENT
-		if (xfaccessat(AT_FDCWD, exe, X_OK) == 0) {
-			res->done = true;
-			return 0;
-		} else {
-			return -1;
+		if (bfs_can_access_early(res, ctx)) {
+			// Do this check eagerly, even though posix_spawn()/execv() also
+			// would, because:
+			//
+			//     - faccessat() is faster than fork()/clone() + execv()
+			//     - posix_spawn() is not guaranteed to report ENOENT
+			if (xfaccessat(AT_FDCWD, exe, X_OK) != 0) {
+				return -1;
+			}
 		}
+
+		res->done = true;
+		return 0;
 	}
 
 	res->path = getenv("PATH");
