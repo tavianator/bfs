@@ -99,6 +99,22 @@ static int reset_path(char *old_path) {
 	return ret;
 }
 
+/** Spawn the test binary and check for success. */
+static void check_spawnee(const char *exe, const struct bfs_spawn *ctx, char **argv, char **envp) {
+	pid_t pid = bfs_spawn(exe, ctx, argv, envp);
+	if (!bfs_echeck(pid >= 0, "bfs_spawn('%s')", exe)) {
+		return;
+	}
+
+	int wstatus;
+	bool exited = bfs_echeck(xwaitpid(pid, &wstatus, 0) == pid)
+		&& bfs_check(WIFEXITED(wstatus));
+	if (exited) {
+		int wexit = WEXITSTATUS(wstatus);
+		bfs_check(wexit == EXIT_SUCCESS, "xspawnee: exit(%d)", wexit);
+	}
+}
+
 /** Check that we resolve executables in $PATH correctly. */
 static void check_use_path(bool use_posix) {
 	struct bfs_spawn spawn;
@@ -133,20 +149,9 @@ static void check_use_path(bool use_posix) {
 	}
 
 	char *argv[] = {"xspawnee", old_path, NULL};
-	pid_t pid = bfs_spawn("xspawnee", &spawn, argv, envp);
-	if (!bfs_echeck(pid >= 0, "bfs_spawn()")) {
-		goto path;
-	}
+	check_spawnee("xspawnee", &spawn, argv, envp);
+	check_spawnee("tests/xspawnee", &spawn, argv, envp);
 
-	int wstatus;
-	bool exited = bfs_echeck(xwaitpid(pid, &wstatus, 0) == pid)
-		&& bfs_check(WIFEXITED(wstatus));
-	if (exited) {
-		int wexit = WEXITSTATUS(wstatus);
-		bfs_check(wexit == EXIT_SUCCESS, "xspawnee: exit(%d)", wexit);
-	}
-
-path:
 	bfs_echeck(reset_path(old_path) == 0);
 env:
 	for (char **var = envp; *var; ++var) {

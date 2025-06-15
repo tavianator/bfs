@@ -232,6 +232,11 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
  */
 #define BFS_POSIX_SPAWNP_AFTER_FCHDIR !(__APPLE__ || __NetBSD__)
 
+/**
+ * NetBSD even resolves the executable before file actions with posix_spawn()!
+ */
+#define BFS_POSIX_SPAWN_AFTER_FCHDIR !__NetBSD__
+
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
 	if (!action) {
@@ -549,6 +554,12 @@ static bool bfs_use_posix_spawn(const struct bfs_resolver *res, const struct bfs
 
 #if !BFS_POSIX_SPAWNP_AFTER_FCHDIR
 	if (!res->done) {
+		return false;
+	}
+#endif
+
+#if !BFS_POSIX_SPAWN_AFTER_FCHDIR
+	if (res->exe[0] != '/' && bfs_spawn_will_chdir(ctx)) {
 		return false;
 	}
 #endif
