@@ -1247,6 +1247,41 @@ static struct bfs_expr *parse_empty(struct bfs_parser *parser, int arg1, int arg
 	return expr;
 }
 
+/** Check for unsafe relative paths in $PATH. */
+static const char *unsafe_path(const struct bfs_exec *execbuf) {
+	if (!(execbuf->flags & BFS_EXEC_CHDIR)) {
+		// Not -execdir or -okdir
+		return NULL;
+	}
+
+	const char *exe = execbuf->tmpl_argv[0];
+	if (strchr(exe, '/')) {
+		// No $PATH lookups for /foo or foo/bar
+		return NULL;
+	}
+
+	if (strstr(exe, "{}")) {
+		// Substituted paths always contain a /
+		return NULL;
+	}
+
+	const char *path = getenv("PATH");
+	while (path) {
+		if (path[0] != '/') {
+			// Relative $PATH component!
+			return path;
+		}
+
+		path = strchr(path, ':');
+		if (path) {
+			++path;
+		}
+	}
+
+	// No relative components in $PATH
+	return NULL;
+}
+
 /**
  * Parse -exec(dir)?/-ok(dir)?.
  */
@@ -1269,29 +1304,21 @@ static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg
 	// For pipe() in bfs_spawn()
 	expr->ephemeral_fds = 2;
 
-	if (execbuf->flags & BFS_EXEC_CHDIR) {
-		// Check for relative paths in $PATH
-		const char *path = getenv("PATH");
-		while (path) {
-			if (*path != '/') {
-				size_t len = strcspn(path, ":");
-				char *comp = strndup(path, len);
-				if (comp) {
-					parse_expr_error(parser, expr,
-						"This action would be unsafe, since ${bld}$$PATH${rs} contains the relative path ${bld}%pq${rs}\n", comp);
-					free(comp);
-				} else {
-					parse_perror(parser, "strndup()");
-				}
-				return NULL;
-			}
-
-			path = strchr(path, ':');
-			if (path) {
-				++path;
-			}
+	const char *unsafe = unsafe_path(execbuf);
+	if (unsafe) {
+		size_t len = strcspn(unsafe, ":");
+		char *comp = strndup(unsafe, len);
+		if (comp) {
+			parse_expr_error(parser, expr,
+				"This action would be unsafe, since ${bld}$$PATH${rs} contains the relative path ${bld}%pq${rs}\n", comp);
+			free(comp);
+		} else {
+			parse_perror(parser, "strndup()");
 		}
+		return NULL;
+	}
 
+	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		// To dup() the parent directory
 		if (execbuf->flags & BFS_EXEC_MULTI) {
 			++expr->persistent_fds;
