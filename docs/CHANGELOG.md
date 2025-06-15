@@ -1,6 +1,31 @@
 4.*
 ===
 
+4.0.7
+-----
+
+**June 15, 2025**
+
+### Changes
+
+- `bfs` now takes CPU affinity into account when picking how many threads to use
+  ([`a36774b`](https://github.com/tavianator/bfs/commit/a36774be636c3429c6e73de33bf65a1bdbdcfb4b))
+
+- `-execdir /bin/...` is now allowed even with a relative path in `$PATH`
+  ([`cb40f51`](https://github.com/tavianator/bfs/commit/cb40f51e4e6375a10265484b6959c6b1b0591378))
+
+- *Expect* is no longer a test suite dependency
+  ([`7102fec`](https://github.com/tavianator/bfs/commit/7102fec257835302cb4978160bba4cbebd0b63e1))
+
+### Bug fixes
+
+- Only the last `-files0-from` argument now has any effect, to match GNU find
+  ([`a662fda`](https://github.com/tavianator/bfs/commit/a662fda2642e17478bc8e78adb4c6642a8505cdb))
+
+- Fixed `-execdir {}`, which was inadvertently broken in bfs 4.0
+  ([`def4a83`](https://github.com/tavianator/bfs/commit/def4a832425bfe94b96b8cb1146a83552b754fb4))
+
+
 4.0.6
 -----
 
