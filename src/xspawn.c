@@ -246,8 +246,8 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 #if __APPLE__
 	// macOS has a bug that causes EBADF when an fchdir() action refers to a
 	// file opened by the file actions
-	for_slist (struct bfs_spawn_action, action, ctx) {
-		if (fd == action->out_fd) {
+	for_slist (struct bfs_spawn_action, prev, ctx) {
+		if (fd == prev->out_fd) {
 			bfs_spawn_clear_posix(ctx);
 			break;
 		}
