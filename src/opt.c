@@ -1623,14 +1623,19 @@ static void data_flow_icmp(struct bfs_opt *opt, const struct bfs_expr *expr, enu
 
 /** Transfer function for -{execut,read,writ}able. */
 static struct bfs_expr *data_flow_access(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
-	if (expr->num & R_OK) {
+	switch (expr->num) {
+	case R_OK:
 		data_flow_pred(opt, READABLE_PRED, true);
-	}
-	if (expr->num & W_OK) {
+		break;
+	case W_OK:
 		data_flow_pred(opt, WRITABLE_PRED, true);
-	}
-	if (expr->num & X_OK) {
+		break;
+	case X_OK:
 		data_flow_pred(opt, EXECUTABLE_PRED, true);
+		break;
+	default:
+		bfs_bug("Unknown access() mode %lld", expr->num);
+		break;
 	}
 
 	return expr;
@@ -1655,7 +1660,7 @@ static struct bfs_expr *data_flow_gid(struct bfs_opt *opt, struct bfs_expr *expr
 		gid_t gid = range->min;
 		bool nogroup = !bfs_getgrgid(opt->ctx->groups, gid);
 		if (errno == 0) {
-			data_flow_pred(opt, NOGROUP_PRED, nogroup);
+			constrain_pred(&opt->after_true.preds[NOGROUP_PRED], nogroup);
 		}
 	}
 
@@ -1729,7 +1734,7 @@ static struct bfs_expr *data_flow_uid(struct bfs_opt *opt, struct bfs_expr *expr
 		uid_t uid = range->min;
 		bool nouser = !bfs_getpwuid(opt->ctx->users, uid);
 		if (errno == 0) {
-			data_flow_pred(opt, NOUSER_PRED, nouser);
+			constrain_pred(&opt->after_true.preds[NOUSER_PRED], nouser);
 		}
 	}
 
