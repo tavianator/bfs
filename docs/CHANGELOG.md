@@ -1,6 +1,25 @@
 4.*
 ===
 
+4.0.8
+-----
+
+**June 20, 2025**
+
+### Bug fixes
+
+- Fixed an invalid optimization that transformed
+
+      $ bfs -user you -or -user me
+
+  into just
+
+      $ bfs -user you
+
+  The bug was originally introduced in bfs 2.0 (October 14, 2020).
+  ([#155](https://github.com/tavianator/bfs/issues/155))
+
+
 4.0.7
 -----
 
