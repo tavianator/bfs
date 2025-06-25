@@ -138,7 +138,7 @@ static void highlight_args(const struct bfs_ctx *ctx, char **argv, size_t argc, 
 /**
  * Print an error message during parsing.
  */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static void parse_error(const struct bfs_parser *parser, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -156,7 +156,7 @@ static void parse_error(const struct bfs_parser *parser, const char *format, ...
 /**
  * Print an error about some command line arguments.
  */
-_printf(4, 5)
+[[_printf(4, 5)]]
 static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_t argc, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -174,7 +174,7 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
 /**
  * Print an error about conflicting command line arguments.
  */
-_printf(4, 5)
+[[_printf(4, 5)]]
 static void parse_conflict_error(const struct bfs_parser *parser, const struct bfs_expr *expr1, const struct bfs_expr *expr2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -193,7 +193,7 @@ static void parse_conflict_error(const struct bfs_parser *parser, const struct b
 /**
  * Print an error about an expression.
  */
-_printf(3, 4)
+[[_printf(3, 4)]]
 static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -208,7 +208,7 @@ static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_e
 /**
  * Print a warning message during parsing.
  */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static bool parse_warning(const struct bfs_parser *parser, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -229,7 +229,7 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
 /**
  * Print a warning about conflicting command line arguments.
  */
-_printf(4, 5)
+[[_printf(4, 5)]]
 static bool parse_conflict_warning(const struct bfs_parser *parser, const struct bfs_expr *expr1, const struct bfs_expr *expr2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -251,7 +251,7 @@ static bool parse_conflict_warning(const struct bfs_parser *parser, const struct
 /**
  * Print a warning about an expression.
  */
-_printf(3, 4)
+[[_printf(3, 4)]]
 static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
@@ -995,16 +995,16 @@ static struct bfs_expr *parse_time(struct bfs_parser *parser, int field, int arg
 		switch (*tail) {
 		case 'w':
 			time *= 7;
-			_fallthrough;
+			[[fallthrough]];
 		case 'd':
 			time *= 24;
-			_fallthrough;
+			[[fallthrough]];
 		case 'h':
 			time *= 60;
-			_fallthrough;
+			[[fallthrough]];
 		case 'm':
 			time *= 60;
-			_fallthrough;
+			[[fallthrough]];
 		case 's':
 			break;
 		default:
@@ -1973,7 +1973,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			who = 0;
 			mask = 0777;
 			state = MODE_WHO;
-			_fallthrough;
+			[[fallthrough]];
 
 		case MODE_WHO:
 			switch (*i) {
@@ -2000,7 +2000,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			case MODE_EQUALS:
 				expr->file_mode &= ~who;
 				expr->dir_mode &= ~who;
-				_fallthrough;
+				[[fallthrough]];
 			case MODE_PLUS:
 				expr->file_mode |= file_change;
 				expr->dir_mode |= dir_change;
@@ -2010,7 +2010,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				expr->dir_mode &= ~dir_change;
 				break;
 			}
-			_fallthrough;
+			[[fallthrough]];
 
 		case MODE_ACTION:
 			if (who == 0) {
@@ -2095,7 +2095,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				break;
 			case 'x':
 				file_change |= mask & 0111;
-				_fallthrough;
+				[[fallthrough]];
 			case 'X':
 				dir_change |= mask & 0111;
 				break;
@@ -2158,7 +2158,7 @@ static struct bfs_expr *parse_perm(struct bfs_parser *parser, int field, int arg
 			++mode;
 			break;
 		}
-		_fallthrough;
+		[[fallthrough]];
 	default:
 		expr->mode_cmp = BFS_MODE_EQUAL;
 		break;

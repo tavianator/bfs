@@ -21,7 +21,8 @@ struct trie_leaf {
 	/** The length of the key in bytes. */
 	size_t length;
 	/** The key itself, stored inline. */
-	char key[] _counted_by(length);
+	[[_counted_by(length)]]
+	char key[];
 };
 
 /**

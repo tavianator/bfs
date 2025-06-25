@@ -423,7 +423,7 @@ static bool is_fatal(int sig) {
 }
 
 /** Reraise a fatal signal. */
-_noreturn
+[[_noreturn]]
 static void reraise(siginfo_t *info) {
 	int sig = info->si_signo;
 

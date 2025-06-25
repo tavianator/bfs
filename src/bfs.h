@@ -84,19 +84,12 @@ extern const char bfs_ldlibs[];
 // Wrappers for attributes
 
 /**
- * Silence warnings about switch/case fall-throughs.
- */
-#if __has_attribute(fallthrough)
-#  define _fallthrough __attribute__((fallthrough))
-#else
-#  define _fallthrough ((void)0)
-#endif
-
-/**
  * Silence warnings about unused declarations.
  */
-#if __has_attribute(unused)
-#  define _maybe_unused __attribute__((unused))
+#if __has_c_attribute(maybe_unused)
+#  define _maybe_unused maybe_unused
+#elif __has_c_attribute(gnu::unused)
+#  define _maybe_unused gnu::unused
 #else
 #  define _maybe_unused
 #endif
@@ -104,8 +97,10 @@ extern const char bfs_ldlibs[];
 /**
  * Warn if a value is unused.
  */
-#if __has_attribute(warn_unused_result)
-#  define _nodiscard __attribute__((warn_unused_result))
+#if __has_c_attribute(nodiscard)
+#  define _nodiscard nodiscard
+#elif __has_c_attribute(gnu::warn_unused_result)
+#  define _nodiscard gnu::warn_unused_result
 #else
 #  define _nodiscard
 #endif
@@ -113,35 +108,38 @@ extern const char bfs_ldlibs[];
 /**
  * Hint to avoid inlining a function.
  */
-#if __has_attribute(noinline)
-#  define _noinline __attribute__((noinline))
+#if __has_c_attribute(gnu::noinline)
+#  define _noinline gnu::noinline
 #else
 #  define _noinline
 #endif
 
 /**
- * Marks a non-returning function.
- */
-#if __STDC_VERSION__ >= C23
-#  define _noreturn [[noreturn]]
-#else
-#  define _noreturn _Noreturn
-#endif
-
-/**
  * Hint that a function is unlikely to be called.
  */
-#if __has_attribute(cold)
-#  define _cold _noinline __attribute__((cold))
+#if __has_c_attribute(gnu::cold)
+#  define _cold _noinline, gnu::cold
 #else
 #  define _cold _noinline
 #endif
 
 /**
+ * Marks a non-returning function.
+ */
+#if __has_c_attribute(noreturn)
+#  define _noreturn noreturn
+#elif __has_c_attribute(gnu::noreturn)
+#  define _noreturn gnu::noreturn
+#else
+#  define _noreturn
+#endif
+
+
+/**
  * Adds compiler warnings for bad printf()-style function calls, if supported.
  */
-#if __has_attribute(format)
-#  define _printf(fmt, args) __attribute__((format(printf, fmt, args)))
+#if __has_c_attribute(gnu::format)
+#  define _printf(fmt, args) gnu::format(printf, fmt, args)
 #else
 #  define _printf(fmt, args)
 #endif
@@ -149,8 +147,8 @@ extern const char bfs_ldlibs[];
 /**
  * Annotates functions that potentially modify and return format strings.
  */
-#if __has_attribute(format_arg)
-#  define _format_arg(arg) __attribute__((format_arg(arg)))
+#if __has_c_attribute(gnu::format_arg)
+#  define _format_arg(arg) gnu::format_arg(arg)
 #else
 #  define _format_arg(arg)
 #endif
@@ -158,11 +156,11 @@ extern const char bfs_ldlibs[];
 /**
  * Annotates allocator-like functions.
  */
-#if __has_attribute(malloc)
+#if __has_c_attribute(gnu::malloc)
 #  if __GNUC__ >= 11 && !__OPTIMIZE__ // malloc(deallocator) disables inlining on GCC
-#    define _malloc(...) _nodiscard __attribute__((malloc(__VA_ARGS__)))
+#    define _malloc(...) _nodiscard, gnu::malloc(__VA_ARGS__)
 #  else
-#    define _malloc(...) _nodiscard __attribute__((malloc))
+#    define _malloc(...) _nodiscard, gnu::malloc
 #  endif
 #else
 #  define _malloc(...) _nodiscard
@@ -171,8 +169,8 @@ extern const char bfs_ldlibs[];
 /**
  * Specifies that a function returns allocations with a given alignment.
  */
-#if __has_attribute(alloc_align)
-#  define _alloc_align(param) __attribute__((alloc_align(param)))
+#if __has_c_attribute(gnu::alloc_align)
+#  define _alloc_align(param) gnu::alloc_align(param)
 #else
 #  define _alloc_align(param)
 #endif
@@ -180,8 +178,8 @@ extern const char bfs_ldlibs[];
 /**
  * Specifies that a function returns allocations with a given size.
  */
-#if __has_attribute(alloc_size)
-#  define _alloc_size(...) __attribute__((alloc_size(__VA_ARGS__)))
+#if __has_c_attribute(gnu::alloc_size)
+#  define _alloc_size(...) gnu::alloc_size(__VA_ARGS__)
 #else
 #  define _alloc_size(...)
 #endif
@@ -189,7 +187,7 @@ extern const char bfs_ldlibs[];
 /**
  * Shorthand for _alloc_align() and _alloc_size().
  */
-#define _aligned_alloc(align, ...) _alloc_align(align) _alloc_size(__VA_ARGS__)
+#define _aligned_alloc(align, ...) _alloc_align(align), _alloc_size(__VA_ARGS__)
 
 /**
  * Check if function multiversioning via GNU indirect functions (ifunc) is supported.
@@ -197,7 +195,7 @@ extern const char bfs_ldlibs[];
  * Disabled on TSan due to https://github.com/google/sanitizers/issues/342.
  */
 #ifndef BFS_USE_TARGET_CLONES
-#  if __has_attribute(target_clones) \
+#  if __has_c_attribute(gnu::target_clones) \
 	&& (__GLIBC__ || __FreeBSD__) \
 	&& !__SANITIZE_THREAD__ \
 	&& !__SANITIZE_TYPE__
@@ -211,7 +209,7 @@ extern const char bfs_ldlibs[];
  * Apply the target_clones attribute, if available.
  */
 #if BFS_USE_TARGET_CLONES
-#  define _target_clones(...) __attribute__((target_clones(__VA_ARGS__)))
+#  define _target_clones(...) gnu::target_clones(__VA_ARGS__)
 #else
 #  define _target_clones(...)
 #endif
@@ -219,8 +217,10 @@ extern const char bfs_ldlibs[];
 /**
  * Mark the size of a flexible array member.
  */
-#if __has_attribute(counted_by)
-#  define _counted_by(...) __attribute__((counted_by(__VA_ARGS__)))
+#if __has_c_attribute(clang::counted_by)
+#  define _counted_by(...) clang::counted_by(__VA_ARGS__)
+#elif __has_c_attribute(gnu::counted_by)
+#  define _counted_by(...) gnu::counted_by(__VA_ARGS__)
 #else
 #  define _counted_by(...)
 #endif

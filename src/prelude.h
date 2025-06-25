@@ -77,12 +77,6 @@
 /** _Bool => bool, true, false */
 #include <stdbool.h>
 
-/**
- * C23 deprecates `noreturn void` in favour of `[[noreturn]] void`, so we expose
- * _noreturn instead with the other attributes in "bfs.h".
- */
-// #include <stdnoreturn.h>
-
 /** Part of <threads.h>, but we don't use anything else from it. */
 #define thread_local _Thread_local
 
@@ -98,11 +92,6 @@
 #define countof(...) (sizeof(__VA_ARGS__) / sizeof(0[__VA_ARGS__]))
 
 // Feature detection
-
-// https://clang.llvm.org/docs/LanguageExtensions.html#has-attribute
-#ifndef __has_attribute
-#  define __has_attribute(attr) false
-#endif
 
 // https://clang.llvm.org/docs/LanguageExtensions.html#has-builtin
 #ifndef __has_builtin

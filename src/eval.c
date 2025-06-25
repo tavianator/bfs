@@ -67,7 +67,7 @@ struct bfs_eval {
 /**
  * Print an error message.
  */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static void eval_error(struct bfs_eval *state, const char *format, ...) {
 	const struct bfs_ctx *ctx = state->ctx;
 
@@ -279,10 +279,10 @@ bool eval_time(const struct bfs_expr *expr, struct bfs_eval *state) {
 	switch (expr->time_unit) {
 	case BFS_DAYS:
 		diff /= 60 * 24;
-		_fallthrough;
+		[[fallthrough]];
 	case BFS_MINUTES:
 		diff /= 60;
-		_fallthrough;
+		[[fallthrough]];
 	case BFS_SECONDS:
 		break;
 	}

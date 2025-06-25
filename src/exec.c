@@ -24,7 +24,7 @@
 #include <unistd.h>
 
 /** Print some debugging info. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
 	const struct bfs_ctx *ctx = execbuf->ctx;
 

@@ -253,7 +253,8 @@ struct bftw_file {
 	/** The length of the file's name. */
 	size_t namelen;
 	/** The file's name. */
-	char name[]; // _counted_by(namelen + 1)
+	// [[_counted_by(namelen + 1)]]
+	char name[];
 };
 
 /**
@@ -1439,7 +1440,7 @@ static bool bftw_must_stat(const struct bftw_state *state, size_t depth, enum bf
 		if (!(bftw_stat_flags(state, depth) & BFS_STAT_NOFOLLOW)) {
 			return true;
 		}
-		_fallthrough;
+		[[fallthrough]];
 
 	default:
 #if __linux__

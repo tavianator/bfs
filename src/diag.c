@@ -33,7 +33,7 @@ void bfs_diagf(const char *format, ...) {
 	va_end(args);
 }
 
-_noreturn
+[[_noreturn]]
 void bfs_abortf(const char *format, ...) {
 	va_list args;
 	va_start(args, format);

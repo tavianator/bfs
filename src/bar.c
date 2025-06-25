@@ -127,7 +127,7 @@ static void bfs_bar_sigexit(int sig, siginfo_t *info, void *arg) {
 }
 
 /** printf() to the status bar with a single write(). */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static int bfs_bar_printf(struct bfs_bar *bar, const char *format, ...) {
 	va_list args;
 	va_start(args, format);

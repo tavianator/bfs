@@ -119,7 +119,7 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 
 #if BFS_POSIX_SPAWN >= 0
 /** Set some posix_spawnattr flags. */
-_maybe_unused
+[[_maybe_unused]]
 static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 	short prev;
 	errno = posix_spawnattr_getflags(&ctx->attr, &prev);
@@ -581,7 +581,7 @@ static bool bfs_use_posix_spawn(const struct bfs_resolver *res, const struct bfs
 #endif // BFS_POSIX_SPAWN >= 0
 
 /** Actually exec() the new process. */
-_noreturn
+[[_noreturn]]
 static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, const sigset_t *mask, int pipefd[2]) {
 	xclose(pipefd[0]);
 

@@ -129,7 +129,8 @@ struct trie_node {
 	 * tag to distinguish internal nodes from leaves.  This is safe as long
 	 * as all dynamic allocations are aligned to more than a single byte.
 	 */
-	uintptr_t children[]; // _counted_by(count_ones(bitmap))
+	// [[_counted_by(count_ones(bitmap))]]
+	uintptr_t children[];
 };
 
 /** Check if an encoded pointer is to an internal node. */
@@ -192,7 +193,7 @@ static unsigned char trie_leaf_nibble(const struct trie_leaf *leaf, size_t offse
 }
 
 /** Get the number of children of an internal node. */
-_trie_clones
+[[_trie_clones]]
 static unsigned int trie_node_size(const struct trie_node *node) {
 	return count_ones((unsigned int)node->bitmap);
 }
@@ -204,7 +205,7 @@ static unsigned int trie_node_size(const struct trie_node *node) {
  * that case, the first mismatch between the key and the representative will be
  * the depth at which to make a new branch to insert the key.
  */
-_trie_clones
+[[_trie_clones]]
 static struct trie_leaf *trie_representative(const struct trie *trie, const void *key, size_t length) {
 	uintptr_t ptr = trie->root;
 
@@ -233,7 +234,7 @@ struct trie_leaf *trie_find_str(const struct trie *trie, const char *key) {
 	return trie_find_mem(trie, key, strlen(key) + 1);
 }
 
-_trie_clones
+[[_trie_clones]]
 static struct trie_leaf *trie_find_mem_impl(const struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	if (rep && rep->length == length && memcmp(rep->key, key, length) == 0) {
@@ -257,7 +258,7 @@ void *trie_get_mem(const struct trie *trie, const void *key, size_t length) {
 	return leaf ? leaf->value : NULL;
 }
 
-_trie_clones
+[[_trie_clones]]
 static struct trie_leaf *trie_find_postfix_impl(const struct trie *trie, const char *key) {
 	size_t length = strlen(key);
 	struct trie_leaf *rep = trie_representative(trie, key, length + 1);
@@ -302,7 +303,7 @@ static bool trie_check_prefix(struct trie_leaf *leaf, size_t skip, const char *k
 	}
 }
 
-_trie_clones
+[[_trie_clones]]
 static struct trie_leaf *trie_find_prefix_impl(const struct trie *trie, const char *key) {
 	uintptr_t ptr = trie->root;
 	if (!ptr) {
@@ -456,7 +457,7 @@ static size_t trie_mismatch(const struct trie_leaf *rep, const void *key, size_t
  *      | Z
  *      +--->...
  */
-_trie_clones
+[[_trie_clones]]
 static struct trie_leaf *trie_node_insert(struct trie *trie, uintptr_t *ptr, struct trie_leaf *leaf, unsigned char nibble) {
 	struct trie_node *node = trie_decode_node(*ptr);
 	unsigned int size = trie_node_size(node);
@@ -579,7 +580,7 @@ struct trie_leaf *trie_insert_str(struct trie *trie, const char *key) {
 	return trie_insert_mem(trie, key, strlen(key) + 1);
 }
 
-_trie_clones
+[[_trie_clones]]
 static struct trie_leaf *trie_insert_mem_impl(struct trie *trie, const void *key, size_t length) {
 	struct trie_leaf *rep = trie_representative(trie, key, length);
 	size_t mismatch = trie_mismatch(rep, key, length);
@@ -707,7 +708,7 @@ static int trie_collapse_node(struct trie *trie, uintptr_t *parent, struct trie_
 	return 0;
 }
 
-_trie_clones
+[[_trie_clones]]
 static void trie_remove_impl(struct trie *trie, struct trie_leaf *leaf) {
 	uintptr_t *child = &trie->root;
 	uintptr_t *parent = NULL;

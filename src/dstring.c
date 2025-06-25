@@ -23,7 +23,8 @@ struct dstring {
 	/** Length of the string, *excluding* the terminating NUL. */
 	size_t len;
 	/** The string itself. */
-	alignas(dchar) char str[] _counted_by(cap);
+	[[_counted_by(cap)]]
+	alignas(dchar) char str[];
 };
 
 #define DSTR_OFFSET offsetof(struct dstring, str)
