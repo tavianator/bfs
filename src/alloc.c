@@ -173,7 +173,7 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 }
 
 /** Allocate a new slab. */
-_cold
+[[_cold]]
 static int slab_alloc(struct arena *arena) {
 	// Make the initial allocation size ~4K
 	size_t size = 4096;

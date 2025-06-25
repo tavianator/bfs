@@ -203,7 +203,8 @@ struct ioqq {
 	cache_align atomic size_t tail;
 
 	/** The circular buffer itself. */
-	cache_align ioq_slot slots[]; // _counted_by(slot_mask + 1)
+	// [[_counted_by(slot_mask + 1)]]
+	cache_align ioq_slot slots[];
 };
 
 /** Destroy an I/O command queue. */
@@ -275,7 +276,7 @@ static struct ioq_monitor *ioq_slot_monitor(struct ioqq *ioqq, ioq_slot *slot) {
 }
 
 /** Atomically wait for a slot to change. */
-_noinline
+[[_noinline]]
 static uintptr_t ioq_slot_wait(struct ioqq *ioqq, ioq_slot *slot, uintptr_t value) {
 	uintptr_t ret;
 
@@ -323,7 +324,7 @@ done:
 }
 
 /** Wake up any threads waiting on a slot. */
-_noinline
+[[_noinline]]
 static void ioq_slot_wake(struct ioqq *ioqq, ioq_slot *slot) {
 	struct ioq_monitor *monitor = ioq_slot_monitor(ioqq, slot);
 
@@ -593,7 +594,8 @@ struct ioq {
 	/** The number of background threads. */
 	size_t nthreads;
 	/** The background threads themselves. */
-	struct ioq_thread threads[] _counted_by(nthreads);
+	[[_counted_by(nthreads)]]
+	struct ioq_thread threads[];
 };
 
 /** Cancel a request if we need to. */

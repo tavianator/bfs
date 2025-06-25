@@ -32,7 +32,8 @@ struct esc_seq {
 	/** The length of the escape sequence. */
 	size_t len;
 	/** The escape sequence itself, without a terminating NUL. */
-	char seq[] _counted_by(len);
+	[[_counted_by(len)]]
+	char seq[];
 };
 
 /**
@@ -48,7 +49,8 @@ struct ext_color {
 	/** Whether the comparison should be case-sensitive. */
 	bool case_sensitive;
 	/** The extension to match (NUL-terminated). */
-	char ext[]; // _counted_by(len + 1);
+	// [[_counted_by(len + 1)]]
+	char ext[];
 };
 
 struct colors {
@@ -1387,7 +1389,7 @@ static int print_link_target(CFILE *cfile, const struct BFTW *ftwbuf) {
 }
 
 /** Format some colored output to the buffer. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static int cbuff(CFILE *cfile, const char *format, ...);
 
 /** Print an expression's name, for diagnostics. */
@@ -1471,7 +1473,7 @@ static int print_expr(CFILE *cfile, const struct bfs_expr *expr, bool verbose, i
 	return 0;
 }
 
-_printf(2, 0)
+[[_printf(2, 0)]]
 static int cvbuff(CFILE *cfile, const char *format, va_list args) {
 	const struct colors *colors = cfile->colors;
 

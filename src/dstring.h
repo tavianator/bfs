@@ -16,14 +16,14 @@
 
 /** Marker type for dynamic strings. */
 #if BFS_LINT && __clang__
-// Abuse __attribute__(aligned) to make a type that allows
+// Abuse [[gnu::aligned]] to make a type that allows
 //
 //     dchar * -> char *
 //
 // conversions, but warns (with Clang's -Walign-mismatch) on
 //
 //     char * -> dchar *
-typedef __attribute__((aligned(alignof(size_t)))) char dchar;
+typedef char dchar [[gnu::aligned(alignof(size_t))]];
 #else
 typedef char dchar;
 #endif
@@ -42,7 +42,7 @@ void dstrfree(dchar *dstr);
  * @cap
  *         The initial capacity of the string.
  */
-_malloc(dstrfree, 1)
+[[_malloc(dstrfree, 1)]]
 dchar *dstralloc(size_t cap);
 
 /**
@@ -51,7 +51,7 @@ dchar *dstralloc(size_t cap);
  * @str
  *         The NUL-terminated string to copy.
  */
-_malloc(dstrfree, 1)
+[[_malloc(dstrfree, 1)]]
 dchar *dstrdup(const char *str);
 
 /**
@@ -62,7 +62,7 @@ dchar *dstrdup(const char *str);
  * @n
  *         The maximum number of characters to copy from str.
  */
-_malloc(dstrfree, 1)
+[[_malloc(dstrfree, 1)]]
 dchar *dstrndup(const char *str, size_t n);
 
 /**
@@ -71,7 +71,7 @@ dchar *dstrndup(const char *str, size_t n);
  * @dstr
  *         The dynamic string to copy.
  */
-_malloc(dstrfree, 1)
+[[_malloc(dstrfree, 1)]]
 dchar *dstrddup(const dchar *dstr);
 
 /**
@@ -82,7 +82,7 @@ dchar *dstrddup(const dchar *dstr);
  * @len
  *         The length of the string, which may include internal NUL bytes.
  */
-_malloc(dstrfree, 1)
+[[_malloc(dstrfree, 1)]]
 dchar *dstrxdup(const char *str, size_t len);
 
 /**
@@ -117,7 +117,7 @@ int dstreserve(dchar **dstr, size_t cap);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstresize(dchar **dstr, size_t len);
 
 /**
@@ -139,7 +139,7 @@ void dstrshrink(dchar *dstr, size_t len);
  *         The string to append.
  * @return 0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrcat(dchar **dest, const char *src);
 
 /**
@@ -154,7 +154,7 @@ int dstrcat(dchar **dest, const char *src);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrncat(dchar **dest, const char *src, size_t n);
 
 /**
@@ -167,7 +167,7 @@ int dstrncat(dchar **dest, const char *src, size_t n);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrdcat(dchar **dest, const dchar *src);
 
 /**
@@ -182,7 +182,7 @@ int dstrdcat(dchar **dest, const dchar *src);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrxcat(dchar **dest, const char *src, size_t len);
 
 /**
@@ -195,7 +195,7 @@ int dstrxcat(dchar **dest, const char *src, size_t len);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrapp(dchar **str, char c);
 
 /**
@@ -208,7 +208,7 @@ int dstrapp(dchar **str, char c);
  * @returns
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrcpy(dchar **dest, const char *str);
 
 /**
@@ -221,7 +221,7 @@ int dstrcpy(dchar **dest, const char *str);
  * @returns
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrdcpy(dchar **dest, const dchar *str);
 
 /**
@@ -236,7 +236,7 @@ int dstrdcpy(dchar **dest, const dchar *str);
  * @returns
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrncpy(dchar **dest, const char *str, size_t n);
 
 /**
@@ -251,7 +251,7 @@ int dstrncpy(dchar **dest, const char *str, size_t n);
  * @returns
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrxcpy(dchar **dest, const char *str, size_t len);
 
 /**
@@ -264,8 +264,8 @@ int dstrxcpy(dchar **dest, const char *str, size_t len);
  * @return
  *         The created string, or NULL on failure.
  */
-_nodiscard
-_printf(1, 2)
+[[_nodiscard]]
+[[_printf(1, 2)]]
 dchar *dstrprintf(const char *format, ...);
 
 /**
@@ -278,8 +278,8 @@ dchar *dstrprintf(const char *format, ...);
  * @return
  *         The created string, or NULL on failure.
  */
-_nodiscard
-_printf(1, 0)
+[[_nodiscard]]
+[[_printf(1, 0)]]
 dchar *dstrvprintf(const char *format, va_list args);
 
 /**
@@ -294,8 +294,8 @@ dchar *dstrvprintf(const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
-_printf(2, 3)
+[[_nodiscard]]
+[[_printf(2, 3)]]
 int dstrcatf(dchar **str, const char *format, ...);
 
 /**
@@ -310,8 +310,8 @@ int dstrcatf(dchar **str, const char *format, ...);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
-_printf(2, 0)
+[[_nodiscard]]
+[[_printf(2, 0)]]
 int dstrvcatf(dchar **str, const char *format, va_list args);
 
 /**
@@ -326,7 +326,7 @@ int dstrvcatf(dchar **str, const char *format, va_list args);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
 
 /**
@@ -343,13 +343,13 @@ int dstrescat(dchar **dest, const char *str, enum wesc_flags flags);
  * @return
  *         0 on success, -1 on failure.
  */
-_nodiscard
+[[_nodiscard]]
 int dstrnescat(dchar **dest, const char *str, size_t n, enum wesc_flags flags);
 
 /**
  * Repeat a string n times.
  */
-_nodiscard
+[[_nodiscard]]
 dchar *dstrepeat(const char *str, size_t n);
 
 #endif // BFS_DSTRING_H

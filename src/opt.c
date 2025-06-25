@@ -374,7 +374,7 @@ struct bfs_opt {
 };
 
 /** Log an optimization. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static bool opt_debug(struct bfs_opt *opt, const char *format, ...) {
 	if (bfs_debug_prefix(opt->ctx, DEBUG_OPT)) {
 		for (int i = 0; i < opt->depth; ++i) {
@@ -392,7 +392,7 @@ static bool opt_debug(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log a recursive call. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static bool opt_enter(struct bfs_opt *opt, const char *format, ...) {
 	int depth = opt->depth;
 	if (depth > 0) {
@@ -412,7 +412,7 @@ static bool opt_enter(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log a recursive return. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static bool opt_leave(struct bfs_opt *opt, const char *format, ...) {
 	bool debug = false;
 	int depth = opt->depth;
@@ -436,7 +436,7 @@ static bool opt_leave(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log a shallow visit. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static bool opt_visit(struct bfs_opt *opt, const char *format, ...) {
 	int depth = opt->depth;
 	if (depth > 0) {
@@ -456,7 +456,7 @@ static bool opt_visit(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log the deletion of an expression. */
-_printf(2, 3)
+[[_printf(2, 3)]]
 static bool opt_delete(struct bfs_opt *opt, const char *format, ...) {
 	int depth = opt->depth;
 
@@ -618,7 +618,7 @@ static bool is_const(const struct bfs_expr *expr) {
 }
 
 /** Warn about an expression. */
-_printf(3, 4)
+[[_printf(3, 4)]]
 static bool opt_warning(const struct bfs_opt *opt, const struct bfs_expr *expr, const char *format, ...) {
 	if (!opt->warn) {
 		return false;
