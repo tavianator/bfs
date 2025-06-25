@@ -18,6 +18,7 @@
  *
  *     bfs: func@src/file.c:0: Message
  */
+// Use (format) ? "..." : "" so the format string is required
 #define BFS_DIAG_FORMAT_(format) \
 	((format) ? "%s: %s@%s:%d: " format "%s" : "")
 
@@ -75,7 +76,7 @@ void bfs_abortf(const char *format, ...);
 	bfs_eabort_(__VA_ARGS__, )
 
 #define bfs_eabort_(format, ...) \
-	((format) ? bfs_abort_(format ": %s", __VA_ARGS__ errstr(), ) : (void)0)
+	bfs_abort_(format "%s%s", __VA_ARGS__ (sizeof("" format) > 1 ? ": " : ""), errstr(), )
 
 /**
  * Abort in debug builds; no-op in release builds.
@@ -115,7 +116,6 @@ void bfs_abortf(const char *format, ...);
  */
 #define bfs_everify(...) \
 	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", )
-
 
 #define bfs_everify_(str, cond, format, ...) \
 	((cond) ? (void)0 : bfs_everify__(format, BFS_DIAG_MSG_(format, str), __VA_ARGS__))
