@@ -26,7 +26,7 @@
  * Add arguments to match a BFS_DIAG_FORMAT string.
  */
 #define BFS_DIAG_ARGS_(...) \
-	xgetprogname(), __func__, __FILE__, __LINE__, __VA_ARGS__ "\n"
+	xgetprogname(), __func__, __FILE__, __LINE__, __VA_ARGS__ __VA_OPT__(,) "\n"
 
 /**
  * Print a low-level diagnostic message to standard error.
@@ -37,20 +37,16 @@ void bfs_diagf(const char *format, ...);
 /**
  * Unconditional diagnostic message.
  */
-#define bfs_diag(...) \
-	bfs_diag_(__VA_ARGS__, )
-
-#define bfs_diag_(format, ...) \
+#define bfs_diag(format, ...) \
 	bfs_diagf(BFS_DIAG_FORMAT_(format), BFS_DIAG_ARGS_(__VA_ARGS__))
 
 /**
  * Print a diagnostic message including the last error.
  */
-#define bfs_ediag(...) \
-	bfs_ediag_(__VA_ARGS__, )
-
-#define bfs_ediag_(format, ...) \
-	bfs_diag_(format "%s%s", __VA_ARGS__ (sizeof("" format) > 1 ? ": " : ""), errstr(), )
+#define bfs_ediag(format, ...) \
+	BFS_VA_IF(format) \
+		(bfs_diag(format ": %s", __VA_ARGS__ __VA_OPT__(,) errstr())) \
+		(bfs_diag("%s", errstr()))
 
 /**
  * Print a message to standard error and abort.
@@ -63,20 +59,16 @@ void bfs_abortf(const char *format, ...);
 /**
  * Unconditional abort with a message.
  */
-#define bfs_abort(...) \
-	bfs_abort_(__VA_ARGS__, )
-
-#define bfs_abort_(format, ...) \
+#define bfs_abort(format, ...) \
 	bfs_abortf(BFS_DIAG_FORMAT_(format), BFS_DIAG_ARGS_(__VA_ARGS__))
 
 /**
  * Abort with a message including the last error.
  */
-#define bfs_eabort(...) \
-	bfs_eabort_(__VA_ARGS__, )
-
-#define bfs_eabort_(format, ...) \
-	bfs_abort_(format "%s%s", __VA_ARGS__ (sizeof("" format) > 1 ? ": " : ""), errstr(), )
+#define bfs_eabort(format, ...) \
+	BFS_VA_IF(__VA_ARGS__) \
+		(bfs_abort(format ": %s", __VA_ARGS__ __VA_OPT__(,) errstr())) \
+		(bfs_abort("%s", errstr()))
 
 /**
  * Abort in debug builds; no-op in release builds.
@@ -90,42 +82,20 @@ void bfs_abortf(const char *format, ...);
 #endif
 
 /**
- * Get the default assertion message, if no format string was specified.
- */
-#define BFS_DIAG_MSG_(format, str) \
-	(sizeof(format) > 1 ? "" : str)
-
-/**
  * Unconditional assert.
  */
-#define bfs_verify(...) \
-	bfs_verify_(#__VA_ARGS__, __VA_ARGS__, "", )
-
-#define bfs_verify_(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_verify__(format, BFS_DIAG_MSG_(format, str), __VA_ARGS__))
-
-#define bfs_verify__(format, ...) \
-	bfs_abortf( \
-		sizeof(format) > 1 \
-			? BFS_DIAG_FORMAT_("%s" format "%s") \
-			: BFS_DIAG_FORMAT_("Assertion failed: `%s`"), \
-		BFS_DIAG_ARGS_(__VA_ARGS__))
+#define bfs_verify(cond, ...) \
+	((cond) ? (void)0 : BFS_VA_IF(__VA_ARGS__) \
+		(bfs_abort(__VA_ARGS__)) \
+		(bfs_abort("Assertion failed: `%s`", #cond)))
 
 /**
  * Unconditional assert, including the last error.
  */
-#define bfs_everify(...) \
-	bfs_everify_(#__VA_ARGS__, __VA_ARGS__, "", )
-
-#define bfs_everify_(str, cond, format, ...) \
-	((cond) ? (void)0 : bfs_everify__(format, BFS_DIAG_MSG_(format, str), __VA_ARGS__))
-
-#define bfs_everify__(format, ...) \
-	bfs_abortf( \
-		sizeof(format) > 1 \
-			? BFS_DIAG_FORMAT_("%s" format "%s: %s") \
-			: BFS_DIAG_FORMAT_("Assertion failed: `%s`: %s"), \
-		BFS_DIAG_ARGS_(__VA_ARGS__ errstr(), ))
+#define bfs_everify(cond, ...) \
+	((cond) ? (void)0 : BFS_VA_IF(__VA_ARGS__) \
+		(bfs_eabort(__VA_ARGS__)) \
+		(bfs_eabort("Assertion failed: `%s`", #cond)))
 
 /**
  * Assert in debug builds; no-op in release builds.
