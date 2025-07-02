@@ -26,6 +26,7 @@ _ASAN := ${TRUTHY,${ASAN}}
 _LSAN := ${TRUTHY,${LSAN}}
 _MSAN := ${TRUTHY,${MSAN}}
 _TSAN := ${TRUTHY,${TSAN}}
+_TYSAN := ${TRUTHY,${TYSAN}}
 _UBSAN := ${TRUTHY,${UBSAN}}
 _GCOV := ${TRUTHY,${GCOV}}
 _LINT := ${TRUTHY,${LINT}}
@@ -38,21 +39,23 @@ ASAN_CFLAGS,y := -fsanitize=address
 LSAN_CFLAGS,y := -fsanitize=leak
 MSAN_CFLAGS,y := -fsanitize=memory -fsanitize-memory-track-origins
 TSAN_CFLAGS,y := -fsanitize=thread
+TYSAN_CFLAGS,y := -fsanitize=type
 UBSAN_CFLAGS,y := -fsanitize=undefined
 
 _CFLAGS += ${ASAN_CFLAGS,${_ASAN}}
 _CFLAGS += ${LSAN_CFLAGS,${_LSAN}}
 _CFLAGS += ${MSAN_CFLAGS,${_MSAN}}
 _CFLAGS += ${TSAN_CFLAGS,${_TSAN}}
+_CFLAGS += ${TYSAN_CFLAGS,${_TYSAN}}
 _CFLAGS += ${UBSAN_CFLAGS,${_UBSAN}}
 
 SAN_CFLAGS,y := -fno-sanitize-recover=all
-INSANE := ${NOT,${_ASAN}${_LSAN}${_MSAN}${_TSAN}${_UBSAN}}
+INSANE := ${NOT,${_ASAN}${_LSAN}${_MSAN}${_TSAN}${_TYSAN}${_UBSAN}}
 SAN := ${NOT,${INSANE}}
 _CFLAGS += ${SAN_CFLAGS,${SAN}}
 
-# MSAN and TSAN both need all code to be instrumented
-YESLIBS := ${NOT,${_MSAN}${_TSAN}}
+# MSan, TSan, and TySan need all code to be instrumented
+YESLIBS := ${NOT,${_MSAN}${_TSAN}${_TYSAN}}
 NOLIBS ?= ${NOT,${YESLIBS}}
 
 # gcov only intercepts fork()/exec() with -std=gnu*

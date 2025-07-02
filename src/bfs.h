@@ -202,7 +202,10 @@ extern const char bfs_ldlibs[];
  * Disabled on TSan due to https://github.com/google/sanitizers/issues/342.
  */
 #ifndef BFS_USE_TARGET_CLONES
-#  if __has_attribute(target_clones) && (__GLIBC__ || __FreeBSD__) && !__SANITIZE_THREAD__
+#  if __has_attribute(target_clones) \
+	&& (__GLIBC__ || __FreeBSD__) \
+	&& !__SANITIZE_THREAD__ \
+	&& !__SANITIZE_TYPE__
 #    define BFS_USE_TARGET_CLONES true
 #  else
 #    define BFS_USE_TARGET_CLONES false

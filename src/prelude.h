@@ -126,5 +126,8 @@
 #if __has_feature(thread_sanitizer) && !defined(__SANITIZE_THREAD__)
 #  define __SANITIZE_THREAD__ true
 #endif
+#if __has_feature(type_sanitizer) && !defined(__SANITIZE_TYPE__)
+#  define __SANITIZE_TYPE__ true
+#endif
 
 #endif // BFS_PRELUDE_H
