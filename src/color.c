@@ -161,26 +161,32 @@ static int cat_esc(dchar **dstr, const struct esc_seq *seq) {
 	return dstrxcat(dstr, seq->seq, seq->len);
 }
 
+/** Set an escape sequence field. */
+static int set_esc_field(struct colors *colors, struct esc_seq **field, const dchar *value) {
+	struct esc_seq *seq = NULL;
+	if (value) {
+		seq = new_esc(colors, value, dstrlen(value));
+		if (!seq) {
+			return -1;
+		}
+	}
+
+	if (*field) {
+		free_esc(colors, *field);
+	}
+	*field = seq;
+
+	return 0;
+}
+
 /** Set a named escape sequence. */
-static int set_esc(struct colors *colors, const char *name, dchar *value) {
+static int set_esc(struct colors *colors, const char *name, const dchar *value) {
 	struct esc_seq **field = get_esc(colors, name);
 	if (!field) {
 		return 0;
 	}
 
-	if (*field) {
-		free_esc(colors, *field);
-		*field = NULL;
-	}
-
-	if (value) {
-		*field = new_esc(colors, value, dstrlen(value));
-		if (!*field) {
-			return -1;
-		}
-	}
-
-	return 0;
+	return set_esc_field(colors, field, value);
 }
 
 /** Reverse a string, to turn suffix matches into prefix matches. */
@@ -609,10 +615,6 @@ fail:
 
 /** Parse the FreeBSD $LSCOLORS format. */
 static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
-	static const char *keys[] = {
-		"di", "ln", "so", "pi", "ex", "bd", "cd", "su", "sg", "tw", "ow"
-	};
-
 	static const char *fg_codes[256] = {
 		['a'] = "30", ['b'] = "31", ['c'] = "32", ['d'] = "33",
 		['e'] = "34", ['f'] = "35", ['g'] = "36", ['h'] = "37", ['x'] = "39",
@@ -638,30 +640,50 @@ static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 	}
 	memcpy(complete_colors, lscolors, len);
 
+	struct esc_seq **keys[] = {
+		&colors->directory,
+		&colors->link,
+		&colors->socket,
+		&colors->pipe,
+		&colors->executable,
+		&colors->blockdev,
+		&colors->chardev,
+		&colors->setuid,
+		&colors->setgid,
+		&colors->sticky_other_writable,
+		&colors->other_writable,
+	};
+
+	dchar *value = dstralloc(0);
+	if (!value) {
+		return -1;
+	}
+
+	int ret = -1;
 	for (size_t i = 0; i < countof(keys); ++i) {
-		uint8_t fg = complete_colors[i * 2];
-		uint8_t bg = complete_colors[(i * 2) + 1];
+		uint8_t fg = complete_colors[2 * i];
+		uint8_t bg = complete_colors[2 * i + 1];
 
 		const char *fg_code = fg_codes[fg];
 		const char *bg_code = bg_codes[bg];
-
 		if (!fg_code || !bg_code) {
 			continue;
 		}
 
-		dchar *esc = dstrprintf("%s;%s", fg_code, bg_code);
-		if (!esc) {
-			return -1;
+		dstrshrink(value, 0);
+		if (dstrcatf(&value, "%s;%s", fg_code, bg_code) != 0) {
+			goto fail;
 		}
 
-		int ret = set_esc(colors, keys[i], esc);
-		dstrfree(esc);
-		if (ret != 0) {
-			return -1;
+		if (set_esc_field(colors, keys[i], value) != 0) {
+			goto fail;
 		}
 	}
 
-	return 0;
+	ret = 0;
+fail:
+	dstrfree(value);
+	return ret;
 }
 
 static bool str_isset(const char *str) {
