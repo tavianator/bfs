@@ -607,6 +607,67 @@ fail:
 	return ret;
 }
 
+/** Parse the FreeBSD $LSCOLORS format. */
+static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
+	static const char *keys[] = {
+		"di", "ln", "so", "pi", "ex", "bd", "cd", "su", "sg", "tw", "ow"
+	};
+
+	static const char *fg_codes[256] = {
+		['a'] = "30", ['b'] = "31", ['c'] = "32", ['d'] = "33",
+		['e'] = "34", ['f'] = "35", ['g'] = "36", ['h'] = "37", ['x'] = "39",
+		['A'] = "1;30", ['B'] = "1;31", ['C'] = "1;32", ['D'] = "1;33",
+		['E'] = "1;34", ['F'] = "1;35", ['G'] = "1;36", ['H'] = "1;37", ['X'] = "1"
+	};
+
+	static const char *bg_codes[256] = {
+		['a'] = "40", ['b'] = "41", ['c'] = "42", ['d'] = "43",
+		['e'] = "44", ['f'] = "45", ['g'] = "46", ['h'] = "47", ['x'] = "49",
+		['A'] = "4;100", ['B'] = "4;101", ['C'] = "4;102", ['D'] = "4;103",
+		['E'] = "4;104", ['F'] = "4;105", ['G'] = "4;106", ['H'] = "4;107", ['X'] = "4;49"
+	};
+
+	// Please refer to https://man.freebsd.org/cgi/man.cgi?ls(1)#ENVIRONMENT
+	char complete_colors[] = "exfxcxdxbxegedabagacad";
+
+	size_t max = strlen(complete_colors);
+	size_t len = strnlen(lscolors, max + 1);
+	if (len == 0 || len % 2 != 0 || len > max) {
+		errno = EINVAL;
+		return -1;
+	}
+	memcpy(complete_colors, lscolors, len);
+
+	for (size_t i = 0; i < countof(keys); ++i) {
+		uint8_t fg = complete_colors[i * 2];
+		uint8_t bg = complete_colors[(i * 2) + 1];
+
+		const char *fg_code = fg_codes[fg];
+		const char *bg_code = bg_codes[bg];
+
+		if (!fg_code || !bg_code) {
+			continue;
+		}
+
+		dchar *esc = dstrprintf("%s;%s", fg_code, bg_code);
+		if (!esc) {
+			return -1;
+		}
+
+		int ret = set_esc(colors, keys[i], esc);
+		dstrfree(esc);
+		if (ret != 0) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static bool str_isset(const char *str) {
+    return str && *str;
+}
+
 struct colors *parse_colors(void) {
 	struct colors *colors = ALLOC(struct colors);
 	if (!colors) {
@@ -676,12 +737,22 @@ struct colors *parse_colors(void) {
 		goto fail;
 	}
 
-	if (parse_gnu_ls_colors(colors, getenv("LS_COLORS")) != 0) {
-		goto fail;
+	const char *gnu_colors = getenv("LS_COLORS");
+	const char *bfs_colors = getenv("BFS_COLORS");
+	const char *bsd_colors = getenv("LSCOLORS");
+	if (str_isset(gnu_colors) || str_isset(bfs_colors)) {
+		if (parse_gnu_ls_colors(colors, gnu_colors) != 0) {
+			goto fail;
+		}
+		if (parse_gnu_ls_colors(colors, bfs_colors) != 0) {
+			goto fail;
+		}
+	} else if (str_isset(bsd_colors)) {
+		if (parse_bsd_ls_colors(colors, bsd_colors) != 0) {
+			goto fail;
+		}
 	}
-	if (parse_gnu_ls_colors(colors, getenv("BFS_COLORS")) != 0) {
-		goto fail;
-	}
+
 	if (build_iext_trie(colors) != 0) {
 		goto fail;
 	}
