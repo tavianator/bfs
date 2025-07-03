@@ -103,6 +103,8 @@ struct colors {
 	struct esc_seq *pipe;
 	struct esc_seq *socket;
 
+	struct esc_seq *dataless;
+
 	/** A mapping from color names (fi, di, ln, etc.) to struct fields. */
 	struct trie names;
 
@@ -630,7 +632,7 @@ static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 	};
 
 	// Please refer to https://man.freebsd.org/cgi/man.cgi?ls(1)#ENVIRONMENT
-	char complete_colors[] = "exfxcxdxbxegedabagacad";
+	char complete_colors[] = "exfxcxdxbxegedabagacadah";
 
 	size_t max = strlen(complete_colors);
 	size_t len = strnlen(lscolors, max + 1);
@@ -652,6 +654,7 @@ static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 		&colors->setgid,
 		&colors->sticky_other_writable,
 		&colors->other_writable,
+		&colors->dataless,
 	};
 
 	dchar *value = dstralloc(0);
@@ -754,6 +757,8 @@ struct colors *parse_colors(void) {
 	fail = fail || init_esc(colors, "do", "01;35", &colors->door);
 	fail = fail || init_esc(colors, "pi", "33",    &colors->pipe);
 	fail = fail || init_esc(colors, "so", "01;35", &colors->socket);
+
+	colors->dataless = NULL;
 
 	if (fail) {
 		goto fail;
@@ -1042,6 +1047,34 @@ static bool cpath_is_broken(const struct cpath *cpath) {
 	}
 }
 
+/** Check if we need a statbuf to colorize a file. */
+static bool must_stat(const struct colors *colors, enum bfs_type type) {
+	switch (type) {
+	case BFS_REG:
+		if (colors->setuid || colors->setgid || colors->executable || colors->multi_hard) {
+			return true;
+		}
+
+#ifdef ST_DATALESS
+		if (colors->dataless) {
+			return true;
+		}
+#endif
+
+		return false;
+
+	case BFS_DIR:
+		if (colors->sticky_other_writable || colors->other_writable || colors->sticky) {
+			return true;
+		}
+
+		return false;
+
+	default:
+		return false;
+	}
+}
+
 /** Get the color for a file. */
 static const struct esc_seq *file_color(const struct colors *colors, const struct cpath *cpath) {
 	enum bfs_type type;
@@ -1056,17 +1089,17 @@ static const struct esc_seq *file_color(const struct colors *colors, const struc
 	}
 
 	const struct bfs_stat *statbuf = NULL;
+	if (must_stat(colors, type)) {
+		statbuf = cpath_stat(cpath);
+		if (!statbuf) {
+			goto error;
+		}
+	}
+
 	const struct esc_seq *color = NULL;
 
 	switch (type) {
 	case BFS_REG:
-		if (colors->setuid || colors->setgid || colors->executable || colors->multi_hard) {
-			statbuf = cpath_stat(cpath);
-			if (!statbuf) {
-				goto error;
-			}
-		}
-
 		if (colors->setuid && (statbuf->mode & 04000)) {
 			color = colors->setuid;
 		} else if (colors->setgid && (statbuf->mode & 02000)) {
@@ -1078,6 +1111,12 @@ static const struct esc_seq *file_color(const struct colors *colors, const struc
 		} else if (colors->multi_hard && statbuf->nlink > 1) {
 			color = colors->multi_hard;
 		}
+
+#ifdef SF_DATALESS
+		if (!color && colors->dataless && (statbuf->attrs & SF_DATALESS)) {
+			color = colors->dataless;
+		}
+#endif
 
 		if (!color) {
 			const char *name = cpath->path + cpath->nameoff;
@@ -1092,13 +1131,6 @@ static const struct esc_seq *file_color(const struct colors *colors, const struc
 		break;
 
 	case BFS_DIR:
-		if (colors->sticky_other_writable || colors->other_writable || colors->sticky) {
-			statbuf = cpath_stat(cpath);
-			if (!statbuf) {
-				goto error;
-			}
-		}
-
 		if (colors->sticky_other_writable && (statbuf->mode & 01002) == 01002) {
 			color = colors->sticky_other_writable;
 		} else if (colors->other_writable && (statbuf->mode & 00002)) {
