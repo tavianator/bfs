@@ -618,28 +618,43 @@ fail:
 /** Parse the FreeBSD $LSCOLORS format. */
 static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 	static const char *fg_codes[256] = {
-		['a'] = "30", ['b'] = "31", ['c'] = "32", ['d'] = "33",
-		['e'] = "34", ['f'] = "35", ['g'] = "36", ['h'] = "37", ['x'] = "39",
+		// 0-7: deprecated aliases for a-h
+		['0'] =   "30", ['1'] =   "31", ['2'] =   "32", ['3'] =   "33",
+		['4'] =   "34", ['5'] =   "35", ['6'] =   "36", ['7'] =   "37",
+		// a-h: first 8 ANSI foreground colors
+		['a'] =   "30", ['b'] =   "31", ['c'] =   "32", ['d'] =   "33",
+		['e'] =   "34", ['f'] =   "35", ['g'] =   "36", ['h'] =   "37",
+		// x: default foreground
+		['x'] =   "39",
+		// A-H: bold foreground colors
 		['A'] = "1;30", ['B'] = "1;31", ['C'] = "1;32", ['D'] = "1;33",
-		['E'] = "1;34", ['F'] = "1;35", ['G'] = "1;36", ['H'] = "1;37", ['X'] = "1"
+		['E'] = "1;34", ['F'] = "1;35", ['G'] = "1;36", ['H'] = "1;37",
+		// X: bold default foreground
+		['X'] = "1;39",
 	};
 
 	static const char *bg_codes[256] = {
-		['a'] = "40", ['b'] = "41", ['c'] = "42", ['d'] = "43",
-		['e'] = "44", ['f'] = "45", ['g'] = "46", ['h'] = "47", ['x'] = "49",
-		['A'] = "4;100", ['B'] = "4;101", ['C'] = "4;102", ['D'] = "4;103",
-		['E'] = "4;104", ['F'] = "4;105", ['G'] = "4;106", ['H'] = "4;107", ['X'] = "4;49"
+		// 0-7: deprecated aliases for a-h
+		['0'] =   "40", ['1'] =   "41", ['2'] =   "42", ['3'] =   "43",
+		['4'] =   "44", ['5'] =   "45", ['6'] =   "46", ['7'] =   "47",
+		// a-h: first 8 ANSI background colors
+		['a'] =   "40", ['b'] =   "41", ['c'] =   "42", ['d'] =   "43",
+		['e'] =   "44", ['f'] =   "45", ['g'] =   "46", ['h'] =   "47",
+		// x: default background
+		['x'] =   "49",
+		// A-H: background colors + underline
+		['A'] = "4;40", ['B'] = "4;41", ['C'] = "4;42", ['D'] = "4;43",
+		['E'] = "4;44", ['F'] = "4;45", ['G'] = "4;46", ['H'] = "4;47",
+		// X: default background + underline
+		['X'] = "4;49",
 	};
 
 	// Please refer to https://man.freebsd.org/cgi/man.cgi?ls(1)#ENVIRONMENT
 	char complete_colors[] = "exfxcxdxbxegedabagacadah";
 
+	// For short $LSCOLORS, use the default colors for the rest
 	size_t max = strlen(complete_colors);
-	size_t len = strnlen(lscolors, max + 1);
-	if (len == 0 || len % 2 != 0 || len > max) {
-		errno = EINVAL;
-		return -1;
-	}
+	size_t len = strnlen(lscolors, max);
 	memcpy(complete_colors, lscolors, len);
 
 	struct esc_seq **keys[] = {
@@ -657,8 +672,8 @@ static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 		&colors->dataless,
 	};
 
-	dchar *value = dstralloc(0);
-	if (!value) {
+	dchar *buf = dstralloc(8);
+	if (!buf) {
 		return -1;
 	}
 
@@ -669,15 +684,25 @@ static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 
 		const char *fg_code = fg_codes[fg];
 		const char *bg_code = bg_codes[bg];
-		if (!fg_code || !bg_code) {
-			continue;
+
+		dstrshrink(buf, 0);
+		if (fg_code) {
+			if (dstrcat(&buf, fg_code) != 0) {
+				goto fail;
+			}
+		}
+		if (fg_code && bg_code) {
+			if (dstrcat(&buf, ";") != 0) {
+				goto fail;
+			}
+		}
+		if (bg_code) {
+			if (dstrcat(&buf, bg_code) != 0) {
+				goto fail;
+			}
 		}
 
-		dstrshrink(value, 0);
-		if (dstrcatf(&value, "%s;%s", fg_code, bg_code) != 0) {
-			goto fail;
-		}
-
+		const dchar *value = dstrlen(buf) > 0 ? buf : NULL;
 		if (set_esc_field(colors, keys[i], value) != 0) {
 			goto fail;
 		}
@@ -685,7 +710,7 @@ static int parse_bsd_ls_colors(struct colors *colors, const char *lscolors) {
 
 	ret = 0;
 fail:
-	dstrfree(value);
+	dstrfree(buf);
 	return ret;
 }
 

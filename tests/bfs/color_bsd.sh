@@ -1,1 +1,1 @@
-LSCOLORS="eB" bfs_diff rainbow -color
+LSCOLORS="exFxcXDXbxeGxdXb" bfs_diff rainbow -color
