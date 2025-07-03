@@ -34,6 +34,7 @@ stdenv() {
 
     export LS_COLORS=""
     unset BFS_COLORS
+    unset LSCOLORS
 
     if [ "$UNAME" = Darwin ]; then
         # ASan on macOS likes to report
