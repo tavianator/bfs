@@ -59,6 +59,25 @@ extern const char bfs_ldlibs[];
 // Fundamental utilities
 
 /**
+ * A preprocessor conditional.
+ *
+ *     BFS_VA_IF(A)(B)(C) => B
+ *     BFS_VA_IF( )(B)(C) => C
+ */
+#define BFS_VA_IF(...) BFS_VA_IF_AB ## __VA_OPT__(C)
+// BFS_VA_IF(A)(B)(C) => BFS_VA_IF_ABC(B)(C)
+// BFS_VA_IF( )(B)(C) => BFS_VA_IF_AB(B)(C)
+
+#define BFS_VA_IF_ABC(...) __VA_ARGS__ BFS_VA_IGNORE
+// BFS_VA_IF_ABC(B)(C) => B BFS_VA_IGNORE(C)
+
+#define BFS_VA_IF_AB(...) BFS_VA_REPEAT
+// BFS_VA_IF_AB(B)(C) => BFS_VA_REPEAT(C)
+
+#define BFS_VA_IGNORE(...)
+#define BFS_VA_REPEAT(...) __VA_ARGS__
+
+/**
  * False sharing/destructive interference/largest cache line size.
  */
 #ifdef __GCC_DESTRUCTIVE_SIZE
