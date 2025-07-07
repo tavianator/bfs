@@ -8,16 +8,18 @@
 #ifndef BFS_SANITY_H
 #define BFS_SANITY_H
 
+#include "bfs.h"
 #include <stddef.h>
 
+/** Get the default size for a sanitize macro call. */
+#define SANITIZE_SIZE_(ptr, size) \
+	BFS_VA_IF(size)(size)(sizeof(*ptr))
+
 // Call macro(ptr, size) or macro(ptr, sizeof(*ptr))
-#define SANITIZE_CALL(...) \
-	SANITIZE_CALL_(__VA_ARGS__, )
+#define SANITIZE_CALL(macro, ptr, ...) \
+	SANITIZE_CALL_(macro, ptr, SANITIZE_SIZE_(ptr, __VA_ARGS__))
 
-#define SANITIZE_CALL_(macro, ptr, ...) \
-	SANITIZE_CALL__(macro, ptr, __VA_ARGS__ sizeof(*(ptr)), )
-
-#define SANITIZE_CALL__(macro, ptr, size, ...) \
+#define SANITIZE_CALL_(macro, ptr, size) \
 	macro(ptr, size)
 
 #if __SANITIZE_ADDRESS__

@@ -24,13 +24,12 @@
 		} \
 	} while (0)
 
-#define THREAD_INFALLIBLE(...) \
-	THREAD_INFALLIBLE_(__VA_ARGS__, 0, )
+#define THREAD_INFALLIBLE(expr, ...) \
+	THREAD_INFALLIBLE_(expr, BFS_VA_IF(__VA_ARGS__)(__VA_ARGS__)(0))
 
-#define THREAD_INFALLIBLE_(expr, allowed, ...) \
+#define THREAD_INFALLIBLE_(expr, allowed) \
 	int err = expr; \
-	bfs_verify(err == 0 || err == allowed, "%s: %s", #expr, xstrerror(err)); \
-	(void)0
+	bfs_verify(err == 0 || err == allowed, "%s: %s", #expr, xstrerror(err))
 
 int thread_create(pthread_t *thread, const pthread_attr_t *attr, thread_fn *fn, void *arg) {
 	THREAD_FALLIBLE(pthread_create(thread, attr, fn, arg));
