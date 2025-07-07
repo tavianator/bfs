@@ -48,20 +48,16 @@ int main(int argc, char *argv[]) {
 	const char *cmd = argc > 0 ? argv[0] : "ptyx";
 
 /** Report an error message and exit. */
-#define die(...) die_(__VA_ARGS__, )
-
-#define die_(format, ...) \
+#define die(format, ...) \
 	do { \
-		fprintf(stderr, "%s: " format "%s", cmd, __VA_ARGS__ "\n"); \
+		fprintf(stderr, "%s: " format "\n", cmd __VA_OPT__(,) __VA_ARGS__); \
 		exit(EXIT_FAILURE); \
 	} while (0)
 
 /** Report an error code and exit. */
-#define edie(...) edie_(__VA_ARGS__, )
-
-#define edie_(format, ...) \
+#define edie(format, ...) \
 	do { \
-		fprintf(stderr, "%s: " format ": %s\n", cmd, __VA_ARGS__ errstr()); \
+		fprintf(stderr, "%s: " format ": %s\n", cmd __VA_OPT__(,) __VA_ARGS__, errstr()); \
 		exit(EXIT_FAILURE); \
 	} while (0)
 
