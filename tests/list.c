@@ -96,4 +96,7 @@ void check_list(void) {
 	SLIST_APPEND(&l2, &i12);
 	SLIST_SPLICE(&l1, &l1.head->next, &l2);
 	bfs_verify(check_list_items(&l1, ARRAY(10, 11, 12, 15, 20)));
+
+	// Check the return type of SLIST_POP()
+	bfs_check(SLIST_POP(&l1)->n == 10);
 }
