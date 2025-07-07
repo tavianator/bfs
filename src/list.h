@@ -82,6 +82,7 @@
 #ifndef BFS_LIST_H
 #define BFS_LIST_H
 
+#include "bfs.h"
 #include "diag.h"
 
 #include <stddef.h>
@@ -121,76 +122,21 @@
  *         The item to initialize.
  * @node (optional)
  *         If specified, use item->node.next rather than item->next.
- *
- * ---
- *
- * We play some tricks with variadic macros to handle the optional parameter:
- *
- *     SLIST_ITEM_INIT(item)       => item->next = NULL
- *     SLIST_ITEM_INIT(item, node) => item->node.next = NULL
- *
- * The first trick is that
- *
- *     #define SLIST_ITEM_INIT(item, ...)
- *
- * won't work because both commas are required (until C23; see N3033). As a
- * workaround, we dispatch to another macro and add a trailing comma.
- *
- *     SLIST_ITEM_INIT(item)       => SLIST_ITEM_INIT_(item, )
- *     SLIST_ITEM_INIT(item, node) => SLIST_ITEM_INIT_(item, node, )
  */
-#define SLIST_ITEM_INIT(...) \
-	SLIST_ITEM_INIT_(__VA_ARGS__, )
+#define SLIST_ITEM_INIT(item, ...) \
+	SLIST_ITEM_INIT_((item), LIST_NEXT_(__VA_ARGS__))
 
-/**
- * Now we need a way to generate either ->next or ->node.next depending on
- * whether the node parameter was passed.  The approach is based on
- *
- *     #define FOO(...) BAR(__VA_ARGS__, 1, 2, )
- *     #define BAR(x, y, z, ...) z
- *
- *     FOO(a)    => 2
- *     FOO(a, b) => 1
- *
- * The LIST_NEXT_() macro uses this technique:
- *
- *     LIST_NEXT_()       => LIST_NODE_(next, )
- *     LIST_NEXT_(node, ) => LIST_NODE_(next, node, )
- */
-#define LIST_NEXT_(...) \
-	LIST_NODE_(next, __VA_ARGS__)
-
-/**
- * LIST_NODE_() dispatches to yet another macro:
- *
- *     LIST_NODE_(next, )       => LIST_NODE__(next,     , . ,   , )
- *     LIST_NODE_(next, node, ) => LIST_NODE__(next, node,   , . , , )
- */
-#define LIST_NODE_(dir, ...) \
-	LIST_NODE__(dir, __VA_ARGS__, . , , )
-
-/**
- * And finally, LIST_NODE__() adds the node and the dot if necessary.
- *
- *                 dir   node ignored dot
- *                  v     v      v     v
- *     LIST_NODE__(next,     ,   .   ,   , )   => next
- *     LIST_NODE__(next, node,       , . , , ) => node . next
- *                  ^     ^      ^     ^
- *                 dir   node ignored dot
- */
-#define LIST_NODE__(dir, node, ignored, dot, ...) \
-	node dot dir
-
-/**
- * SLIST_ITEM_INIT_() uses LIST_NEXT_() to generate the right name for the list
- * node, and finally delegates to the actual implementation.
- */
-#define SLIST_ITEM_INIT_(item, ...) \
-	SLIST_ITEM_INIT__((item), LIST_NEXT_(__VA_ARGS__))
-
-#define SLIST_ITEM_INIT__(item, next) \
+#define SLIST_ITEM_INIT_(item, next) \
 	LIST_VOID_(item->next = NULL)
+
+/**
+ * Get the projection for an item's next pointer.
+ *
+ *     LIST_NEXT_()     => next
+ *     LIST_NEXT_(node) => node.next
+ */
+#define LIST_NEXT_(node) \
+	BFS_VA_IF(node)(node.next)(next)
 
 /**
  * Type-checking macro for singly-linked lists.
@@ -219,13 +165,6 @@
 	(!SLIST_HEAD(list))
 
 /**
- * Like container_of(), but using the head pointer instead of offsetof() since
- * we don't have the type around.
- */
-#define SLIST_CONTAINER_(tail, head, next) \
-	(void *)((char *)tail - ((char *)&head->next - (char *)head))
-
-/**
  * Get the tail of a singly-linked list.
  *
  * @list
@@ -235,14 +174,11 @@
  * @return
  *         The last item in the list.
  */
-#define SLIST_TAIL(...) \
-	SLIST_TAIL_(__VA_ARGS__, )
+#define SLIST_TAIL(list, ...) \
+	SLIST_TAIL_((list), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_TAIL_(list, ...) \
-	SLIST_TAIL__((list), LIST_NEXT_(__VA_ARGS__))
-
-#define SLIST_TAIL__(list, next) \
-	(list->head ? SLIST_CONTAINER_(list->tail, list->head, next) : NULL)
+#define SLIST_TAIL_(list, next) \
+	(list->head ? container_of(list->tail, typeof(*list->head), next) : NULL)
 
 /**
  * Check if an item is attached to a singly-linked list.
@@ -256,13 +192,10 @@
  * @return
  *         Whether the item is attached to the list.
  */
-#define SLIST_ATTACHED(list, ...) \
-	SLIST_ATTACHED_(list, __VA_ARGS__, )
+#define SLIST_ATTACHED(list, item, ...) \
+	SLIST_ATTACHED_((list), (item), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_ATTACHED_(list, item, ...) \
-	SLIST_ATTACHED__((list), (item), LIST_NEXT_(__VA_ARGS__))
-
-#define SLIST_ATTACHED__(list, item, next) \
+#define SLIST_ATTACHED_(list, item, next) \
 	(item->next || list->tail == &item->next)
 
 /**
@@ -279,14 +212,11 @@
  * @return
  *         A cursor for the next item.
  */
-#define SLIST_INSERT(list, cursor, ...) \
-	SLIST_INSERT_(list, cursor, __VA_ARGS__, )
+#define SLIST_INSERT(list, cursor, item, ...) \
+	SLIST_INSERT_((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_INSERT_(list, cursor, item, ...) \
-	SLIST_INSERT__((list), (cursor), (item), LIST_NEXT_(__VA_ARGS__))
-
-#define SLIST_INSERT__(list, cursor, item, next) \
-	(bfs_assert(!SLIST_ATTACHED__(list, item, next)), \
+#define SLIST_INSERT_(list, cursor, item, next) \
+	(bfs_assert(!SLIST_ATTACHED_(list, item, next)), \
 	 item->next = *cursor, \
 	 *cursor = item, \
 	 list->tail = item->next ? list->tail : &item->next, \
@@ -302,11 +232,8 @@
  * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
-#define SLIST_APPEND(list, ...) \
-	SLIST_APPEND_(list, __VA_ARGS__, )
-
-#define SLIST_APPEND_(list, item, ...) \
-	LIST_VOID_(SLIST_INSERT_(list, (list)->tail, item, __VA_ARGS__))
+#define SLIST_APPEND(list, item, ...) \
+	LIST_VOID_(SLIST_INSERT(list, (list)->tail, item, __VA_ARGS__))
 
 /**
  * Add an item to the head of a singly-linked list.
@@ -318,11 +245,8 @@
  * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
-#define SLIST_PREPEND(list, ...) \
-	SLIST_PREPEND_(list, __VA_ARGS__, )
-
-#define SLIST_PREPEND_(list, item, ...) \
-	LIST_VOID_(SLIST_INSERT_(list, &(list)->head, item, __VA_ARGS__))
+#define SLIST_PREPEND(list, item, ...) \
+	LIST_VOID_(SLIST_INSERT(list, &(list)->head, item, __VA_ARGS__))
 
 /**
  * Splice a singly-linked list into another.
@@ -366,15 +290,12 @@
  * @return
  *         The removed item.
  */
-#define SLIST_REMOVE(list, ...) \
-	SLIST_REMOVE_(list, __VA_ARGS__, )
+#define SLIST_REMOVE(list, cursor, ...) \
+	SLIST_REMOVE_((list), (cursor), LIST_NEXT_(__VA_ARGS__))
 
-#define SLIST_REMOVE_(list, cursor, ...) \
-	SLIST_REMOVE__((list), (cursor), LIST_NEXT_(__VA_ARGS__))
-
-#define SLIST_REMOVE__(list, cursor, next) \
+#define SLIST_REMOVE_(list, cursor, next) \
 	(list->tail = (*cursor)->next ? list->tail : cursor, \
-	 slist_remove_(*cursor, cursor, &(*cursor)->next, sizeof(*cursor)))
+	 (typeof(*cursor))slist_remove_(*cursor, cursor, &(*cursor)->next, sizeof(*cursor)))
 
 // Helper for SLIST_REMOVE()
 static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t size) {
@@ -396,14 +317,8 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @return
  *         The popped item, or NULL if the list was empty.
  */
-#define SLIST_POP(...) \
-	SLIST_POP_(__VA_ARGS__, )
-
-#define SLIST_POP_(list, ...) \
-	SLIST_POP__((list), __VA_ARGS__)
-
-#define SLIST_POP__(list, ...) \
-	(list->head ? SLIST_REMOVE_(list, &list->head, __VA_ARGS__) : NULL)
+#define SLIST_POP(list, ...) \
+	((list)->head ? SLIST_REMOVE(list, &(list)->head, __VA_ARGS__) : NULL)
 
 /**
  * Loop over the items in a singly-linked list.
@@ -417,15 +332,12 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  */
-#define for_slist(type, item, ...) \
-	for_slist_(type, item, __VA_ARGS__, )
+#define for_slist(type, item, list, ...) \
+	for_slist_(type, item, (list), LIST_NEXT_(__VA_ARGS__))
 
-#define for_slist_(type, item, list, ...) \
-	for_slist__(type, item, (list), LIST_NEXT_(__VA_ARGS__))
-
-#define for_slist__(type, item, list, next) \
-	for (type *item = list->head, *_next; \
-	     item && (SLIST_CHECK_(list), _next = item->next, true); \
+#define for_slist_(type, item, list, next) \
+	for (type *item = SLIST_HEAD(list), *_next; \
+	     item && (_next = item->next, true); \
 	     item = _next)
 
 /**
@@ -440,8 +352,8 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  */
-#define drain_slist(type, item, ...) \
-	for (type *item; (item = SLIST_POP(__VA_ARGS__));)
+#define drain_slist(type, item, list, ...) \
+	for (type *item; (item = SLIST_POP(list, __VA_ARGS__));)
 
 /**
  * Initialize a doubly-linked list.
@@ -456,11 +368,11 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
 	LIST_VOID_(list->head = list->tail = NULL)
 
 /**
- * LIST_PREV_()       => prev
- * LIST_PREV_(node, ) => node.prev
+ * LIST_PREV_()     => prev
+ * LIST_PREV_(node) => node.prev
  */
-#define LIST_PREV_(...) \
-	LIST_NODE_(prev, __VA_ARGS__)
+#define LIST_PREV_(node) \
+	BFS_VA_IF(node)(node.prev)(prev)
 
 /**
  * Initialize a doubly-linked list item.
@@ -470,13 +382,10 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use item->node.next rather than item->next.
  */
-#define LIST_ITEM_INIT(...) \
-	LIST_ITEM_INIT_(__VA_ARGS__, )
+#define LIST_ITEM_INIT(item, ...) \
+	LIST_ITEM_INIT_((item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
-#define LIST_ITEM_INIT_(item, ...) \
-	LIST_ITEM_INIT__((item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
-
-#define LIST_ITEM_INIT__(item, prev, next) \
+#define LIST_ITEM_INIT_(item, prev, next) \
 	LIST_VOID_(item->prev = item->next = NULL)
 
 /**
@@ -489,10 +398,7 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * Check if a doubly-linked list is empty.
  */
 #define LIST_EMPTY(list) \
-	LIST_EMPTY_((list))
-
-#define LIST_EMPTY_(list) \
-	(LIST_CHECK_(list), !list->head)
+	(LIST_CHECK_(list), !(list)->head)
 
 /**
  * Add an item to the tail of a doubly-linked list.
@@ -504,8 +410,8 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_APPEND(list, ...) \
-	LIST_INSERT(list, (list)->tail, __VA_ARGS__)
+#define LIST_APPEND(list, item, ...) \
+	LIST_INSERT(list, (list)->tail, item, __VA_ARGS__)
 
 /**
  * Add an item to the head of a doubly-linked list.
@@ -517,8 +423,8 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_PREPEND(list, ...) \
-	LIST_INSERT(list, NULL, __VA_ARGS__)
+#define LIST_PREPEND(list, item, ...) \
+	LIST_INSERT(list, NULL, item, __VA_ARGS__)
 
 /**
  * Check if an item is attached to a doubly-linked list.
@@ -532,13 +438,10 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @return
  *         Whether the item is attached to the list.
  */
-#define LIST_ATTACHED(list, ...) \
-	LIST_ATTACHED_(list, __VA_ARGS__, )
+#define LIST_ATTACHED(list, item, ...) \
+	LIST_ATTACHED_((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
-#define LIST_ATTACHED_(list, item, ...) \
-	LIST_ATTACHED__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
-
-#define LIST_ATTACHED__(list, item, prev, next) \
+#define LIST_ATTACHED_(list, item, prev, next) \
 	(item->prev || item->next || list->head == item || list->tail == item)
 
 /**
@@ -553,14 +456,11 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_INSERT(list, cursor, ...) \
-	LIST_INSERT_(list, cursor, __VA_ARGS__, )
+#define LIST_INSERT(list, cursor, item, ...) \
+	LIST_INSERT_((list), (cursor), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
-#define LIST_INSERT_(list, cursor, item, ...) \
-	LIST_INSERT__((list), (cursor), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
-
-#define LIST_INSERT__(list, cursor, item, prev, next) LIST_VOID_( \
-	bfs_assert(!LIST_ATTACHED__(list, item, prev, next)), \
+#define LIST_INSERT_(list, cursor, item, prev, next) LIST_VOID_( \
+	bfs_assert(!LIST_ATTACHED_(list, item, prev, next)), \
 	item->prev = cursor, \
 	item->next = cursor ? cursor->next : list->head, \
 	*(item->prev ? &item->prev->next : &list->head) = item, \
@@ -576,13 +476,10 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use item->node.{prev,next} rather than item->{prev,next}.
  */
-#define LIST_REMOVE(list, ...) \
-	LIST_REMOVE_(list, __VA_ARGS__, )
+#define LIST_REMOVE(list, item, ...) \
+	LIST_REMOVE_((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
 
-#define LIST_REMOVE_(list, item, ...) \
-	LIST_REMOVE__((list), (item), LIST_PREV_(__VA_ARGS__), LIST_NEXT_(__VA_ARGS__))
-
-#define LIST_REMOVE__(list, item, prev, next) LIST_VOID_( \
+#define LIST_REMOVE_(list, item, prev, next) LIST_VOID_( \
 	*(item->prev ? &item->prev->next : &list->head) = item->next, \
 	*(item->next ? &item->next->prev : &list->tail) = item->prev, \
 	item->prev = item->next = NULL)
@@ -599,15 +496,12 @@ static inline void *slist_remove_(void *ret, void *cursor, void *next, size_t si
  * @node (optional)
  *         If specified, use head->node.next rather than head->next.
  */
-#define for_list(type, item, ...) \
-	for_list_(type, item, __VA_ARGS__, )
+#define for_list(type, item, list, ...) \
+	for_list_(type, item, (list), LIST_NEXT_(__VA_ARGS__))
 
-#define for_list_(type, item, list, ...) \
-	for_list__(type, item, (list), LIST_NEXT_(__VA_ARGS__))
-
-#define for_list__(type, item, list, next) \
-	for (type *item = list->head, *_next; \
-	     item && (LIST_CHECK_(list), _next = item->next, true); \
+#define for_list_(type, item, list, next) \
+	for (type *item = (LIST_CHECK_(list), list->head), *_next; \
+	     item && (_next = item->next, true); \
 	     item = _next)
 
 #endif // BFS_LIST_H
