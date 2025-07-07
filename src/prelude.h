@@ -88,6 +88,15 @@
 
 #endif // !C23
 
+// Future C standard backports
+
+/**
+ * Get the length of an array.
+ *
+ * https://www.open-std.org/JTC1/SC22/WG14/www/docs/n3469.htm
+ */
+#define countof(...) (sizeof(__VA_ARGS__) / sizeof(0[__VA_ARGS__]))
+
 // Feature detection
 
 // https://clang.llvm.org/docs/LanguageExtensions.html#has-attribute

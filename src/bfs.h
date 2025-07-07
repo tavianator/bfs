@@ -59,11 +59,6 @@ extern const char bfs_ldlibs[];
 // Fundamental utilities
 
 /**
- * Get the length of an array.
- */
-#define countof(...) (sizeof(__VA_ARGS__) / sizeof(0[__VA_ARGS__]))
-
-/**
  * False sharing/destructive interference/largest cache line size.
  */
 #ifdef __GCC_DESTRUCTIVE_SIZE
