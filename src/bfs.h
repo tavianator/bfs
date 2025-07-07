@@ -8,6 +8,9 @@
 #ifndef BFS_H
 #define BFS_H
 
+#include <assert.h> // For __GLIBC__
+#include <stddef.h> // For offsetof
+
 // Standard versions
 
 /** Possible __STDC_VERSION__ values. */
@@ -53,10 +56,17 @@ extern const char bfs_cflags[];
 extern const char bfs_ldflags[];
 extern const char bfs_ldlibs[];
 
-// Get __GLIBC__
-#include <assert.h>
-
 // Fundamental utilities
+
+/**
+ * Given `ptr = &t->member`, return `t`.
+ */
+#define container_of(ptr, type, member) \
+	(container_of_typecheck(ptr, type, member), \
+	 (type *)((char *)ptr - offsetof(type, member)))
+
+#define container_of_typecheck(ptr, type, field) \
+	(void)sizeof(ptr - &((type *)NULL)->field)
 
 /**
  * A preprocessor conditional.
