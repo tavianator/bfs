@@ -80,6 +80,11 @@
 /** Part of <threads.h>, but we don't use anything else from it. */
 #define thread_local _Thread_local
 
+/** Get the type of an expression. */
+#define typeof __typeof__
+/** Get the unqualified type of an expression. */
+#define typeof_unqual __typeof_unqual__
+
 #endif // !C23
 
 // Future C standard backports
