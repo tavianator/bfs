@@ -8,7 +8,7 @@ include gen/vars.mk
 
 # Internal flags
 _CPPFLAGS := -Isrc -Igen -include src/prelude.h
-_CFLAGS := -std=c17
+_CFLAGS :=
 _LDFLAGS :=
 _LDLIBS :=
 
@@ -58,8 +58,7 @@ _CFLAGS += ${SAN_CFLAGS,${SAN}}
 YESLIBS := ${NOT,${_MSAN}${_TSAN}${_TYSAN}}
 NOLIBS ?= ${NOT,${YESLIBS}}
 
-# gcov only intercepts fork()/exec() with -std=gnu*
-GCOV_CFLAGS,y := -std=gnu17 --coverage
+GCOV_CFLAGS,y := --coverage
 _CFLAGS += ${GCOV_CFLAGS,${_GCOV}}
 
 LINT_CPPFLAGS,y := -D_FORTIFY_SOURCE=3 -DBFS_LINT
@@ -91,6 +90,10 @@ include build/exports.mk
 
 # Conditionally-supported flags
 AUTO_FLAGS := \
+    gen/flags/std.mk \
+    gen/flags/bind-now.mk \
+    gen/flags/deps.mk \
+    gen/flags/pthread.mk \
     gen/flags/Wformat.mk \
     gen/flags/Wimplicit-fallthrough.mk \
     gen/flags/Wimplicit.mk \
@@ -99,10 +102,7 @@ AUTO_FLAGS := \
     gen/flags/Wshadow.mk \
     gen/flags/Wsign-compare.mk \
     gen/flags/Wstrict-prototypes.mk \
-    gen/flags/Wundef-prefix.mk \
-    gen/flags/bind-now.mk \
-    gen/flags/deps.mk \
-    gen/flags/pthread.mk
+    gen/flags/Wundef-prefix.mk
 
 gen/flags.mk: ${AUTO_FLAGS}
 	${MSG} "[ GEN] $@"

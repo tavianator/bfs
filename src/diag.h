@@ -55,9 +55,9 @@ void bfs_diagf(const char *format, ...);
 /**
  * Print a message to standard error and abort.
  */
+_noreturn
 _cold
 _printf(1, 2)
-_noreturn
 void bfs_abortf(const char *format, ...);
 
 /**
