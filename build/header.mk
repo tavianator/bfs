@@ -89,5 +89,5 @@ OUT = ${SLUG:has/%=gen/has/.%.out}
 
 ${HEADERS}::
 	@${MKDIR} ${@D}
-	@build/define-if.sh ${SLUG} build/cc.sh build/${SLUG}.c -o ${OUT} >$@ 2>$@.log; \
+	@build/define-if.sh ${SLUG} build/flags-if.sh build/${SLUG}.c -o ${OUT} >$@ 2>$@.log; \
 	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
