@@ -33,11 +33,23 @@ OUTPUT=""
 OLD_FLAGS=" $XCPPFLAGS $XCFLAGS $XLDFLAGS $XLDLIBS "
 
 add_flag() {
-    if [ "${OLD_FLAGS#* $1 }" = "$OLD_FLAGS" ]; then
-        FLAGS="${FLAGS}${FLAGS:+ }$1"
-    else
-        return 1
-    fi
+    case "$1" in
+        -std=*)
+            # Don't overwrite -std=* flags
+            case "$OLD_FLAGS" in
+                *\ -std=*)
+                    return 1
+                    ;;
+            esac
+            ;;
+        *)
+            if [ "${OLD_FLAGS#* $1 }" != "$OLD_FLAGS" ]; then
+                return 1
+            fi
+            ;;
+    esac
+
+    FLAGS="${FLAGS}${FLAGS:+ }$1"
 }
 
 try_cc() {
