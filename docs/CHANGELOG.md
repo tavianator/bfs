@@ -1,6 +1,24 @@
 4.*
 ===
 
+4.1
+---
+
+**August 11, 2025**
+
+
+### New features
+
+- Added support for the `$LSCOLORS` variable used by FreeBSD and macOS
+  ([#54](https://github.com/tavianator/bfs/issues/54),
+  [#157](https://github.com/tavianator/bfs/pull/157))
+
+### Changes
+
+- Switched from C17 to [C23](https://en.cppreference.com/w/c/23) by default.
+  C17 is still supported as a fallback as long as your compiler supports some common extensions.
+
+
 4.0.8
 -----
 
