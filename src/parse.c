@@ -1612,6 +1612,14 @@ static struct bfs_expr *parse_hidden(struct bfs_parser *parser, int arg1, int ar
 }
 
 /**
+ * Parse -ignore-vcs.
+ */
+static struct bfs_expr *parse_ignore_vcs(struct bfs_parser *parser, int arg1, int arg2) {
+	parser->ctx->ignore_vcs = true;
+	return parse_nullary_option(parser);
+}
+
+/**
  * Parse -(no)?ignore_readdir_race.
  */
 static struct bfs_expr *parse_ignore_races(struct bfs_parser *parser, int ignore, int arg2) {
@@ -2801,6 +2809,8 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "      Search the NUL ('\\0')-separated paths from ${bld}FILE${rs} (${bld}-${rs} for standard input).\n");
 	cfprintf(cout, "  ${blu}-follow${rs}\n");
 	cfprintf(cout, "      Follow all symbolic links (same as ${cyn}-L${rs})\n");
+	cfprintf(cout, "  ${blu}-ignore_vcs${rs}\n");
+	cfprintf(cout, "      Ignore files and directories ignored by version control systems (e.g. git)\n");
 	cfprintf(cout, "  ${blu}-ignore_readdir_race${rs}\n");
 	cfprintf(cout, "  ${blu}-noignore_readdir_race${rs}\n");
 	cfprintf(cout, "      Whether to report an error if ${ex}%s${rs} detects that the file tree is modified\n",
@@ -3115,6 +3125,7 @@ static const struct table_entry parse_table[] = {
 	{"-group", BFS_TEST, parse_group},
 	{"-help", BFS_ACTION, parse_help},
 	{"-hidden", BFS_TEST, parse_hidden},
+	{"-ignore_vcs", BFS_OPTION, parse_ignore_vcs},
 	{"-ignore_readdir_race", BFS_OPTION, parse_ignore_races, true},
 	{"-ilname", BFS_TEST, parse_lname, true},
 	{"-iname", BFS_TEST, parse_name, true},
@@ -3834,6 +3845,10 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag) {
 		cfprintf(cerr, " ${blu}-xdev${rs}");
 	}
 
+	if (ctx->ignore_vcs) {
+		cfprintf(cerr, " ${blu}-ignore_vcs${rs}");
+	}
+
 	fputs("\n", stderr);
 
 	bfs_debug(ctx, flag, "(${red}-exclude${rs}\n");
@@ -3865,6 +3880,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	ctx->argc = argc;
+	ctx->ignore_vcs = false;
 	ctx->argv = xmemdup(argv, sizeof_array(char *, argc + 1));
 	if (!ctx->argv) {
 		perror("xmemdup()");

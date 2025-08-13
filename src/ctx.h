@@ -20,6 +20,7 @@
 #include <time.h>
 
 struct CFILE;
+struct git_repository;
 
 /**
  * The execution context for bfs.
@@ -62,6 +63,8 @@ struct bfs_ctx {
 	int optlevel;
 	/** Debugging flags (-D). */
 	enum debug_flags debug;
+	/** Whether to ignore files ignored by VCS (e.g. git). */
+	bool ignore_vcs;
 	/** Whether to ignore deletions that race with bfs (-ignore_readdir_race). */
 	bool ignore_races;
 	/** Whether to follow POSIXisms more closely ($POSIXLY_CORRECT). */
@@ -120,6 +123,11 @@ struct bfs_ctx {
 
 	/** The current time. */
 	struct timespec now;
+
+#ifdef BFS_WITH_LIBGIT2
+	/** The git repository for the current root. */
+	struct git_repository *git_repo;
+#endif
 };
 
 /**
@@ -181,4 +189,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag);
  */
 int bfs_ctx_free(struct bfs_ctx *ctx);
 
+#ifdef BFS_WITH_LIBGIT2
+bool bfs_git_ignored(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf);
+#endif // BFS_WITH_LIBGIT2
 #endif // BFS_CTX_H

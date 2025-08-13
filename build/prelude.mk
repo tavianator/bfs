@@ -65,4 +65,5 @@ ALL_PKGS := \
     libcap \
     libselinux \
     liburing \
-    oniguruma
+    oniguruma \
+    libgit2

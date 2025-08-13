@@ -49,6 +49,10 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#ifdef BFS_WITH_LIBGIT2
+#include <git2.h>
+#endif
+
 struct bfs_eval {
 	/** Data about the current file. */
 	const struct BFTW *ftwbuf;
@@ -1504,6 +1508,13 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 			goto done;
 		}
 	}
+
+#ifdef BFS_WITH_LIBGIT2
+	if (ctx->ignore_vcs && bfs_git_ignored(ctx, ftwbuf)) {
+		state.action = BFTW_PRUNE;
+		goto done;
+	}
+#endif
 
 	if (eval_expr(ctx->exclude, &state)) {
 		state.action = BFTW_PRUNE;
