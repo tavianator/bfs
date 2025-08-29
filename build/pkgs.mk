@@ -14,7 +14,6 @@ gen/pkgs.mk: ${HEADERS}
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
 	@gen() { \
-	    printf 'PKGS := %s\n' "$$*"; \
 	    printf '_CFLAGS += %s\n' "$$(build/pkgconf.sh --cflags "$$@")"; \
 	    printf '_LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
 	    printf '_LDLIBS := %s $${_LDLIBS}\n' "$$(build/pkgconf.sh --ldlibs "$$@")"; \
