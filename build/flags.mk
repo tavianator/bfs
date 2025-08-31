@@ -1,7 +1,7 @@
 # Copyright © Tavian Barnes <tavianator@tavianator.com>
 # SPDX-License-Identifier: 0BSD
 
-# Makefile that generates gen/flags.mk
+# Makefile that generates gen/{early,late}.mk
 
 include build/prelude.mk
 include gen/vars.mk
@@ -79,32 +79,10 @@ _CFLAGS += ${LTO_CFLAGS,${_LTO}}
 # Configurable flags
 CFLAGS ?= -g -Wall
 
-# Add the configurable flags last so they can override ours
-_CPPFLAGS += ${CPPFLAGS} ${EXTRA_CPPFLAGS}
-_CFLAGS += ${CFLAGS} ${EXTRA_CFLAGS}
-_LDFLAGS += ${LDFLAGS} ${EXTRA_LDFLAGS}
-# (except LDLIBS, as earlier libs override later ones)
-_LDLIBS := ${LDLIBS} ${EXTRA_LDLIBS} ${_LDLIBS}
-
 include build/exports.mk
 
-# Conditionally-supported flags
-AUTO_FLAGS := \
-    gen/flags/std.mk \
-    gen/flags/bind-now.mk \
-    gen/flags/deps.mk \
-    gen/flags/pthread.mk \
-    gen/flags/Wformat.mk \
-    gen/flags/Wimplicit-fallthrough.mk \
-    gen/flags/Wimplicit.mk \
-    gen/flags/Wmissing-decls.mk \
-    gen/flags/Wmissing-var-decls.mk \
-    gen/flags/Wshadow.mk \
-    gen/flags/Wsign-compare.mk \
-    gen/flags/Wstrict-prototypes.mk \
-    gen/flags/Wundef-prefix.mk
-
-gen/flags.mk: ${AUTO_FLAGS}
+# Saves the internal flags
+gen/early.mk::
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
 	@printf '_CPPFLAGS := %s\n' "$$XCPPFLAGS" >>$@
@@ -113,27 +91,14 @@ gen/flags.mk: ${AUTO_FLAGS}
 	@printf '_LDLIBS := %s\n' "$$XLDLIBS" >>$@
 	@printf 'NOLIBS := %s\n' "$$XNOLIBS" >>$@
 	@test "${OS}-${SAN}" != FreeBSD-y || printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@
-	@cat $^ >>$@
-	@cat ${^:%=%.log} >gen/flags.log
 	${VCAT} $@
-.PHONY: gen/flags.mk
 
-# Check that the C compiler works at all
-cc::
-	@build/cc.sh -q build/empty.c -o gen/.cc.out; \
-	    ret=$$?; \
-	    build/msg-if.sh "[ CC ] build/empty.c" test $$ret -eq 0; \
-	    exit $$ret
-
-# The short name of the config test
-SLUG = ${@:gen/%.mk=%}
-# The source file to build
-CSRC = build/${SLUG}.c
-# The hidden output file name
-OUT = ${SLUG:flags/%=gen/flags/.%.out}
-
-${AUTO_FLAGS}: cc
-	@${MKDIR} ${@D}
-	@build/flags-if.sh ${CSRC} -o ${OUT} >$@ 2>$@.log; \
-	    build/msg-if.sh "[ CC ] ${SLUG}.c" test $$? -eq 0
-.PHONY: ${AUTO_FLAGS}
+# Save explicit flags from ./configure separately so they can override the rest
+gen/late.mk::
+	${MSG} "[ GEN] $@"
+	@printf '# %s\n' "$@" >$@
+	@printf '_CPPFLAGS += %s\n' "$$CONF_CPPFLAGS" >>$@
+	@printf '_CFLAGS += %s\n' "$$CONF_CFLAGS" >>$@
+	@printf '_LDFLAGS += %s\n' "$$CONF_LDFLAGS" >>$@
+	@printf '_LDLIBS := %s $${_LDLIBS}\n' "$$CONF_LDLIBS" >>$@
+	${VCAT} $@
