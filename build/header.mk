@@ -5,8 +5,10 @@
 
 include build/prelude.mk
 include gen/vars.mk
-include gen/flags.mk
+include gen/early.mk
+include gen/auto.mk
 include gen/pkgs.mk
+include gen/late.mk
 include build/exports.mk
 
 # All header fragments we generate
