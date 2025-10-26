@@ -11,7 +11,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Install dependencies
         run: |
@@ -41,7 +41,7 @@ jobs:
         run: |
           .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: linux-x86-config.log
           path: distcheck-*/gen/config.log
@@ -53,7 +53,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Install dependencies
         run: |
@@ -72,7 +72,7 @@ jobs:
         run: |
           .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: linux-arm-config.log
           path: distcheck-*/gen/config.log
@@ -84,7 +84,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Install dependencies
         run: |
@@ -102,10 +102,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run tests
-        uses: cross-platform-actions/action@v0.29.0
+        uses: cross-platform-actions/action@e8a7b572196ff79ded1979dc2bb9ee67d1ddb252 # v0.29.0
         with:
           operating_system: freebsd
           version: "14.2"
@@ -118,7 +118,7 @@ jobs:
             sudo mount -t fdescfs none /dev/fd
             .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: freebsd-config.log
           path: distcheck-*/gen/config.log
@@ -130,10 +130,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run tests
-        uses: cross-platform-actions/action@v0.29.0
+        uses: cross-platform-actions/action@e8a7b572196ff79ded1979dc2bb9ee67d1ddb252 # v0.29.0
         with:
           operating_system: openbsd
           version: "7.7"
@@ -147,7 +147,7 @@ jobs:
             ./configure MAKE=gmake
             .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: openbsd-config.log
           path: gen/config.log
@@ -159,10 +159,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run tests
-        uses: cross-platform-actions/action@v0.29.0
+        uses: cross-platform-actions/action@e8a7b572196ff79ded1979dc2bb9ee67d1ddb252 # v0.29.0
         with:
           operating_system: netbsd
           version: "10.1"
@@ -177,7 +177,7 @@ jobs:
             ./configure
             .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: netbsd-config.log
           path: gen/config.log
@@ -189,10 +189,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run tests
-        uses: vmactions/dragonflybsd-vm@v1
+        uses: vmactions/dragonflybsd-vm@ff1f01c32b9e82f2ba388d0ff270442bcd6ceddc # v1.1.1
         with:
           release: "6.4.0"
           usesh: true
@@ -213,7 +213,7 @@ jobs:
             sudo -u action ./configure CC=clang18
             sudo -u action .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: dragonfly-config.log
           path: gen/config.log
@@ -225,10 +225,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run tests
-        uses: vmactions/omnios-vm@v1
+        uses: vmactions/omnios-vm@c31844c7abe722cd7c97df82cab1f1fab1e5339f # v1.1.1
         with:
           release: "r151052"
           usesh: true
@@ -250,7 +250,7 @@ jobs:
             sudo -u action ./configure MAKE=gmake
             sudo -u action .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: omnios-config.log
           path: gen/config.log
