@@ -228,7 +228,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Run tests
-        uses: vmactions/omnios-vm@c31844c7abe722cd7c97df82cab1f1fab1e5339f # v1.1.1
+        uses: vmactions/omnios-vm@affa9744a4f240f181f67d0962ba9d685333999e # v1.1.2
         with:
           release: "r151052"
           usesh: true
