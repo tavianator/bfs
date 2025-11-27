@@ -63,6 +63,7 @@ VCAT   := ${VCAT,${XV}}
 ALL_PKGS := \
     libacl \
     libcap \
+    libgit2 \
     libselinux \
     liburing \
     oniguruma
