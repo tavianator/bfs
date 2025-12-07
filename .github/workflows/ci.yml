@@ -194,7 +194,7 @@ jobs:
       - name: Run tests
         uses: vmactions/dragonflybsd-vm@4ffb90652b45abc8156f89ede453c85f7ea257bb # v1.1.4
         with:
-          release: "6.4.0"
+          release: "6.4.2"
           usesh: true
 
           prepare: |
