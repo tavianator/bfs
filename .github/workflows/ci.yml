@@ -41,7 +41,7 @@ jobs:
         run: |
           .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: linux-x86-config.log
           path: distcheck-*/gen/config.log
@@ -72,7 +72,7 @@ jobs:
         run: |
           .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: linux-arm-config.log
           path: distcheck-*/gen/config.log
@@ -118,7 +118,7 @@ jobs:
             sudo mount -t fdescfs none /dev/fd
             .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: freebsd-config.log
           path: distcheck-*/gen/config.log
@@ -147,7 +147,7 @@ jobs:
             ./configure MAKE=gmake
             .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: openbsd-config.log
           path: gen/config.log
@@ -177,7 +177,7 @@ jobs:
             ./configure
             .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: netbsd-config.log
           path: gen/config.log
@@ -213,7 +213,7 @@ jobs:
             sudo -u action ./configure CC=clang18
             sudo -u action .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: dragonfly-config.log
           path: gen/config.log
@@ -250,7 +250,7 @@ jobs:
             sudo -u action ./configure MAKE=gmake
             sudo -u action .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: omnios-config.log
           path: gen/config.log
