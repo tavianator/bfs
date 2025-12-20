@@ -9,6 +9,7 @@ include gen/vars.mk
 # Internal flags
 _CPPFLAGS := -Isrc -Igen -include src/prelude.h
 _CFLAGS :=
+_ARFLAGS :=
 _LDFLAGS :=
 _LDLIBS :=
 
@@ -77,7 +78,8 @@ LTO_CFLAGS,y := -flto=auto
 _CFLAGS += ${LTO_CFLAGS,${_LTO}}
 
 # Configurable flags
-CFLAGS ?= -g -Wall
+CFLAGS := -g -Wall
+ARFLAGS := rcs
 
 include build/exports.mk
 
@@ -87,6 +89,7 @@ gen/early.mk::
 	@printf '# %s\n' "$@" >$@
 	@printf '_CPPFLAGS := %s\n' "$$XCPPFLAGS" >>$@
 	@printf '_CFLAGS := %s\n' "$$XCFLAGS" >>$@
+	@printf '_ARFLAGS := %s\n' "$$XARFLAGS" >>$@
 	@printf '_LDFLAGS := %s\n' "$$XLDFLAGS" >>$@
 	@printf '_LDLIBS := %s\n' "$$XLDLIBS" >>$@
 	@printf 'NOLIBS := %s\n' "$$XNOLIBS" >>$@
@@ -99,6 +102,7 @@ gen/late.mk::
 	@printf '# %s\n' "$@" >$@
 	@printf '_CPPFLAGS += %s\n' "$$CONF_CPPFLAGS" >>$@
 	@printf '_CFLAGS += %s\n' "$$CONF_CFLAGS" >>$@
+	@printf '_ARFLAGS += %s\n' "$$CONF_ARFLAGS" >>$@
 	@printf '_LDFLAGS += %s\n' "$$CONF_LDFLAGS" >>$@
 	@printf '_LDLIBS := %s $${_LDLIBS}\n' "$$CONF_LDLIBS" >>$@
 	${VCAT} $@
