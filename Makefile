@@ -49,7 +49,11 @@ BINS := \
     bin/tests/xtouch \
     bin/bench/ioq
 
-all: ${BINS}
+# All libraries
+LIBS := \
+    lib/libbfs.a
+
+all: ${BINS} ${LIBS}
 .PHONY: all
 
 # All object files except the entry point
@@ -86,8 +90,15 @@ LIBBFS := \
 # All object files
 OBJS := ${LIBBFS}
 
+# The main library
+lib/libbfs.a: ${LIBBFS}
+
+${LIBS}:
+	@${MKDIR} ${@D}
+	+${MSG} "[ AR ] $@" ${AR} ${_ARFLAGS} $@ $^
+
 # The main binary
-bin/bfs: obj/src/main.o ${LIBBFS}
+bin/bfs: obj/src/main.o lib/libbfs.a
 OBJS += obj/src/main.o
 
 ${BINS}:
@@ -149,7 +160,7 @@ UNIT_OBJS := \
     obj/tests/xspawn.o \
     obj/tests/xtime.o
 
-bin/tests/units: ${UNIT_OBJS} ${LIBBFS}
+bin/tests/units: ${UNIT_OBJS} lib/libbfs.a
 OBJS += ${UNIT_OBJS}
 
 bin/tests/xspawnee: obj/tests/xspawnee.o
@@ -178,13 +189,13 @@ check-j1 check-j2 check-j3 check-s: bin/bfs ${ITEST_BINS}
 integration-tests: ${INTEGRATION_TESTS}
 .PHONY: integration-tests
 
-bin/tests/mksock: obj/tests/mksock.o ${LIBBFS}
+bin/tests/mksock: obj/tests/mksock.o lib/libbfs.a
 OBJS += obj/tests/mksock.o
 
-bin/tests/ptyx: obj/tests/ptyx.o ${LIBBFS}
+bin/tests/ptyx: obj/tests/ptyx.o lib/libbfs.a
 OBJS += obj/tests/ptyx.o
 
-bin/tests/xtouch: obj/tests/xtouch.o ${LIBBFS}
+bin/tests/xtouch: obj/tests/xtouch.o lib/libbfs.a
 OBJS += obj/tests/xtouch.o
 
 # `make distcheck` configurations
@@ -226,7 +237,7 @@ ${DISTCHECKS}::
 bench: bin/bench/ioq
 .PHONY: bench
 
-bin/bench/ioq: obj/bench/ioq.o ${LIBBFS}
+bin/bench/ioq: obj/bench/ioq.o lib/libbfs.a
 OBJS += obj/bench/ioq.o
 
 ## Automatic dependency tracking
@@ -300,8 +311,8 @@ check-man::
 
 # Clean all build products
 clean::
-	${MSG} "[ RM ] bin obj" \
-	    ${RM} -r bin obj
+	${MSG} "[ RM ] bin lib obj" \
+	    ${RM} -r bin lib obj
 
 # Clean everything, including generated files
 distclean: clean

@@ -1,4 +1,5 @@
 /bin/
 /gen/
+/lib/
 /obj/
 /distcheck-*/
