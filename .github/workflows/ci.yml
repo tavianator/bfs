@@ -230,7 +230,7 @@ jobs:
       - name: Run tests
         uses: vmactions/omnios-vm@4f4fcbf0847b079a6e0eafe6ff06b3d15510f0b0 # v1.1.5
         with:
-          release: "r151054"
+          release: "r151056"
           usesh: true
 
           prepare: |
