@@ -207,7 +207,7 @@ distcheck:
 .PHONY: distcheck
 
 # Per-distcheck configuration
-DISTCHECK_CONFIG_asan := --enable-asan --enable-ubsan
+DISTCHECK_CONFIG_asan := --enable-asan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_msan := --enable-msan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_tsan := --enable-tsan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_m32 := EXTRA_CFLAGS="-m32" PKG_CONFIG_LIBDIR=/usr/lib32/pkgconfig
