@@ -105,7 +105,7 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Run tests
-        uses: cross-platform-actions/action@46e8d7fb25520a8d6c64fd2b7a1192611da98eda # v0.30.0
+        uses: cross-platform-actions/action@492b0c80085400348c599edace11141a4ee73524 # v0.32.0
         with:
           operating_system: freebsd
           version: "14.2"
@@ -133,7 +133,7 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Run tests
-        uses: cross-platform-actions/action@46e8d7fb25520a8d6c64fd2b7a1192611da98eda # v0.30.0
+        uses: cross-platform-actions/action@492b0c80085400348c599edace11141a4ee73524 # v0.32.0
         with:
           operating_system: openbsd
           version: "7.8"
@@ -162,7 +162,7 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Run tests
-        uses: cross-platform-actions/action@46e8d7fb25520a8d6c64fd2b7a1192611da98eda # v0.30.0
+        uses: cross-platform-actions/action@492b0c80085400348c599edace11141a4ee73524 # v0.32.0
         with:
           operating_system: netbsd
           version: "10.1"
@@ -228,27 +228,21 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Run tests
-        uses: vmactions/omnios-vm@4f4fcbf0847b079a6e0eafe6ff06b3d15510f0b0 # v1.1.5
+        uses: cross-platform-actions/action@492b0c80085400348c599edace11141a4ee73524 # v0.32.0
         with:
-          release: "r151056"
-          usesh: true
+          operating_system: omnios
+          version: "r151056"
 
-          prepare: |
-            pkg install \
+          run: |
+            sudo pkg install \
                 bash \
                 build-essential \
                 gnu-make \
-                onig \
-                sudo
-            useradd -m -g staff action
-            echo "%staff ALL=(ALL) NOPASSWD: ALL" >>/etc/sudoers
-
-          run: |
+                onig
             PATH="/usr/xpg4/bin:$PATH"
-            chown -R action:staff .
             jobs=$(getconf NPROCESSORS_ONLN)
-            sudo -u action ./configure MAKE=gmake
-            sudo -u action .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            ./configure MAKE=gmake
+            .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
