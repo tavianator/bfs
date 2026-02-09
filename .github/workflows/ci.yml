@@ -192,7 +192,7 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Run tests
-        uses: vmactions/dragonflybsd-vm@4ffb90652b45abc8156f89ede453c85f7ea257bb # v1.1.4
+        uses: vmactions/dragonflybsd-vm@f5f91909e46784f08db2551b7c2222157e086c20 # v1.2.5
         with:
           release: "6.4.2"
           usesh: true
