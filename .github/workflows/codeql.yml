@@ -44,7 +44,7 @@ jobs:
           ./configure
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@1b168cd39490f61582a9beae412bb7057a6b2c4e # v4.31.8
+        uses: github/codeql-action/init@0d579ffd059c29b07949a3cce3983f0780820c98 # v4.32.6
         with:
           languages: cpp
           queries: +security-and-quality
@@ -55,6 +55,6 @@ jobs:
           make -j$(nproc) all
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@1b168cd39490f61582a9beae412bb7057a6b2c4e # v4.31.8
+        uses: github/codeql-action/analyze@0d579ffd059c29b07949a3cce3983f0780820c98 # v4.32.6
         with:
           category: "/language:cpp"
