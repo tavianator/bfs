@@ -1187,7 +1187,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, size_t coun
 	for (size_t i = lhslen; lhslen < pathlen; lhslen = i) {
 		wint_t wc = xmbrtowc(status, &i, pathlen, &mb);
 		int cwidth;
-		if (wc == WEOF) {
+		if (wc == (wint_t)WEOF) {
 			// Invalid byte sequence, assume a single-width '?'
 			cwidth = 1;
 		} else {

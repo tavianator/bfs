@@ -238,6 +238,7 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
 #define BFS_POSIX_SPAWN_AFTER_FCHDIR !__NetBSD__
 
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
+#if BFS_HAS_FCHDIR
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
 	if (!action) {
 		return -1;
@@ -275,6 +276,10 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 	action->in_fd = fd;
 	SLIST_APPEND(ctx, action);
 	return 0;
+#else // !BFS_HAS_FCHDIR
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
@@ -627,10 +632,15 @@ static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx
 			}
 			break;
 		case BFS_SPAWN_FCHDIR:
+#if BFS_HAS_FCHDIR
 			if (fchdir(action->in_fd) != 0) {
 				goto fail;
 			}
 			break;
+#else
+			errno = ENOTSUP;
+			goto fail;
+#endif
 		case BFS_SPAWN_SETRLIMIT:
 			if (setrlimit(action->resource, &action->rlimit) != 0) {
 				goto fail;

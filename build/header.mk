@@ -22,11 +22,13 @@ HEADERS := \
     gen/has/acl-trivial.h \
     gen/has/builtin-riscv-pause.h \
     gen/has/confstr.h \
+    gen/has/ctermid.h \
     gen/has/dprintf.h \
     gen/has/extattr-get-file.h \
     gen/has/extattr-get-link.h \
     gen/has/extattr-list-file.h \
     gen/has/extattr-list-link.h \
+    gen/has/fchdir.h \
     gen/has/fdclosedir.h \
     gen/has/getdents.h \
     gen/has/getdents64-syscall.h \
