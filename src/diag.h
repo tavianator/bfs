@@ -66,7 +66,7 @@ void bfs_abortf(const char *format, ...);
  * Abort with a message including the last error.
  */
 #define bfs_eabort(format, ...) \
-	BFS_VA_IF(__VA_ARGS__) \
+	BFS_VA_IF(format) \
 		(bfs_abort(format ": %s", __VA_ARGS__ __VA_OPT__(,) errstr())) \
 		(bfs_abort("%s", errstr()))
 
