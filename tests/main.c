@@ -112,7 +112,7 @@ static bool should_run(const struct test_ctx *ctx, const char *test) {
 /** Wait for a test to finish. */
 static void wait_test(struct test_ctx *ctx) {
 	int wstatus;
-	pid_t pid = xwaitpid(0, &wstatus, 0);
+	pid_t pid = xwaitpid(-1, &wstatus, 0);
 	bfs_everify(pid > 0, "xwaitpid()");
 
 	struct test_proc *proc = NULL;
