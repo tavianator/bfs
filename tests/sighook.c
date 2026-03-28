@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -199,6 +200,13 @@ static void check_sigexit(int sig) {
 		// Child
 		xclose(ready[0]);
 		xclose(killed[0]);
+
+		// Don't dump core
+		const struct rlimit rl = {
+			.rlim_cur = 0,
+			.rlim_max = 0,
+		};
+		setrlimit(RLIMIT_CORE, &rl);
 
 		// exit_hook() will write to killed[1]
 		bfs_everify(atsigexit(exit_hook, killed) != NULL);
