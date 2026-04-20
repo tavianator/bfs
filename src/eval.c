@@ -1505,6 +1505,13 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 		}
 	}
 
+#if BFS_WITH_LIBGIT2
+	if (ctx->ignore_vcs && bftw_is_gitignored(ftwbuf, ctx)) {
+		state.action = BFTW_PRUNE;
+		goto done;
+	}
+#endif
+
 	if (eval_expr(ctx->exclude, &state)) {
 		state.action = BFTW_PRUNE;
 		goto done;
