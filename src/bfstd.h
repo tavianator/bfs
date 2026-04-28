@@ -319,6 +319,11 @@ void xstrmode(mode_t mode, char str[11]);
  */
 int rlim_cmp(rlim_t a, rlim_t b);
 
+/**
+ * @return The minimum of two rlim_t values.
+ */
+rlim_t rlim_min(rlim_t a, rlim_t b);
+
 #include <sys/types.h>
 
 /**

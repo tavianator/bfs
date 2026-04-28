@@ -610,6 +610,14 @@ int rlim_cmp(rlim_t a, rlim_t b) {
 	return (a > b) - (a < b);
 }
 
+rlim_t rlim_min(rlim_t a, rlim_t b) {
+	if (rlim_cmp(a, b) <= 0) {
+		return a;
+	} else {
+		return b;
+	}
+}
+
 dev_t xmakedev(int ma, int mi) {
 #if __QNX__
 	return makedev(0, ma, mi);

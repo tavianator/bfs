@@ -1558,12 +1558,14 @@ static int raise_fdlimit(struct bfs_ctx *ctx) {
 		max = cur;
 	}
 
+	// Default to 64k files
 	rlim_t target = 64 << 10;
-	if (rlim_cmp(target, max) > 0) {
-		target = max;
-	}
+
+	// Don't exceed ulimit -Hn
+	target = rlim_min(target, max);
 
 	if (rlim_cmp(target, cur) <= 0) {
+		// No need to raise the limit
 		return target;
 	}
 
@@ -1573,6 +1575,7 @@ static int raise_fdlimit(struct bfs_ctx *ctx) {
 	};
 
 	if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		// Failed to raise, return the original limit
 		return cur;
 	}
 
