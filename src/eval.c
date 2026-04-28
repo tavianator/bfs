@@ -49,6 +49,10 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#if BFS_HAS_SYSCTLBYNAME
+#  include <sys/sysctl.h>
+#endif
+
 struct bfs_eval {
 	/** Data about the current file. */
 	const struct BFTW *ftwbuf;
@@ -1550,6 +1554,62 @@ done:
 	return state.action;
 }
 
+#if BFS_HAS_SYSCTLBYNAME
+/** Simple wrapper over sysctlbyname() that only reads. */
+static int xsysctl(const char *name, void *ptr, size_t size) {
+	size_t retsize = size;
+	int ret = sysctlbyname(name, ptr, &retsize, NULL, 0);
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (retsize != size) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	return 0;
+}
+#endif
+
+/** Get the system-wide open file limit if possible. */
+static rlim_t system_fdlimit(void) {
+	rlim_t ret = RLIM_INFINITY;
+
+#if BFS_HAS_SYSCTLBYNAME
+	int32_t value;
+	if (xsysctl("kern.maxfiles", &value, sizeof(value)) == 0) {
+		ret = value;
+	}
+#elif __linux__
+	FILE *file = xfopen("/proc/sys/fs/file-max", O_RDONLY | O_CLOEXEC);
+	if (!file) {
+		return ret;
+	}
+
+	long value;
+	if (fscanf(file, "%ld", &value) == 1) {
+		ret = value;
+	}
+
+	fclose(file);
+#endif
+
+	return ret;
+}
+
+/** Get the per-process open file limit, if different from ulimit -n. */
+static rlim_t process_fdlimit(void) {
+#if BFS_HAS_SYSCTLBYNAME
+	int32_t value;
+	if (xsysctl("kern.maxfilesperproc", &value, sizeof(value)) == 0) {
+		return value;
+	}
+#endif
+
+	return RLIM_INFINITY;
+}
+
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
 static int raise_fdlimit(struct bfs_ctx *ctx) {
 	rlim_t cur = ctx->orig_nofile.rlim_cur;
@@ -1563,6 +1623,16 @@ static int raise_fdlimit(struct bfs_ctx *ctx) {
 
 	// Don't exceed ulimit -Hn
 	target = rlim_min(target, max);
+
+	// FreeBSD/macOS have a fairly low system-wide limit that we should try to respect
+	rlim_t sys_limit = system_fdlimit();
+	if (sys_limit != RLIM_INFINITY) {
+		// Play nice and restrict ourselves to 1/16th of the system-wide limit
+		target = rlim_min(target, sys_limit / 16);
+	}
+
+	// FreeBSD/macOS have this limit separately from ulimit -n
+	target = rlim_min(target, process_fdlimit());
 
 	if (rlim_cmp(target, cur) <= 0) {
 		// No need to raise the limit
