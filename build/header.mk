@@ -59,6 +59,7 @@ HEADERS := \
     gen/has/strerror-r-posix.h \
     gen/has/string-to-flags.h \
     gen/has/strtofflags.h \
+    gen/has/sysctlbyname.h \
     gen/has/tcgetwinsize.h \
     gen/has/tcsetwinsize.h \
     gen/has/timegm.h \
