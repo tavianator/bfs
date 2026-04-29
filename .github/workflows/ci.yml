@@ -196,6 +196,7 @@ jobs:
         with:
           release: "6.4.2"
           usesh: true
+          envs: "GITHUB_JOB"
 
           prepare: |
             pkg install -y \
@@ -211,7 +212,7 @@ jobs:
             chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
             sudo -u action ./configure CC=clang18
-            sudo -u action .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            sudo -u action --preserve-env=GITHUB_JOB .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
