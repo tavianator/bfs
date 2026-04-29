@@ -192,26 +192,21 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Run tests
-        uses: vmactions/dragonflybsd-vm@17fba5ae01ae16ac714dead56eed198c3b2e210e # v1.2.8
+        uses: cross-platform-actions/action@233156312992f3f169d8d0c633c21d12a5d30455 # v1.0.0
         with:
-          release: "6.4.2"
-          usesh: true
+          operating_system: dragonflybsd
+          version: "6.4.2"
 
-          prepare: |
-            pkg install -y \
+          run: |
+            sudo pkg install -y \
                 bash \
                 llvm18 \
                 oniguruma \
                 pkgconf \
                 sudo
-            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
-            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
-
-          run: |
-            chown -R action:action .
             jobs=$(sysctl -n hw.ncpu)
-            sudo -u action ./configure CC=clang18
-            sudo -u action .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+            ./configure CC=clang18
+            .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
