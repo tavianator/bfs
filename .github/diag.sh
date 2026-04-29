@@ -14,7 +14,7 @@ if sed -u 's/s/s/' </dev/null &>/dev/null; then
 fi
 
 filter() {
-    sed $SEDFLAGS 'p; s/^([^:]*):([^:]*):([^:]*): (warning|error): (.*)$/::\4 file=\1,line=\2,col=\3,title=Compiler \4::\5/p'
+    sed $SEDFLAGS 'p; s/^([^:]*):([^:]*):([^:]*): (warning|error): (.*)$/::\4 file=\1,line=\2,col=\3,title=['"$GITHUB_JOB"'] Compiler \4::\5/p'
 }
 
 exec "$@" > >(filter) 2> >(filter >&2)
