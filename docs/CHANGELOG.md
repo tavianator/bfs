@@ -1,11 +1,31 @@
 4.*
 ===
 
+4.1.1
+-----
+
+**April 29, 2026**
+
+## Bug fixes
+
+- Fixed `./configure CFLAGS=...` being overridden by auto-detected flags
+  ([`70341236`](https://github.com/tavianator/bfs/commit/703412368c8afc811f2cec47684054e3875b607b))
+
+- Fixed the build for [WASIX](https://wasix.org/)
+  ([`5de89564`](https://github.com/tavianator/bfs/commit/5de89564baf301b93f09d567c96e6b991e6be30c))
+
+- Fixed the build on Android < 11
+  ([#215](https://github.com/tavianator/bfs/issues/215))
+
+- `bfs` now takes system-wide open file limits into account.
+  Previously, a handful of concurrent `bfs` instances could overwhelm a system with a low global limit, particularly macOS.
+  ([`6f6f760a`](https://github.com/tavianator/bfs/commit/6f6f760a138a9c16471bffc56eabc0a5f6431645))
+
+
 4.1
 ---
 
 **August 11, 2025**
-
 
 ### New features
 
