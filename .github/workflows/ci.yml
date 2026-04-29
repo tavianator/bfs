@@ -213,28 +213,28 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: vmactions/dragonflybsd-vm@17fba5ae01ae16ac714dead56eed198c3b2e210e # v1.2.8
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
-          release: "6.4.2"
-          usesh: true
-          envs: "GITHUB_JOB"
+          operating_system: dragonflybsd
+          version: "6.4.2"
 
-          prepare: |
-            pkg install -y \
-                bash \
-                llvm18 \
-                oniguruma \
-                pkgconf \
-                sudo
-            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
-            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg install -y \
+              bash \
+              llvm18 \
+              oniguruma \
+              pkgconf \
+              sudo
 
-          run: |
-            chown -R action:action .
-            jobs=$(sysctl -n hw.ncpu)
-            sudo -u action ./configure CC=clang18
-            sudo -u action --preserve-env=GITHUB_JOB .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          jobs=$(sysctl -n hw.ncpu)
+          ./configure CC=clang18
+          .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
