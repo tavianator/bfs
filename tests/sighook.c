@@ -18,20 +18,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-/** Counts SIGALRM deliveries. */
-static atomic size_t count = 0;
-
-/** SIGALRM handler. */
-static void alrm_hook(int sig, siginfo_t *info, void *arg) {
-	fetch_add(&count, 1, relaxed);
-}
-
-/** SH_ONESHOT counter. */
-static atomic size_t shots = 0;
-
-/** SH_ONESHOT hook. */
-static void alrm_oneshot(int sig, siginfo_t *info, void *arg) {
-	fetch_add(&shots, 1, relaxed);
+/** Signal handler that increments a counter. */
+static void counter_hook(int sig, siginfo_t *info, void *arg) {
+	atomic size_t *counter = arg;
+	fetch_add(counter, 1, relaxed);
 }
 
 /** Keeps the background thread alive. */
@@ -69,10 +59,13 @@ static int block_signal(int sig, sigset_t *old) {
 
 /** Tests for sighook(). */
 static void check_hooks(void) {
+	atomic size_t count = 0; // SIGALRM counter
+	atomic size_t shots = 0; // SH_ONESHOT counter
+
 	struct sighook *hook = NULL;
 	struct sighook *oneshot = NULL;
 
-	hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
+	hook = sighook(SIGALRM, counter_hook, &count, SH_CONTINUE);
 	if (!bfs_echeck(hook, "sighook(SIGALRM)")) {
 		return;
 	}
@@ -92,13 +85,13 @@ static void check_hooks(void) {
 
 	// Check that we can unregister and re-register a hook
 	sigunhook(hook);
-	hook = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
+	hook = sighook(SIGALRM, counter_hook, &count, SH_CONTINUE);
 	if (!bfs_echeck(hook, "sighook(SIGALRM)")) {
 		goto unblock;
 	}
 
 	// Test SH_ONESHOT
-	oneshot = sighook(SIGALRM, alrm_oneshot, NULL, SH_ONESHOT);
+	oneshot = sighook(SIGALRM, counter_hook, &shots, SH_ONESHOT);
 	if (!bfs_echeck(oneshot, "sighook(SH_ONESHOT)")) {
 		goto unblock;
 	}
@@ -123,7 +116,7 @@ static void check_hooks(void) {
 			oneshot = NULL;
 		}
 
-		struct sighook *next = sighook(SIGALRM, alrm_hook, NULL, SH_CONTINUE);
+		struct sighook *next = sighook(SIGALRM, counter_hook, &count, SH_CONTINUE);
 		if (!bfs_echeck(next, "sighook(SIGALRM)")) {
 			break;
 		}
