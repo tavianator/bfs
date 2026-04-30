@@ -53,7 +53,7 @@ bool error_is_like(int error, int category) {
 
 	case ENOSYS:
 		// https://github.com/opencontainers/runc/issues/2151
-		return errno == EPERM;
+		return error == EPERM;
 
 #if __DragonFly__
 	// https://twitter.com/tavianator/status/1742991411203485713
