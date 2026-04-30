@@ -717,7 +717,7 @@ fail:
 }
 
 static bool str_isset(const char *str) {
-    return str && *str;
+	return str && *str;
 }
 
 struct colors *parse_colors(void) {
