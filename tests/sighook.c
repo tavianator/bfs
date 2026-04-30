@@ -215,6 +215,38 @@ static void check_sigexit(int sig) {
 	}
 }
 
+/** Regression test for removing the last hook in the list. */
+static void check_sigunhook_tail(void) {
+	atomic size_t count = 0;
+
+	struct sighook *h1 = sighook(SIGUSR1, counter_hook, &count, SH_CONTINUE);
+	if (!bfs_echeck(h1, "sighook(SIGUSR1)")) {
+		return;
+	}
+
+	struct sighook *h2 = sighook(SIGUSR1, counter_hook, &count, SH_CONTINUE);
+	if (!bfs_check(h2, "sighook(SIGUSR1)")) {
+		sigunhook(h1);
+		return;
+	}
+
+	sigunhook(h2);
+
+	h2 = sighook(SIGUSR1, counter_hook, &count, SH_CONTINUE);
+	if (!bfs_check(h2, "sighook(SIGUSR1)")) {
+		sigunhook(h1);
+		return;
+	}
+
+	bfs_echeck(raise(SIGUSR1) == 0);
+
+	size_t value = load(&count, relaxed);
+	bfs_check(value == 2, "Expected 2 hooks to fire, but saw %zu", value);
+
+	sigunhook(h2);
+	sigunhook(h1);
+}
+
 void check_sighook(void) {
 	check_hooks();
 
@@ -226,4 +258,6 @@ void check_sighook(void) {
 #if !__APPLE__
 	check_sigexit(SIGSEGV);
 #endif
+
+	check_sigunhook_tail();
 }

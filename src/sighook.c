@@ -290,7 +290,7 @@ static void rcu_list_remove(struct rcu_list *list, struct rcu_node *node) {
 	if (next) {
 		next->self = node->self;
 	} else {
-		list->tail = &list->head;
+		list->tail = node->self;
 	}
 	rcu_destroy(&node->next);
 }
@@ -298,7 +298,7 @@ static void rcu_list_remove(struct rcu_list *list, struct rcu_node *node) {
 /**
  * Iterate over an rcu_list.
  *
- * It is save to `break` out of this loop, but `return` or `goto` will lead to
+ * It is safe to `break` out of this loop, but `return` or `goto` will lead to
  * a missed arc_put().
  */
 #define for_rcu(type, node, list) \
