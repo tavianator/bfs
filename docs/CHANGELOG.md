@@ -1,6 +1,19 @@
 4.*
 ===
 
+4.1.2
+-----
+
+**May 6, 2026**
+
+## Bug fixes
+
+- Fixed `./configure`-time detection of `sysctlbyname()` on FreeBSD
+  ([#219](https://github.com/tavianator/bfs/issues/219))
+
+- Bumped the default version number, which was missed in 4.1.1
+
+
 4.1.1
 -----
 
