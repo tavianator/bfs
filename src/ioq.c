@@ -662,8 +662,6 @@ struct ioq_ring_state {
 	struct io_uring *ring;
 	/** Supported io_uring operations. */
 	enum ioq_ring_ops ops;
-	/** Number of prepped, unsubmitted SQEs. */
-	size_t prepped;
 	/** Number of submitted, unreaped SQEs. */
 	size_t submitted;
 	/** Whether to stop the loop. */
@@ -755,10 +753,11 @@ static void ioq_ring_drain(struct ioq_ring_state *state, size_t wait_nr) {
 static void ioq_ring_submit(struct ioq_ring_state *state) {
 	struct io_uring *ring = state->ring;
 
-	size_t unreaped = state->prepped + state->submitted;
+	size_t prepped = io_uring_sq_ready(ring);
+	size_t unreaped = prepped + state->submitted;
 	size_t wait_nr = 0;
 
-	if (state->prepped == 0 && unreaped > 0) {
+	if (prepped == 0 && unreaped > 0) {
 		// If we have no new SQEs, wait for at least one old one to
 		// complete, to avoid livelock
 		wait_nr = 1;
@@ -770,15 +769,15 @@ static void ioq_ring_submit(struct ioq_ring_state *state) {
 	}
 
 	// Submit all prepped SQEs
-	while (state->prepped > 0) {
+	while (prepped > 0) {
 		int ret = io_uring_submit_and_wait(state->ring, wait_nr);
 		if (ret <= 0) {
 			continue;
 		}
 
 		state->submitted += ret;
-		state->prepped -= ret;
-		if (state->prepped > 0) {
+		prepped -= ret;
+		if (prepped > 0) {
 			// In the unlikely event of a short submission, any SQE
 			// links will be broken.  Wait for all SQEs to complete
 			// to preserve any ordering requirements.
@@ -861,7 +860,8 @@ static struct io_uring_sqe *ioq_dispatch_async(struct ioq_ring_state *state, str
 
 /** Check if ioq_ring_reap() has work to do. */
 static bool ioq_ring_empty(struct ioq_ring_state *state) {
-	return !state->prepped && !state->submitted && ioq_batch_empty(&state->ready);
+	size_t prepped = io_uring_sq_ready(state->ring);
+	return !prepped && !state->submitted && ioq_batch_empty(&state->ready);
 }
 
 /** Prep a single SQE. */
@@ -875,7 +875,6 @@ static void ioq_prep_sqe(struct ioq_ring_state *state, struct ioq_ent *ent) {
 	struct io_uring_sqe *sqe = ioq_dispatch_async(state, ent);
 	if (sqe) {
 		io_uring_sqe_set_data(sqe, ent);
-		++state->prepped;
 	} else {
 		ioq_dispatch_sync(ioq, ent);
 		ioq_batch_push(ioq->ready, &state->ready, ent);
