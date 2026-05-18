@@ -254,7 +254,7 @@ jobs:
         uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: omnios
-          version: "r151056"
+          version: "r151058"
 
       - name: Install dependencies
         shell: cpa.sh {0}
