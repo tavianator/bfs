@@ -108,19 +108,25 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@233156312992f3f169d8d0c633c21d12a5d30455 # v1.0.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: freebsd
           version: "15.0"
 
-          run: |
-            sudo pkg install -y \
-                bash \
-                oniguruma \
-                pkgconf
-            sudo mount -t fdescfs none /dev/fd
-            .github/diag.sh make -j$(nproc) distcheck
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg install -y \
+              bash \
+              oniguruma \
+              pkgconf
+          sudo mount -t fdescfs none /dev/fd
+
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          .github/diag.sh make -j$(nproc) distcheck
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -136,20 +142,26 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@233156312992f3f169d8d0c633c21d12a5d30455 # v1.0.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: openbsd
           version: "7.8"
 
-          run: |
-            sudo pkg_add \
-                bash \
-                gmake \
-                oniguruma
-            jobs=$(sysctl -n hw.ncpu)
-            ./configure MAKE=gmake
-            .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg_add \
+              bash \
+              gmake \
+              oniguruma
+
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          jobs=$(sysctl -n hw.ncpu)
+          ./configure MAKE=gmake
+          .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -165,21 +177,27 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@233156312992f3f169d8d0c633c21d12a5d30455 # v1.0.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: netbsd
           version: "10.1"
 
-          run: |
-            PATH="/sbin:/usr/sbin:$PATH"
-            sudo pkgin -y install \
-                bash \
-                oniguruma \
-                pkgconf
-            jobs=$(sysctl -n hw.ncpu)
-            ./configure
-            .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkgin -y install \
+              bash \
+              oniguruma \
+              pkgconf
+
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          PATH="/sbin:/usr/sbin:$PATH"
+          jobs=$(sysctl -n hw.ncpu)
+          ./configure
+          .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -232,22 +250,28 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@233156312992f3f169d8d0c633c21d12a5d30455 # v1.0.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: omnios
           version: "r151056"
 
-          run: |
-            sudo pkg install \
-                bash \
-                build-essential \
-                gnu-make \
-                onig
-            PATH="/usr/xpg4/bin:$PATH"
-            jobs=$(getconf NPROCESSORS_ONLN)
-            ./configure MAKE=gmake
-            .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg install \
+              bash \
+              build-essential \
+              gnu-make \
+              onig
+
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          PATH="/usr/xpg4/bin:$PATH"
+          jobs=$(getconf NPROCESSORS_ONLN)
+          ./configure MAKE=gmake
+          .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
