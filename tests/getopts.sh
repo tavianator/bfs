@@ -146,7 +146,13 @@ parse_args() {
     # Try to resolve the path to $BFS before we cd, while also supporting
     # --bfs="./bin/bfs -S ids"
     read -a BFS <<<"${BFS:-$BIN/bfs}"
-    BFS[0]=$(_realpath "$(command -v "${BFS[0]}")")
+    local bfs
+    if ! bfs=$(command -v "${BFS[0]}"); then
+        color printf "${RED}error:${RST} Command not found: ${RED}%s${RST}\n\n" "${BFS[0]}" >&2
+        usage >&2
+        exit 1
+    fi
+    BFS[0]=$(_realpath "$bfs")
 
     if ((${#PATTERNS[@]} == 0)); then
         PATTERNS=("*")
