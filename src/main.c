@@ -123,9 +123,13 @@ static void find2fd_extract(struct bfs_exprs *exprs, struct bfs_expr *expr) {
 	}
 }
 
+#define xdstrcat(...) bfs_everify(dstrcat(__VA_ARGS__) == 0)
+#define xdstrcatf(...) bfs_everify(dstrcatf(__VA_ARGS__) == 0)
+#define xdstrescat(...) bfs_everify(dstrescat(__VA_ARGS__) == 0)
+
 static void shellesc(dchar **cmdline, const char *str) {
-	dstrcat(cmdline, " ");
-	dstrescat(cmdline, str, WESC_SHELL | WESC_TTY);
+	xdstrcat(cmdline, " ");
+	xdstrescat(cmdline, str, WESC_SHELL | WESC_TTY);
 }
 
 /**
@@ -231,11 +235,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	dchar *cmdline = dstralloc(0);
+	bfs_everify(cmdline, "dstralloc()");
 
-	dstrcat(&cmdline, "fd --no-ignore");
+	xdstrcat(&cmdline, "fd --no-ignore");
 
 	if (hidden) {
-		dstrcat(&cmdline, " --hidden");
+		xdstrcat(&cmdline, " --hidden");
 	}
 
 	if (ctx->flags & BFTW_POST_ORDER) {
@@ -247,43 +252,43 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 	if (ctx->flags & BFTW_FOLLOW_ALL) {
-		dstrcat(&cmdline, " --follow");
+		xdstrcat(&cmdline, " --follow");
 	}
 	if (ctx->flags & (BFTW_SKIP_MOUNTS | BFTW_PRUNE_MOUNTS)) {
-		dstrcat(&cmdline, " --one-file-system");
+		xdstrcat(&cmdline, " --one-file-system");
 	}
 
 	if (ctx->mindepth == ctx->maxdepth) {
-		dstrcatf(&cmdline, " --exact-depth %d", ctx->mindepth);
+		xdstrcatf(&cmdline, " --exact-depth %d", ctx->mindepth);
 	} else {
 		if (ctx->mindepth > 0) {
-			dstrcatf(&cmdline, " --min-depth %d", ctx->mindepth);
+			xdstrcatf(&cmdline, " --min-depth %d", ctx->mindepth);
 		}
 		if (ctx->maxdepth < INT_MAX) {
-			dstrcatf(&cmdline, " --max-depth %d", ctx->mindepth);
+			xdstrcatf(&cmdline, " --max-depth %d", ctx->mindepth);
 		}
 	}
 
 	if (type) {
 		unsigned int types = type->num;
 		if (types & (1 << BFS_REG)) {
-			dstrcat(&cmdline, " --type file");
+			xdstrcat(&cmdline, " --type file");
 			types ^= (1 << BFS_REG);
 		}
 		if (types & (1 << BFS_DIR)) {
-			dstrcat(&cmdline, " --type directory");
+			xdstrcat(&cmdline, " --type directory");
 			types ^= (1 << BFS_DIR);
 		}
 		if (types & (1 << BFS_LNK)) {
-			dstrcat(&cmdline, " --type symlink");
+			xdstrcat(&cmdline, " --type symlink");
 			types ^= (1 << BFS_LNK);
 		}
 		if (types & (1 << BFS_SOCK)) {
-			dstrcat(&cmdline, " --type socket");
+			xdstrcat(&cmdline, " --type socket");
 			types ^= (1 << BFS_SOCK);
 		}
 		if (types & (1 << BFS_FIFO)) {
-			dstrcat(&cmdline, " --type pipe");
+			xdstrcat(&cmdline, " --type pipe");
 			types ^= (1 << BFS_FIFO);
 		}
 		if (types) {
@@ -294,30 +299,30 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (executable) {
-		dstrcat(&cmdline, " --type executable");
+		xdstrcat(&cmdline, " --type executable");
 	}
 
 	if (empty) {
-		dstrcat(&cmdline, " --type empty");
+		xdstrcat(&cmdline, " --type empty");
 	}
 
 	if (action->eval_fn == eval_fprint0) {
-		dstrcat(&cmdline, " --print0");
+		xdstrcat(&cmdline, " --print0");
 	} else if (action->eval_fn == eval_fls) {
-		dstrcat(&cmdline, " --list-details");
+		xdstrcat(&cmdline, " --list-details");
 	}
 
 	if (pattern) {
 		if (pattern->eval_fn != eval_name) {
-			dstrcat(&cmdline, " --full-path");
+			xdstrcat(&cmdline, " --full-path");
 		}
 		if (pattern->eval_fn != eval_regex) {
-			dstrcat(&cmdline, " --glob");
+			xdstrcat(&cmdline, " --glob");
 		}
 		if (pattern->argv[0][1] == 'i') {
-			dstrcat(&cmdline, " --ignore-case");
+			xdstrcat(&cmdline, " --ignore-case");
 		} else {
-			dstrcat(&cmdline, " --case-sensitive");
+			xdstrcat(&cmdline, " --case-sensitive");
 		}
 		shellesc(&cmdline, pattern->argv[1]);
 	}
@@ -325,7 +330,7 @@ int main(int argc, char *argv[]) {
 	for (size_t i = 0; i < ctx->npaths; ++i) {
 		const char *path = ctx->paths[i];
 		if (!pattern || path[0] == '-') {
-			dstrcat(&cmdline, " --search-path");
+			xdstrcat(&cmdline, " --search-path");
 		}
 		shellesc(&cmdline, path);
 	}
@@ -333,9 +338,9 @@ int main(int argc, char *argv[]) {
 	if (action->eval_fn == eval_exec) {
 		struct bfs_exec *execbuf = action->exec;
 
-		dstrcat(&cmdline, " --exec");
+		xdstrcat(&cmdline, " --exec");
 		if (execbuf->flags & BFS_EXEC_MULTI) {
-			dstrcat(&cmdline, "-batch");
+			xdstrcat(&cmdline, "-batch");
 		}
 
 		bool placeholder = false;
