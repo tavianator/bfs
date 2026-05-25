@@ -38,7 +38,7 @@ make_perms() {
     "$XTOUCH" -p -M400 "$1/fr--------"
     "$XTOUCH" -p -M500 "$1/fr-x------" "$1/dr-x------/"
     "$XTOUCH" -p -M600 "$1/frw-------"
-    "$XTOUCH" -p -M700 "$1/frwxr-----" "$1/drwx------/"
+    "$XTOUCH" -p -M700 "$1/frwx------" "$1/drwx------/"
 }
 
 # Creates a file+directory structure with various symbolic and hard links
