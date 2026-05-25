@@ -204,14 +204,29 @@ _nproc() {
     } 2>/dev/null
 }
 
+# Stores the PID that exited from the last _wait call
+WAIT_PID=
+
 # Run wait, looping if interrupted
 _wait() {
-    local ret=130
+    local ret
 
-    # "If wait is interrupted by a signal, the return status will be greater than 128"
-    while ((ret > 128)); do
+    while :; do
 	ret=0
-	wait "$@" || ret=$?
+	wait -pWAIT_PID "$@" || ret=$?
+
+        if [ "${WAIT_PID:-}" ]; then
+            # If WAIT_PID is filled in, the child exited (possibly with a status > 128)
+            break
+        elif ((ret > 128)); then
+            # https://www.gnu.org/software/bash/manual/bash.html#index-wait
+            #
+            #     If wait is interrupted by a signal, the return status will be greater than 128
+            continue
+        else
+            # wait itself failed (e.g. invalid PID)
+            break
+        fi
     done
 
     return $ret

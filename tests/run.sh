@@ -94,14 +94,14 @@ reap_test() {
 
 # Wait for a background test to finish
 wait_test() {
-    local pid line ret
+    local line ret
 
     while :; do
         line=$((LINENO + 1))
-        _wait -n -ppid
+        _wait -n
         ret=$?
 
-        if [ "${pid:-}" ]; then
+        if [ "${WAIT_PID:-}" ]; then
             break
         else
             debug "${BASH_SOURCE[0]}" $line "${RED}error $ret${RST}" >&$DUPERR
