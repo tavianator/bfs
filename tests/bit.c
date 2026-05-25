@@ -156,5 +156,5 @@ void check_bit(void) {
 
 	bfs_check(!has_single_bit(0U));
 	bfs_check(!has_single_bit(UINT32_MAX));
-	bfs_check(has_single_bit((uint32_t)1 << (UINT_WIDTH - 1)));
+	bfs_check(has_single_bit(1U << (UINT_WIDTH - 1)));
 }
