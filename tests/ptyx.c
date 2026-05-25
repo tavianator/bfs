@@ -214,7 +214,7 @@ int main(int argc, char *argv[]) {
 	while (true) {
 		ssize_t len = read(ptm, buf, sizeof(buf));
 		if (len > 0) {
-			if (xwrite(STDOUT_FILENO, buf, len) < 0) {
+			if (xwrite(STDOUT_FILENO, buf, len) != (size_t)len) {
 				edie("write()");
 			}
 		} else if (len == 0) {

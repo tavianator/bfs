@@ -23,6 +23,7 @@ AUTO_FLAGS := \
     gen/flags/Wshadow.mk \
     gen/flags/Wsign-compare.mk \
     gen/flags/Wstrict-prototypes.mk \
+    gen/flags/Wtautological-uzc.mk \
     gen/flags/Wundef-prefix.mk
 
 gen/auto.mk: ${AUTO_FLAGS}
