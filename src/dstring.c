@@ -1,11 +1,12 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "dstring.h"
+
 #include "alloc.h"
 #include "bit.h"
 #include "diag.h"
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -22,6 +23,7 @@ struct dstring {
 	/** Length of the string, *excluding* the terminating NUL. */
 	size_t len;
 	/** The string itself. */
+	[[_counted_by(cap)]]
 	alignas(dchar) char str[];
 };
 
@@ -45,6 +47,13 @@ static dchar *dstrdata(struct dstring *header) {
 	return (char *)header + DSTR_OFFSET;
 }
 
+/** Set the length of a dynamic string. */
+static void dstrsetlen(struct dstring *header, size_t len) {
+	bfs_assert(len < header->cap);
+	header->len = len;
+	header->str[len] = '\0';
+}
+
 /** Allocate a dstring with the given contents. */
 static dchar *dstralloc_impl(size_t cap, size_t len, const char *str) {
 	// Avoid reallocations for small strings
@@ -58,11 +67,10 @@ static dchar *dstralloc_impl(size_t cap, size_t len, const char *str) {
 	}
 
 	header->cap = cap;
-	header->len = len;
+	dstrsetlen(header, len);
 
-	char *ret = dstrdata(header);
+	dchar *ret = dstrdata(header);
 	memcpy(ret, str, len);
-	ret[len] = '\0';
 	return ret;
 }
 
@@ -120,9 +128,14 @@ int dstresize(dchar **dstr, size_t len) {
 	}
 
 	struct dstring *header = dstrheader(*dstr);
-	header->len = len;
-	header->str[len] = '\0';
+	dstrsetlen(header, len);
 	return 0;
+}
+
+void dstrshrink(dchar *dstr, size_t len) {
+	struct dstring *header = dstrheader(dstr);
+	bfs_assert(len <= header->len);
+	dstrsetlen(header, len);
 }
 
 int dstrcat(dchar **dest, const char *src) {
@@ -174,7 +187,7 @@ int dstrxcpy(dchar **dest, const char *src, size_t len) {
 	return 0;
 }
 
-char *dstrprintf(const char *format, ...) {
+dchar *dstrprintf(const char *format, ...) {
 	va_list args;
 
 	va_start(args, format);
@@ -184,7 +197,7 @@ char *dstrprintf(const char *format, ...) {
 	return str;
 }
 
-char *dstrvprintf(const char *format, va_list args) {
+dchar *dstrvprintf(const char *format, va_list args) {
 	// Guess a capacity to try to avoid reallocating
 	dchar *str = dstralloc(2 * strlen(format));
 	if (!str) {
@@ -276,4 +289,21 @@ void dstrfree(dchar *dstr) {
 	if (dstr) {
 		free(dstrheader(dstr));
 	}
+}
+
+dchar *dstrepeat(const char *str, size_t n) {
+	size_t len = strlen(str);
+	dchar *ret = dstralloc(n * len);
+	if (!ret) {
+		return NULL;
+	}
+
+	for (size_t i = 0; i < n; ++i) {
+		if (dstrxcat(&ret, str, len) < 0) {
+			dstrfree(ret);
+			return NULL;
+		}
+	}
+
+	return ret;
 }

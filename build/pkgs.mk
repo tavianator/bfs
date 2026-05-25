@@ -5,29 +5,30 @@
 
 include build/prelude.mk
 include gen/vars.mk
-include gen/flags.mk
+include gen/early.mk
+include gen/auto.mk
+include gen/late.mk
 include build/exports.mk
 
-HEADERS := ${ALL_PKGS:%=gen/use/%.h}
+HEADERS := ${ALL_PKGS:%=gen/with/%.h}
 
 gen/pkgs.mk: ${HEADERS}
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
 	@gen() { \
-	    printf 'PKGS := %s\n' "$$*"; \
-	    printf 'CFLAGS += %s\n' "$$(build/pkgconf.sh --cflags "$$@")"; \
-	    printf 'LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
-	    printf 'LDLIBS := %s $${LDLIBS}\n' "$$(build/pkgconf.sh --ldlibs "$$@")"; \
+	    printf '_CFLAGS += %s\n' "$$(build/pkgconf.sh --cflags "$$@")"; \
+	    printf '_LDFLAGS += %s\n' "$$(build/pkgconf.sh --ldflags "$$@")"; \
+	    printf '_LDLIBS := %s $${_LDLIBS}\n' "$$(build/pkgconf.sh --ldlibs "$$@")"; \
 	}; \
-	gen $$(grep -l ' true$$' ${.ALLSRC} | sed 's|.*/\(.*\)\.h|\1|') >>$@
+	gen $$(grep -l ' true$$' $^ | sed 's|.*/\(.*\)\.h|\1|') >>$@
 	${VCAT} $@
 
 .PHONY: gen/pkgs.mk
 
-# Convert gen/use/foo.h to foo
-PKG = ${@:gen/use/%.h=%}
+# Convert gen/with/foo.h to foo
+PKG = ${@:gen/with/%.h=%}
 
 ${HEADERS}::
 	@${MKDIR} ${@D}
-	@build/define-if.sh use/${PKG} build/pkgconf.sh ${PKG} >$@ 2>$@.log; \
-	    build/msg-if.sh "[ CC ] use/${PKG}.c" test $$? -eq 0;
+	@build/define-if.sh with/${PKG} build/pkgconf.sh ${PKG} >$@ 2>$@.log; \
+	    build/msg-if.sh "[ CC ] with/${PKG}.c" test $$? -eq 0;

@@ -1,24 +1,29 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "xspawn.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
+#include "diag.h"
 #include "list.h"
+#include "sighook.h"
+
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#if BFS_USE_PATHS_H
+#if __has_include(<paths.h>)
 #  include <paths.h>
 #endif
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 #  include <spawn.h>
 #endif
 
@@ -68,29 +73,42 @@ int bfs_spawn_init(struct bfs_spawn *ctx) {
 	ctx->flags = 0;
 	SLIST_INIT(ctx);
 
-#if _POSIX_SPAWN > 0
-	ctx->flags |= BFS_SPAWN_USE_POSIX;
+#if BFS_POSIX_SPAWN >= 0
+	if (sysoption(SPAWN) > 0) {
+		ctx->flags |= BFS_SPAWN_USE_POSIX;
 
-	errno = posix_spawn_file_actions_init(&ctx->actions);
-	if (errno != 0) {
-		return -1;
-	}
+		errno = posix_spawn_file_actions_init(&ctx->actions);
+		if (errno != 0) {
+			return -1;
+		}
 
-	errno = posix_spawnattr_init(&ctx->attr);
-	if (errno != 0) {
-		posix_spawn_file_actions_destroy(&ctx->actions);
-		return -1;
+		errno = posix_spawnattr_init(&ctx->attr);
+		if (errno != 0) {
+			posix_spawn_file_actions_destroy(&ctx->actions);
+			return -1;
+		}
 	}
 #endif
 
 	return 0;
 }
 
-int bfs_spawn_destroy(struct bfs_spawn *ctx) {
-#if _POSIX_SPAWN > 0
-	posix_spawnattr_destroy(&ctx->attr);
-	posix_spawn_file_actions_destroy(&ctx->actions);
+/**
+ * Clear the BFS_SPAWN_USE_POSIX flag and free the attributes.
+ */
+static void bfs_spawn_clear_posix(struct bfs_spawn *ctx) {
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+
+#if BFS_POSIX_SPAWN >= 0
+		posix_spawnattr_destroy(&ctx->attr);
+		posix_spawn_file_actions_destroy(&ctx->actions);
 #endif
+	}
+}
+
+int bfs_spawn_destroy(struct bfs_spawn *ctx) {
+	bfs_spawn_clear_posix(ctx);
 
 	for_slist (struct bfs_spawn_action, action, ctx) {
 		free(action);
@@ -99,9 +117,9 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 	return 0;
 }
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 /** Set some posix_spawnattr flags. */
-attr(maybe_unused)
+[[_maybe_unused]]
 static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 	short prev;
 	errno = posix_spawnattr_getflags(&ctx->attr, &prev);
@@ -119,7 +137,7 @@ static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 
 	return 0;
 }
-#endif // _POSIX_SPAWN > 0
+#endif
 
 /** Allocate a spawn action. */
 static struct bfs_spawn_action *bfs_spawn_action(enum bfs_spawn_op op) {
@@ -141,7 +159,7 @@ int bfs_spawn_addopen(struct bfs_spawn *ctx, int fd, const char *path, int flags
 		return -1;
 	}
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_addopen(&ctx->actions, fd, path, flags, mode);
 		if (errno != 0) {
@@ -165,7 +183,7 @@ int bfs_spawn_addclose(struct bfs_spawn *ctx, int fd) {
 		return -1;
 	}
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_addclose(&ctx->actions, fd);
 		if (errno != 0) {
@@ -186,7 +204,7 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
 		return -1;
 	}
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = posix_spawn_file_actions_adddup2(&ctx->actions, oldfd, newfd);
 		if (errno != 0) {
@@ -214,11 +232,28 @@ int bfs_spawn_adddup2(struct bfs_spawn *ctx, int oldfd, int newfd) {
  */
 #define BFS_POSIX_SPAWNP_AFTER_FCHDIR !(__APPLE__ || __NetBSD__)
 
+/**
+ * NetBSD even resolves the executable before file actions with posix_spawn()!
+ */
+#define BFS_POSIX_SPAWN_AFTER_FCHDIR !__NetBSD__
+
 int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
+#if BFS_HAS_FCHDIR
 	struct bfs_spawn_action *action = bfs_spawn_action(BFS_SPAWN_FCHDIR);
 	if (!action) {
 		return -1;
 	}
+
+#if __APPLE__
+	// macOS has a bug that causes EBADF when an fchdir() action refers to a
+	// file opened by the file actions
+	for_slist (struct bfs_spawn_action, prev, ctx) {
+		if (fd == prev->out_fd) {
+			bfs_spawn_clear_posix(ctx);
+			break;
+		}
+	}
+#endif
 
 #if BFS_HAS_POSIX_SPAWN_ADDFCHDIR
 #  define BFS_POSIX_SPAWN_ADDFCHDIR posix_spawn_file_actions_addfchdir
@@ -226,7 +261,7 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 #  define BFS_POSIX_SPAWN_ADDFCHDIR posix_spawn_file_actions_addfchdir_np
 #endif
 
-#if _POSIX_SPAWN > 0 && defined(BFS_POSIX_SPAWN_FCHDIR)
+#if BFS_POSIX_SPAWN >= 0 && defined(BFS_POSIX_SPAWN_ADDFCHDIR)
 	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
 		errno = BFS_POSIX_SPAWN_ADDFCHDIR(&ctx->actions, fd);
 		if (errno != 0) {
@@ -235,12 +270,16 @@ int bfs_spawn_addfchdir(struct bfs_spawn *ctx, int fd) {
 		}
 	}
 #else
-	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+	bfs_spawn_clear_posix(ctx);
 #endif
 
 	action->in_fd = fd;
 	SLIST_APPEND(ctx, action);
 	return 0;
+#else // !BFS_HAS_FCHDIR
+	errno = ENOTSUP;
+	return -1;
+#endif
 }
 
 int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit *rl) {
@@ -259,7 +298,7 @@ int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit
 		goto fail;
 	}
 #else
-	ctx->flags &= ~BFS_SPAWN_USE_POSIX;
+	bfs_spawn_clear_posix(ctx);
 #endif
 
 	action->resource = resource;
@@ -383,18 +422,40 @@ static bool bfs_resolve_relative(const struct bfs_resolver *res) {
 	return false;
 }
 
+/** Check if the actions include fchdir(). */
+static bool bfs_spawn_will_chdir(const struct bfs_spawn *ctx) {
+	if (ctx) {
+		for_slist (const struct bfs_spawn_action, action, ctx) {
+			if (action->op == BFS_SPAWN_FCHDIR) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/** Check if we can call xfaccessat() before file actions. */
+static bool bfs_can_access_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
+	if (res->exe[0] == '/') {
+		return true;
+	}
+
+	if (bfs_spawn_will_chdir(ctx)) {
+		return false;
+	}
+
+	return true;
+}
+
 /** Check if we can resolve the executable before file actions. */
 static bool bfs_can_resolve_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
 	if (!bfs_resolve_relative(res)) {
 		return true;
 	}
 
-	if (ctx) {
-		for_slist (const struct bfs_spawn_action, action, ctx) {
-			if (action->op == BFS_SPAWN_FCHDIR) {
-				return false;
-			}
-		}
+	if (bfs_spawn_will_chdir(ctx)) {
+		return false;
 	}
 
 	return true;
@@ -424,6 +485,17 @@ static int bfs_resolve_early(struct bfs_resolver *res, const char *exe, const st
 	};
 
 	if (bfs_can_skip_resolve(res, ctx)) {
+		if (bfs_can_access_early(res, ctx)) {
+			// Do this check eagerly, even though posix_spawn()/execv() also
+			// would, because:
+			//
+			//     - faccessat() is faster than fork()/clone() + execv()
+			//     - posix_spawn() is not guaranteed to report ENOENT
+			if (xfaccessat(AT_FDCWD, exe, X_OK) != 0) {
+				return -1;
+			}
+		}
+
 		res->done = true;
 		return 0;
 	}
@@ -471,7 +543,7 @@ fail:
 	return -1;
 }
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 
 /** bfs_spawn() implementation using posix_spawn(). */
 static pid_t bfs_posix_spawn(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
@@ -502,13 +574,20 @@ static bool bfs_use_posix_spawn(const struct bfs_resolver *res, const struct bfs
 	}
 #endif
 
+#if !BFS_POSIX_SPAWN_AFTER_FCHDIR
+	if (res->exe[0] != '/' && bfs_spawn_will_chdir(ctx)) {
+		return false;
+	}
+#endif
+
 	return true;
 }
 
-#endif // _POSIX_SPAWN > 0
+#endif // BFS_POSIX_SPAWN >= 0
 
 /** Actually exec() the new process. */
-static noreturn void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, int pipefd[2]) {
+[[_noreturn]]
+static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp, const sigset_t *mask, int pipefd[2]) {
 	xclose(pipefd[0]);
 
 	for_slist (const struct bfs_spawn_action, action, ctx) {
@@ -553,10 +632,15 @@ static noreturn void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_s
 			}
 			break;
 		case BFS_SPAWN_FCHDIR:
+#if BFS_HAS_FCHDIR
 			if (fchdir(action->in_fd) != 0) {
 				goto fail;
 			}
 			break;
+#else
+			errno = ENOTSUP;
+			goto fail;
+#endif
 		case BFS_SPAWN_SETRLIMIT:
 			if (setrlimit(action->resource, &action->rlimit) != 0) {
 				goto fail;
@@ -566,6 +650,18 @@ static noreturn void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_s
 	}
 
 	if (bfs_resolve_late(res) != 0) {
+		goto fail;
+	}
+
+	// Reset signal handlers to their original values before we unblock
+	// signals, so that handlers don't run in both the parent and the child
+	if (sigreset() != 0) {
+		goto fail;
+	}
+
+	// Restore the original signal mask for the child process
+	errno = pthread_sigmask(SIG_SETMASK, mask, NULL);
+	if (errno != 0) {
 		goto fail;
 	}
 
@@ -590,35 +686,58 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 		return -1;
 	}
 
-	pid_t pid = fork();
-	if (pid < 0) {
-		close_quietly(pipefd[1]);
-		close_quietly(pipefd[0]);
-		return -1;
-	} else if (pid == 0) {
-		// Child
-		bfs_spawn_exec(res, ctx, argv, envp, pipefd);
+	// Block signals before fork() so handlers don't run in the child
+	sigset_t new_mask;
+	if (sigfillset(&new_mask) != 0) {
+		goto fail;
+	}
+	sigset_t old_mask;
+	errno = pthread_sigmask(SIG_BLOCK, &new_mask, &old_mask);
+	if (errno != 0) {
+		goto fail;
 	}
 
-	// Parent
+#if BFS_HAS__FORK
+	pid_t pid = _Fork();
+#else
+	pid_t pid = fork();
+#endif
+	if (pid == 0) {
+		// Child
+		bfs_spawn_exec(res, ctx, argv, envp, &old_mask, pipefd);
+	}
+
+	// Restore the original signal mask
+	errno = pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+	bfs_everify(errno == 0, "pthread_sigmask()");
+
+	if (pid < 0) {
+		// fork() failed
+		goto fail;
+	}
+
 	xclose(pipefd[1]);
 
 	int error;
 	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
 	xclose(pipefd[0]);
 	if (nbytes == sizeof(error)) {
-		int wstatus;
-		xwaitpid(pid, &wstatus, 0);
+		xwaitpid(pid, NULL, 0);
 		errno = error;
 		return -1;
 	}
 
 	return pid;
+
+fail:
+	close_quietly(pipefd[1]);
+	close_quietly(pipefd[0]);
+	return -1;
 }
 
 /** Call the right bfs_spawn() implementation. */
 static pid_t bfs_spawn_impl(struct bfs_resolver *res, const struct bfs_spawn *ctx, char **argv, char **envp) {
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	if (bfs_use_posix_spawn(res, ctx)) {
 		return bfs_posix_spawn(res, ctx, argv, envp);
 	}

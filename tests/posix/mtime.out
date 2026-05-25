@@ -1,0 +1,6 @@
+-mtime  1: ./yesterday
+-mtime +1: ./last_week
+-mtime +1: ./two_days_ago
+-mtime -1: ./now
+-mtime -1: ./one_hour_ago
+-mtime -1: ./tomorrow

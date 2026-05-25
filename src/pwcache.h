@@ -27,9 +27,9 @@ struct bfs_users *bfs_users_new(void);
 /**
  * Get a user entry by name.
  *
- * @param users
+ * @users
  *         The user cache.
- * @param name
+ * @name
  *         The username to look up.
  * @return
  *         The matching user, or NULL if not found (errno == 0) or an error
@@ -40,9 +40,9 @@ const struct passwd *bfs_getpwnam(struct bfs_users *users, const char *name);
 /**
  * Get a user entry by ID.
  *
- * @param users
+ * @users
  *         The user cache.
- * @param uid
+ * @uid
  *         The ID to look up.
  * @return
  *         The matching user, or NULL if not found (errno == 0) or an error
@@ -53,7 +53,7 @@ const struct passwd *bfs_getpwuid(struct bfs_users *users, uid_t uid);
 /**
  * Flush a user cache.
  *
- * @param users
+ * @users
  *         The cache to flush.
  */
 void bfs_users_flush(struct bfs_users *users);
@@ -61,7 +61,7 @@ void bfs_users_flush(struct bfs_users *users);
 /**
  * Free a user cache.
  *
- * @param users
+ * @users
  *         The user cache to free.
  */
 void bfs_users_free(struct bfs_users *users);
@@ -82,9 +82,9 @@ struct bfs_groups *bfs_groups_new(void);
 /**
  * Get a group entry by name.
  *
- * @param groups
+ * @groups
  *         The group cache.
- * @param name
+ * @name
  *         The group name to look up.
  * @return
  *         The matching group, or NULL if not found (errno == 0) or an error
@@ -95,9 +95,9 @@ const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name);
 /**
  * Get a group entry by ID.
  *
- * @param groups
+ * @groups
  *         The group cache.
- * @param uid
+ * @uid
  *         The ID to look up.
  * @return
  *         The matching group, or NULL if not found (errno == 0) or an error
@@ -108,7 +108,7 @@ const struct group *bfs_getgrgid(struct bfs_groups *groups, gid_t gid);
 /**
  * Flush a group cache.
  *
- * @param groups
+ * @groups
  *         The cache to flush.
  */
 void bfs_groups_flush(struct bfs_groups *groups);
@@ -116,7 +116,7 @@ void bfs_groups_flush(struct bfs_groups *groups);
 /**
  * Free a group cache.
  *
- * @param groups
+ * @groups
  *         The group cache to free.
  */
 void bfs_groups_free(struct bfs_groups *groups);

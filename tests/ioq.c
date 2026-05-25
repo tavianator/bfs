@@ -1,13 +1,12 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "tests.h"
-#include "ioq.h"
-#include "bfstd.h"
+
 #include "diag.h"
 #include "dir.h"
-#include <errno.h>
+#include "ioq.h"
+
 #include <fcntl.h>
 #include <stdlib.h>
 
@@ -40,16 +39,17 @@ static void check_ioq_push_block(void) {
 	const size_t depth = 2;
 
 	struct ioq *ioq = ioq_create(depth, 1);
-	bfs_verify(ioq, "ioq_create(): %s", xstrerror(errno));
+	bfs_everify(ioq, "ioq_create()");
 
 	// Push enough operations to fill the queue
 	for (size_t i = 0; i < depth; ++i) {
 		struct bfs_dir *dir = bfs_allocdir();
-		bfs_verify(dir, "bfs_allocdir(): %s", xstrerror(errno));
+		bfs_everify(dir, "bfs_allocdir()");
 
 		int ret = ioq_opendir(ioq, dir, AT_FDCWD, ".", 0, NULL);
-		bfs_verify(ret == 0, "ioq_opendir(): %s", xstrerror(errno));
+		bfs_everify(ret == 0, "ioq_opendir()");
 	}
+	ioq_submit(ioq);
 	bfs_verify(ioq_capacity(ioq) == 0);
 
 	// Now cancel the queue, pushing an additional IOQ_STOP message
@@ -71,7 +71,6 @@ static void check_ioq_push_block(void) {
 	ioq_destroy(ioq);
 }
 
-bool check_ioq(void) {
+void check_ioq(void) {
 	check_ioq_push_block();
-	return true;
 }

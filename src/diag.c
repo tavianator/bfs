@@ -1,38 +1,43 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "diag.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "color.h"
 #include "ctx.h"
 #include "dstring.h"
 #include "expr.h"
-#include <errno.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-/** bfs_diagf() implementation. */
-attr(printf(2, 0))
-static void bfs_vdiagf(const struct bfs_loc *loc, const char *format, va_list args) {
-	fprintf(stderr, "%s: %s@%s:%d: ", xgetprogname(), loc->func, loc->file, loc->line);
-	vfprintf(stderr, format, args);
-	fprintf(stderr, "\n");
-}
+/**
+ * Print an error using dprintf() if possible, because it's more likely to be
+ * async-signal-safe in practice.
+ */
+#if BFS_HAS_DPRINTF
+#  define veprintf(...) vdprintf(STDERR_FILENO, __VA_ARGS__)
+#else
+#  define veprintf(...) vfprintf(stderr, __VA_ARGS__)
+#endif
 
-void bfs_diagf(const struct bfs_loc *loc, const char *format, ...) {
+void bfs_diagf(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bfs_vdiagf(loc, format, args);
+	veprintf(format, args);
 	va_end(args);
 }
 
-noreturn void bfs_abortf(const struct bfs_loc *loc, const char *format, ...) {
+[[_noreturn]]
+void bfs_abortf(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	bfs_vdiagf(loc, format, args);
+	veprintf(format, args);
 	va_end(args);
 
 	abort();
@@ -64,7 +69,7 @@ const char *debug_flag_name(enum debug_flags flag) {
 }
 
 void bfs_perror(const struct bfs_ctx *ctx, const char *str) {
-	bfs_error(ctx, "%s: %m.\n", str);
+	bfs_error(ctx, "%s: %s.\n", str, errstr());
 }
 
 void bfs_error(const struct bfs_ctx *ctx, const char *format, ...) {
@@ -91,19 +96,12 @@ bool bfs_debug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *for
 }
 
 void bfs_verror(const struct bfs_ctx *ctx, const char *format, va_list args) {
-	int error = errno;
-
 	bfs_error_prefix(ctx);
-
-	errno = error;
 	cvfprintf(ctx->cerr, format, args);
 }
 
 bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args) {
-	int error = errno;
-
 	if (bfs_warning_prefix(ctx)) {
-		errno = error;
 		cvfprintf(ctx->cerr, format, args);
 		return true;
 	} else {
@@ -112,10 +110,7 @@ bool bfs_vwarning(const struct bfs_ctx *ctx, const char *format, va_list args) {
 }
 
 bool bfs_vdebug(const struct bfs_ctx *ctx, enum debug_flags flag, const char *format, va_list args) {
-	int error = errno;
-
 	if (bfs_debug_prefix(ctx, flag)) {
-		errno = error;
 		cvfprintf(ctx->cerr, format, args);
 		return true;
 	} else {
@@ -169,7 +164,7 @@ static bool highlight_expr_recursive(const struct bfs_ctx *ctx, const struct bfs
 		}
 	}
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		ret |= highlight_expr_recursive(ctx, child, args);
 	}
 

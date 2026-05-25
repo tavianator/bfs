@@ -14,13 +14,31 @@ make_basic() {
 
 # Creates a file+directory structure with various permissions for tests
 make_perms() {
-    "$XTOUCH" -p -M000 "$1/0"
-    "$XTOUCH" -p -M444 "$1/r"
-    "$XTOUCH" -p -M222 "$1/w"
-    "$XTOUCH" -p -M644 "$1/rw"
-    "$XTOUCH" -p -M555 "$1/rx"
-    "$XTOUCH" -p -M311 "$1/wx"
-    "$XTOUCH" -p -M755 "$1/rwx"
+    "$XTOUCH" -p -M000 "$1/f---------"
+    "$XTOUCH" -p -M111 "$1/f--x--x--x"
+    "$XTOUCH" -p -M222 "$1/f-w--w--w-"
+    "$XTOUCH" -p -M333 "$1/f-wx-wx-wx"
+    "$XTOUCH" -p -M444 "$1/fr--r--r--"
+    "$XTOUCH" -p -M555 "$1/fr-xr-xr-x" "$1/dr-xr-xr-x/"
+    "$XTOUCH" -p -M666 "$1/frw-rw-rw-"
+    "$XTOUCH" -p -M777 "$1/frwxrwxrwx" "$1/drwxrwxrwx/"
+
+    "$XTOUCH" -p -M220 "$1/f-w--w----"
+    "$XTOUCH" -p -M331 "$1/f-wx-wx--x"
+    "$XTOUCH" -p -M664 "$1/frw-rw-r--"
+    "$XTOUCH" -p -M775 "$1/frwxrwxr-x" "$1/drwxrwxr-x/"
+
+    "$XTOUCH" -p -M311 "$1/f-wx--x--x"
+    "$XTOUCH" -p -M644 "$1/frw-r--r--"
+    "$XTOUCH" -p -M755 "$1/frwxr-xr-x" "$1/drwxr-xr-x/"
+
+    "$XTOUCH" -p -M100 "$1/f--x------"
+    "$XTOUCH" -p -M200 "$1/f-w-------"
+    "$XTOUCH" -p -M300 "$1/f-wx------"
+    "$XTOUCH" -p -M400 "$1/fr--------"
+    "$XTOUCH" -p -M500 "$1/fr-x------" "$1/dr-x------/"
+    "$XTOUCH" -p -M600 "$1/frw-------"
+    "$XTOUCH" -p -M700 "$1/frwxr-----" "$1/drwx------/"
 }
 
 # Creates a file+directory structure with various symbolic and hard links
@@ -48,6 +66,12 @@ make_loops() {
     ln -s deeply/nested/loop/nested "$1/skip"
 }
 
+# Creates a file+directory structure with inaccessible files
+make_inaccessible() {
+    "$XTOUCH" -p -M000 "$1/file" "$1/dir/"
+    ln -s dir/file "$1/link"
+}
+
 # Creates a file+directory structure with varying timestamps
 make_times() {
     "$XTOUCH" -p -t "1991-12-14 00:00" "$1/a"
@@ -71,6 +95,9 @@ make_weirdnames() {
     "$XTOUCH" -p "$1/\\/i"
     "$XTOUCH" -p "$1/ /j"
     "$XTOUCH" -p "$1/[/k"
+    "$XTOUCH" -p "$1/{/l"
+    "$XTOUCH" -p "$1/*/m"
+    "$XTOUCH" -p "$1/"$'\n/n'
 }
 
 # Creates a very deep directory structure for testing PATH_MAX handling
@@ -124,7 +151,7 @@ make_stddirs() {
     if ((CLEAN)); then
         defer clean_stddirs
     else
-        printf "Test files saved to ${BLD}%s${RST}\n" "$TMP"
+        color printf "Test files saved to ${BLD}%s${RST}\n" "$TMP"
     fi
 
     chown "$(id -u):$(id -g)" "$TMP"
@@ -133,6 +160,7 @@ make_stddirs() {
     make_perms "$TMP/perms"
     make_links "$TMP/links"
     make_loops "$TMP/loops"
+    make_inaccessible "$TMP/inaccessible"
     make_times "$TMP/times"
     make_weirdnames "$TMP/weirdnames"
     make_deep "$TMP/deep"
@@ -148,5 +176,6 @@ clean_stddirs() {
         fi
     done
 
+    chmod -R +rwX "$TMP"
     rm -rf "$TMP"
 }

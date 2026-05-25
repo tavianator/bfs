@@ -59,4 +59,4 @@ if is_loud; then
     printf '%s\n' "$*"
 fi
 
-"$@"
+exec "$@"

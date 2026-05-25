@@ -25,8 +25,9 @@ These are not usually installed as the system `find`, but are designed to be `fi
 - [`bfs`](https://tavianator.com/projects/bfs.html) ([manual](https://man.archlinux.org/man/bfs.1), [source](https://github.com/tavianator/bfs))
 - [schilytools](https://codeberg.org/schilytools/schilytools) `sfind` ([source](https://codeberg.org/schilytools/schilytools/src/branch/master/sfind))
 - [BusyBox](https://busybox.net/) `find` ([manual](https://busybox.net/downloads/BusyBox.html#find), [source](https://git.busybox.net/busybox/tree/findutils/find.c))
-- [ToyBox](http://landley.net/toybox/) `find` ([manual](http://landley.net/toybox/help.html#find), [source](https://github.com/landley/toybox/blob/master/toys/posix/find.c))
-- uutils `find` ([source](https://github.com/uutils/findutils))
+- [ToyBox](https://landley.net/toybox/) `find` ([manual](http://landley.net/toybox/help.html#find), [source](https://github.com/landley/toybox/blob/master/toys/posix/find.c))
+- [Heirloom Project](https://heirloom.sourceforge.net/) `find` ([manual](https://heirloom.sourceforge.net/man/find.1.html), [source](https://github.com/eunuchs/heirloom-project/blob/master/heirloom/heirloom/find/find.c))
+- [uutils](https://uutils.github.io/) `find` ([source](https://github.com/uutils/findutils))
 
 ## `find` alternatives
 

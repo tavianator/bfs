@@ -8,11 +8,12 @@
 #ifndef BFS_BIT_H
 #define BFS_BIT_H
 
-#include "prelude.h"
+#include "bfs.h"
+
 #include <limits.h>
 #include <stdint.h>
 
-#if __STDC_VERSION__ >= C23
+#if __has_include(<stdbit.h>)
 #  include <stdbit.h>
 #endif
 
@@ -147,7 +148,7 @@
 #  define INTMAX_WIDTH UINTMAX_WIDTH
 #endif
 
-// C23 polyfill: byte order
+// N3022 polyfill: byte order
 
 #ifdef __STDC_ENDIAN_LITTLE__
 #  define ENDIAN_LITTLE __STDC_ENDIAN_LITTLE__
@@ -173,11 +174,7 @@
 #  define ENDIAN_NATIVE 0
 #endif
 
-#if __STDC_VERSION__ >= C23
-#  define bswap_u16 stdc_memreverse8u16
-#  define bswap_u32 stdc_memreverse8u32
-#  define bswap_u64 stdc_memreverse8u64
-#elif __GNUC__
+#if __GNUC__
 #  define bswap_u16 __builtin_bswap16
 #  define bswap_u32 __builtin_bswap32
 #  define bswap_u64 __builtin_bswap64
@@ -201,15 +198,35 @@ static inline uint8_t bswap_u8(uint8_t n) {
 	return n;
 }
 
-/**
- * Reverse the byte order of an integer.
- */
-#define bswap(n) \
-	_Generic((n), \
-		uint8_t: bswap_u8, \
-		uint16_t: bswap_u16, \
-		uint32_t: bswap_u32, \
-		uint64_t: bswap_u64)(n)
+#if UCHAR_WIDTH == 8
+#  define bswap_uc bswap_u8
+#endif
+
+#if USHRT_WIDTH == 16
+#  define bswap_us bswap_u16
+#elif USHRT_WIDTH == 32
+#  define bswap_us bswap_u32
+#elif USHRT_WIDTH == 64
+#  define bswap_us bswap_u64
+#endif
+
+#if UINT_WIDTH == 16
+#  define bswap_ui bswap_u16
+#elif UINT_WIDTH == 32
+#  define bswap_ui bswap_u32
+#elif UINT_WIDTH == 64
+#  define bswap_ui bswap_u64
+#endif
+
+#if ULONG_WIDTH == 32
+#  define bswap_ul bswap_u32
+#elif ULONG_WIDTH == 64
+#  define bswap_ul bswap_u64
+#endif
+
+#if ULLONG_WIDTH == 64
+#  define bswap_ull bswap_u64
+#endif
 
 // Define an overload for each unsigned type
 #define UINT_OVERLOADS(macro) \
@@ -222,25 +239,74 @@ static inline uint8_t bswap_u8(uint8_t n) {
 // Select an overload based on an unsigned integer type
 #define UINT_SELECT(n, name) \
 	_Generic((n), \
-		char:               name##_uc, \
-		signed char:        name##_uc, \
 		unsigned char:      name##_uc, \
-		signed short:       name##_us, \
 		unsigned short:     name##_us, \
-		signed int:         name##_ui, \
 		unsigned int:       name##_ui, \
-		signed long:        name##_ul, \
 		unsigned long:      name##_ul, \
-		signed long long:   name##_ull, \
 		unsigned long long: name##_ull)
+
+/**
+ * Reverse the byte order of an integer.
+ */
+#define bswap(n) UINT_SELECT(n, bswap)(n)
+
+#define LOAD8_LEU8(ptr, i, n) ((uint##n##_t)((const unsigned char *)ptr)[(i) / 8] << (i))
+#define LOAD8_BEU8(ptr, i, n) ((uint##n##_t)((const unsigned char *)ptr)[(i) / 8] << (n - (i) - 8))
+
+/** Load a little-endian 8-bit word. */
+static inline uint8_t load8_leu8(const void *ptr) {
+	return LOAD8_LEU8(ptr, 0, 8);
+}
+
+/** Load a big-endian 8-bit word. */
+static inline uint8_t load8_beu8(const void *ptr) {
+	return LOAD8_BEU8(ptr, 0, 8);
+}
+
+#define LOAD8_LEU16(ptr, i, n) (LOAD8_LEU8(ptr, i, n) | LOAD8_LEU8(ptr, i + 8, n))
+#define LOAD8_BEU16(ptr, i, n) (LOAD8_BEU8(ptr, i, n) | LOAD8_BEU8(ptr, i + 8, n))
+
+/** Load a little-endian 16-bit word. */
+static inline uint16_t load8_leu16(const void *ptr) {
+	return LOAD8_LEU16(ptr, 0, 16);
+}
+
+/** Load a big-endian 16-bit word. */
+static inline uint16_t load8_beu16(const void *ptr) {
+	return LOAD8_BEU16(ptr, 0, 16);
+}
+
+#define LOAD8_LEU32(ptr, i, n) (LOAD8_LEU16(ptr, i, n) | LOAD8_LEU16(ptr, i + 16, n))
+#define LOAD8_BEU32(ptr, i, n) (LOAD8_BEU16(ptr, i, n) | LOAD8_BEU16(ptr, i + 16, n))
+
+/** Load a little-endian 32-bit word. */
+static inline uint32_t load8_leu32(const void *ptr) {
+	return LOAD8_LEU32(ptr, 0, 32);
+}
+
+/** Load a big-endian 32-bit word. */
+static inline uint32_t load8_beu32(const void *ptr) {
+	return LOAD8_BEU32(ptr, 0, 32);
+}
+
+#define LOAD8_LEU64(ptr, i, n) (LOAD8_LEU32(ptr, i, n) | LOAD8_LEU32(ptr, i + 32, n))
+#define LOAD8_BEU64(ptr, i, n) (LOAD8_BEU32(ptr, i, n) | LOAD8_BEU32(ptr, i + 32, n))
+
+/** Load a little-endian 64-bit word. */
+static inline uint64_t load8_leu64(const void *ptr) {
+	return LOAD8_LEU64(ptr, 0, 64);
+}
+
+/** Load a big-endian 64-bit word. */
+static inline uint64_t load8_beu64(const void *ptr) {
+	return LOAD8_BEU64(ptr, 0, 64);
+}
 
 // C23 polyfill: bit utilities
 
-#if __STDC_VERSION__ >= C23
+#if __STDC_VERSION_STDBIT_H__ >= C23
 #  define count_ones stdc_count_ones
 #  define count_zeros stdc_count_zeros
-#  define rotate_left stdc_rotate_left
-#  define rotate_right stdc_rotate_right
 #  define leading_zeros stdc_leading_zeros
 #  define leading_ones stdc_leading_ones
 #  define trailing_zeros stdc_trailing_zeros
@@ -273,31 +339,31 @@ static inline uint8_t bswap_u8(uint8_t n) {
 #define BUILTIN_WIDTH(suffix) BUILTIN_WIDTH##suffix
 
 #define COUNT_ONES(type, suffix, width) \
-	static inline int count_ones##suffix(type n) { \
+	static inline unsigned int count_ones##suffix(type n) { \
 		return UINT_BUILTIN(popcount, suffix)(n); \
 	}
 
 #define LEADING_ZEROS(type, suffix, width) \
-	static inline int leading_zeros##suffix(type n) { \
+	static inline unsigned int leading_zeros##suffix(type n) { \
 	        return n \
 			? UINT_BUILTIN(clz, suffix)(n) - (BUILTIN_WIDTH(suffix) - width) \
 			: width; \
 	}
 
 #define TRAILING_ZEROS(type, suffix, width) \
-	static inline int trailing_zeros##suffix(type n) { \
+	static inline unsigned int trailing_zeros##suffix(type n) { \
 		return n ? UINT_BUILTIN(ctz, suffix)(n) : (int)width; \
 	}
 
 #define FIRST_TRAILING_ONE(type, suffix, width) \
-	static inline int first_trailing_one##suffix(type n) { \
+	static inline unsigned int first_trailing_one##suffix(type n) { \
 		return UINT_BUILTIN(ffs, suffix)(n); \
 	}
 
 #else // !__GNUC__
 
 #define COUNT_ONES(type, suffix, width) \
-	static inline int count_ones##suffix(type n) { \
+	static inline unsigned int count_ones##suffix(type n) { \
 		int ret; \
 		for (ret = 0; n; ++ret) { \
 			n &= n - 1; \
@@ -306,7 +372,7 @@ static inline uint8_t bswap_u8(uint8_t n) {
 	}
 
 #define LEADING_ZEROS(type, suffix, width) \
-	static inline int leading_zeros##suffix(type n) { \
+	static inline unsigned int leading_zeros##suffix(type n) { \
 		type bit = (type)1 << (width - 1); \
 		int ret; \
 		for (ret = 0; bit && !(n & bit); ++ret, bit >>= 1); \
@@ -314,7 +380,7 @@ static inline uint8_t bswap_u8(uint8_t n) {
 	}
 
 #define TRAILING_ZEROS(type, suffix, width) \
-	static inline int trailing_zeros##suffix(type n) { \
+	static inline unsigned int trailing_zeros##suffix(type n) { \
 		type bit = 1; \
 		int ret; \
 		for (ret = 0; bit && !(n & bit); ++ret, bit <<= 1); \
@@ -322,7 +388,7 @@ static inline uint8_t bswap_u8(uint8_t n) {
 	}
 
 #define FIRST_TRAILING_ONE(type, suffix, width) \
-	static inline int first_trailing_one##suffix(type n) { \
+	static inline unsigned int first_trailing_one##suffix(type n) { \
 		return n ? trailing_zeros##suffix(n) + 1 : 0; \
 	}
 
@@ -333,19 +399,9 @@ UINT_OVERLOADS(LEADING_ZEROS)
 UINT_OVERLOADS(TRAILING_ZEROS)
 UINT_OVERLOADS(FIRST_TRAILING_ONE)
 
-#define ROTATE_LEFT(type, suffix, width) \
-	static inline type rotate_left##suffix(type n, int c) { \
-		return (n << c) | (n >> ((width - c) % width)); \
-	}
-
-#define ROTATE_RIGHT(type, suffix, width) \
-	static inline type rotate_right##suffix(type n, int c) { \
-		return (n >> c) | (n << ((width - c) % width)); \
-	}
-
 #define FIRST_LEADING_ONE(type, suffix, width) \
-	static inline int first_leading_one##suffix(type n) { \
-		return width - leading_zeros##suffix(n); \
+	static inline unsigned int first_leading_one##suffix(type n) { \
+		return n ? leading_zeros##suffix(n) + 1 : 0; \
 	}
 
 #define HAS_SINGLE_BIT(type, suffix, width) \
@@ -354,16 +410,29 @@ UINT_OVERLOADS(FIRST_TRAILING_ONE)
 		return n - 1 < (n ^ (n - 1)); \
 	}
 
-UINT_OVERLOADS(ROTATE_LEFT)
-UINT_OVERLOADS(ROTATE_RIGHT)
+#define BIT_WIDTH(type, suffix, width) \
+	static inline unsigned int bit_width##suffix(type n) { \
+		return width - leading_zeros##suffix(n); \
+	}
+
+#define BIT_FLOOR(type, suffix, width) \
+	static inline type bit_floor##suffix(type n) { \
+		return n ? (type)1 << (bit_width##suffix(n) - 1) : 0; \
+	}
+
+#define BIT_CEIL(type, suffix, width) \
+	static inline type bit_ceil##suffix(type n) { \
+		return (type)1 << bit_width##suffix(n - !!n); \
+	}
+
 UINT_OVERLOADS(FIRST_LEADING_ONE)
 UINT_OVERLOADS(HAS_SINGLE_BIT)
+UINT_OVERLOADS(BIT_WIDTH)
+UINT_OVERLOADS(BIT_FLOOR)
+UINT_OVERLOADS(BIT_CEIL)
 
 #define count_ones(n) UINT_SELECT(n, count_ones)(n)
 #define count_zeros(n) UINT_SELECT(n, count_ones)(~(n))
-
-#define rotate_left(n, c) UINT_SELECT(n, rotate_left)(n, c)
-#define rotate_right(n, c) UINT_SELECT(n, rotate_right)(n, c)
 
 #define leading_zeros(n) UINT_SELECT(n, leading_zeros)(n)
 #define leading_ones(n) UINT_SELECT(n, leading_zeros)(~(n))
@@ -379,23 +448,26 @@ UINT_OVERLOADS(HAS_SINGLE_BIT)
 
 #define has_single_bit(n) UINT_SELECT(n, has_single_bit)(n)
 
-#define BIT_FLOOR(type, suffix, width) \
-	static inline type bit_floor##suffix(type n) { \
-		return n ? (type)1 << (first_leading_one##suffix(n) - 1) : 0; \
-	}
-
-#define BIT_CEIL(type, suffix, width) \
-	static inline type bit_ceil##suffix(type n) { \
-		return (type)1 << first_leading_one##suffix(n - !!n); \
-	}
-
-UINT_OVERLOADS(BIT_FLOOR)
-UINT_OVERLOADS(BIT_CEIL)
-
-#define bit_width(n) first_leading_one(n)
+#define bit_width(n) UINT_SELECT(n, bit_width)(n)
 #define bit_floor(n) UINT_SELECT(n, bit_floor)(n)
 #define bit_ceil(n) UINT_SELECT(n, bit_ceil)(n)
 
-#endif // __STDC_VERSION__ < C23
+#endif // __STDC_VERSION_STDBIT_H__ < C23
+
+#define ROTATE_LEFT(type, suffix, width) \
+	static inline type rotate_left##suffix(type n, int c) { \
+		return (n << c) | (n >> ((width - c) % width)); \
+	}
+
+#define ROTATE_RIGHT(type, suffix, width) \
+	static inline type rotate_right##suffix(type n, int c) { \
+		return (n >> c) | (n << ((width - c) % width)); \
+	}
+
+UINT_OVERLOADS(ROTATE_LEFT)
+UINT_OVERLOADS(ROTATE_RIGHT)
+
+#define rotate_left(n, c) UINT_SELECT(n, rotate_left)(n, c)
+#define rotate_right(n, c) UINT_SELECT(n, rotate_right)(n, c)
 
 #endif // BFS_BIT_H

@@ -8,6 +8,8 @@
 #ifndef BFS_ATOMIC_H
 #define BFS_ATOMIC_H
 
+#include "bfs.h"
+
 #include <stdatomic.h>
 
 /**
@@ -18,9 +20,9 @@
 /**
  * Shorthand for atomic_load_explicit().
  *
- * @param obj
+ * @obj
  *         A pointer to the atomic object.
- * @param order
+ * @order
  *         The memory ordering to use, without the memory_order_ prefix.
  * @return
  *         The loaded value.
@@ -81,5 +83,36 @@
  */
 #define fetch_and(obj, arg, order) \
 	atomic_fetch_and_explicit(obj, arg, memory_order_##order)
+
+/**
+ * Shorthand for atomic_thread_fence().
+ */
+#if __SANITIZE_THREAD__
+// TSan doesn't support fences: https://github.com/google/sanitizers/issues/1415
+#  define thread_fence(obj, order) \
+	fetch_add(obj, 0, order)
+#else
+#  define thread_fence(obj, order) \
+	atomic_thread_fence(memory_order_##order)
+#endif
+
+/**
+ * Shorthand for atomic_signal_fence().
+ */
+#define signal_fence(order) \
+	atomic_signal_fence(memory_order_##order)
+
+/**
+ * A hint to the CPU to relax while it spins.
+ */
+#if __has_builtin(__builtin_ia32_pause)
+#  define spin_loop() __builtin_ia32_pause()
+#elif __has_builtin(__builtin_arm_yield)
+#  define spin_loop() __builtin_arm_yield()
+#elif BFS_HAS_BUILTIN_RISCV_PAUSE
+#  define spin_loop() __builtin_riscv_pause()
+#else
+#  define spin_loop() ((void)0)
+#endif
 
 #endif // BFS_ATOMIC_H

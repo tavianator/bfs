@@ -8,9 +8,10 @@
  * flags like always-true options, and skipping over paths wherever they appear.
  */
 
-#include "prelude.h"
 #include "parse.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -31,6 +32,7 @@
 #include "xregex.h"
 #include "xspawn.h"
 #include "xtime.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -78,14 +80,10 @@ struct bfs_parser {
 
 	/** Whether stdout is a terminal. */
 	bool stdout_tty;
-	/** Whether this session is interactive (stdin and stderr are each a terminal). */
-	bool interactive;
 	/** Whether -color or -nocolor has been passed. */
 	enum use_color use_color;
 	/** Whether a -print action is implied. */
 	bool implicit_print;
-	/** Whether the default root "." should be used. */
-	bool implicit_root;
 	/** Whether the expression has started. */
 	bool expr_started;
 	/** Whether an information option like -help or -version was passed. */
@@ -95,41 +93,23 @@ struct bfs_parser {
 
 	/** The last non-path argument. */
 	char **last_arg;
-	/** A "-depth"-type argument, if any. */
-	char **depth_arg;
-	/** A "-limit" argument, if any. */
-	char **limit_arg;
-	/** A "-prune" argument, if any. */
-	char **prune_arg;
-	/** A "-mount" argument, if any. */
-	char **mount_arg;
-	/** An "-xdev" argument, if any. */
-	char **xdev_arg;
-	/** A "-files0-from -" argument, if any. */
-	char **files0_stdin_arg;
-	/** An "-ok"-type expression, if any. */
-	const struct bfs_expr *ok_expr;
+	/** A "-depth"-type expression, if any. */
+	const struct bfs_expr *depth_expr;
+	/** A "-limit" expression, if any. */
+	const struct bfs_expr *limit_expr;
+	/** A "-prune" expression, if any. */
+	const struct bfs_expr *prune_expr;
+	/** A "-mount" expression, if any. */
+	const struct bfs_expr *mount_expr;
+	/** An "-xdev" expression, if any. */
+	const struct bfs_expr *xdev_expr;
+	/** A "-files0-from" expression, if any. */
+	const struct bfs_expr *files0_expr;
+	/** An expression that consumes stdin, if any. */
+	const struct bfs_expr *stdin_expr;
 
 	/** The current time (maybe modified by -daystart). */
 	struct timespec now;
-};
-
-/**
- * Possible token types.
- */
-enum token_type {
-	/** A flag. */
-	T_FLAG,
-	/** A root path. */
-	T_PATH,
-	/** An option. */
-	T_OPTION,
-	/** A test. */
-	T_TEST,
-	/** An action. */
-	T_ACTION,
-	/** An operator. */
-	T_OPERATOR,
 };
 
 /**
@@ -158,9 +138,8 @@ static void highlight_args(const struct bfs_ctx *ctx, char **argv, size_t argc, 
 /**
  * Print an error message during parsing.
  */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static void parse_error(const struct bfs_parser *parser, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -170,7 +149,6 @@ static void parse_error(const struct bfs_parser *parser, const char *format, ...
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(parser->ctx, format, args);
 	va_end(args);
 }
@@ -178,9 +156,8 @@ static void parse_error(const struct bfs_parser *parser, const char *format, ...
 /**
  * Print an error about some command line arguments.
  */
-attr(printf(4, 5))
+[[_printf(4, 5)]]
 static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_t argc, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -190,7 +167,6 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
@@ -198,20 +174,18 @@ static void parse_argv_error(const struct bfs_parser *parser, char **argv, size_
 /**
  * Print an error about conflicting command line arguments.
  */
-attr(printf(6, 7))
-static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
-	int error = errno;
+[[_printf(4, 5)]]
+static void parse_conflict_error(const struct bfs_parser *parser, const struct bfs_expr *expr1, const struct bfs_expr *expr2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
 	init_highlight(ctx, highlight);
-	highlight_args(ctx, argv1, argc1, highlight);
-	highlight_args(ctx, argv2, argc2, highlight);
+	highlight_args(ctx, expr1->argv, expr1->argc, highlight);
+	highlight_args(ctx, expr2->argv, expr2->argc, highlight);
 	bfs_argv_error(ctx, highlight);
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
@@ -219,16 +193,14 @@ static void parse_conflict_error(const struct bfs_parser *parser, char **argv1, 
 /**
  * Print an error about an expression.
  */
-attr(printf(3, 4))
+[[_printf(3, 4)]]
 static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bfs_expr_error(ctx, expr);
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bfs_verror(ctx, format, args);
 	va_end(args);
 }
@@ -236,9 +208,8 @@ static void parse_expr_error(const struct bfs_parser *parser, const struct bfs_e
 /**
  * Print a warning message during parsing.
  */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static bool parse_warning(const struct bfs_parser *parser, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
@@ -250,7 +221,6 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bool ret = bfs_vwarning(parser->ctx, format, args);
 	va_end(args);
 	return ret;
@@ -259,22 +229,20 @@ static bool parse_warning(const struct bfs_parser *parser, const char *format, .
 /**
  * Print a warning about conflicting command line arguments.
  */
-attr(printf(6, 7))
-static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1, size_t argc1, char **argv2, size_t argc2, const char *format, ...) {
-	int error = errno;
+[[_printf(4, 5)]]
+static bool parse_conflict_warning(const struct bfs_parser *parser, const struct bfs_expr *expr1, const struct bfs_expr *expr2, const char *format, ...) {
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	bool highlight[ctx->argc];
 	init_highlight(ctx, highlight);
-	highlight_args(ctx, argv1, argc1, highlight);
-	highlight_args(ctx, argv2, argc2, highlight);
+	highlight_args(ctx, expr1->argv, expr1->argc, highlight);
+	highlight_args(ctx, expr2->argv, expr2->argc, highlight);
 	if (!bfs_argv_warning(ctx, highlight)) {
 		return false;
 	}
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bool ret = bfs_vwarning(ctx, format, args);
 	va_end(args);
 	return ret;
@@ -283,9 +251,8 @@ static bool parse_conflict_warning(const struct bfs_parser *parser, char **argv1
 /**
  * Print a warning about an expression.
  */
-attr(printf(3, 4))
+[[_printf(3, 4)]]
 static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs_expr *expr, const char *format, ...) {
-	int error = errno;
 	const struct bfs_ctx *ctx = parser->ctx;
 
 	if (!bfs_expr_warning(ctx, expr)) {
@@ -294,17 +261,31 @@ static bool parse_expr_warning(const struct bfs_parser *parser, const struct bfs
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	bool ret = bfs_vwarning(ctx, format, args);
 	va_end(args);
 	return ret;
 }
 
 /**
+ * Report an error if stdin is already consumed, then consume it.
+ */
+static bool consume_stdin(struct bfs_parser *parser, const struct bfs_expr *expr) {
+	if (parser->stdin_expr) {
+		parse_conflict_error(parser, parser->stdin_expr, expr,
+			"%pX and %pX can't both use standard input.\n",
+			parser->stdin_expr, expr);
+		return false;
+	}
+
+	parser->stdin_expr = expr;
+	return true;
+}
+
+/**
  * Allocate a new expression.
  */
-static struct bfs_expr *parse_new_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc, char **argv) {
-	struct bfs_expr *expr = bfs_expr_new(parser->ctx, eval_fn, argc, argv);
+static struct bfs_expr *parse_new_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc, char **argv, enum bfs_kind kind) {
+	struct bfs_expr *expr = bfs_expr_new(parser->ctx, eval_fn, argc, argv, kind);
 	if (!expr) {
 		parse_perror(parser, "bfs_expr_new()");
 	}
@@ -315,7 +296,7 @@ static struct bfs_expr *parse_new_expr(const struct bfs_parser *parser, bfs_eval
  * Create a new unary expression.
  */
 static struct bfs_expr *new_unary_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, struct bfs_expr *rhs, char **argv) {
-	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv);
+	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv, BFS_OPERATOR);
 	if (!expr) {
 		return NULL;
 	}
@@ -329,7 +310,7 @@ static struct bfs_expr *new_unary_expr(const struct bfs_parser *parser, bfs_eval
  * Create a new binary expression.
  */
 static struct bfs_expr *new_binary_expr(const struct bfs_parser *parser, bfs_eval_fn *eval_fn, struct bfs_expr *lhs, struct bfs_expr *rhs, char **argv) {
-	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv);
+	struct bfs_expr *expr = parse_new_expr(parser, eval_fn, 1, argv, BFS_OPERATOR);
 	if (!expr) {
 		return NULL;
 	}
@@ -381,7 +362,7 @@ static int expr_open(struct bfs_parser *parser, struct bfs_expr *expr, const cha
 	return 0;
 
 fail:
-	parse_expr_error(parser, expr, "%m.\n");
+	parse_expr_error(parser, expr, "%s.\n", errstr());
 	if (cfile) {
 		cfclose(cfile);
 	} else if (file) {
@@ -401,7 +382,7 @@ static int stat_arg(const struct bfs_parser *parser, char **arg, struct bfs_stat
 
 	int ret = bfs_stat(AT_FDCWD, *arg, flags, sb);
 	if (ret != 0) {
-		parse_argv_error(parser, arg, 1, "%m.\n");
+		parse_argv_error(parser, arg, 1, "%s.\n", errstr());
 	}
 	return ret;
 }
@@ -414,14 +395,19 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser);
 /**
  * Advance by a single token.
  */
-static char **parser_advance(struct bfs_parser *parser, enum token_type type, size_t argc) {
-	if (type != T_FLAG && type != T_PATH) {
+static char **parser_advance(struct bfs_parser *parser, enum bfs_kind kind, size_t argc) {
+	struct bfs_ctx *ctx = parser->ctx;
+
+	if (kind != BFS_FLAG && kind != BFS_PATH) {
 		parser->expr_started = true;
 	}
 
-	if (type != T_PATH) {
+	if (kind != BFS_PATH) {
 		parser->last_arg = parser->argv;
 	}
+
+	size_t i = parser->argv - ctx->argv;
+	ctx->kinds[i] = kind;
 
 	char **argv = parser->argv;
 	parser->argv += argc;
@@ -446,7 +432,6 @@ static int parse_root(struct bfs_parser *parser, const char *path) {
 		return -1;
 	}
 
-	parser->implicit_root = false;
 	return 0;
 }
 
@@ -465,7 +450,7 @@ static int skip_paths(struct bfs_parser *parser) {
 				// find uses -- to separate flags from the rest
 				// of the command line.  We allow mixing flags
 				// and paths/predicates, so we just ignore --.
-				parser_advance(parser, T_FLAG, 1);
+				parser_advance(parser, BFS_FLAG, 1);
 				continue;
 			}
 			if (strcmp(arg, "-") != 0) {
@@ -497,7 +482,7 @@ static int skip_paths(struct bfs_parser *parser) {
 			return -1;
 		}
 
-		parser_advance(parser, T_PATH, 1);
+		parser_advance(parser, BFS_PATH, 1);
 	}
 }
 
@@ -517,32 +502,19 @@ enum int_flags {
  * Parse an integer.
  */
 static const char *parse_int(const struct bfs_parser *parser, char **arg, const char *str, void *result, enum int_flags flags) {
-	// strtoll() skips leading spaces, but we want to reject them
-	if (xisspace(str[0])) {
-		goto bad;
-	}
-
 	int base = flags & IF_BASE_MASK;
 	if (base == 0) {
 		base = 10;
 	}
 
 	char *endptr;
-	errno = 0;
-	long long value = strtoll(str, &endptr, base);
-	if (errno != 0) {
+	long long value;
+	if (xstrtoll(str, &endptr, base, &value) != 0) {
 		if (errno == ERANGE) {
 			goto range;
 		} else {
 			goto bad;
 		}
-	}
-
-	// https://github.com/llvm/llvm-project/issues/64946
-	sanitize_init(&endptr);
-
-	if (endptr == str) {
-		goto bad;
 	}
 
 	if (!(flags & IF_PARTIAL_OK) && *endptr != '\0') {
@@ -641,8 +613,8 @@ static bool looks_like_icmp(const char *str) {
  * Parse a single flag.
  */
 static struct bfs_expr *parse_flag(struct bfs_parser *parser, size_t argc) {
-	char **argv = parser_advance(parser, T_FLAG, argc);
-	return parse_new_expr(parser, eval_true, argc, argv);
+	char **argv = parser_advance(parser, BFS_FLAG, argc);
+	return parse_new_expr(parser, eval_true, argc, argv, BFS_FLAG);
 }
 
 /**
@@ -657,9 +629,11 @@ static struct bfs_expr *parse_nullary_flag(struct bfs_parser *parser) {
  */
 static struct bfs_expr *parse_unary_flag(struct bfs_parser *parser) {
 	const char *arg = parser->argv[0];
+	char flag = arg[strlen(arg) - 1];
+
 	const char *value = parser->argv[1];
 	if (!value) {
-		parse_error(parser, "${cyn}%s${rs} needs a value.\n", arg);
+		parse_error(parser, "${cyn}-%c${rs} needs a value.\n", flag);
 		return NULL;
 	}
 
@@ -667,11 +641,34 @@ static struct bfs_expr *parse_unary_flag(struct bfs_parser *parser) {
 }
 
 /**
+ * Parse a prefix flag like -O3, -j8, etc.
+ */
+static struct bfs_expr *parse_prefix_flag(struct bfs_parser *parser, char flag, bool allow_separate, const char **value) {
+	const char *arg = parser->argv[0];
+
+	const char *suffix = strchr(arg, flag) + 1;
+	if (*suffix) {
+		*value = suffix;
+		return parse_nullary_flag(parser);
+	}
+
+	suffix = parser->argv[1];
+	if (allow_separate && suffix) {
+		*value = suffix;
+	} else {
+		parse_error(parser, "${cyn}-%c${rs} needs a value.\n", flag);
+		return NULL;
+	}
+
+	return parse_unary_flag(parser);
+}
+
+/**
  * Parse a single option.
  */
 static struct bfs_expr *parse_option(struct bfs_parser *parser, size_t argc) {
-	char **argv = parser_advance(parser, T_OPTION, argc);
-	return parse_new_expr(parser, eval_true, argc, argv);
+	char **argv = parser_advance(parser, BFS_OPTION, argc);
+	return parse_new_expr(parser, eval_true, argc, argv, BFS_OPTION);
 }
 
 /**
@@ -699,8 +696,8 @@ static struct bfs_expr *parse_unary_option(struct bfs_parser *parser) {
  * Parse a single test.
  */
 static struct bfs_expr *parse_test(struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc) {
-	char **argv = parser_advance(parser, T_TEST, argc);
-	return parse_new_expr(parser, eval_fn, argc, argv);
+	char **argv = parser_advance(parser, BFS_TEST, argc);
+	return parse_new_expr(parser, eval_fn, argc, argv, BFS_TEST);
 }
 
 /**
@@ -728,7 +725,7 @@ static struct bfs_expr *parse_unary_test(struct bfs_parser *parser, bfs_eval_fn 
  * Parse a single action.
  */
 static struct bfs_expr *parse_action(struct bfs_parser *parser, bfs_eval_fn *eval_fn, size_t argc) {
-	char **argv = parser_advance(parser, T_ACTION, argc);
+	char **argv = parser_advance(parser, BFS_ACTION, argc);
 
 	if (parser->excluding) {
 		parse_argv_error(parser, argv, argc, "This action is not supported within ${red}-exclude${rs}.\n");
@@ -739,7 +736,7 @@ static struct bfs_expr *parse_action(struct bfs_parser *parser, bfs_eval_fn *eva
 		parser->implicit_print = false;
 	}
 
-	return parse_new_expr(parser, eval_fn, argc, argv);
+	return parse_new_expr(parser, eval_fn, argc, argv, BFS_ACTION);
 }
 
 /**
@@ -811,7 +808,8 @@ static bool parse_debug_flag(const char *flag, size_t len, const char *expected)
 static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg2) {
 	struct bfs_ctx *ctx = parser->ctx;
 
-	struct bfs_expr *expr = parse_unary_flag(parser);
+	const char *flags;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'D', true, &flags);
 	if (!expr) {
 		cfprintf(ctx->cerr, "\n");
 		debug_help(ctx->cerr);
@@ -820,7 +818,7 @@ static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg
 
 	bool unrecognized = false;
 
-	for (const char *flag = expr->argv[1], *next; flag; flag = next) {
+	for (const char *flag = flags, *next; flag; flag = next) {
 		size_t len = strcspn(flag, ",");
 		if (flag[len]) {
 			next = flag + len + 1;
@@ -868,21 +866,22 @@ static struct bfs_expr *parse_debug(struct bfs_parser *parser, int arg1, int arg
  * Parse -On.
  */
 static struct bfs_expr *parse_optlevel(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_flag(parser);
+	const char *arg;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'O', false, &arg);
 	if (!expr) {
 		return NULL;
 	}
 
 	int *optlevel = &parser->ctx->optlevel;
 
-	if (strcmp(expr->argv[0], "-Ofast") == 0) {
+	if (strcmp(arg, "fast") == 0) {
 		*optlevel = 4;
-	} else if (!parse_int(parser, expr->argv, expr->argv[0] + 2, optlevel, IF_INT | IF_UNSIGNED)) {
+	} else if (!parse_int(parser, expr->argv, arg, optlevel, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
 
 	if (*optlevel > 4) {
-		parse_expr_warning(parser, expr, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", expr->argv[0] + 2);
+		parse_expr_warning(parser, expr, "${cyn}-O${bld}%s${rs} is the same as ${cyn}-O${bld}4${rs}.\n\n", arg);
 	}
 
 	return expr;
@@ -996,16 +995,16 @@ static struct bfs_expr *parse_time(struct bfs_parser *parser, int field, int arg
 		switch (*tail) {
 		case 'w':
 			time *= 7;
-			fallthru;
+			[[fallthrough]];
 		case 'd':
 			time *= 24;
-			fallthru;
+			[[fallthrough]];
 		case 'h':
 			time *= 60;
-			fallthru;
+			[[fallthrough]];
 		case 'm':
 			time *= 60;
-			fallthru;
+			[[fallthrough]];
 		case 's':
 			break;
 		default:
@@ -1117,7 +1116,7 @@ static struct bfs_expr *parse_fnmatch(const struct bfs_parser *parser, struct bf
 	// strcmp() can be much faster than fnmatch() since it doesn't have to
 	// parse the pattern, so special-case patterns with no wildcards.
 	//
-	//     https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01
+	//     https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_14_01
 	expr->literal = strcspn(expr->pattern, "?*\\[") == len;
 
 	return expr;
@@ -1176,18 +1175,33 @@ static struct bfs_expr *parse_daystart(struct bfs_parser *parser, int arg1, int 
  * Parse -delete.
  */
 static struct bfs_expr *parse_delete(struct bfs_parser *parser, int arg1, int arg2) {
-	parser->ctx->flags |= BFTW_POST_ORDER;
-	parser->depth_arg = parser->argv;
-	return parse_nullary_action(parser, eval_delete);
+	struct bfs_expr *expr = parse_nullary_action(parser, eval_delete);
+	if (!expr) {
+		return NULL;
+	}
+
+	struct bfs_ctx *ctx = parser->ctx;
+	ctx->flags |= BFTW_POST_ORDER;
+	ctx->dangerous = true;
+
+	parser->depth_expr = expr;
+	return expr;
 }
 
 /**
  * Parse -d.
  */
-static struct bfs_expr *parse_depth(struct bfs_parser *parser, int arg1, int arg2) {
+static struct bfs_expr *parse_depth(struct bfs_parser *parser, int flag, int arg2) {
+	struct bfs_expr *expr = flag
+		? parse_nullary_flag(parser)
+		: parse_nullary_option(parser);
+	if (!expr) {
+		return NULL;
+	}
+
 	parser->ctx->flags |= BFTW_POST_ORDER;
-	parser->depth_arg = parser->argv;
-	return parse_nullary_flag(parser);
+	parser->depth_expr = expr;
+	return expr;
 }
 
 /**
@@ -1233,11 +1247,48 @@ static struct bfs_expr *parse_empty(struct bfs_parser *parser, int arg1, int arg
 	return expr;
 }
 
+/** Check for unsafe relative paths in $PATH. */
+static const char *unsafe_path(const struct bfs_exec *execbuf) {
+	if (!(execbuf->flags & BFS_EXEC_CHDIR)) {
+		// Not -execdir or -okdir
+		return NULL;
+	}
+
+	const char *exe = execbuf->tmpl_argv[0];
+	if (strchr(exe, '/')) {
+		// No $PATH lookups for /foo or foo/bar
+		return NULL;
+	}
+
+	if (strstr(exe, "{}")) {
+		// Substituted paths always contain a /
+		return NULL;
+	}
+
+	const char *path = getenv("PATH");
+	while (path) {
+		if (path[0] != '/') {
+			// Relative $PATH component!
+			return path;
+		}
+
+		path = strchr(path, ':');
+		if (path) {
+			++path;
+		}
+	}
+
+	// No relative components in $PATH
+	return NULL;
+}
+
 /**
  * Parse -exec(dir)?/-ok(dir)?.
  */
 static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg2) {
-	struct bfs_exec *execbuf = bfs_exec_parse(parser->ctx, parser->argv, flags);
+	struct bfs_ctx *ctx = parser->ctx;
+
+	struct bfs_exec *execbuf = bfs_exec_parse(ctx, parser->argv, flags);
 	if (!execbuf) {
 		return NULL;
 	}
@@ -1253,29 +1304,21 @@ static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg
 	// For pipe() in bfs_spawn()
 	expr->ephemeral_fds = 2;
 
-	if (execbuf->flags & BFS_EXEC_CHDIR) {
-		// Check for relative paths in $PATH
-		const char *path = getenv("PATH");
-		while (path) {
-			if (*path != '/') {
-				size_t len = strcspn(path, ":");
-				char *comp = strndup(path, len);
-				if (comp) {
-					parse_expr_error(parser, expr,
-						"This action would be unsafe, since ${bld}$$PATH${rs} contains the relative path ${bld}%pq${rs}\n", comp);
-					free(comp);
-				} else {
-					parse_perror(parser, "strndup()");
-				}
-				return NULL;
-			}
-
-			path = strchr(path, ':');
-			if (path) {
-				++path;
-			}
+	const char *unsafe = unsafe_path(execbuf);
+	if (unsafe) {
+		size_t len = strcspn(unsafe, ":");
+		char *comp = strndup(unsafe, len);
+		if (comp) {
+			parse_expr_error(parser, expr,
+				"This action would be unsafe, since ${bld}$$PATH${rs} contains the relative path ${bld}%pq${rs}\n", comp);
+			free(comp);
+		} else {
+			parse_perror(parser, "strndup()");
 		}
+		return NULL;
+	}
 
+	if (execbuf->flags & BFS_EXEC_CHDIR) {
 		// To dup() the parent directory
 		if (execbuf->flags & BFS_EXEC_MULTI) {
 			++expr->persistent_fds;
@@ -1285,7 +1328,11 @@ static struct bfs_expr *parse_exec(struct bfs_parser *parser, int flags, int arg
 	}
 
 	if (execbuf->flags & BFS_EXEC_CONFIRM) {
-		parser->ok_expr = expr;
+		if (!consume_stdin(parser, expr)) {
+			return NULL;
+		}
+	} else {
+		ctx->dangerous = true;
 	}
 
 	return expr;
@@ -1314,10 +1361,16 @@ static struct bfs_expr *parse_exit(struct bfs_parser *parser, int arg1, int arg2
  * Parse -f PATH.
  */
 static struct bfs_expr *parse_f(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	struct bfs_expr *expr = parse_unary_flag(parser);
 	if (!expr) {
 		return NULL;
 	}
+
+	// Mark the path as a path, not a regular argument
+	size_t i = expr->argv - ctx->argv;
+	ctx->kinds[i + 1] = BFS_PATH;
 
 	if (parse_root(parser, expr->argv[1]) != 0) {
 		return NULL;
@@ -1335,50 +1388,14 @@ static struct bfs_expr *parse_files0_from(struct bfs_parser *parser, int arg1, i
 		return NULL;
 	}
 
-	const char *from = expr->argv[1];
-
-	FILE *file;
-	if (strcmp(from, "-") == 0) {
-		file = stdin;
-	} else {
-		file = xfopen(from, O_RDONLY | O_CLOEXEC);
-	}
-	if (!file) {
-		parse_expr_error(parser, expr, "%m.\n");
-		return NULL;
-	}
-
-	while (true) {
-		char *path = xgetdelim(file, '\0');
-		if (!path) {
-			if (errno) {
-				goto fail;
-			} else {
-				break;
-			}
-		}
-
-		int ret = parse_root(parser, path);
-		free(path);
-		if (ret != 0) {
-			goto fail;
-		}
-	}
-
-	if (file == stdin) {
-		parser->files0_stdin_arg = expr->argv;
-	} else {
-		fclose(file);
-	}
-
-	parser->implicit_root = false;
+	// For compatibility with GNU find,
+	//
+	//     bfs -files0-from a -files0-from b
+	//
+	// should *only* use b, not a.  So stash the expression here and only
+	// process the last one at the end of parsing.
+	parser->files0_expr = expr;
 	return expr;
-
-fail:
-	if (file != stdin) {
-		fclose(file);
-	}
-	return NULL;
 }
 
 /**
@@ -1509,7 +1526,7 @@ static struct bfs_expr *parse_fstype(struct bfs_parser *parser, int arg1, int ar
 	}
 
 	if (!bfs_ctx_mtab(parser->ctx)) {
-		parse_expr_error(parser, expr, "Couldn't parse the mount table: %m.\n");
+		parse_expr_error(parser, expr, "Couldn't parse the mount table: %s.\n", errstr());
 		return NULL;
 	}
 
@@ -1534,7 +1551,7 @@ static struct bfs_expr *parse_group(struct bfs_parser *parser, int arg1, int arg
 			return NULL;
 		}
 	} else if (errno) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return NULL;
 	} else {
 		parse_expr_error(parser, expr, "No such group.\n");
@@ -1577,7 +1594,7 @@ static struct bfs_expr *parse_user(struct bfs_parser *parser, int arg1, int arg2
 			return NULL;
 		}
 	} else if (errno) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return NULL;
 	} else {
 		parse_expr_error(parser, expr, "No such user.\n");
@@ -1613,13 +1630,14 @@ static struct bfs_expr *parse_inum(struct bfs_parser *parser, int arg1, int arg2
  * Parse -j<n>.
  */
 static struct bfs_expr *parse_jobs(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *expr = parse_nullary_flag(parser);
+	const char *arg;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'j', false, &arg);
 	if (!expr) {
 		return NULL;
 	}
 
 	unsigned int n;
-	if (!parse_int(parser, expr->argv, expr->argv[0] + 2, &n, IF_INT | IF_UNSIGNED)) {
+	if (!parse_int(parser, expr->argv, arg, &n, IF_INT | IF_UNSIGNED)) {
 		return NULL;
 	}
 
@@ -1647,11 +1665,11 @@ static struct bfs_expr *parse_limit(struct bfs_parser *parser, int arg1, int arg
 	}
 
 	if (expr->num <= 0) {
-		parse_expr_error(parser, expr, "The ${blu}%s${rs} must be at least ${bld}1${rs}.\n", expr->argv[0]);
+		parse_expr_error(parser, expr, "The %pX must be at least ${bld}1${rs}.\n", expr);
 		return NULL;
 	}
 
-	parser->limit_arg = expr->argv;
+	parser->limit_expr = expr;
 	return expr;
 }
 
@@ -1684,11 +1702,8 @@ static struct bfs_expr *parse_mount(struct bfs_parser *parser, int arg1, int arg
 		return NULL;
 	}
 
-	parse_expr_warning(parser, expr, "In the future, ${blu}%s${rs} will skip mount points entirely, unlike\n", expr->argv[0]);
-	bfs_warning(parser->ctx, "${blu}-xdev${rs}, due to http://austingroupbugs.net/view.php?id=1133.\n\n");
-
-	parser->ctx->flags |= BFTW_PRUNE_MOUNTS;
-	parser->mount_arg = expr->argv;
+	parser->ctx->flags |= BFTW_SKIP_MOUNTS;
+	parser->mount_expr = expr;
 	return expr;
 }
 
@@ -1737,7 +1752,7 @@ static int parse_reftime(const struct bfs_parser *parser, struct bfs_expr *expr)
 	if (xgetdate(expr->argv[1], &expr->reftime) == 0) {
 		return 0;
 	} else if (errno != EINVAL) {
-		parse_expr_error(parser, expr, "%m.\n");
+		parse_expr_error(parser, expr, "%s.\n", errstr());
 		return -1;
 	}
 
@@ -1831,6 +1846,14 @@ static struct bfs_expr *parse_newerxy(struct bfs_parser *parser, int arg1, int a
 }
 
 /**
+ * Parse -noerror.
+ */
+static struct bfs_expr *parse_noerror(struct bfs_parser *parser, int arg1, int arg2) {
+	parser->ctx->ignore_errors = true;
+	return parse_nullary_option(parser);
+}
+
+/**
  * Parse -nogroup.
  */
 static struct bfs_expr *parse_nogroup(struct bfs_parser *parser, int arg1, int arg2) {
@@ -1846,7 +1869,7 @@ static struct bfs_expr *parse_nogroup(struct bfs_parser *parser, int arg1, int a
  * Parse -nohidden.
  */
 static struct bfs_expr *parse_nohidden(struct bfs_parser *parser, int arg1, int arg2) {
-	struct bfs_expr *hidden = parse_new_expr(parser, eval_hidden, 1, &fake_hidden_arg);
+	struct bfs_expr *hidden = parse_new_expr(parser, eval_hidden, 1, &fake_hidden_arg, BFS_TEST);
 	if (!hidden) {
 		return NULL;
 	}
@@ -1859,9 +1882,15 @@ static struct bfs_expr *parse_nohidden(struct bfs_parser *parser, int arg1, int 
  * Parse -noleaf.
  */
 static struct bfs_expr *parse_noleaf(struct bfs_parser *parser, int arg1, int arg2) {
-	parse_warning(parser, "${ex}%s${rs} does not apply the optimization that ${blu}%s${rs} inhibits.\n\n",
-		BFS_COMMAND, parser->argv[0]);
-	return parse_nullary_option(parser);
+	struct bfs_expr *expr = parse_nullary_option(parser);
+	if (!expr) {
+		return NULL;
+	}
+
+	parse_expr_warning(parser, expr,
+		"${ex}%s${rs} does not apply the optimization that %px inhibits.\n\n",
+		BFS_COMMAND, expr);
+	return expr;
 }
 
 /**
@@ -1894,6 +1923,8 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		return 0;
 	}
 
+	mode_t umask = parser->ctx->umask;
+
 	expr->file_mode = 0;
 	expr->dir_mode = 0;
 
@@ -1914,7 +1945,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 	//
 	// PERMCOPY : "u" | "g" | "o"
 
-	// Parser machine parser
+	// State machine state
 	enum {
 		MODE_CLAUSE,
 		MODE_WHO,
@@ -1922,7 +1953,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		MODE_ACTION_APPLY,
 		MODE_OP,
 		MODE_PERM,
-	} mparser = MODE_CLAUSE;
+	} state = MODE_CLAUSE;
 
 	enum {
 		MODE_PLUS,
@@ -1931,16 +1962,18 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 	} op uninit(MODE_EQUALS);
 
 	mode_t who uninit(0);
+	mode_t mask uninit(0);
 	mode_t file_change uninit(0);
 	mode_t dir_change uninit(0);
 
 	const char *i = mode;
 	while (true) {
-		switch (mparser) {
+		switch (state) {
 		case MODE_CLAUSE:
 			who = 0;
-			mparser = MODE_WHO;
-			fallthru;
+			mask = 0777;
+			state = MODE_WHO;
+			[[fallthrough]];
 
 		case MODE_WHO:
 			switch (*i) {
@@ -1957,7 +1990,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				who |= 0777;
 				break;
 			default:
-				mparser = MODE_ACTION;
+				state = MODE_ACTION;
 				continue;
 			}
 			break;
@@ -1967,7 +2000,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			case MODE_EQUALS:
 				expr->file_mode &= ~who;
 				expr->dir_mode &= ~who;
-				fallthru;
+				[[fallthrough]];
 			case MODE_PLUS:
 				expr->file_mode |= file_change;
 				expr->dir_mode |= dir_change;
@@ -1977,37 +2010,40 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				expr->dir_mode &= ~dir_change;
 				break;
 			}
-			fallthru;
+			[[fallthrough]];
 
 		case MODE_ACTION:
 			if (who == 0) {
 				who = 0777;
+				mask = who & ~umask;
+			} else {
+				mask = who;
 			}
 
 			switch (*i) {
 			case '+':
 				op = MODE_PLUS;
-				mparser = MODE_OP;
+				state = MODE_OP;
 				break;
 			case '-':
 				op = MODE_MINUS;
-				mparser = MODE_OP;
+				state = MODE_OP;
 				break;
 			case '=':
 				op = MODE_EQUALS;
-				mparser = MODE_OP;
+				state = MODE_OP;
 				break;
 
 			case ',':
-				if (mparser == MODE_ACTION_APPLY) {
-					mparser = MODE_CLAUSE;
+				if (state == MODE_ACTION_APPLY) {
+					state = MODE_CLAUSE;
 				} else {
 					goto fail;
 				}
 				break;
 
 			case '\0':
-				if (mparser == MODE_ACTION_APPLY) {
+				if (state == MODE_ACTION_APPLY) {
 					goto done;
 				} else {
 					goto fail;
@@ -2036,32 +2072,32 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			default:
 				file_change = 0;
 				dir_change = 0;
-				mparser = MODE_PERM;
+				state = MODE_PERM;
 				continue;
 			}
 
 			file_change |= (file_change << 6) | (file_change << 3);
-			file_change &= who;
+			file_change &= mask;
 			dir_change |= (dir_change << 6) | (dir_change << 3);
-			dir_change &= who;
-			mparser = MODE_ACTION_APPLY;
+			dir_change &= mask;
+			state = MODE_ACTION_APPLY;
 			break;
 
 		case MODE_PERM:
 			switch (*i) {
 			case 'r':
-				file_change |= who & 0444;
-				dir_change |= who & 0444;
+				file_change |= mask & 0444;
+				dir_change |= mask & 0444;
 				break;
 			case 'w':
-				file_change |= who & 0222;
-				dir_change |= who & 0222;
+				file_change |= mask & 0222;
+				dir_change |= mask & 0222;
 				break;
 			case 'x':
-				file_change |= who & 0111;
-				fallthru;
+				file_change |= mask & 0111;
+				[[fallthrough]];
 			case 'X':
-				dir_change |= who & 0111;
+				dir_change |= mask & 0111;
 				break;
 			case 's':
 				if (who & 0700) {
@@ -2080,7 +2116,7 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				}
 				break;
 			default:
-				mparser = MODE_ACTION_APPLY;
+				state = MODE_ACTION_APPLY;
 				continue;
 			}
 			break;
@@ -2122,7 +2158,7 @@ static struct bfs_expr *parse_perm(struct bfs_parser *parser, int field, int arg
 			++mode;
 			break;
 		}
-		fallthru;
+		[[fallthrough]];
 	default:
 		expr->mode_cmp = BFS_MODE_EQUAL;
 		break;
@@ -2190,8 +2226,13 @@ static struct bfs_expr *parse_printx(struct bfs_parser *parser, int arg1, int ar
  * Parse -prune.
  */
 static struct bfs_expr *parse_prune(struct bfs_parser *parser, int arg1, int arg2) {
-	parser->prune_arg = parser->argv;
-	return parse_nullary_action(parser, eval_prune);
+	struct bfs_expr *expr = parse_nullary_action(parser, eval_prune);
+	if (!expr) {
+		return NULL;
+	}
+
+	parser->prune_expr = expr;
+	return expr;
 }
 
 /**
@@ -2253,16 +2294,27 @@ static struct bfs_expr *parse_regextype(struct bfs_parser *parser, int arg1, int
 	// See https://www.gnu.org/software/gnulib/manual/html_node/Predefined-Syntaxes.html
 	const char *type = expr->argv[1];
 	if (strcmp(type, "posix-basic") == 0
+	    || strcmp(type, "posix-minimal-basic") == 0
 	    || strcmp(type, "ed") == 0
 	    || strcmp(type, "sed") == 0) {
 		parser->regex_type = BFS_REGEX_POSIX_BASIC;
 	} else if (strcmp(type, "posix-extended") == 0) {
 		parser->regex_type = BFS_REGEX_POSIX_EXTENDED;
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
+	} else if (strcmp(type, "awk") == 0
+	           || strcmp(type, "posix-awk") == 0) {
+		parser->regex_type = BFS_REGEX_AWK;
+	} else if (strcmp(type, "gnu-awk") == 0) {
+		parser->regex_type = BFS_REGEX_GNU_AWK;
 	} else if (strcmp(type, "emacs") == 0) {
 		parser->regex_type = BFS_REGEX_EMACS;
 	} else if (strcmp(type, "grep") == 0) {
 		parser->regex_type = BFS_REGEX_GREP;
+	} else if (strcmp(type, "egrep") == 0
+	           || strcmp(type, "posix-egrep") == 0) {
+		parser->regex_type = BFS_REGEX_EGREP;
+	} else if (strcmp(type, "findutils-default") == 0) {
+		parser->regex_type = BFS_REGEX_GNU_FIND;
 #endif
 	} else if (strcmp(type, "help") == 0) {
 		parser->just_info = true;
@@ -2277,14 +2329,23 @@ static struct bfs_expr *parse_regextype(struct bfs_parser *parser, int arg1, int
 
 list_types:
 	cfprintf(cfile, "Supported types are:\n\n");
-	cfprintf(cfile, "  ${bld}posix-basic${rs}:    POSIX basic regular expressions (BRE)\n");
-	cfprintf(cfile, "  ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n");
-	cfprintf(cfile, "  ${bld}ed${rs}:             Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
-#if BFS_USE_ONIGURUMA
-	cfprintf(cfile, "  ${bld}emacs${rs}:          Like ${grn}emacs${rs}\n");
-	cfprintf(cfile, "  ${bld}grep${rs}:           Like ${grn}grep${rs}\n");
+	cfprintf(cfile, "        ${bld}posix-basic${rs}: POSIX basic regular expressions (BRE)\n");
+	cfprintf(cfile, "                 ${bld}ed${rs}: Like ${grn}ed${rs} (same as ${bld}posix-basic${rs})\n");
+	cfprintf(cfile, "                ${bld}sed${rs}: Like ${grn}sed${rs} (same as ${bld}posix-basic${rs})\n\n");
+
+	cfprintf(cfile, "     ${bld}posix-extended${rs}: POSIX extended regular expressions (ERE)\n\n");
+
+#if BFS_WITH_ONIGURUMA
+	cfprintf(cfile, "        [${bld}posix-${rs}]${bld}awk${rs}: Like ${grn}awk${rs}\n");
+	cfprintf(cfile, "            ${bld}gnu-awk${rs}: Like GNU ${grn}awk${rs}\n\n");
+
+	cfprintf(cfile, "              ${bld}emacs${rs}: Like ${grn}emacs${rs}\n\n");
+
+	cfprintf(cfile, "               ${bld}grep${rs}: Like ${grn}grep${rs}\n");
+	cfprintf(cfile, "      [${bld}posix-${rs}]${bld}egrep${rs}: Like ${grn}grep${rs} ${cyn}-E${rs}\n\n");
+
+	cfprintf(cfile, "  ${bld}findutils-default${rs}: Like GNU ${grn}find${rs}\n");
 #endif
-	cfprintf(cfile, "  ${bld}sed${rs}:            Like ${grn}sed${rs} (same as ${bld}posix-basic${rs})\n");
 	return NULL;
 }
 
@@ -2322,13 +2383,13 @@ static struct bfs_expr *parse_search_strategy(struct bfs_parser *parser, int arg
 	struct bfs_ctx *ctx = parser->ctx;
 	CFILE *cfile = ctx->cerr;
 
-	struct bfs_expr *expr = parse_unary_flag(parser);
+	const char *arg;
+	struct bfs_expr *expr = parse_prefix_flag(parser, 'S', true, &arg);
 	if (!expr) {
 		cfprintf(cfile, "\n");
 		goto list_strategies;
 	}
 
-	const char *arg = expr->argv[1];
 	if (strcmp(arg, "bfs") == 0) {
 		ctx->strategy = BFTW_BFS;
 	} else if (strcmp(arg, "dfs") == 0) {
@@ -2549,9 +2610,14 @@ static struct bfs_expr *parse_xattrname(struct bfs_parser *parser, int arg1, int
  * Parse -xdev.
  */
 static struct bfs_expr *parse_xdev(struct bfs_parser *parser, int arg1, int arg2) {
+	struct bfs_expr *expr = parse_nullary_option(parser);
+	if (!expr) {
+		return NULL;
+	}
+
 	parser->ctx->flags |= BFTW_PRUNE_MOUNTS;
-	parser->xdev_arg = parser->argv;
-	return parse_nullary_option(parser);
+	parser->xdev_expr = expr;
+	return expr;
 }
 
 /**
@@ -2744,8 +2810,9 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "  ${blu}-mindepth${rs} ${bld}N${rs}\n");
 	cfprintf(cout, "      Ignore files deeper/shallower than ${bld}N${rs}\n");
 	cfprintf(cout, "  ${blu}-mount${rs}\n");
-	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs} for now, but will\n");
-	cfprintf(cout, "      skip mount points entirely in the future)\n");
+	cfprintf(cout, "      Exclude mount points entirely from the results\n");
+	cfprintf(cout, "  ${blu}-noerror${rs}\n");
+	cfprintf(cout, "      Ignore any errors that occur during traversal\n");
 	cfprintf(cout, "  ${blu}-nohidden${rs}\n");
 	cfprintf(cout, "      Exclude hidden files\n");
 	cfprintf(cout, "  ${blu}-noleaf${rs}\n");
@@ -2922,18 +2989,60 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	return NULL;
 }
 
+/** Print the bfs "logo". */
+static void print_logo(CFILE *cout) {
+	if (!cout->colors) {
+		goto boring;
+	}
+
+	size_t vwidth = xstrwidth(bfs_version);
+	dchar *spaces = dstrepeat(" ", vwidth);
+	dchar *lines = dstrepeat("─", vwidth);
+	if (!spaces || !lines) {
+		dstrfree(lines);
+		dstrfree(spaces);
+		goto boring;
+	}
+
+	// We do ----\r<emoji> rather than <emoji>--- so we don't have to assume
+	// anything about the width of the emoji
+	cfprintf(cout, "╭─────%s╮\r📂\n", lines);
+	cfprintf(cout, "├${ex}b${rs}   %s │\n", spaces);
+	cfprintf(cout, "╰├${ex}f${rs}  ${bld}%s${rs} │\n", bfs_version);
+	cfprintf(cout, " ╰├${ex}s${rs} %s │\n", spaces);
+	cfprintf(cout, "  ╰──%s─╯\n\n", lines);
+
+	dstrfree(lines);
+	dstrfree(spaces);
+	return;
+
+boring:
+	printf("%s %s\n\n", BFS_COMMAND, bfs_version);
+}
+
 /**
  * "Parse" -version.
  */
 static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int arg2) {
-	cfprintf(parser->ctx->cout, "${ex}%s${rs} ${bld}%s${rs}\n\n", BFS_COMMAND, bfs_version);
+	print_logo(parser->ctx->cout);
 
-	printf("%s\n", BFS_HOMEPAGE);
+	printf("Copyright © Tavian Barnes and the bfs contributors\n");
+	printf("No rights reserved (https://opensource.org/license/0BSD)\n\n");
+
+	printf("CONFFLAGS := %s\n", bfs_confflags);
+	printf("CC        := %s\n", bfs_cc);
+	printf("CPPFLAGS  := %s\n", bfs_cppflags);
+	printf("CFLAGS    := %s\n", bfs_cflags);
+	printf("LDFLAGS   := %s\n", bfs_ldflags);
+	printf("LDLIBS    := %s\n", bfs_ldlibs);
+
+	printf("\n%s\n", BFS_HOMEPAGE);
 
 	parser->just_info = true;
 	return NULL;
 }
 
+/** Parser callback function type. */
 typedef struct bfs_expr *parse_fn(struct bfs_parser *parser, int arg1, int arg2);
 
 /**
@@ -2941,137 +3050,139 @@ typedef struct bfs_expr *parse_fn(struct bfs_parser *parser, int arg1, int arg2)
  */
 struct table_entry {
 	char *arg;
-	enum token_type type;
+	enum bfs_kind kind;
 	parse_fn *parse;
 	int arg1;
 	int arg2;
 	bool prefix;
+	bool needs_arg;
 };
 
 /**
  * The parse table for primary expressions.
  */
 static const struct table_entry parse_table[] = {
-	{"--", T_FLAG},
-	{"--help", T_ACTION, parse_help},
-	{"--version", T_ACTION, parse_version},
-	{"-Bmin", T_TEST, parse_min, BFS_STAT_BTIME},
-	{"-Bnewer", T_TEST, parse_newer, BFS_STAT_BTIME},
-	{"-Bsince", T_TEST, parse_since, BFS_STAT_BTIME},
-	{"-Btime", T_TEST, parse_time, BFS_STAT_BTIME},
-	{"-D", T_FLAG, parse_debug},
-	{"-E", T_FLAG, parse_regex_extended},
-	{"-H", T_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
-	{"-L", T_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
-	{"-O", T_FLAG, parse_optlevel, 0, 0, true},
-	{"-P", T_FLAG, parse_follow, 0, false},
-	{"-S", T_FLAG, parse_search_strategy},
-	{"-X", T_FLAG, parse_xargs_safe},
-	{"-a", T_OPERATOR},
-	{"-acl", T_TEST, parse_acl},
-	{"-amin", T_TEST, parse_min, BFS_STAT_ATIME},
-	{"-and", T_OPERATOR},
-	{"-anewer", T_TEST, parse_newer, BFS_STAT_ATIME},
-	{"-asince", T_TEST, parse_since, BFS_STAT_ATIME},
-	{"-atime", T_TEST, parse_time, BFS_STAT_ATIME},
-	{"-capable", T_TEST, parse_capable},
-	{"-cmin", T_TEST, parse_min, BFS_STAT_CTIME},
-	{"-cnewer", T_TEST, parse_newer, BFS_STAT_CTIME},
-	{"-color", T_OPTION, parse_color, true},
-	{"-context", T_TEST, parse_context, true},
-	{"-csince", T_TEST, parse_since, BFS_STAT_CTIME},
-	{"-ctime", T_TEST, parse_time, BFS_STAT_CTIME},
-	{"-d", T_FLAG, parse_depth},
-	{"-daystart", T_OPTION, parse_daystart},
-	{"-delete", T_ACTION, parse_delete},
-	{"-depth", T_OPTION, parse_depth_n},
-	{"-empty", T_TEST, parse_empty},
-	{"-exclude", T_OPERATOR},
-	{"-exec", T_ACTION, parse_exec, 0},
-	{"-execdir", T_ACTION, parse_exec, BFS_EXEC_CHDIR},
-	{"-executable", T_TEST, parse_access, X_OK},
-	{"-exit", T_ACTION, parse_exit},
-	{"-f", T_FLAG, parse_f},
-	{"-false", T_TEST, parse_const, false},
-	{"-files0-from", T_OPTION, parse_files0_from},
-	{"-flags", T_TEST, parse_flags},
-	{"-fls", T_ACTION, parse_fls},
-	{"-follow", T_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
-	{"-fprint", T_ACTION, parse_fprint},
-	{"-fprint0", T_ACTION, parse_fprint0},
-	{"-fprintf", T_ACTION, parse_fprintf},
-	{"-fstype", T_TEST, parse_fstype},
-	{"-gid", T_TEST, parse_group},
-	{"-group", T_TEST, parse_group},
-	{"-help", T_ACTION, parse_help},
-	{"-hidden", T_TEST, parse_hidden},
-	{"-ignore_readdir_race", T_OPTION, parse_ignore_races, true},
-	{"-ilname", T_TEST, parse_lname, true},
-	{"-iname", T_TEST, parse_name, true},
-	{"-inum", T_TEST, parse_inum},
-	{"-ipath", T_TEST, parse_path, true},
-	{"-iregex", T_TEST, parse_regex, BFS_REGEX_ICASE},
-	{"-iwholename", T_TEST, parse_path, true},
-	{"-j", T_FLAG, parse_jobs, 0, 0, true},
-	{"-limit", T_ACTION, parse_limit},
-	{"-links", T_TEST, parse_links},
-	{"-lname", T_TEST, parse_lname, false},
-	{"-ls", T_ACTION, parse_ls},
-	{"-maxdepth", T_OPTION, parse_depth_limit, false},
-	{"-mindepth", T_OPTION, parse_depth_limit, true},
-	{"-mmin", T_TEST, parse_min, BFS_STAT_MTIME},
-	{"-mnewer", T_TEST, parse_newer, BFS_STAT_MTIME},
-	{"-mount", T_OPTION, parse_mount},
-	{"-msince", T_TEST, parse_since, BFS_STAT_MTIME},
-	{"-mtime", T_TEST, parse_time, BFS_STAT_MTIME},
-	{"-name", T_TEST, parse_name, false},
-	{"-newer", T_TEST, parse_newer, BFS_STAT_MTIME},
-	{"-newer", T_TEST, parse_newerxy, 0, 0, true},
-	{"-nocolor", T_OPTION, parse_color, false},
-	{"-nogroup", T_TEST, parse_nogroup},
-	{"-nohidden", T_TEST, parse_nohidden},
-	{"-noignore_readdir_race", T_OPTION, parse_ignore_races, false},
-	{"-noleaf", T_OPTION, parse_noleaf},
-	{"-not", T_OPERATOR},
-	{"-nouser", T_TEST, parse_nouser},
-	{"-nowarn", T_OPTION, parse_warn, false},
-	{"-o", T_OPERATOR},
-	{"-ok", T_ACTION, parse_exec, BFS_EXEC_CONFIRM},
-	{"-okdir", T_ACTION, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
-	{"-or", T_OPERATOR},
-	{"-path", T_TEST, parse_path, false},
-	{"-perm", T_TEST, parse_perm},
-	{"-print", T_ACTION, parse_print},
-	{"-print0", T_ACTION, parse_print0},
-	{"-printf", T_ACTION, parse_printf},
-	{"-printx", T_ACTION, parse_printx},
-	{"-prune", T_ACTION, parse_prune},
-	{"-quit", T_ACTION, parse_quit},
-	{"-readable", T_TEST, parse_access, R_OK},
-	{"-regex", T_TEST, parse_regex, 0},
-	{"-regextype", T_OPTION, parse_regextype},
-	{"-rm", T_ACTION, parse_delete},
-	{"-s", T_FLAG, parse_s},
-	{"-samefile", T_TEST, parse_samefile},
-	{"-since", T_TEST, parse_since, BFS_STAT_MTIME},
-	{"-size", T_TEST, parse_size},
-	{"-sparse", T_TEST, parse_sparse},
-	{"-status", T_OPTION, parse_status},
-	{"-true", T_TEST, parse_const, true},
-	{"-type", T_TEST, parse_type, false},
-	{"-uid", T_TEST, parse_user},
-	{"-unique", T_OPTION, parse_unique},
-	{"-used", T_TEST, parse_used},
-	{"-user", T_TEST, parse_user},
-	{"-version", T_ACTION, parse_version},
-	{"-warn", T_OPTION, parse_warn, true},
-	{"-wholename", T_TEST, parse_path, false},
-	{"-writable", T_TEST, parse_access, W_OK},
-	{"-x", T_FLAG, parse_xdev},
-	{"-xattr", T_TEST, parse_xattr},
-	{"-xattrname", T_TEST, parse_xattrname},
-	{"-xdev", T_OPTION, parse_xdev},
-	{"-xtype", T_TEST, parse_type, true},
+	{"--", BFS_FLAG},
+	{"--help", BFS_ACTION, parse_help},
+	{"--version", BFS_ACTION, parse_version},
+	{"-Bmin", BFS_TEST, parse_min, BFS_STAT_BTIME},
+	{"-Bnewer", BFS_TEST, parse_newer, BFS_STAT_BTIME},
+	{"-Bsince", BFS_TEST, parse_since, BFS_STAT_BTIME},
+	{"-Btime", BFS_TEST, parse_time, BFS_STAT_BTIME},
+	{"-D", BFS_FLAG, parse_debug, .prefix = true},
+	{"-E", BFS_FLAG, parse_regex_extended},
+	{"-H", BFS_FLAG, parse_follow, BFTW_FOLLOW_ROOTS, false},
+	{"-L", BFS_FLAG, parse_follow, BFTW_FOLLOW_ALL, false},
+	{"-O", BFS_FLAG, parse_optlevel, .prefix = true},
+	{"-P", BFS_FLAG, parse_follow, 0, false},
+	{"-S", BFS_FLAG, parse_search_strategy, .prefix = true},
+	{"-X", BFS_FLAG, parse_xargs_safe},
+	{"-a", BFS_OPERATOR},
+	{"-acl", BFS_TEST, parse_acl},
+	{"-amin", BFS_TEST, parse_min, BFS_STAT_ATIME},
+	{"-and", BFS_OPERATOR},
+	{"-anewer", BFS_TEST, parse_newer, BFS_STAT_ATIME},
+	{"-asince", BFS_TEST, parse_since, BFS_STAT_ATIME},
+	{"-atime", BFS_TEST, parse_time, BFS_STAT_ATIME},
+	{"-capable", BFS_TEST, parse_capable},
+	{"-cmin", BFS_TEST, parse_min, BFS_STAT_CTIME},
+	{"-cnewer", BFS_TEST, parse_newer, BFS_STAT_CTIME},
+	{"-color", BFS_OPTION, parse_color, true},
+	{"-context", BFS_TEST, parse_context, true},
+	{"-csince", BFS_TEST, parse_since, BFS_STAT_CTIME},
+	{"-ctime", BFS_TEST, parse_time, BFS_STAT_CTIME},
+	{"-d", BFS_FLAG, parse_depth, true},
+	{"-daystart", BFS_OPTION, parse_daystart},
+	{"-delete", BFS_ACTION, parse_delete},
+	{"-depth", BFS_OPTION, parse_depth_n, false},
+	{"-empty", BFS_TEST, parse_empty},
+	{"-exclude", BFS_OPERATOR},
+	{"-exec", BFS_ACTION, parse_exec, 0},
+	{"-execdir", BFS_ACTION, parse_exec, BFS_EXEC_CHDIR},
+	{"-executable", BFS_TEST, parse_access, X_OK},
+	{"-exit", BFS_ACTION, parse_exit},
+	{"-f", BFS_FLAG, parse_f, .needs_arg = true},
+	{"-false", BFS_TEST, parse_const, false},
+	{"-files0-from", BFS_OPTION, parse_files0_from},
+	{"-flags", BFS_TEST, parse_flags},
+	{"-fls", BFS_ACTION, parse_fls},
+	{"-follow", BFS_OPTION, parse_follow, BFTW_FOLLOW_ALL, true},
+	{"-fprint", BFS_ACTION, parse_fprint},
+	{"-fprint0", BFS_ACTION, parse_fprint0},
+	{"-fprintf", BFS_ACTION, parse_fprintf},
+	{"-fstype", BFS_TEST, parse_fstype},
+	{"-gid", BFS_TEST, parse_group},
+	{"-group", BFS_TEST, parse_group},
+	{"-help", BFS_ACTION, parse_help},
+	{"-hidden", BFS_TEST, parse_hidden},
+	{"-ignore_readdir_race", BFS_OPTION, parse_ignore_races, true},
+	{"-ilname", BFS_TEST, parse_lname, true},
+	{"-iname", BFS_TEST, parse_name, true},
+	{"-inum", BFS_TEST, parse_inum},
+	{"-ipath", BFS_TEST, parse_path, true},
+	{"-iregex", BFS_TEST, parse_regex, BFS_REGEX_ICASE},
+	{"-iwholename", BFS_TEST, parse_path, true},
+	{"-j", BFS_FLAG, parse_jobs, .prefix = true},
+	{"-limit", BFS_ACTION, parse_limit},
+	{"-links", BFS_TEST, parse_links},
+	{"-lname", BFS_TEST, parse_lname, false},
+	{"-ls", BFS_ACTION, parse_ls},
+	{"-maxdepth", BFS_OPTION, parse_depth_limit, false},
+	{"-mindepth", BFS_OPTION, parse_depth_limit, true},
+	{"-mmin", BFS_TEST, parse_min, BFS_STAT_MTIME},
+	{"-mnewer", BFS_TEST, parse_newer, BFS_STAT_MTIME},
+	{"-mount", BFS_OPTION, parse_mount},
+	{"-msince", BFS_TEST, parse_since, BFS_STAT_MTIME},
+	{"-mtime", BFS_TEST, parse_time, BFS_STAT_MTIME},
+	{"-name", BFS_TEST, parse_name, false},
+	{"-newer", BFS_TEST, parse_newer, BFS_STAT_MTIME},
+	{"-newer", BFS_TEST, parse_newerxy, .prefix = true},
+	{"-nocolor", BFS_OPTION, parse_color, false},
+	{"-noerror", BFS_OPTION, parse_noerror},
+	{"-nogroup", BFS_TEST, parse_nogroup},
+	{"-nohidden", BFS_TEST, parse_nohidden},
+	{"-noignore_readdir_race", BFS_OPTION, parse_ignore_races, false},
+	{"-noleaf", BFS_OPTION, parse_noleaf},
+	{"-not", BFS_OPERATOR},
+	{"-nouser", BFS_TEST, parse_nouser},
+	{"-nowarn", BFS_OPTION, parse_warn, false},
+	{"-o", BFS_OPERATOR},
+	{"-ok", BFS_ACTION, parse_exec, BFS_EXEC_CONFIRM},
+	{"-okdir", BFS_ACTION, parse_exec, BFS_EXEC_CONFIRM | BFS_EXEC_CHDIR},
+	{"-or", BFS_OPERATOR},
+	{"-path", BFS_TEST, parse_path, false},
+	{"-perm", BFS_TEST, parse_perm},
+	{"-print", BFS_ACTION, parse_print},
+	{"-print0", BFS_ACTION, parse_print0},
+	{"-printf", BFS_ACTION, parse_printf},
+	{"-printx", BFS_ACTION, parse_printx},
+	{"-prune", BFS_ACTION, parse_prune},
+	{"-quit", BFS_ACTION, parse_quit},
+	{"-readable", BFS_TEST, parse_access, R_OK},
+	{"-regex", BFS_TEST, parse_regex, 0},
+	{"-regextype", BFS_OPTION, parse_regextype},
+	{"-rm", BFS_ACTION, parse_delete},
+	{"-s", BFS_FLAG, parse_s},
+	{"-samefile", BFS_TEST, parse_samefile},
+	{"-since", BFS_TEST, parse_since, BFS_STAT_MTIME},
+	{"-size", BFS_TEST, parse_size},
+	{"-sparse", BFS_TEST, parse_sparse},
+	{"-status", BFS_OPTION, parse_status},
+	{"-true", BFS_TEST, parse_const, true},
+	{"-type", BFS_TEST, parse_type, false},
+	{"-uid", BFS_TEST, parse_user},
+	{"-unique", BFS_OPTION, parse_unique},
+	{"-used", BFS_TEST, parse_used},
+	{"-user", BFS_TEST, parse_user},
+	{"-version", BFS_ACTION, parse_version},
+	{"-warn", BFS_OPTION, parse_warn, true},
+	{"-wholename", BFS_TEST, parse_path, false},
+	{"-writable", BFS_TEST, parse_access, W_OK},
+	{"-x", BFS_FLAG, parse_xdev},
+	{"-xattr", BFS_TEST, parse_xattr},
+	{"-xattrname", BFS_TEST, parse_xattrname},
+	{"-xdev", BFS_OPTION, parse_xdev},
+	{"-xtype", BFS_TEST, parse_type, true},
 	{0},
 };
 
@@ -3090,6 +3201,83 @@ static const struct table_entry *table_lookup(const char *arg) {
 	}
 
 	return NULL;
+}
+
+/** Look up a single-character flag in the parse table. */
+static const struct table_entry *flag_lookup(char flag) {
+	for (const struct table_entry *entry = parse_table; entry->arg; ++entry) {
+		enum bfs_kind kind = entry->kind;
+		if (kind == BFS_FLAG && entry->arg[1] == flag && !entry->arg[2]) {
+			return entry;
+		}
+	}
+
+	return NULL;
+}
+
+/** Check for a multi-flag argument like -LEXO2. */
+static bool is_flag_group(const char *arg) {
+	// We enforce that at least one flag in a flag group must be a capital
+	// letter, to avoid ambiguity with primary expressions
+	bool has_upper = false;
+
+	// Flags that take an argument must appear last
+	bool needs_arg = false;
+
+	for (size_t i = 1; arg[i]; ++i) {
+		char c = arg[i];
+		if (c >= 'A' && c <= 'Z') {
+			has_upper = true;
+		}
+
+		if (needs_arg) {
+			return false;
+		}
+
+		const struct table_entry *entry = flag_lookup(c);
+		if (!entry || !entry->parse) {
+			return false;
+		}
+
+		if (entry->prefix) {
+			// The rest is the flag's argument
+			break;
+		}
+
+		needs_arg |= entry->needs_arg;
+	}
+
+	return has_upper;
+}
+
+/** Parse a multi-flag argument. */
+static struct bfs_expr *parse_flag_group(struct bfs_parser *parser) {
+	struct bfs_expr *expr = NULL;
+
+	char **start = parser->argv;
+	char **end = start;
+	const char *arg = start[0];
+
+	for (size_t i = 1; arg[i]; ++i) {
+		parser->argv = start;
+
+		const struct table_entry *entry = flag_lookup(arg[i]);
+		expr = entry->parse(parser, entry->arg1, entry->arg2);
+
+		if (parser->argv > end) {
+			end = parser->argv;
+		}
+
+		if (!expr || entry->prefix) {
+			break;
+		}
+	}
+
+	if (expr) {
+		bfs_assert(parser->argv == end, "Didn't eat enough tokens");
+	}
+
+	return expr;
 }
 
 /** Search for a fuzzy match in the parse table. */
@@ -3114,6 +3302,8 @@ static const struct table_entry *table_lookup_fuzzy(const char *arg) {
  *         | ACTION
  */
 static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	// Paths are already skipped at this point
 	const char *arg = parser->argv[0];
 
@@ -3130,15 +3320,19 @@ static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
 		}
 	}
 
+	if (is_flag_group(arg)) {
+		return parse_flag_group(parser);
+	}
+
 	match = table_lookup_fuzzy(arg);
 
-	CFILE *cerr = parser->ctx->cerr;
+	CFILE *cerr = ctx->cerr;
 	parse_error(parser, "Unknown argument; did you mean ");
-	switch (match->type) {
-	case T_FLAG:
+	switch (match->kind) {
+	case BFS_FLAG:
 		cfprintf(cerr, "${cyn}%s${rs}?", match->arg);
 		break;
-	case T_OPERATOR:
+	case BFS_OPERATOR:
 		cfprintf(cerr, "${red}%s${rs}?", match->arg);
 		break;
 	default:
@@ -3146,7 +3340,7 @@ static struct bfs_expr *parse_primary(struct bfs_parser *parser) {
 		break;
 	}
 
-	if (!parser->interactive || !match->parse) {
+	if (!ctx->interactive || !match->parse) {
 		fprintf(stderr, "\n");
 		goto unmatched;
 	}
@@ -3188,7 +3382,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 	}
 
 	if (strcmp(arg, "(") == 0) {
-		parser_advance(parser, T_OPERATOR, 1);
+		parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *expr = parse_expr(parser);
 		if (!expr) {
@@ -3205,7 +3399,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 			return NULL;
 		}
 
-		parser_advance(parser, T_OPERATOR, 1);
+		parser_advance(parser, BFS_OPERATOR, 1);
 		return expr;
 	} else if (strcmp(arg, "-exclude") == 0) {
 		if (parser->excluding) {
@@ -3213,7 +3407,7 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 			return NULL;
 		}
 
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 		parser->excluding = true;
 
 		struct bfs_expr *factor = parse_factor(parser);
@@ -3224,9 +3418,9 @@ static struct bfs_expr *parse_factor(struct bfs_parser *parser) {
 		parser->excluding = false;
 
 		bfs_expr_append(parser->ctx->exclude, factor);
-		return parse_new_expr(parser, eval_true, parser->argv - argv, argv);
+		return parse_new_expr(parser, eval_true, parser->argv - argv, argv, BFS_OPERATOR);
 	} else if (strcmp(arg, "!") == 0 || strcmp(arg, "-not") == 0) {
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *factor = parse_factor(parser);
 		if (!factor) {
@@ -3266,7 +3460,7 @@ static struct bfs_expr *parse_term(struct bfs_parser *parser) {
 
 		char **argv = &fake_and_arg;
 		if (strcmp(arg, "-a") == 0 || strcmp(arg, "-and") == 0) {
-			argv = parser_advance(parser, T_OPERATOR, 1);
+			argv = parser_advance(parser, BFS_OPERATOR, 1);
 		}
 
 		struct bfs_expr *lhs = term;
@@ -3303,7 +3497,7 @@ static struct bfs_expr *parse_clause(struct bfs_parser *parser) {
 			break;
 		}
 
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *lhs = clause;
 		struct bfs_expr *rhs = parse_term(parser);
@@ -3338,7 +3532,7 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser) {
 			break;
 		}
 
-		char **argv = parser_advance(parser, T_OPERATOR, 1);
+		char **argv = parser_advance(parser, BFS_OPERATOR, 1);
 
 		struct bfs_expr *lhs = expr;
 		struct bfs_expr *rhs = parse_clause(parser);
@@ -3352,10 +3546,79 @@ static struct bfs_expr *parse_expr(struct bfs_parser *parser) {
 	return expr;
 }
 
+/** Handle -files0-from after parsing. */
+static int parse_files0_roots(struct bfs_parser *parser) {
+	const struct bfs_ctx *ctx = parser->ctx;
+	const struct bfs_expr *expr = parser->files0_expr;
+
+	if (ctx->npaths > 0) {
+		bool highlight[ctx->argc];
+		init_highlight(ctx, highlight);
+		highlight_args(ctx, expr->argv, expr->argc, highlight);
+
+		for (size_t i = 0; i < ctx->argc; ++i) {
+			if (ctx->kinds[i] == BFS_PATH) {
+				highlight[i] = true;
+			}
+		}
+
+		bfs_argv_error(ctx, highlight);
+		bfs_error(ctx, "Cannot combine %pX with explicit root paths.\n", expr);
+		return -1;
+	}
+
+	const char *from = expr->argv[1];
+
+	FILE *file;
+	if (strcmp(from, "-") == 0) {
+		if (!consume_stdin(parser, expr)) {
+			return -1;
+		}
+		file = stdin;
+	} else {
+		file = xfopen(from, O_RDONLY | O_CLOEXEC);
+	}
+	if (!file) {
+		parse_expr_error(parser, expr, "%s.\n", errstr());
+		return -1;
+	}
+
+	while (true) {
+		char *path = xgetdelim(file, '\0');
+		if (!path) {
+			if (errno) {
+				goto fail;
+			} else {
+				break;
+			}
+		}
+
+		int ret = parse_root(parser, path);
+		free(path);
+		if (ret != 0) {
+			goto fail;
+		}
+	}
+
+	if (file != stdin) {
+		fclose(file);
+	}
+
+	return 0;
+
+fail:
+	if (file != stdin) {
+		fclose(file);
+	}
+	return -1;
+}
+
 /**
  * Parse the top-level expression.
  */
 static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
+	struct bfs_ctx *ctx = parser->ctx;
+
 	if (skip_paths(parser) != 0) {
 		return NULL;
 	}
@@ -3364,7 +3627,7 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 	if (parser->argv[0]) {
 		expr = parse_expr(parser);
 	} else {
-		expr = parse_new_expr(parser, eval_true, 1, &fake_true_arg);
+		expr = parse_new_expr(parser, eval_true, 1, &fake_true_arg, BFS_TEST);
 	}
 	if (!expr) {
 		return NULL;
@@ -3375,16 +3638,26 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 		return NULL;
 	}
 
+	if (parser->files0_expr) {
+		if (parse_files0_roots(parser) != 0) {
+			return NULL;
+		}
+	} else if (ctx->npaths == 0) {
+		if (parse_root(parser, ".") != 0) {
+			return NULL;
+		}
+	}
+
 	if (parser->implicit_print) {
-		char **limit = parser->limit_arg;
+		const struct bfs_expr *limit = parser->limit_expr;
 		if (limit) {
-			parse_argv_error(parser, parser->limit_arg, 2,
-				"With ${blu}%s${rs}, you must specify an action explicitly; for example, ${blu}-print${rs} ${blu}%s${rs} ${bld}%s${rs}.\n",
-				limit[0], limit[0], limit[1]);
+			parse_expr_error(parser, limit,
+				"With %pX, you must specify an action explicitly; for example, ${blu}-print${rs} %px.\n",
+				limit, limit);
 			return NULL;
 		}
 
-		struct bfs_expr *print = parse_new_expr(parser, eval_fprint, 1, &fake_print_arg);
+		struct bfs_expr *print = parse_new_expr(parser, eval_fprint, 1, &fake_print_arg, BFS_ACTION);
 		if (!print) {
 			return NULL;
 		}
@@ -3396,32 +3669,25 @@ static struct bfs_expr *parse_whole_expr(struct bfs_parser *parser) {
 		}
 	}
 
-	if (parser->mount_arg && parser->xdev_arg) {
-		parse_conflict_warning(parser, parser->mount_arg, 1, parser->xdev_arg, 1,
-			"${blu}%s${rs} is redundant in the presence of ${blu}%s${rs}.\n\n",
-			parser->xdev_arg[0], parser->mount_arg[0]);
+	if (parser->mount_expr && parser->xdev_expr) {
+		parse_conflict_warning(parser, parser->mount_expr, parser->xdev_expr,
+			"%px is redundant in the presence of %px.\n\n",
+			parser->xdev_expr, parser->mount_expr);
 	}
 
-	if (parser->ctx->warn && parser->depth_arg && parser->prune_arg) {
-		parse_conflict_warning(parser, parser->depth_arg, 1, parser->prune_arg, 1,
-			"${blu}%s${rs} does not work in the presence of ${blu}%s${rs}.\n",
-			parser->prune_arg[0], parser->depth_arg[0]);
+	if (ctx->warn && parser->depth_expr && parser->prune_expr) {
+		parse_conflict_warning(parser, parser->depth_expr, parser->prune_expr,
+			"%px does not work in the presence of %px.\n",
+			parser->prune_expr, parser->depth_expr);
 
-		if (parser->interactive) {
-			bfs_warning(parser->ctx, "Do you want to continue? ");
-			if (ynprompt() == 0) {
+		if (ctx->interactive) {
+			bfs_warning(ctx, "Do you want to continue? ");
+			if (ynprompt() <= 0) {
 				return NULL;
 			}
 		}
 
 		fprintf(stderr, "\n");
-	}
-
-	if (parser->ok_expr && parser->files0_stdin_arg) {
-		parse_conflict_error(parser, parser->ok_expr->argv, parser->ok_expr->argc, parser->files0_stdin_arg, 2,
-			"${blu}%s${rs} conflicts with ${blu}%s${rs} ${bld}%s${rs}.\n",
-			parser->ok_expr->argv[0], parser->files0_stdin_arg[0], parser->files0_stdin_arg[1]);
-		return NULL;
 	}
 
 	return expr;
@@ -3458,7 +3724,7 @@ static void dump_expr_multiline(const struct bfs_ctx *ctx, enum debug_flags flag
 			++rparens;
 		} else {
 			cfprintf(ctx->cerr, "(${red}%s${rs}\n", expr->argv[0]);
-			for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+			for_expr (child, expr) {
 				int parens = child->next ? 0 : rparens + 1;
 				dump_expr_multiline(ctx, flag, child, indent + 1, parens);
 			}
@@ -3605,6 +3871,12 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		goto fail;
 	}
 
+	ctx->kinds = ZALLOC_ARRAY(enum bfs_kind, argc);
+	if (!ctx->kinds) {
+		perror("zalloc()");
+		goto fail;
+	}
+
 	enum use_color use_color = COLOR_AUTO;
 	const char *no_color = getenv("NO_COLOR");
 	if (no_color && *no_color) {
@@ -3643,6 +3915,7 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	} else {
 		ctx->warn = stdin_tty;
 	}
+	ctx->interactive = stdin_tty && stderr_tty;
 
 	struct bfs_parser parser = {
 		.ctx = ctx,
@@ -3650,23 +3923,20 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 		.command = ctx->argv[0],
 		.regex_type = BFS_REGEX_POSIX_BASIC,
 		.stdout_tty = stdout_tty,
-		.interactive = stdin_tty && stderr_tty,
 		.use_color = use_color,
 		.implicit_print = true,
-		.implicit_root = true,
 		.just_info = false,
 		.excluding = false,
 		.last_arg = NULL,
-		.depth_arg = NULL,
-		.prune_arg = NULL,
-		.mount_arg = NULL,
-		.xdev_arg = NULL,
-		.files0_stdin_arg = NULL,
-		.ok_expr = NULL,
+		.depth_expr = NULL,
+		.prune_expr = NULL,
+		.mount_expr = NULL,
+		.xdev_expr = NULL,
+		.stdin_expr = NULL,
 		.now = ctx->now,
 	};
 
-	ctx->exclude = parse_new_expr(&parser, eval_or, 1, &fake_or_arg);
+	ctx->exclude = parse_new_expr(&parser, eval_or, 1, &fake_or_arg, BFS_OPERATOR);
 	if (!ctx->exclude) {
 		goto fail;
 	}
@@ -3685,14 +3955,10 @@ struct bfs_ctx *bfs_parse_cmdline(int argc, char *argv[]) {
 	}
 
 	if (bfs_optimize(ctx) != 0) {
-		bfs_perror(ctx, "bfs_optimize()");
-		goto fail;
-	}
-
-	if (ctx->npaths == 0 && parser.implicit_root) {
-		if (parse_root(&parser, ".") != 0) {
-			goto fail;
+		if (errno != 0) {
+			bfs_perror(ctx, "bfs_optimize()");
 		}
+		goto fail;
 	}
 
 	if ((ctx->flags & BFTW_FOLLOW_ALL) && !ctx->unique) {

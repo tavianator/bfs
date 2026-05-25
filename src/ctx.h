@@ -8,14 +8,15 @@
 #ifndef BFS_CTX_H
 #define BFS_CTX_H
 
-#include "prelude.h"
 #include "alloc.h"
 #include "bftw.h"
 #include "diag.h"
 #include "expr.h"
 #include "trie.h"
+
 #include <stddef.h>
 #include <sys/resource.h>
+#include <sys/types.h>
 #include <time.h>
 
 struct CFILE;
@@ -28,6 +29,8 @@ struct bfs_ctx {
 	size_t argc;
 	/** The unparsed command line arguments. */
 	char **argv;
+	/** The argument token kinds. */
+	enum bfs_kind *kinds;
 
 	/** The root paths. */
 	const char **paths;
@@ -67,10 +70,17 @@ struct bfs_ctx {
 	bool status;
 	/** Whether to only return unique files (-unique). */
 	bool unique;
-	/** Whether to print warnings (-warn/-nowarn). */
-	bool warn;
 	/** Whether to only handle paths with xargs-safe characters (-X). */
 	bool xargs_safe;
+
+	/** Whether bfs was run interactively. */
+	bool interactive;
+	/** Whether to print warnings (-warn/-nowarn). */
+	bool warn;
+	/** Whether to report errors (-noerror). */
+	bool ignore_errors;
+	/** Whether any dangerous actions (-delete/-exec) are present. */
+	bool dangerous;
 
 	/** Color data. */
 	struct colors *colors;
@@ -98,10 +108,15 @@ struct bfs_ctx {
 	/** The number of files owned by the context. */
 	int nfiles;
 
+	/** The current file creation mask. */
+	mode_t umask;
+
 	/** The initial RLIMIT_NOFILE limits. */
 	struct rlimit orig_nofile;
 	/** The current RLIMIT_NOFILE limits. */
 	struct rlimit cur_nofile;
+	/** Whether the fd limit should be raised. */
+	bool raise_nofile;
 
 	/** The current time. */
 	struct timespec now;
@@ -116,7 +131,7 @@ struct bfs_ctx *bfs_ctx_new(void);
 /**
  * Get the mount table.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
  * @return
  *         The cached mount table, or NULL on failure.
@@ -126,11 +141,11 @@ const struct bfs_mtab *bfs_ctx_mtab(const struct bfs_ctx *ctx);
 /**
  * Deduplicate an opened file.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
- * @param cfile
+ * @cfile
  *         The opened file.
- * @param path
+ * @path
  *         The path to the opened file (or NULL for standard streams).
  * @return
  *         If the same file was opened previously, that file is returned.  If cfile is a new file,
@@ -141,7 +156,7 @@ struct CFILE *bfs_ctx_dedup(struct bfs_ctx *ctx, struct CFILE *cfile, const char
 /**
  * Flush any caches for consistency with external processes.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
  */
 void bfs_ctx_flush(const struct bfs_ctx *ctx);
@@ -149,9 +164,9 @@ void bfs_ctx_flush(const struct bfs_ctx *ctx);
 /**
  * Dump the parsed command line.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
- * @param flag
+ * @flag
  *         The -D flag that triggered the dump.
  */
 void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag);
@@ -159,7 +174,7 @@ void bfs_ctx_dump(const struct bfs_ctx *ctx, enum debug_flags flag);
 /**
  * Free a bfs context.
  *
- * @param ctx
+ * @ctx
  *         The context to free.
  * @return
  *         0 on success, -1 if any errors occurred.

@@ -1,19 +1,21 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "xregex.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "sanity.h"
 #include "thread.h"
+
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 #  include <langinfo.h>
 #  include <oniguruma.h>
 #else
@@ -21,7 +23,7 @@
 #endif
 
 struct bfs_regex {
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 	unsigned char *pattern;
 	OnigRegex impl;
 	int err;
@@ -32,10 +34,16 @@ struct bfs_regex {
 #endif
 };
 
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 
 static int bfs_onig_status;
 static OnigEncoding bfs_onig_enc;
+
+static OnigSyntaxType bfs_onig_syntax_awk;
+static OnigSyntaxType bfs_onig_syntax_gnu_awk;
+static OnigSyntaxType bfs_onig_syntax_emacs;
+static OnigSyntaxType bfs_onig_syntax_egrep;
+static OnigSyntaxType bfs_onig_syntax_gnu_find;
 
 /** pthread_once() callback. */
 static void bfs_onig_once(void) {
@@ -103,6 +111,35 @@ static void bfs_onig_once(void) {
 	if (bfs_onig_status != ONIG_NORMAL) {
 		bfs_onig_enc = NULL;
 	}
+
+	// Compute the GNU extensions
+	OnigSyntaxType *ere = ONIG_SYNTAX_POSIX_EXTENDED;
+	OnigSyntaxType *gnu = ONIG_SYNTAX_GNU_REGEX;
+	unsigned int gnu_op = gnu->op & ~ere->op;
+	unsigned int gnu_op2 = gnu->op2 & ~ere->op2;
+	unsigned int gnu_behavior = gnu->behavior & ~ere->behavior;
+
+	onig_copy_syntax(&bfs_onig_syntax_awk, ONIG_SYNTAX_POSIX_EXTENDED);
+	bfs_onig_syntax_awk.behavior |= ONIG_SYN_ALLOW_INVALID_INTERVAL;
+	bfs_onig_syntax_awk.behavior |= ONIG_SYN_BACKSLASH_ESCAPE_IN_CC;
+
+	onig_copy_syntax(&bfs_onig_syntax_gnu_awk, &bfs_onig_syntax_awk);
+	bfs_onig_syntax_gnu_awk.op |= gnu_op;
+	bfs_onig_syntax_gnu_awk.op2 |= gnu_op2;
+	bfs_onig_syntax_gnu_awk.behavior |= gnu_behavior;
+	bfs_onig_syntax_gnu_awk.behavior &= ~ONIG_SYN_CONTEXT_INDEP_REPEAT_OPS;
+	bfs_onig_syntax_gnu_awk.behavior &= ~ONIG_SYN_CONTEXT_INVALID_REPEAT_OPS;
+
+	// https://github.com/kkos/oniguruma/issues/296
+	onig_copy_syntax(&bfs_onig_syntax_emacs, ONIG_SYNTAX_EMACS);
+	bfs_onig_syntax_emacs.op2 |= ONIG_SYN_OP2_QMARK_GROUP_EFFECT;
+
+	onig_copy_syntax(&bfs_onig_syntax_egrep, ONIG_SYNTAX_POSIX_EXTENDED);
+	bfs_onig_syntax_egrep.behavior |= ONIG_SYN_ALLOW_INVALID_INTERVAL;
+	bfs_onig_syntax_egrep.behavior &= ~ONIG_SYN_CONTEXT_INVALID_REPEAT_OPS;
+
+	onig_copy_syntax(&bfs_onig_syntax_gnu_find, &bfs_onig_syntax_emacs);
+	bfs_onig_syntax_gnu_find.options |= ONIG_OPTION_MULTILINE;
 }
 
 /** Initialize Oniguruma. */
@@ -121,7 +158,7 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 		return -1;
 	}
 
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 	// onig_error_code_to_str() says
 	//
 	//     don't call this after the pattern argument of onig_new() is freed
@@ -143,11 +180,23 @@ int bfs_regcomp(struct bfs_regex **preg, const char *pattern, enum bfs_regex_typ
 	case BFS_REGEX_POSIX_EXTENDED:
 		syntax = ONIG_SYNTAX_POSIX_EXTENDED;
 		break;
+	case BFS_REGEX_AWK:
+		syntax = &bfs_onig_syntax_awk;
+		break;
+	case BFS_REGEX_GNU_AWK:
+		syntax = &bfs_onig_syntax_gnu_awk;
+		break;
 	case BFS_REGEX_EMACS:
-		syntax = ONIG_SYNTAX_EMACS;
+		syntax = &bfs_onig_syntax_emacs;
 		break;
 	case BFS_REGEX_GREP:
 		syntax = ONIG_SYNTAX_GREP;
+		break;
+	case BFS_REGEX_EGREP:
+		syntax = &bfs_onig_syntax_egrep;
+		break;
+	case BFS_REGEX_GNU_FIND:
+		syntax = &bfs_onig_syntax_gnu_find;
 		break;
 	}
 	bfs_assert(syntax, "Invalid regex type");
@@ -204,7 +253,7 @@ fail:
 int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags flags) {
 	size_t len = strlen(str);
 
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 	const unsigned char *ustr = (const unsigned char *)str;
 	const unsigned char *end = ustr + len;
 
@@ -263,7 +312,7 @@ int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags
 
 void bfs_regfree(struct bfs_regex *regex) {
 	if (regex) {
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 		onig_free(regex->impl);
 		free(regex->pattern);
 #else
@@ -278,7 +327,7 @@ char *bfs_regerror(const struct bfs_regex *regex) {
 		return strdup(xstrerror(ENOMEM));
 	}
 
-#if BFS_USE_ONIGURUMA
+#if BFS_WITH_ONIGURUMA
 	unsigned char *str = malloc(ONIG_MAX_ERROR_MESSAGE_LEN);
 	if (str) {
 		onig_error_code_to_str(str, regex->err, &regex->einfo);

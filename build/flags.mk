@@ -1,136 +1,104 @@
 # Copyright © Tavian Barnes <tavianator@tavianator.com>
 # SPDX-License-Identifier: 0BSD
 
-# Makefile that generates gen/flags.mk
+# Makefile that generates gen/{early,late}.mk
 
 include build/prelude.mk
 include gen/vars.mk
 
-# Configurable flags
-CPPFLAGS ?=
-CFLAGS ?= \
-    -g \
-    -Wall \
-    -Wformat=2 \
-    -Werror=implicit \
-    -Wimplicit-fallthrough \
-    -Wmissing-declarations \
-    -Wshadow \
-    -Wsign-compare \
-    -Wstrict-prototypes
-LDFLAGS ?=
-LDLIBS ?=
-
-export XCPPFLAGS=${CPPFLAGS}
-export XCFLAGS=${CFLAGS}
-export XLDFLAGS=${LDFLAGS}
-export XLDLIBS=${LDLIBS}
-
-# Immutable flags
-export BFS_CPPFLAGS= \
-    -Isrc \
-    -Igen \
-    -D__EXTENSIONS__ \
-    -D_ATFILE_SOURCE \
-    -D_BSD_SOURCE \
-    -D_DARWIN_C_SOURCE \
-    -D_DEFAULT_SOURCE \
-    -D_GNU_SOURCE \
-    -D_POSIX_PTHREAD_SEMANTICS \
-    -D_FILE_OFFSET_BITS=64 \
-    -D_TIME_BITS=64
-export BFS_CFLAGS= -std=c17 -pthread
+# Internal flags
+_CPPFLAGS := -Isrc -Igen -include src/prelude.h
+_CFLAGS :=
+_LDFLAGS :=
+_LDLIBS :=
 
 # Platform-specific system libraries
 LDLIBS,DragonFly := -lposix1e
+LDLIBS,FreeBSD := -lrt
 LDLIBS,Linux := -lrt
 LDLIBS,NetBSD := -lutil
+LDLIBS,QNX := -lregex -lsocket
 LDLIBS,SunOS := -lsec -lsocket -lnsl
-export BFS_LDLIBS=${LDLIBS,${OS}}
+_LDLIBS += ${LDLIBS,${OS}}
 
 # Build profiles
 _ASAN := ${TRUTHY,${ASAN}}
 _LSAN := ${TRUTHY,${LSAN}}
 _MSAN := ${TRUTHY,${MSAN}}
 _TSAN := ${TRUTHY,${TSAN}}
+_TYSAN := ${TRUTHY,${TYSAN}}
 _UBSAN := ${TRUTHY,${UBSAN}}
 _GCOV := ${TRUTHY,${GCOV}}
 _LINT := ${TRUTHY,${LINT}}
 _RELEASE := ${TRUTHY,${RELEASE}}
 
-# https://github.com/google/sanitizers/issues/342
-TSAN_CPPFLAGS,y := -DBFS_USE_TARGET_CLONES=0
-export TSAN_CPPFLAGS=${TSAN_CPPFLAGS,${_TSAN}}
+LTO ?= ${RELEASE}
+_LTO := ${TRUTHY,${LTO}}
 
 ASAN_CFLAGS,y := -fsanitize=address
 LSAN_CFLAGS,y := -fsanitize=leak
 MSAN_CFLAGS,y := -fsanitize=memory -fsanitize-memory-track-origins
 TSAN_CFLAGS,y := -fsanitize=thread
-UBSAN_CFLAGS.y := -fsanitize=undefined
+TYSAN_CFLAGS,y := -fsanitize=type
+UBSAN_CFLAGS,y := -fsanitize=undefined
 
-export ASAN_CFLAGS=${ASAN_CFLAGS,${_ASAN}}
-export LSAN_CFLAGS=${LSAN_CFLAGS,${_LSAN}}
-export MSAN_CFLAGS=${MSAN_CFLAGS,${_MSAN}}
-export TSAN_CFLAGS=${TSAN_CFLAGS,${_TSAN}}
-export UBSAN_CFLAGS=${UBSAN_CFLAGS,${_UBSAN}}
+_CFLAGS += ${ASAN_CFLAGS,${_ASAN}}
+_CFLAGS += ${LSAN_CFLAGS,${_LSAN}}
+_CFLAGS += ${MSAN_CFLAGS,${_MSAN}}
+_CFLAGS += ${TSAN_CFLAGS,${_TSAN}}
+_CFLAGS += ${TYSAN_CFLAGS,${_TYSAN}}
+_CFLAGS += ${UBSAN_CFLAGS,${_UBSAN}}
 
 SAN_CFLAGS,y := -fno-sanitize-recover=all
-INSANE := ${NOT,${_ASAN}${_LSAN}${_MSAN}${_TSAN}${_UBSAN}}
+INSANE := ${NOT,${_ASAN}${_LSAN}${_MSAN}${_TSAN}${_TYSAN}${_UBSAN}}
 SAN := ${NOT,${INSANE}}
-export SAN_CFLAGS=${SAN_CFLAGS,${SAN}}
+_CFLAGS += ${SAN_CFLAGS,${SAN}}
 
-# MSAN and TSAN both need all code to be instrumented
-YESLIBS := ${NOT,${_MSAN}${_TSAN}}
+# MSan, TSan, and TySan need all code to be instrumented
+YESLIBS := ${NOT,${_MSAN}${_TSAN}${_TYSAN}}
 NOLIBS ?= ${NOT,${YESLIBS}}
-export XNOLIBS=${NOLIBS}
 
-# gcov only intercepts fork()/exec() with -std=gnu*
-GCOV_CFLAGS,y := -std=gnu17 --coverage
-export GCOV_CFLAGS=${GCOV_CFLAGS,${_GCOV}}
+GCOV_CFLAGS,y := --coverage
+_CFLAGS += ${GCOV_CFLAGS,${_GCOV}}
 
 LINT_CPPFLAGS,y := -D_FORTIFY_SOURCE=3 -DBFS_LINT
 LINT_CFLAGS,y := -Werror -O2
 
-export LINT_CPPFLAGS=${LINT_CPPFLAGS,${_LINT}}
-export LINT_CFLAGS=${LINT_CFLAGS,${_LINT}}
+_CPPFLAGS += ${LINT_CPPFLAGS,${_LINT}}
+_CFLAGS += ${LINT_CFLAGS,${_LINT}}
 
 RELEASE_CPPFLAGS,y := -DNDEBUG
-RELEASE_CFLAGS,y := -O3 -flto=auto
+RELEASE_CFLAGS,y := -O3
 
-export RELEASE_CPPFLAGS=${RELEASE_CPPFLAGS,${_RELEASE}}
-export RELEASE_CFLAGS=${RELEASE_CFLAGS,${_RELEASE}}
+_CPPFLAGS += ${RELEASE_CPPFLAGS,${_RELEASE}}
+_CFLAGS += ${RELEASE_CFLAGS,${_RELEASE}}
 
-# Set a variable
-SETVAR = @printf '%s := %s\n' >>$@
+LTO_CFLAGS,y := -flto=auto
+_CFLAGS += ${LTO_CFLAGS,${_LTO}}
 
-# Append to a variable, if non-empty
-APPEND = @append() { test -z "$$2" || printf '%s += %s\n' "$$1" "$$2" >>$@; }; append
+# Configurable flags
+CFLAGS ?= -g -Wall
 
-gen/flags.mk::
+include build/exports.mk
+
+# Saves the internal flags
+gen/early.mk::
 	${MSG} "[ GEN] $@"
 	@printf '# %s\n' "$@" >$@
-	${SETVAR} CPPFLAGS "$$BFS_CPPFLAGS"
-	${APPEND} CPPFLAGS "$$TSAN_CPPFLAGS"
-	${APPEND} CPPFLAGS "$$LINT_CPPFLAGS"
-	${APPEND} CPPFLAGS "$$RELEASE_CPPFLAGS"
-	${APPEND} CPPFLAGS "$$XCPPFLAGS"
-	${APPEND} CPPFLAGS "$$EXTRA_CPPFLAGS"
-	${SETVAR} CFLAGS "$$BFS_CFLAGS"
-	${APPEND} CFLAGS "$$ASAN_CFLAGS"
-	${APPEND} CFLAGS "$$LSAN_CFLAGS"
-	${APPEND} CFLAGS "$$MSAN_CFLAGS"
-	${APPEND} CFLAGS "$$TSAN_CFLAGS"
-	${APPEND} CFLAGS "$$UBSAN_CFLAGS"
-	${APPEND} CFLAGS "$$SAN_CFLAGS"
-	${APPEND} CFLAGS "$$GCOV_CFLAGS"
-	${APPEND} CFLAGS "$$LINT_CFLAGS"
-	${APPEND} CFLAGS "$$RELEASE_CFLAGS"
-	${APPEND} CFLAGS "$$XCFLAGS"
-	${APPEND} CFLAGS "$$EXTRA_CFLAGS"
-	${SETVAR} LDFLAGS "$$XLDFLAGS"
-	${SETVAR} LDLIBS "$$XLDLIBS"
-	${APPEND} LDLIBS "$$EXTRA_LDLIBS"
-	${APPEND} LDLIBS "$$BFS_LDLIBS"
-	${SETVAR} NOLIBS "$$XNOLIBS"
+	@printf '_CPPFLAGS := %s\n' "$$XCPPFLAGS" >>$@
+	@printf '_CFLAGS := %s\n' "$$XCFLAGS" >>$@
+	@printf '_LDFLAGS := %s\n' "$$XLDFLAGS" >>$@
+	@printf '_LDLIBS := %s\n' "$$XLDLIBS" >>$@
+	@printf 'NOLIBS := %s\n' "$$XNOLIBS" >>$@
 	@test "${OS}-${SAN}" != FreeBSD-y || printf 'POSTLINK = elfctl -e +noaslr $$@\n' >>$@
+	${VCAT} $@
+
+# Save explicit flags from ./configure separately so they can override the rest
+gen/late.mk::
+	${MSG} "[ GEN] $@"
+	@printf '# %s\n' "$@" >$@
+	@printf '_CPPFLAGS += %s\n' "$$CONF_CPPFLAGS" >>$@
+	@printf '_CFLAGS += %s\n' "$$CONF_CFLAGS" >>$@
+	@printf '_LDFLAGS += %s\n' "$$CONF_LDFLAGS" >>$@
+	@printf '_LDLIBS := %s $${_LDLIBS}\n' "$$CONF_LDLIBS" >>$@
 	${VCAT} $@

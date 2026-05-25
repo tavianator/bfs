@@ -1,16 +1,15 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "pwcache.h"
+
 #include "alloc.h"
 #include "trie.h"
+
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /** Represents cache hits for negative results. */
 static void *MISSING = &MISSING;

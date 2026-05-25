@@ -16,6 +16,7 @@ ROOT=$(_realpath "$(dirname -- "$TESTS")")
 TESTS="$ROOT/tests"
 BIN="$ROOT/bin"
 MKSOCK="$BIN/tests/mksock"
+PTYX="$BIN/tests/ptyx"
 XTOUCH="$BIN/tests/xtouch"
 UNAME=$(uname)
 
@@ -33,6 +34,7 @@ stdenv() {
 
     export LS_COLORS=""
     unset BFS_COLORS
+    unset LSCOLORS
 
     if [ "$UNAME" = Darwin ]; then
         # ASan on macOS likes to report
@@ -59,9 +61,18 @@ stdenv() {
     # Close stdin so bfs doesn't think we're interactive
     # dup() the standard fds for logging even when redirected
     exec </dev/null {DUPOUT}>&1 {DUPERR}>&2
+
+    # Get the ttyname
+    if [ -t $DUPOUT ]; then
+        TTY=$(tty <&$DUPOUT)
+    elif [ -t $DUPERR ]; then
+        TTY=$(tty <&$DUPERR)
+    else
+        TTY=
+    fi
 }
 
-# Drop root priviliges or bail
+# Drop root privileges or bail
 drop_root() {
     if command -v capsh &>/dev/null; then
         if capsh --has-p=cap_dac_override &>/dev/null || capsh --has-p=cap_dac_read_search &>/dev/null; then
@@ -176,6 +187,31 @@ pop_defers() {
 
     while ((${#DEFER_CMDS[@]} > 0)); do
         pop_defer || ret=$?
+    done
+
+    return $ret
+}
+
+## Parallelism
+
+# Get the number of processors
+_nproc() {
+    {
+        nproc \
+            || sysctl -n hw.ncpu \
+            || getconf _NPROCESSORS_ONLN \
+            || echo 1
+    } 2>/dev/null
+}
+
+# Run wait, looping if interrupted
+_wait() {
+    local ret=130
+
+    # "If wait is interrupted by a signal, the return status will be greater than 128"
+    while ((ret > 128)); do
+	ret=0
+	wait "$@" || ret=$?
     done
 
     return $ret

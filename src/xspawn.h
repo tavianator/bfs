@@ -8,12 +8,17 @@
 #ifndef BFS_XSPAWN_H
 #define BFS_XSPAWN_H
 
-#include "prelude.h"
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#if _POSIX_SPAWN > 0
+#ifdef _POSIX_SPAWN
+#  define BFS_POSIX_SPAWN _POSIX_SPAWN
+#else
+#  define BFS_POSIX_SPAWN (-1)
+#endif
+
+#if BFS_POSIX_SPAWN >= 0
 #  include <spawn.h>
 #endif
 
@@ -38,7 +43,7 @@ struct bfs_spawn {
 	struct bfs_spawn_action *head;
 	struct bfs_spawn_action **tail;
 
-#if _POSIX_SPAWN > 0
+#if BFS_POSIX_SPAWN >= 0
 	/** posix_spawn() context, for when we can use it. */
 	posix_spawn_file_actions_t actions;
 	posix_spawnattr_t attr;
@@ -104,13 +109,13 @@ int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit
 /**
  * Spawn a new process.
  *
- * @param exe
+ * @exe
  *         The executable to run.
- * @param ctx
+ * @ctx
  *         The context for the new process.
- * @param argv
+ * @argv
  *         The arguments for the new process.
- * @param envp
+ * @envp
  *         The environment variables for the new process (NULL for the current
  *         environment).
  * @return
@@ -122,7 +127,7 @@ pid_t bfs_spawn(const char *exe, const struct bfs_spawn *ctx, char **argv, char 
  * Look up an executable in the current PATH, as BFS_SPAWN_USE_PATH or execvp()
  * would do.
  *
- * @param exe
+ * @exe
  *         The name of the binary to execute.  Bare names without a '/' will be
  *         searched on the provided PATH.
  * @return

@@ -8,16 +8,7 @@
 #ifndef BFS_THREAD_H
 #define BFS_THREAD_H
 
-#include "prelude.h"
 #include <pthread.h>
-
-#if __STDC_VERSION__ < C23 && !defined(thread_local)
-#  if BFS_USE_THREADS_H
-#    include <threads.h>
-#  else
-#    define thread_local _Thread_local
-#  endif
-#endif
 
 /** Thread entry point type. */
 typedef void *thread_fn(void *arg);
@@ -29,6 +20,11 @@ typedef void *thread_fn(void *arg);
  *         0 on success, -1 on error.
  */
 int thread_create(pthread_t *thread, const pthread_attr_t *attr, thread_fn *fn, void *arg);
+
+/**
+ * Set the name of a thread.
+ */
+void thread_setname(pthread_t thread, const char *name);
 
 /**
  * Wrapper for pthread_join().

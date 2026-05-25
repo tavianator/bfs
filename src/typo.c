@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: 0BSD
 
 #include "typo.h"
+
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>

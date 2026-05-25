@@ -1,12 +1,14 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "stat.h"
+
 #include "atomic.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "sanity.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -49,9 +51,11 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 		return "change time";
 	case BFS_STAT_MTIME:
 		return "modification time";
+	case BFS_STAT_MNT_ID:
+		return "mount ID";
 	}
 
-	bfs_bug("Unrecognized stat field");
+	bfs_bug("Unrecognized stat field %d", (int)field);
 	return "???";
 }
 
@@ -99,6 +103,10 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 	dest->rdev = src->st_rdev;
 	dest->mask |= BFS_STAT_RDEV;
 
+	// No mount IDs in regular stat(), so use the dev_t as an approximation
+	dest->mnt_id = dest->dev;
+	dest->mask |= BFS_STAT_MNT_ID;
+
 #if BFS_HAS_ST_FLAGS
 	dest->attrs = src->st_flags;
 	dest->mask |= BFS_STAT_ATTRS;
@@ -115,6 +123,9 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src) {
 
 #if BFS_HAS_ST_BIRTHTIM
 	dest->btime = src->st_birthtim;
+	dest->mask |= BFS_STAT_BTIME;
+#elif BFS_HAS___ST_BIRTHTIM
+	dest->btime = src->__st_birthtim;
 	dest->mask |= BFS_STAT_BTIME;
 #elif BFS_HAS_ST_BIRTHTIMESPEC
 	dest->btime = src->st_birthtimespec;
@@ -164,6 +175,17 @@ int bfs_statx_flags(enum bfs_stat_flags flags) {
 	return ret;
 }
 
+unsigned int bfs_statx_mask(void) {
+	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
+#ifdef STATX_MNT_ID
+	mask |= STATX_MNT_ID;
+#endif
+#ifdef STATX_MNT_ID_UNIQUE
+	mask |= STATX_MNT_ID_UNIQUE;
+#endif
+	return mask;
+}
+
 int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src) {
 	// Callers shouldn't have to check anything except the times
 	const unsigned int guaranteed = STATX_BASIC_STATS & ~(STATX_ATIME | STATX_CTIME | STATX_MTIME);
@@ -204,6 +226,18 @@ int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src) {
 	dest->attrs = src->stx_attributes;
 	dest->mask |= BFS_STAT_ATTRS;
 
+	dest->mnt_id = dest->dev;
+#ifdef STATX_MNT_ID
+	unsigned int mnt_mask = STATX_MNT_ID;
+#  ifdef STATX_MNT_ID_UNIQUE
+	mnt_mask |= STATX_MNT_ID_UNIQUE;
+#  endif
+	if (src->stx_mask & mnt_mask) {
+		dest->mnt_id = src->stx_mnt_id;
+	}
+#endif
+	dest->mask |= BFS_STAT_MNT_ID;
+
 	if (src->stx_mask & STATX_ATIME) {
 		dest->atime.tv_sec = src->stx_atime.tv_sec;
 		dest->atime.tv_nsec = src->stx_atime.tv_nsec;
@@ -235,7 +269,7 @@ int bfs_statx_convert(struct bfs_stat *dest, const struct statx *src) {
  * bfs_stat() implementation backed by statx().
  */
 static int bfs_statx_impl(int at_fd, const char *at_path, int at_flags, struct bfs_stat *buf) {
-	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
+	unsigned int mask = bfs_statx_mask();
 	struct statx xbuf;
 	int ret = bfs_statx(at_fd, at_path, at_flags, mask, &xbuf);
 	if (ret != 0) {

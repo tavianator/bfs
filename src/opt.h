@@ -13,7 +13,7 @@ struct bfs_ctx;
 /**
  * Apply optimizations to the command line.
  *
- * @param ctx
+ * @ctx
  *         The bfs context to optimize.
  * @return
  *         0 if successful, -1 on error.

@@ -1,14 +1,16 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "fsade.h"
+
 #include "atomic.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "dir.h"
 #include "dstring.h"
 #include "sanity.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
@@ -26,22 +28,31 @@
 #  include <selinux/selinux.h>
 #endif
 
-#if BFS_USE_SYS_EXTATTR_H
+#if __has_include(<sys/extattr.h>)
 #  include <sys/extattr.h>
-#elif BFS_USE_SYS_XATTR_H
+#  define BFS_USE_EXTATTR true
+#elif __has_include(<sys/xattr.h>)
 #  include <sys/xattr.h>
+#  define BFS_USE_XATTR true
+#endif
+
+#ifndef BFS_USE_EXTATTR
+#  define BFS_USE_EXTATTR false
+#endif
+#ifndef BFS_USE_XATTR
+#  define BFS_USE_XATTR false
 #endif
 
 /**
  * Many of the APIs used here don't have *at() variants, but we can try to
  * emulate something similar if /proc/self/fd is available.
  */
-attr(maybe_unused)
+[[_maybe_unused]]
 static const char *fake_at(const struct BFTW *ftwbuf) {
 	static atomic int proc_works = -1;
 
 	dchar *path = NULL;
-	if (ftwbuf->at_fd == AT_FDCWD || load(&proc_works, relaxed) == 0) {
+	if (ftwbuf->at_fd == (int)AT_FDCWD || load(&proc_works, relaxed) == 0) {
 		goto fail;
 	}
 
@@ -70,7 +81,7 @@ fail:
 	return ftwbuf->path;
 }
 
-attr(maybe_unused)
+[[_maybe_unused]]
 static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 	if (path != ftwbuf->path) {
 		dstrfree((dchar *)path);
@@ -80,7 +91,7 @@ static void free_fake_at(const struct BFTW *ftwbuf, const char *path) {
 /**
  * Check if an error was caused by the absence of support or data for a feature.
  */
-attr(maybe_unused)
+[[_maybe_unused]]
 static bool is_absence_error(int error) {
 	// If the OS doesn't support the feature, it's obviously not enabled for
 	// any files
@@ -160,7 +171,7 @@ static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
 }
 
 /** Unified interface for acl_get_tag_type(). */
-attr(maybe_unused)
+[[_maybe_unused]]
 static int bfs_acl_tag_type(acl_entry_t entry, acl_tag_t *tag) {
 #if BFS_HAS_ACL_GET_TAG_TYPE
 	return acl_get_tag_type(entry, tag);
@@ -344,7 +355,7 @@ int bfs_check_capabilities(const struct BFTW *ftwbuf) {
 
 #if BFS_CAN_CHECK_XATTRS
 
-#if BFS_USE_SYS_EXTATTR_H
+#if BFS_USE_EXTATTR
 
 /** Wrapper for extattr_list_{file,link}. */
 static ssize_t bfs_extattr_list(const char *path, enum bfs_type type, int namespace) {
@@ -390,13 +401,13 @@ static ssize_t bfs_extattr_get(const char *path, enum bfs_type type, int namespa
 #endif
 }
 
-#endif // BFS_USE_SYS_EXTATTR_H
+#endif // BFS_USE_EXTATTR
 
 int bfs_check_xattrs(const struct BFTW *ftwbuf) {
 	const char *path = fake_at(ftwbuf);
 	ssize_t len;
 
-#if BFS_USE_SYS_EXTATTR_H
+#if BFS_USE_EXTATTR
 	len = bfs_extattr_list(path, ftwbuf->type, EXTATTR_NAMESPACE_SYSTEM);
 	if (len <= 0) {
 		len = bfs_extattr_list(path, ftwbuf->type, EXTATTR_NAMESPACE_USER);
@@ -432,7 +443,7 @@ int bfs_check_xattr_named(const struct BFTW *ftwbuf, const char *name) {
 	const char *path = fake_at(ftwbuf);
 	ssize_t len;
 
-#if BFS_USE_SYS_EXTATTR_H
+#if BFS_USE_EXTATTR
 	len = bfs_extattr_get(path, ftwbuf->type, EXTATTR_NAMESPACE_SYSTEM, name);
 	if (len < 0) {
 		len = bfs_extattr_get(path, ftwbuf->type, EXTATTR_NAMESPACE_USER, name);

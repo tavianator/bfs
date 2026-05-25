@@ -12,7 +12,9 @@
 #ifndef BFS_STAT_H
 #define BFS_STAT_H
 
-#include "prelude.h"
+#include "bfs.h"
+
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -25,7 +27,7 @@
 #  define BFS_USE_STATX (BFS_HAS_STATX || BFS_HAS_STATX_SYSCALL)
 #endif
 
-#if BFS_USE_SYS_PARAM_H
+#if __has_include(<sys/param.h>)
 #  include <sys/param.h>
 #endif
 
@@ -55,6 +57,7 @@ enum bfs_stat_field {
 	BFS_STAT_BTIME  = 1 << 11,
 	BFS_STAT_CTIME  = 1 << 12,
 	BFS_STAT_MTIME  = 1 << 13,
+	BFS_STAT_MNT_ID = 1 << 14,
 };
 
 /**
@@ -101,6 +104,8 @@ struct bfs_stat {
 	blkcnt_t blocks;
 	/** The device ID represented by this file. */
 	dev_t rdev;
+	/** The ID of the mount point containing this file. */
+	uint64_t mnt_id;
 
 	/** Attributes/flags set on the file. */
 	unsigned long long attrs;
@@ -118,14 +123,14 @@ struct bfs_stat {
 /**
  * Facade over fstatat().
  *
- * @param at_fd
+ * @at_fd
  *         The base file descriptor for the lookup.
- * @param at_path
+ * @at_path
  *         The path to stat, relative to at_fd.  Pass NULL to fstat() at_fd
  *         itself.
- * @param flags
+ * @flags
  *         Flags that affect the lookup.
- * @param[out] buf
+ * @buf[out]
  *         A place to store the stat buffer, if successful.
  * @return
  *         0 on success, -1 on error.
@@ -147,6 +152,11 @@ void bfs_stat_convert(struct bfs_stat *dest, const struct stat *src);
  * Convert bfs_stat_flags to statx() flags.
  */
 int bfs_statx_flags(enum bfs_stat_flags flags);
+
+/**
+ * Get the default statx() mask.
+ */
+unsigned int bfs_statx_mask(void);
 
 /**
  * Convert struct statx to struct bfs_stat.

@@ -25,8 +25,10 @@
  * effects are reachable at all, skipping the traversal if not.
  */
 
-#include "prelude.h"
 #include "opt.h"
+
+#include "bfs.h"
+#include "bfstd.h"
 #include "bftw.h"
 #include "bit.h"
 #include "color.h"
@@ -38,6 +40,8 @@
 #include "expr.h"
 #include "list.h"
 #include "pwcache.h"
+#include "xspawn.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -102,42 +106,23 @@ enum pred_type {
 	PRED_TYPES,
 };
 
-/** Get the name of a predicate type. */
-static const char *pred_type_name(enum pred_type type) {
-	switch (type) {
-	case READABLE_PRED:
-		return "-readable";
-	case WRITABLE_PRED:
-		return "-writable";
-	case EXECUTABLE_PRED:
-		return "-executable";
-	case ACL_PRED:
-		return "-acl";
-	case CAPABLE_PRED:
-		return "-capable";
-	case EMPTY_PRED:
-		return "-empty";
-	case HIDDEN_PRED:
-		return "-hidden";
-	case NOGROUP_PRED:
-		return "-nogroup";
-	case NOUSER_PRED:
-		return "-nouser";
-	case SPARSE_PRED:
-		return "-sparse";
-	case XATTR_PRED:
-		return "-xattr";
-
-	case PRED_TYPES:
-		break;
-	}
-
-	bfs_bug("Unknown predicate %d", (int)type);
-	return "???";
-}
+/** Predicate type names. */
+static const char *const pred_names[] = {
+	[READABLE_PRED] = "-readable",
+	[WRITABLE_PRED] = "-writable",
+	[EXECUTABLE_PRED] = "-executable",
+	[ACL_PRED] = "-acl",
+	[CAPABLE_PRED] = "-capable",
+	[EMPTY_PRED] = "-empty",
+	[HIDDEN_PRED] = "-hidden",
+	[NOGROUP_PRED] = "-nogroup",
+	[NOUSER_PRED] = "-nouser",
+	[SPARSE_PRED] = "-sparse",
+	[XATTR_PRED] = "-xattr",
+};
 
 /**
- * A contrained integer range.
+ * A constrained integer range.
  */
 struct df_range {
 	/** The (inclusive) minimum value. */
@@ -192,9 +177,15 @@ static void constrain_min(struct df_range *range, long long value) {
 	range->min = max_value(range->min, value);
 }
 
-/** Contrain the maximum of a range. */
+/** Constrain the maximum of a range. */
 static void constrain_max(struct df_range *range, long long value) {
 	range->max = min_value(range->max, value);
+}
+
+/** Constrain a range to a single value. */
+static void constrain_range(struct df_range *range, long long value) {
+	constrain_min(range, value);
+	constrain_max(range, value);
 }
 
 /** Remove a single value from a range. */
@@ -242,29 +233,15 @@ enum range_type {
 	RANGE_TYPES,
 };
 
-/** Get the name of a range type. */
-static const char *range_type_name(enum range_type type) {
-	switch (type) {
-	case DEPTH_RANGE:
-		return "-depth";
-	case GID_RANGE:
-		return "-gid";
-	case INUM_RANGE:
-		return "-inum";
-	case LINKS_RANGE:
-		return "-links";
-	case SIZE_RANGE:
-		return "-size";
-	case UID_RANGE:
-		return "-uid";
-
-	case RANGE_TYPES:
-		break;
-	}
-
-	bfs_bug("Unknown range %d", (int)type);
-	return "???";
-}
+/** Range type names. */
+static const char *const range_names[] = {
+	[DEPTH_RANGE] = "-depth",
+	[GID_RANGE] = "-gid",
+	[INUM_RANGE] = "-inum",
+	[LINKS_RANGE] = "-links",
+	[SIZE_RANGE] = "-size",
+	[UID_RANGE] = "-uid",
+};
 
 /**
  * The data flow analysis domain.
@@ -333,27 +310,27 @@ static void df_init_top(struct df_domain *value) {
 
 /** Check for the top element. */
 static bool df_is_top(const struct df_domain *value) {
-        for (int i = 0; i < PRED_TYPES; ++i) {
-                if (value->preds[i] != PRED_TOP) {
-                        return false;
-                }
-        }
+	for (int i = 0; i < PRED_TYPES; ++i) {
+		if (value->preds[i] != PRED_TOP) {
+			return false;
+		}
+	}
 
-        for (int i = 0; i < RANGE_TYPES; ++i) {
-                if (!range_is_top(&value->ranges[i])) {
-                        return false;
-                }
-        }
+	for (int i = 0; i < RANGE_TYPES; ++i) {
+		if (!range_is_top(&value->ranges[i])) {
+			return false;
+		}
+	}
 
-        if (value->types != ~0U) {
-                return false;
-        }
+	if (value->types != ~0U) {
+		return false;
+	}
 
-        if (value->xtypes != ~0U) {
-                return false;
-        }
+	if (value->xtypes != ~0U) {
+		return false;
+	}
 
-        return true;
+	return true;
 }
 
 /** Compute the union of two fact sets. */
@@ -397,7 +374,7 @@ struct bfs_opt {
 };
 
 /** Log an optimization. */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static bool opt_debug(struct bfs_opt *opt, const char *format, ...) {
 	if (bfs_debug_prefix(opt->ctx, DEBUG_OPT)) {
 		for (int i = 0; i < opt->depth; ++i) {
@@ -415,7 +392,7 @@ static bool opt_debug(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log a recursive call. */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static bool opt_enter(struct bfs_opt *opt, const char *format, ...) {
 	int depth = opt->depth;
 	if (depth > 0) {
@@ -435,7 +412,7 @@ static bool opt_enter(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log a recursive return. */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static bool opt_leave(struct bfs_opt *opt, const char *format, ...) {
 	bool debug = false;
 	int depth = opt->depth;
@@ -459,7 +436,7 @@ static bool opt_leave(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log a shallow visit. */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static bool opt_visit(struct bfs_opt *opt, const char *format, ...) {
 	int depth = opt->depth;
 	if (depth > 0) {
@@ -479,7 +456,7 @@ static bool opt_visit(struct bfs_opt *opt, const char *format, ...) {
 }
 
 /** Log the deletion of an expression. */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static bool opt_delete(struct bfs_opt *opt, const char *format, ...) {
 	int depth = opt->depth;
 
@@ -503,7 +480,7 @@ typedef bool dump_fn(struct bfs_opt *opt, const char *format, ...);
 
 /** Print a df_pred. */
 static void pred_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain *value, enum pred_type type) {
-	dump(opt, "${blu}%s${rs}: ", pred_type_name(type));
+	dump(opt, "${blu}%s${rs}: ", pred_names[type]);
 
 	FILE *file = opt->ctx->cerr->file;
 	switch (value->preds[type]) {
@@ -524,7 +501,7 @@ static void pred_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain
 
 /** Print a df_range. */
 static void range_dump(dump_fn *dump, struct bfs_opt *opt, const struct df_domain *value, enum range_type type) {
-	dump(opt, "${blu}%s${rs}: ", range_type_name(type));
+	dump(opt, "${blu}%s${rs}: ", range_names[type]);
 
 	FILE *file = opt->ctx->cerr->file;
 	const struct df_range *range = &value->ranges[type];
@@ -641,22 +618,26 @@ static bool is_const(const struct bfs_expr *expr) {
 }
 
 /** Warn about an expression. */
-attr(printf(3, 4))
-static void opt_warning(const struct bfs_opt *opt, const struct bfs_expr *expr, const char *format, ...) {
+[[_printf(3, 4)]]
+static bool opt_warning(const struct bfs_opt *opt, const struct bfs_expr *expr, const char *format, ...) {
 	if (!opt->warn) {
-		return;
+		return false;
 	}
 
 	if (bfs_expr_is_parent(expr) || is_const(expr)) {
-		return;
+		return false;
 	}
 
-	if (bfs_expr_warning(opt->ctx, expr)) {
-		va_list args;
-		va_start(args, format);
-		bfs_vwarning(opt->ctx, format, args);
-		va_end(args);
+	if (!bfs_expr_warning(opt->ctx, expr)) {
+		return false;
 	}
+
+	va_list args;
+	va_start(args, format);
+	bfs_vwarning(opt->ctx, format, args);
+	va_end(args);
+
+	return true;
 }
 
 /** Remove and return an expression's children. */
@@ -756,9 +737,7 @@ static struct bfs_expr *visit_and(struct bfs_opt *opt, struct bfs_expr *expr, co
 	df_init_bottom(&opt->after_false);
 	struct bfs_opt nested = *opt;
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			nested.ignore_result = opt->ignore_result;
 		} else {
@@ -790,9 +769,7 @@ static struct bfs_expr *visit_or(struct bfs_opt *opt, struct bfs_expr *expr, con
 	df_init_bottom(&opt->after_true);
 	struct bfs_opt nested = *opt;
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			nested.ignore_result = opt->ignore_result;
 		} else {
@@ -822,9 +799,7 @@ static struct bfs_expr *visit_comma(struct bfs_opt *opt, struct bfs_expr *expr, 
 
 	struct bfs_opt nested = *opt;
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			nested.ignore_result = opt->ignore_result;
 		} else {
@@ -1088,7 +1063,7 @@ static struct bfs_expr *annotate_and(struct bfs_opt *opt, struct bfs_expr *expr,
 	expr->cost = 0.0;
 	expr->probability = 1.0;
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		expr->pure &= child->pure;
 		expr->always_true &= child->always_true;
 		expr->always_false |= child->always_false;
@@ -1107,7 +1082,7 @@ static struct bfs_expr *annotate_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 	expr->cost = 0.0;
 
 	float false_prob = 1.0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		expr->pure &= child->pure;
 		expr->always_true |= child->always_true;
 		expr->always_false &= child->always_false;
@@ -1124,7 +1099,7 @@ static struct bfs_expr *annotate_comma(struct bfs_opt *opt, struct bfs_expr *exp
 	expr->pure = true;
 	expr->cost = 0.0;
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		expr->pure &= child->pure;
 		expr->always_true = child->always_true;
 		expr->always_false = child->always_false;
@@ -1360,7 +1335,7 @@ static struct bfs_expr *opt_const(struct bfs_opt *opt, bool value) {
 	static bfs_eval_fn *const fns[] = {eval_false, eval_true};
 	static char *fake_args[] = {"-false", "-true"};
 
-	struct bfs_expr *expr = bfs_expr_new(opt->ctx, fns[value], 1, &fake_args[value]);
+	struct bfs_expr *expr = bfs_expr_new(opt->ctx, fns[value], 1, &fake_args[value], BFS_TEST);
 	return visit_shallow(opt, expr, &annotate);
 }
 
@@ -1374,7 +1349,7 @@ static struct bfs_expr *negate_expr(struct bfs_opt *opt, struct bfs_expr *expr, 
 		return opt_const(opt, true);
 	}
 
-	struct bfs_expr *ret = bfs_expr_new(opt->ctx, eval_not, 1, argv);
+	struct bfs_expr *ret = bfs_expr_new(opt->ctx, eval_not, 1, argv, BFS_OPERATOR);
 	if (!ret) {
 		return NULL;
 	}
@@ -1403,8 +1378,7 @@ static struct bfs_expr *sink_not_andor(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		opt_enter(opt, "%pe\n", child);
 
 		child = negate_expr(opt, child, argv);
@@ -1422,18 +1396,16 @@ static struct bfs_expr *sink_not_andor(struct bfs_opt *opt, struct bfs_expr *exp
 
 /** Sink a negation into a comma expression. */
 static struct bfs_expr *sink_not_comma(struct bfs_opt *opt, struct bfs_expr *expr) {
-	bfs_assert(expr->eval_fn == eval_comma);
-
-	opt_enter(opt, "%pe\n", expr);
-
 	char **argv = expr->argv;
 	expr = only_child(expr);
+	opt_enter(opt, "%pe\n", expr);
+
+	bfs_assert(expr->eval_fn == eval_comma);
 
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		if (SLIST_EMPTY(&children)) {
 			opt_enter(opt, "%pe\n", child);
 			opt_debug(opt, "sink\n");
@@ -1461,7 +1433,6 @@ static struct bfs_expr *canonicalize_not(struct bfs_opt *opt, struct bfs_expr *e
 
 	if (rhs->eval_fn == eval_not) {
 		opt_debug(opt, "double negation\n");
-		rhs = only_child(expr);
 		return only_child(rhs);
 	} else if (rhs->eval_fn == eval_and || rhs->eval_fn == eval_or) {
 		return sink_not_andor(opt, expr);
@@ -1483,8 +1454,7 @@ static struct bfs_expr *canonicalize_assoc(struct bfs_opt *opt, struct bfs_expr 
 	struct bfs_exprs flat;
 	SLIST_INIT(&flat);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child->eval_fn == expr->eval_fn) {
 			struct bfs_expr *head = SLIST_HEAD(&child->children);
 			struct bfs_expr *tail = SLIST_TAIL(&child->children);
@@ -1592,8 +1562,7 @@ static struct bfs_expr *reorder_andor(struct bfs_opt *opt, struct bfs_expr *expr
 	struct bfs_exprs pure;
 	SLIST_INIT(&pure);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child->pure) {
 			SLIST_APPEND(&pure, child);
 		} else {
@@ -1634,8 +1603,7 @@ static void data_flow_icmp(struct bfs_opt *opt, const struct bfs_expr *expr, enu
 
 	switch (expr->int_cmp) {
 	case BFS_INT_EQUAL:
-		constrain_min(true_range, value);
-		constrain_max(true_range, value);
+		constrain_range(true_range, value);
 		range_remove(false_range, value);
 		break;
 
@@ -1655,14 +1623,31 @@ static void data_flow_icmp(struct bfs_opt *opt, const struct bfs_expr *expr, enu
 
 /** Transfer function for -{execut,read,writ}able. */
 static struct bfs_expr *data_flow_access(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
-	if (expr->num & R_OK) {
+	switch (expr->num) {
+	case R_OK:
 		data_flow_pred(opt, READABLE_PRED, true);
-	}
-	if (expr->num & W_OK) {
+		break;
+	case W_OK:
 		data_flow_pred(opt, WRITABLE_PRED, true);
-	}
-	if (expr->num & X_OK) {
+		break;
+	case X_OK:
 		data_flow_pred(opt, EXECUTABLE_PRED, true);
+		break;
+	default:
+		bfs_bug("Unknown access() mode %lld", expr->num);
+		break;
+	}
+
+	return expr;
+}
+
+/** Transfer function for -empty. */
+static struct bfs_expr *data_flow_empty(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt->after_true.types &= (1 << BFS_REG) | (1 << BFS_DIR);
+
+	if (opt->before.types == (1 << BFS_REG)) {
+		constrain_range(&opt->after_true.ranges[SIZE_RANGE], 0);
+		range_remove(&opt->after_false.ranges[SIZE_RANGE], 0);
 	}
 
 	return expr;
@@ -1675,7 +1660,7 @@ static struct bfs_expr *data_flow_gid(struct bfs_opt *opt, struct bfs_expr *expr
 		gid_t gid = range->min;
 		bool nogroup = !bfs_getgrgid(opt->ctx->groups, gid);
 		if (errno == 0) {
-			data_flow_pred(opt, NOGROUP_PRED, nogroup);
+			constrain_pred(&opt->after_true.preds[NOGROUP_PRED], nogroup);
 		}
 	}
 
@@ -1706,11 +1691,16 @@ static struct bfs_expr *data_flow_links(struct bfs_opt *opt, struct bfs_expr *ex
 	return expr;
 }
 
+/** Transfer function for -lname. */
+static struct bfs_expr *data_flow_lname(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	opt->after_true.types &= 1 << BFS_LNK;
+	return expr;
+}
+
 /** Transfer function for -samefile. */
 static struct bfs_expr *data_flow_samefile(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
 	struct df_range *true_range = &opt->after_true.ranges[INUM_RANGE];
-	constrain_min(true_range, expr->ino);
-	constrain_max(true_range, expr->ino);
+	constrain_range(true_range, expr->ino);
 
 	struct df_range *false_range = &opt->after_false.ranges[INUM_RANGE];
 	range_remove(false_range, expr->ino);
@@ -1744,7 +1734,7 @@ static struct bfs_expr *data_flow_uid(struct bfs_opt *opt, struct bfs_expr *expr
 		uid_t uid = range->min;
 		bool nouser = !bfs_getpwuid(opt->ctx->users, uid);
 		if (errno == 0) {
-			data_flow_pred(opt, NOUSER_PRED, nouser);
+			constrain_pred(&opt->after_true.preds[NOUSER_PRED], nouser);
 		}
 	}
 
@@ -1790,7 +1780,7 @@ static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *ex
 	if (df_is_bottom(&opt->after_false)) {
 		if (!expr->pure) {
 			expr->always_true = true;
-			expr->probability = 0.0;
+			expr->probability = 1.0;
 		} else if (expr->eval_fn != eval_true) {
 			opt_warning(opt, expr, "This expression is always true.\n\n");
 			opt_debug(opt, "pure, always true\n");
@@ -1818,12 +1808,45 @@ static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *ex
 	return visit_leave(opt, expr, visitor);
 }
 
+/** Ignore an expression (and possibly warn/prompt). */
+static struct bfs_expr *opt_ignore(struct bfs_opt *opt, struct bfs_expr *expr, bool delete) {
+	if (delete) {
+		opt_delete(opt, "%pe [ignored result]\n", expr);
+	} else {
+		opt_debug(opt, "ignored result\n");
+	}
+
+	if (expr->kind != BFS_TEST) {
+		goto done;
+	}
+
+	if (!opt_warning(opt, expr, "The result of this expression is ignored.\n")) {
+		goto done;
+	}
+
+	struct bfs_ctx *ctx = opt->ctx;
+	if (ctx->interactive && ctx->dangerous) {
+		bfs_warning(ctx, "Do you want to continue? ");
+		if (ynprompt() <= 0) {
+			errno = 0;
+			return NULL;
+		}
+	}
+
+	fprintf(stderr, "\n");
+
+done:
+	if (!delete && expr->pure) {
+		// If we're not deleting the expression entirely, replace it with -false
+		expr = opt_const(opt, false);
+	}
+	return expr;
+}
+
 /** Data flow visitor function. */
 static struct bfs_expr *data_flow_visit(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
-	if (opt->ignore_result && expr->pure) {
-		opt_debug(opt, "ignored result\n");
-		opt_warning(opt, expr, "The result of this expression is ignored.\n\n");
-		expr = opt_const(opt, false);
+	if (opt->ignore_result) {
+		expr = opt_ignore(opt, expr, false);
 		if (!expr) {
 			return NULL;
 		}
@@ -1893,9 +1916,11 @@ static const struct visitor data_flow = {
 	.leave = data_flow_leave,
 	.table = (const struct visitor_table[]) {
 		{eval_access, data_flow_access},
+		{eval_empty, data_flow_empty},
 		{eval_gid, data_flow_gid},
 		{eval_inum, data_flow_inum},
 		{eval_links, data_flow_links},
+		{eval_lname, data_flow_lname},
 		{eval_samefile, data_flow_samefile},
 		{eval_size, data_flow_size},
 		{eval_type, data_flow_type},
@@ -1919,7 +1944,7 @@ static struct bfs_expr *simplify_not(struct bfs_opt *opt, struct bfs_expr *expr,
 static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *expr) {
 	// Only lift negations if it would reduce the number of (-not) expressions
 	size_t added = 0, removed = 0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (child->eval_fn == eval_not) {
 			++removed;
 		} else {
@@ -1944,8 +1969,7 @@ static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	struct bfs_expr *child;
-	while ((child = SLIST_POP(&children))) {
+	drain_slist (struct bfs_expr, child, &children) {
 		opt_enter(opt, "%pe\n", child);
 
 		child = negate_expr(opt, child, &fake_not_arg);
@@ -1958,6 +1982,10 @@ static struct bfs_expr *lift_andor_not(struct bfs_opt *opt, struct bfs_expr *exp
 	}
 
 	expr = visit_shallow(opt, expr, &annotate);
+	if (!expr) {
+		return NULL;
+	}
+
 	return negate_expr(opt, expr, &fake_not_arg);
 }
 
@@ -1968,7 +1996,7 @@ static struct bfs_expr *first_ignorable(struct bfs_opt *opt, struct bfs_expr *ex
 	}
 
 	struct bfs_expr *ret = NULL;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (!child->pure) {
 			ret = NULL;
 		} else if (!ret) {
@@ -1987,16 +2015,15 @@ static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr,
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child == ignorable) {
 			ignore = true;
 		}
 
 		if (ignore) {
-			opt_delete(opt, "%pe [ignored result]\n", child);
-			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			if (!opt_ignore(opt, child, true)) {
+				return NULL;
+			}
 			continue;
 		}
 
@@ -2009,8 +2036,8 @@ static struct bfs_expr *simplify_and(struct bfs_opt *opt, struct bfs_expr *expr,
 		bfs_expr_append(expr, child);
 
 		if (child->always_false) {
-			while ((child = SLIST_POP(&children))) {
-				opt_delete(opt, "%pe [short-circuit]\n", child);
+			drain_slist (struct bfs_expr, dead, &children) {
+				opt_delete(opt, "%pe [short-circuit]\n", dead);
 			}
 		}
 	}
@@ -2035,16 +2062,15 @@ static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (child == ignorable) {
 			ignore = true;
 		}
 
 		if (ignore) {
-			opt_delete(opt, "%pe [ignored result]\n", child);
-			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			if (!opt_ignore(opt, child, true)) {
+				return NULL;
+			}
 			continue;
 		}
 
@@ -2057,8 +2083,8 @@ static struct bfs_expr *simplify_or(struct bfs_opt *opt, struct bfs_expr *expr, 
 		bfs_expr_append(expr, child);
 
 		if (child->always_true) {
-			while ((child = SLIST_POP(&children))) {
-				opt_delete(opt, "%pe [short-circuit]\n", child);
+			drain_slist (struct bfs_expr, dead, &children) {
+				opt_delete(opt, "%pe [short-circuit]\n", dead);
 			}
 		}
 	}
@@ -2080,12 +2106,11 @@ static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *exp
 	struct bfs_exprs children;
 	foster_children(expr, &children);
 
-	while (!SLIST_EMPTY(&children)) {
-		struct bfs_expr *child = SLIST_POP(&children);
-
+	drain_slist (struct bfs_expr, child, &children) {
 		if (opt->level >= 2 && child->pure && !SLIST_EMPTY(&children)) {
-			opt_delete(opt, "%pe [ignored result]\n", child);
-			opt_warning(opt, child, "The result of this expression is ignored.\n\n");
+			if (!opt_ignore(opt, child, true)) {
+				return NULL;
+			}
 			continue;
 		}
 
@@ -2136,6 +2161,8 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 	};
 
 	struct df_domain impure;
+	df_init_top(&opt->after_true);
+	df_init_top(&opt->after_false);
 
 	for (int i = 0; i < 3; ++i) {
 		struct bfs_opt nested = *opt;
@@ -2149,9 +2176,11 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 				continue;
 			}
 
+			const struct visitor *visitor = passes[j].visitor;
+
 			// Skip reordering the first time through the passes, to
 			// make warnings more understandable
-			if (passes[j].visitor == &reorder) {
+			if (visitor == &reorder) {
 				if (i == 0) {
 					continue;
 				} else {
@@ -2159,9 +2188,14 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 				}
 			}
 
-			expr = visit(&nested, expr, passes[j].visitor);
+			expr = visit(&nested, expr, visitor);
 			if (!expr) {
 				return NULL;
+			}
+
+			if (visitor == &data_flow) {
+				opt->after_true = nested.after_true;
+				opt->after_false = nested.after_false;
 			}
 		}
 
@@ -2176,17 +2210,20 @@ static struct bfs_expr *optimize(struct bfs_opt *opt, struct bfs_expr *expr) {
 	return expr;
 }
 
-/** Estimate the odds of an expression calling stat(). */
-static float expr_stat_odds(struct bfs_expr *expr) {
-	if (expr->calls_stat) {
+/** An expression predicate. */
+typedef bool expr_pred(const struct bfs_expr *expr);
+
+/** Estimate the odds that a matching expression will be evaluated. */
+static float estimate_odds(const struct bfs_expr *expr, expr_pred *pred) {
+	if (pred(expr)) {
 		return 1.0;
 	}
 
-	float nostat_odds = 1.0;
+	float nonmatch_odds = 1.0;
 	float reached_odds = 1.0;
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
-		float child_odds = expr_stat_odds(child);
-		nostat_odds *= 1.0 - reached_odds * child_odds;
+	for_expr (child, expr) {
+		float child_odds = estimate_odds(child, pred);
+		nonmatch_odds *= 1.0 - reached_odds * child_odds;
 
 		if (expr->eval_fn == eval_and) {
 			reached_odds *= child->probability;
@@ -2195,7 +2232,12 @@ static float expr_stat_odds(struct bfs_expr *expr) {
 		}
 	}
 
-	return 1.0 - nostat_odds;
+	return 1.0 - nonmatch_odds;
+}
+
+/** Whether an expression calls stat(). */
+static bool calls_stat(const struct bfs_expr *expr) {
+	return expr->calls_stat;
 }
 
 /** Estimate the odds of calling stat(). */
@@ -2204,13 +2246,18 @@ static float estimate_stat_odds(struct bfs_ctx *ctx) {
 		return 1.0;
 	}
 
-	float nostat_odds = 1.0 - expr_stat_odds(ctx->exclude);
+	float nostat_odds = 1.0 - estimate_odds(ctx->exclude, calls_stat);
 
 	float reached_odds = 1.0 - ctx->exclude->probability;
-	float expr_odds = expr_stat_odds(ctx->expr);
+	float expr_odds = estimate_odds(ctx->expr, calls_stat);
 	nostat_odds *= 1.0 - reached_odds * expr_odds;
 
 	return 1.0 - nostat_odds;
+}
+
+/** Matches -(exec|ok) ... \; */
+static bool single_exec(const struct bfs_expr *expr) {
+	return expr->eval_fn == eval_exec && !(expr->exec->flags & BFS_EXEC_MULTI);
 }
 
 int bfs_optimize(struct bfs_ctx *ctx) {
@@ -2291,6 +2338,17 @@ int bfs_optimize(struct bfs_ctx *ctx) {
 			opt_leave(&opt, "eager stat cost: ${ylw}%g${rs}\n", eager_cost);
 		}
 
+#ifndef POSIX_SPAWN_SETRLIMIT
+		// If bfs_spawn_setrlimit() would force us to use fork() over
+		// posix_spawn(), the extra cost may outweigh the benefit of a
+		// higher RLIMIT_NOFILE
+		float single_exec_odds = estimate_odds(ctx->expr, single_exec);
+		if (single_exec_odds >= 0.5) {
+			opt_enter(&opt, "single ${blu}-exec${rs} odds: ${ylw}%g${rs}\n", single_exec_odds);
+			ctx->raise_nofile = false;
+			opt_leave(&opt, "not raising RLIMIT_NOFILE\n");
+		}
+#endif
 	}
 
 	opt_leave(&opt, NULL);

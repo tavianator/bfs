@@ -8,8 +8,9 @@
 #ifndef BFS_COLOR_H
 #define BFS_COLOR_H
 
-#include "prelude.h"
+#include "bfs.h"
 #include "dstring.h"
+
 #include <stdio.h>
 
 /**
@@ -42,6 +43,8 @@ typedef struct CFILE {
 	const struct colors *colors;
 	/** A buffer for colored formatting. */
 	dchar *buffer;
+	/** Cached file descriptor number. */
+	int fd;
 	/** Whether the next ${rs} is actually necessary. */
 	bool need_reset;
 	/** Whether to close the underlying stream. */
@@ -51,11 +54,11 @@ typedef struct CFILE {
 /**
  * Wrap an existing file into a colored stream.
  *
- * @param file
+ * @file
  *         The underlying file.
- * @param colors
+ * @colors
  *         The color table to use if file is a TTY.
- * @param close
+ * @close
  *         Whether to close the underlying stream when this stream is closed.
  * @return
  *         A colored wrapper around file.
@@ -65,7 +68,7 @@ CFILE *cfwrap(FILE *file, const struct colors *colors, bool close);
 /**
  * Close a colored file.
  *
- * @param cfile
+ * @cfile
  *         The colored file to close.
  * @return
  *         0 on success, -1 on failure.
@@ -75,9 +78,9 @@ int cfclose(CFILE *cfile);
 /**
  * Colored, formatted output.
  *
- * @param cfile
+ * @cfile
  *         The colored stream to print to.
- * @param format
+ * @format
  *         A printf()-style format string, supporting these format specifiers:
  *
  *         %c: A single character
@@ -85,7 +88,6 @@ int cfclose(CFILE *cfile);
  *         %g: A double
  *         %s: A string
  *         %zu: A size_t
- *         %m: strerror(errno)
  *         %pq: A shell-escaped string, like bash's printf %q
  *         %pQ: A TTY-escaped string.
  *         %pF: A colored file name, from a const struct BFTW * argument
@@ -93,19 +95,26 @@ int cfclose(CFILE *cfile);
  *         %pL: A colored link target, from a const struct BFTW * argument
  *         %pe: Dump a const struct bfs_expr *, for debugging.
  *         %pE: Dump a const struct bfs_expr * in verbose form, for debugging.
+ *         %px: Print a const struct bfs_expr * with syntax highlighting.
+ *         %pX: Print the name of a const struct bfs_expr *, without arguments.
  *         %%: A literal '%'
  *         ${cc}: Change the color to 'cc'
  *         $$: A literal '$'
  * @return
  *         0 on success, -1 on failure.
  */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 int cfprintf(CFILE *cfile, const char *format, ...);
 
 /**
  * cfprintf() variant that takes a va_list.
  */
-attr(printf(2, 0))
+[[_printf(2, 0)]]
 int cvfprintf(CFILE *cfile, const char *format, va_list args);
+
+/**
+ * Reset the TTY state when terminating abnormally (async-signal-safe).
+ */
+int cfreset(CFILE *cfile);
 
 #endif // BFS_COLOR_H

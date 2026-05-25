@@ -16,7 +16,7 @@ Configuration
 $ ./configure --help
 Usage:
 
-  $ ./configure [--enable-*|--disable-*] [CC=...] [CFLAGS=...] [...]
+  $ ./configure [--enable-*|--disable-*] [--with-*|--without-*] [CC=...] [...]
   $ make
 
 ...
@@ -82,18 +82,18 @@ You can combine multiple profiles (e.g. `./configure --enable-asan --enable-ubsa
 ### Dependencies
 
 `bfs` depends on some system libraries for some of its features.
-External dependencies are auto-detected by default, but you can `--enable` or `--disable` them manually:
+External dependencies are auto-detected by default, but you can build `--with` or `--without` them explicitly:
 
 <pre>
---enable-<a href="https://savannah.nongnu.org/projects/acl">libacl</a>      --disable-libacl
---enable-<a href="https://sites.google.com/site/fullycapable/">libcap</a>      --disable-libcap
---enable-<a href="https://github.com/SELinuxProject/selinux">libselinux</a>  --disable-libselinux
---enable-<a href="https://github.com/axboe/liburing">liburing</a>    --disable-liburing
---enable-<a href="https://github.com/kkos/oniguruma">oniguruma</a>   --disable-oniguruma
+--with-<a href="https://savannah.nongnu.org/projects/acl">libacl</a>      --without-libacl
+--with-<a href="https://sites.google.com/site/fullycapable/">libcap</a>      --without-libcap
+--with-<a href="https://github.com/SELinuxProject/selinux">libselinux</a>  --without-libselinux
+--with-<a href="https://github.com/axboe/liburing">liburing</a>    --without-liburing
+--with-<a href="https://github.com/kkos/oniguruma">oniguruma</a>   --without-oniguruma
 </pre>
 
 [`pkg-config`] is used, if available, to detect these libraries and any additional build flags they may require.
-If this is undesireable, disable it by setting `PKG_CONFIG` to the empty string (`./configure PKG_CONFIG=""`).
+If this is undesirable, disable it by setting `PKG_CONFIG` to the empty string (`./configure PKG_CONFIG=""`).
 
 [`pkg-config`]: https://www.freedesktop.org/wiki/Software/pkg-config/
 
@@ -178,11 +178,11 @@ It can be handy to generate the snapshot with a different `find` implementation 
 But keep in mind, other `find` implementations may not be correct.
 To my knowledge, no other implementation passes even the POSIX-compatible subset of the tests:
 
-    $ ./tests/tests.sh --bfs=find --posix
+    $ ./tests/tests.sh --bfs=find --sudo --posix
     ...
-    tests passed: 90
-    tests skipped: 3
-    tests failed: 6
+    [PASS] 104 / 119
+    [SKIP]   1 / 119
+    [FAIL]  14 / 119
 
 Run
 

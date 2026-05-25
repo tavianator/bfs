@@ -1,11 +1,14 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "xtime.h"
+
+#include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "sanity.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <sys/time.h>
@@ -20,7 +23,7 @@ int xmktime(struct tm *tm, time_t *timep) {
 
 		struct tm tmp;
 		if (!localtime_r(&time, &tmp)) {
-			bfs_bug("localtime_r(-1): %s", xstrerror(errno));
+			bfs_ebug("localtime_r(-1)");
 			return -1;
 		}
 
@@ -36,7 +39,7 @@ int xmktime(struct tm *tm, time_t *timep) {
 }
 
 // FreeBSD is missing an interceptor
-#if BFS_HAS_TIMEGM && !(__FreeBSD__ && SANITIZE_MEMORY)
+#if BFS_HAS_TIMEGM && !(__FreeBSD__ && __SANITIZE_MEMORY__)
 
 int xtimegm(struct tm *tm, time_t *timep) {
 	time_t time = timegm(tm);
@@ -46,7 +49,7 @@ int xtimegm(struct tm *tm, time_t *timep) {
 
 		struct tm tmp;
 		if (!gmtime_r(&time, &tmp)) {
-			bfs_bug("gmtime_r(-1): %s", xstrerror(errno));
+			bfs_ebug("gmtime_r(-1)");
 			return -1;
 		}
 
@@ -206,6 +209,23 @@ static int xgetpart(const char **str, size_t n, int *result) {
 }
 
 int xgetdate(const char *str, struct timespec *result) {
+	// Handle @epochseconds
+	if (str[0] == '@') {
+		long long value;
+		if (xstrtoll(str + 1, NULL, 10, &value) != 0) {
+			goto error;
+		}
+
+		time_t time = (time_t)value;
+		if ((long long)time != value) {
+			errno = ERANGE;
+			goto error;
+		}
+
+		result->tv_sec = time;
+		goto done;
+	}
+
 	struct tm tm = {
 		.tm_isdst = -1,
 	};
@@ -324,6 +344,7 @@ end:
 		}
 	}
 
+done:
 	result->tv_nsec = 0;
 	return 0;
 
@@ -333,16 +354,150 @@ error:
 	return -1;
 }
 
-int xgettime(struct timespec *result) {
-#if _POSIX_TIMERS > 0
-	return clock_gettime(CLOCK_REALTIME, result);
-#else
-	struct timeval tv;
-	int ret = gettimeofday(&tv, NULL);
-	if (ret == 0) {
-		result->tv_sec = tv.tv_sec;
-		result->tv_nsec = tv.tv_usec * 1000L;
+/** One nanosecond. */
+static const long NS = 1000L * 1000 * 1000;
+
+void timespec_add(struct timespec *lhs, const struct timespec *rhs) {
+	lhs->tv_sec += rhs->tv_sec;
+	lhs->tv_nsec += rhs->tv_nsec;
+	if (lhs->tv_nsec >= NS) {
+		lhs->tv_nsec -= NS;
+		lhs->tv_sec += 1;
 	}
-	return ret;
+}
+
+void timespec_sub(struct timespec *lhs, const struct timespec *rhs) {
+	lhs->tv_sec -= rhs->tv_sec;
+	lhs->tv_nsec -= rhs->tv_nsec;
+	if (lhs->tv_nsec < 0) {
+		lhs->tv_nsec += NS;
+		lhs->tv_sec -= 1;
+	}
+}
+
+int timespec_cmp(const struct timespec *lhs, const struct timespec *rhs) {
+	if (lhs->tv_sec < rhs->tv_sec) {
+		return -1;
+	} else if (lhs->tv_sec > rhs->tv_sec) {
+		return 1;
+	}
+
+	if (lhs->tv_nsec < rhs->tv_nsec) {
+		return -1;
+	} else if (lhs->tv_nsec > rhs->tv_nsec) {
+		return 1;
+	}
+
+	return 0;
+}
+
+void timespec_min(struct timespec *dest, const struct timespec *src) {
+	if (timespec_cmp(src, dest) < 0) {
+		*dest = *src;
+	}
+}
+
+void timespec_max(struct timespec *dest, const struct timespec *src) {
+	if (timespec_cmp(src, dest) > 0) {
+		*dest = *src;
+	}
+}
+
+double timespec_ns(const struct timespec *ts) {
+	return 1.0e9 * ts->tv_sec + ts->tv_nsec;
+}
+
+#if defined(_POSIX_TIMERS) && BFS_HAS_TIMER_CREATE
+#  define BFS_POSIX_TIMERS _POSIX_TIMERS
+#else
+#  define BFS_POSIX_TIMERS (-1)
 #endif
+
+struct timer {
+#if BFS_POSIX_TIMERS >= 0
+	/** The POSIX timer. */
+	timer_t timer;
+#endif
+	/** Whether to use timer_create() or setitimer(). */
+	bool legacy;
+};
+
+struct timer *xtimer_start(const struct timespec *interval) {
+	struct timer *timer = ALLOC(struct timer);
+	if (!timer) {
+		return NULL;
+	}
+
+#if BFS_POSIX_TIMERS >= 0
+	if (sysoption(TIMERS)) {
+		clockid_t clock = CLOCK_REALTIME;
+
+#if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
+		if (sysoption(MONOTONIC_CLOCK) > 0) {
+			clock = CLOCK_MONOTONIC;
+		}
+#endif
+
+		if (timer_create(clock, NULL, &timer->timer) != 0) {
+			goto fail;
+		}
+
+		// https://github.com/llvm/llvm-project/issues/111847
+		sanitize_init(&timer->timer);
+
+		struct itimerspec spec = {
+			.it_value = *interval,
+			.it_interval = *interval,
+		};
+		if (timer_settime(timer->timer, 0, &spec, NULL) != 0) {
+			timer_delete(timer->timer);
+			goto fail;
+		}
+
+		timer->legacy = false;
+		return timer;
+	}
+#endif
+
+#if BFS_POSIX_TIMERS <= 0
+	struct timeval tv = {
+		.tv_sec = interval->tv_sec,
+		.tv_usec = (interval->tv_nsec + 999) / 1000,
+	};
+	struct itimerval ival = {
+		.it_value = tv,
+		.it_interval = tv,
+	};
+	if (setitimer(ITIMER_REAL, &ival, NULL) != 0) {
+		goto fail;
+	}
+
+	timer->legacy = true;
+	return timer;
+#endif
+
+fail:
+	free(timer);
+	return NULL;
+}
+
+void xtimer_stop(struct timer *timer) {
+	if (!timer) {
+		return;
+	}
+
+	if (timer->legacy) {
+#if BFS_POSIX_TIMERS <= 0
+		struct itimerval ival = {0};
+		int ret = setitimer(ITIMER_REAL, &ival, NULL);
+		bfs_everify(ret == 0, "setitimer()");
+#endif
+	} else {
+#if BFS_POSIX_TIMERS >= 0
+		int ret = timer_delete(timer->timer);
+		bfs_everify(ret == 0, "timer_delete()");
+#endif
+	}
+
+	free(timer);
 }

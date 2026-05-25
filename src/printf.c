@@ -1,9 +1,10 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "printf.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -16,6 +17,7 @@
 #include "mtab.h"
 #include "pwcache.h"
 #include "stat.h"
+
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
@@ -89,7 +91,7 @@ static bool should_color(CFILE *cfile, const struct bfs_fmt *fmt) {
 	(void)ret
 
 /** Return a dynamic format string. */
-attr(format_arg(2))
+[[_format_arg(2)]]
 static const char *dyn_fmt(const char *str, const char *fake) {
 	bfs_assert(strcmp(str + strlen(str) - strlen(fake) + 1, fake + 1) == 0,
 		"Mismatched format specifiers: '%s' vs. '%s'", str, fake);
@@ -97,7 +99,7 @@ static const char *dyn_fmt(const char *str, const char *fake) {
 }
 
 /** Wrapper for fprintf(). */
-attr(printf(3, 4))
+[[_printf(3, 4)]]
 static int bfs_fprintf(CFILE *cfile, const struct bfs_fmt *fmt, const char *fake, ...) {
 	va_list args;
 	va_start(args, fake);
@@ -505,30 +507,25 @@ static int bfs_printf_u(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 }
 
 static const char *bfs_printf_type(enum bfs_type type) {
-	switch (type) {
-	case BFS_BLK:
-		return "b";
-	case BFS_CHR:
-		return "c";
-	case BFS_DIR:
-		return "d";
-	case BFS_DOOR:
-		return "D";
-	case BFS_FIFO:
-		return "p";
-	case BFS_LNK:
-		return "l";
-	case BFS_PORT:
-		return "P";
-	case BFS_REG:
-		return "f";
-	case BFS_SOCK:
-		return "s";
-	case BFS_WHT:
-		return "w";
-	default:
-		return "U";
+	const char *const names[] = {
+		[BFS_BLK] = "b",
+		[BFS_CHR] = "c",
+		[BFS_DIR] = "d",
+		[BFS_DOOR] = "D",
+		[BFS_FIFO] = "p",
+		[BFS_LNK] = "l",
+		[BFS_PORT] = "P",
+		[BFS_REG] = "f",
+		[BFS_SOCK] = "s",
+		[BFS_WHT] = "w",
+	};
+
+	const char *name = NULL;
+	if ((size_t)type < countof(names)) {
+		name = names[type];
 	}
+
+	return name ? name : "U";
 }
 
 /** %y: type */
@@ -544,7 +541,7 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 
 	int error = 0;
 	if (type == BFS_ERROR) {
-		if (errno_is_like(ELOOP)) {
+		if (errno == ELOOP) {
 			str = "L";
 		} else if (errno_is_like(ENOENT)) {
 			str = "N";
@@ -565,7 +562,7 @@ static int bfs_printf_Y(CFILE *cfile, const struct bfs_fmt *fmt, const struct BF
 }
 
 /** %Z: SELinux context */
-attr(maybe_unused)
+[[_maybe_unused]]
 static int bfs_printf_Z(CFILE *cfile, const struct bfs_fmt *fmt, const struct BFTW *ftwbuf) {
 	char *con = bfs_getfilecon(ftwbuf);
 	if (!con) {
@@ -709,9 +706,9 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 				case '#':
 				case '0':
 				case '+':
-					must_be_numeric = true;
-					fallthru;
 				case ' ':
+					must_be_numeric = true;
+					[[fallthrough]];
 				case '-':
 					if (strchr(fmt.str, c)) {
 						bfs_expr_error(ctx, expr);

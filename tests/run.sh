@@ -5,23 +5,6 @@
 
 ## Running test cases
 
-# Beginning/end of line escape sequences
-BOL=$'\n'
-EOL=$'\n'
-
-# Update $EOL for the terminal size
-update_eol() {
-    # Bash gets $COLUMNS from stderr, so if it's redirected use tput instead
-    local cols="${COLUMNS-}"
-    if [ -z "$cols" ]; then
-        cols=$(tput cols 2>/dev/tty)
-    fi
-
-    # Put the cursor at the last column, then write a space so the next
-    # character will wrap
-    EOL=$'\e['"${cols}G "
-}
-
 # ERR trap for tests
 debug_err() {
     local ret=$? line func file
@@ -64,19 +47,19 @@ run_test() {
     case $ret in
         0)
             if ((VERBOSE_TESTS)); then
-                color printf "${BOL}${GRN}[PASS]${RST} ${BLD}%s${RST}\n" "$TEST"
+                color printf "${GRN}[PASS]${RST} ${BLD}%s${RST}\n" "$TEST"
             fi
             ;;
         $EX_SKIP)
             if ((VERBOSE_SKIPPED || VERBOSE_TESTS)); then
-                color printf "${BOL}${CYN}[SKIP]${RST} ${BLD}%s${RST}\n" "$TEST"
+                color printf "${CYN}[SKIP]${RST} ${BLD}%s${RST}\n" "$TEST"
             fi
             ;;
         *)
             if ((!VERBOSE_ERRORS)); then
                 cat "$TMP/$TEST.err" >&2
             fi
-            color printf "${BOL}${RED}[FAIL]${RST} ${BLD}%s${RST}\n" "$TEST"
+            color printf "${RED}[FAIL]${RST} ${BLD}%s${RST}\n" "$TEST"
             ;;
     esac
 
@@ -111,13 +94,20 @@ reap_test() {
 
 # Wait for a background test to finish
 wait_test() {
-    local pid
-    wait -n -ppid
-    ret=$?
-    if [ -z "${pid:-}" ]; then
-        debug "${BASH_SOURCE[0]}" $((LINENO - 3)) "${RED}error $ret${RST}" >&$DUPERR
-        exit 1
-    fi
+    local pid line ret
+
+    while :; do
+        line=$((LINENO + 1))
+        _wait -n -ppid
+        ret=$?
+
+        if [ "${pid:-}" ]; then
+            break
+        else
+            debug "${BASH_SOURCE[0]}" $line "${RED}error $ret${RST}" >&$DUPERR
+            exit 1
+        fi
+    done
 
     reap_test $ret
 }
@@ -128,7 +118,9 @@ wait_ready() {
         # We'd like to parse the output of jobs -n, but we can't run it in a
         # subshell or we won't get the right output
         jobs -n >"$TMP/jobs"
-        while read -r job status ret foo; do
+
+        local job status ret rest
+        while read -r job status ret rest; do
             case "$status" in
                 Done)
                     reap_test 0
@@ -164,35 +156,24 @@ comake() {
     exec {READY_PIPE}<&${COPROC[0]} {DONE_PIPE}>&${COPROC[1]}
 }
 
+# Print the current test progress
+progress() {
+    if [ "${BAR:-}" ]; then
+        print_bar "$(printf "$@")"
+    elif ((VERBOSE_TESTS)); then
+         color printf "$@"
+    fi
+}
+
 # Run all the tests
 run_tests() {
-    if ((VERBOSE_TESTS)); then
-        BOL=''
-    elif ((COLOR_STDOUT)); then
-        # Carriage return + clear line
-        BOL=$'\r\e[K'
-
-        # Workaround for bash 4: checkwinsize is off by default.  We can turn it
-        # on, but we also have to explicitly trigger a foreground job to finish
-        # so that it will update the window size before we use $COLUMNS
-        shopt -s checkwinsize
-        (:)
-
-        update_eol
-        trap update_eol WINCH
-    fi
-
     passed=0
     failed=0
     skipped=0
     ran=0
     total=${#TEST_CASES[@]}
 
-    if ((COLOR_STDOUT || VERBOSE_TESTS)); then
-        TEST_FMT="${BOL}${YLW}[%3d%%]${RST} ${BLD}%s${RST}${EOL}"
-    else
-        TEST_FMT="."
-    fi
+    TEST_FMT="${YLW}[%3d%%]${RST} ${BLD}%s${RST}\\n"
 
     if ((${#MAKE[@]})); then
         comake
@@ -201,6 +182,10 @@ run_tests() {
     # Turn off set -e (but turn it back on in run_test)
     set +e
 
+    if ((COLOR_STDOUT && !VERBOSE_TESTS)); then
+        show_bar
+    fi
+
     for TEST in "${TEST_CASES[@]}"; do
         wait_ready
         if ((STOP && failed > 0)); then
@@ -208,7 +193,7 @@ run_tests() {
         fi
 
         percent=$((100 * ran / total))
-        color printf "$TEST_FMT" $percent "$TEST"
+        progress "${YLW}[%3d%%]${RST} ${BLD}%s${RST}\\n" $percent "$TEST"
 
         mkdir -p "$TMP/$TEST"
         OUT="$TMP/$TEST.out"
@@ -221,7 +206,9 @@ run_tests() {
         wait_test
     done
 
-    printf "${BOL}"
+    if [ "${BAR:-}" ]; then
+        hide_bar
+    fi
 
     if ((passed > 0)); then
         color printf "${GRN}[PASS]${RST} ${BLD}%3d${RST} / ${BLD}%d${RST}\n" $passed $total
@@ -253,7 +240,6 @@ skip() {
     if ((VERBOSE_SKIPPED)); then
         caller | {
             read -r line file
-            printf "${BOL}"
             debug "$file" $line "" >&$DUPOUT
         }
     fi
@@ -374,20 +360,12 @@ invoke_bfs() {
     fi
 }
 
-if command -v unbuffer &>/dev/null; then
-    UNBUFFER=unbuffer
-elif command -v expect_unbuffer &>/dev/null; then
-    UNBUFFER=expect_unbuffer
-fi
-
 # Run bfs with a pseudo-terminal attached
 bfs_pty() {
-    test -n "${UNBUFFER:-}" || skip
-
     bfs_verbose "$@"
 
     local ret=0
-    "$UNBUFFER" bash -c 'stty cols 80 rows 24 && "$@" </dev/null' bash "${BFS[@]}" "$@" || ret=$?
+    "$PTYX" -w80 -h24 -- "${BFS[@]}" "$@" || ret=$?
 
     if ((ret > 125)); then
         exit $ret
@@ -425,14 +403,25 @@ make_xattrs() {
     esac
 }
 
+# Get the Unix epoch time in seconds
+epoch_time() {
+    if [ "${EPOCHSECONDS:-}" ]; then
+        # Added in bash 5
+        printf '%d' "$EPOCHSECONDS"
+    else
+        # https://stackoverflow.com/a/12746260/502399
+        awk 'BEGIN { srand(); print srand(); }'
+    fi
+}
+
 ## Snapshot testing
 
 # Return value when a difference is detected
 EX_DIFF=20
 
 # Detect colored diff support
-if diff --color /dev/null /dev/null &>/dev/null; then
-    DIFF="diff --color"
+if ((COLOR_STDERR)) && diff --color=always /dev/null /dev/null &>/dev/null; then
+    DIFF="diff --color=always"
 else
     DIFF="diff"
 fi

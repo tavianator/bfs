@@ -20,13 +20,14 @@
  *     - bftw.[ch]     (an extended version of nftw(3))
  *
  * - Utilities:
+ *     - prelude.h     (feature test macros; automatically included)
  *     - alloc.[ch]    (memory allocation)
  *     - atomic.h      (atomic operations)
  *     - bar.[ch]      (a terminal status bar)
  *     - bit.h         (bit manipulation)
+ *     - bfs.h         (configuration and fundamental utilities)
  *     - bfstd.[ch]    (standard library wrappers/polyfills)
  *     - color.[ch]    (for pretty terminal colors)
- *     - prelude.h     (configuration and feature/platform detection)
  *     - diag.[ch]     (formats diagnostic messages)
  *     - dir.[ch]      (a directory API facade)
  *     - dstring.[ch]  (a dynamic string library)
@@ -36,16 +37,17 @@
  *     - mtab.[ch]     (parses the system's mount table)
  *     - pwcache.[ch]  (a cache for the user/group tables)
  *     - sanity.h      (sanitizer interfaces)
+ *     - sighook.[ch]  (signal hooks)
  *     - stat.[ch]     (wraps stat(), or statx() on Linux)
  *     - thread.h      (multi-threading)
  *     - trie.[ch]     (a trie set/map implementation)
  *     - typo.[ch]     (fuzzy matching for typos)
+ *     - version.c     (embeds version information)
  *     - xregex.[ch]   (regular expression support)
  *     - xspawn.[ch]   (spawns processes)
  *     - xtime.[ch]    (date/time handling utilities)
  */
 
-#include "prelude.h"
 #include "bfstd.h"
 #include "ctx.h"
 #include "diag.h"
@@ -53,6 +55,7 @@
 #include "exec.h"
 #include "expr.h"
 #include "parse.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>

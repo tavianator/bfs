@@ -22,11 +22,11 @@ struct bfs_printf;
 /**
  * Parse a -printf format string.
  *
- * @param ctx
+ * @ctx
  *         The bfs context.
- * @param expr
+ * @expr
  *         The expression to fill in.
- * @param format
+ * @format
  *         The format string to parse.
  * @return
  *         0 on success, -1 on failure.
@@ -36,11 +36,11 @@ int bfs_printf_parse(const struct bfs_ctx *ctx, struct bfs_expr *expr, const cha
 /**
  * Evaluate a parsed format string.
  *
- * @param cfile
+ * @cfile
  *         The CFILE to print to.
- * @param format
+ * @format
  *         The parsed printf format.
- * @param ftwbuf
+ * @ftwbuf
  *         The bftw() data for the current file.
  * @return
  *         0 on success, -1 on failure.

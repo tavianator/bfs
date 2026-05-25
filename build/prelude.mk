@@ -9,11 +9,9 @@
 # We don't use any suffix rules
 .SUFFIXES:
 
-# GNU make has $^ for the full list of targets, while BSD make has $> and the
-# long-form ${.ALLSRC}.  We could write $^ $> to get them both, but that would
-# break if one of them implemented support for the other.  So instead, bring
-# BSD's ${.ALLSRC} to GNU.
-.ALLSRC ?= $^
+# GNU make has $^ for the full list of targets, while BSD make has $> (and the
+# long-form ${.ALLSRC}).  We use the GNU version, bringing it to BSD like this:
+^ ?= $>
 
 # Installation paths
 DESTDIR ?=
@@ -37,7 +35,7 @@ RM ?= rm -f
 #     VAR=1      ${TRUTHY,${VAR}} => ${TRUTHY,1}     => y
 #     VAR=n      ${TRUTHY,${VAR}} => ${TRUTHY,n}     =>   [empty]
 #     VAR=other  ${TRUTHY,${VAR}} => ${TRUTHY,other} =>   [empty]
-#     VAR=       ${TRUTHY,${VAR}} => ${TRUTHY,}      =>   [emtpy]
+#     VAR=       ${TRUTHY,${VAR}} => ${TRUTHY,}      =>   [empty]
 #
 # Inspired by https://github.com/wahern/autoguess
 TRUTHY,y := y
@@ -68,55 +66,3 @@ ALL_PKGS := \
     libselinux \
     liburing \
     oniguruma
-
-# List all object files here, as they're needed by both `./configure` and `make`
-
-# All object files except the entry point
-LIBBFS := \
-    obj/src/alloc.o \
-    obj/src/bar.o \
-    obj/src/bfstd.o \
-    obj/src/bftw.o \
-    obj/src/color.o \
-    obj/src/ctx.o \
-    obj/src/diag.o \
-    obj/src/dir.o \
-    obj/src/dstring.o \
-    obj/src/eval.o \
-    obj/src/exec.o \
-    obj/src/expr.o \
-    obj/src/fsade.o \
-    obj/src/ioq.o \
-    obj/src/mtab.o \
-    obj/src/opt.o \
-    obj/src/parse.o \
-    obj/src/printf.o \
-    obj/src/pwcache.o \
-    obj/src/stat.o \
-    obj/src/thread.o \
-    obj/src/trie.o \
-    obj/src/typo.o \
-    obj/src/xregex.o \
-    obj/src/xspawn.o \
-    obj/src/xtime.o \
-    obj/gen/version.o
-
-# Unit test objects
-UNIT_OBJS := \
-    obj/tests/alloc.o \
-    obj/tests/bfstd.o \
-    obj/tests/bit.o \
-    obj/tests/ioq.o \
-    obj/tests/main.o \
-    obj/tests/trie.o \
-    obj/tests/xspawn.o \
-    obj/tests/xtime.o
-
-# All object files
-OBJS := \
-    obj/src/main.o \
-    obj/tests/mksock.o \
-    obj/tests/xspawnee.o \
-    obj/tests/xtouch.o \
-    ${LIBBFS} \
-    ${UNIT_OBJS}

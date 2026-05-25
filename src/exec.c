@@ -1,9 +1,10 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "exec.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -11,6 +12,7 @@
 #include "diag.h"
 #include "dstring.h"
 #include "xspawn.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
@@ -22,7 +24,7 @@
 #include <unistd.h>
 
 /** Print some debugging info. */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static void bfs_exec_debug(const struct bfs_exec *execbuf, const char *format, ...) {
 	const struct bfs_ctx *ctx = execbuf->ctx;
 
@@ -56,7 +58,7 @@ static size_t bfs_exec_arg_size(const char *arg) {
 
 /** Determine the maximum argv size. */
 static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
-	long arg_max = sysconf(_SC_ARG_MAX);
+	long arg_max = xsysconf(_SC_ARG_MAX);
 	bfs_exec_debug(execbuf, "ARG_MAX: %ld according to sysconf()\n", arg_max);
 	if (arg_max < 0) {
 		arg_max = BFS_EXEC_ARG_MAX;
@@ -82,7 +84,7 @@ static size_t bfs_exec_arg_max(const struct bfs_exec *execbuf) {
 
 	// Assume arguments are counted with the granularity of a single page,
 	// so allow a one page cushion to account for rounding up
-	long page_size = sysconf(_SC_PAGESIZE);
+	long page_size = xsysconf(_SC_PAGESIZE);
 	if (page_size < 4096) {
 		page_size = 4096;
 	}
@@ -234,7 +236,7 @@ static char *bfs_exec_format_arg(char *arg, const char *path) {
 
 	char *last = arg;
 	do {
-		if (dstrncat(&ret, last, match - last) != 0) {
+		if (dstrxcat(&ret, last, match - last) != 0) {
 			goto err;
 		}
 		if (dstrcat(&ret, path) != 0) {
@@ -268,7 +270,7 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 	bfs_assert(execbuf->wd_fd < 0);
 	bfs_assert(!execbuf->wd_path);
 
-	if (ftwbuf->at_fd != AT_FDCWD) {
+	if (ftwbuf->at_fd != (int)AT_FDCWD) {
 		// Rely on at_fd being the immediate parent
 		bfs_assert(xbaseoff(ftwbuf->at_path) == 0);
 

@@ -2,21 +2,27 @@ name: CI
 
 on: [push, pull_request]
 
-jobs:
-  linux:
-    name: Linux
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-    runs-on: ubuntu-22.04
+jobs:
+  linux-x86:
+    name: Linux (x86)
+    runs-on: ubuntu-24.04
+
+    # Don't run on both pushes and pull requests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install dependencies
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -y
           sudo apt-get install -y \
-              expect \
+              mandoc \
               gcc-multilib \
               libgcc-s1:i386 \
               acl \
@@ -34,194 +40,240 @@ jobs:
           sudo ln -s libacl.so.1 /lib/i386-linux-gnu/libacl.so
           sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
           sudo ln -s libonig.so.5 /lib/i386-linux-gnu/libonig.so
-          # Work around https://github.com/actions/runner-images/issues/9491
-          sudo sysctl vm.mmap_rnd_bits=28
 
       - name: Run tests
         run: |
-          make -j$(nproc) distcheck
+          .github/diag.sh make -j$(nproc) distcheck
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: linux-config.log
+          name: linux-x86-config.log
+          path: distcheck-*/gen/config.log
+
+  linux-arm:
+    name: Linux (Arm64)
+    runs-on: ubuntu-24.04-arm
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+              mandoc \
+              acl \
+              libacl1-dev \
+              attr \
+              libcap2-bin \
+              libcap-dev \
+              libonig-dev \
+              liburing-dev
+
+      - name: Run tests
+        run: |
+          .github/diag.sh make -j$(nproc) distcheck
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-arm-config.log
           path: distcheck-*/gen/config.log
 
   macos:
     name: macOS
+    runs-on: macos-15
 
-    runs-on: macos-14
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install dependencies
         run: |
-          brew install \
-              bash \
-              expect
+          brew install bash
 
       - name: Run tests
         run: |
           jobs=$(sysctl -n hw.ncpu)
-          make -j$jobs distcheck
+          .github/diag.sh make -j$jobs distcheck
 
   freebsd:
     name: FreeBSD
+    runs-on: ubuntu-24.04
 
-    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@v0.24.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: freebsd
-          version: "14.0"
+          version: "15.0"
 
-          run: |
-            sudo pkg install -y \
-                bash \
-                expect \
-                oniguruma \
-                pkgconf \
-                tcl-wrapper
-            sudo mount -t fdescfs none /dev/fd
-            make -j$(nproc) distcheck
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg install -y \
+              bash \
+              oniguruma \
+              pkgconf
+          sudo mount -t fdescfs none /dev/fd
 
-      - uses: actions/upload-artifact@v4
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          .github/diag.sh make -j$(nproc) distcheck
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: freebsd-config.log
           path: distcheck-*/gen/config.log
 
   openbsd:
     name: OpenBSD
+    runs-on: ubuntu-24.04
 
-    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@v0.24.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: openbsd
-          version: "7.5"
+          version: "7.8"
 
-          run: |
-            sudo pkg_add \
-                bash \
-                expect \
-                gmake \
-                oniguruma
-            jobs=$(sysctl -n hw.ncpu)
-            ./configure MAKE=gmake
-            gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg_add \
+              bash \
+              gmake \
+              oniguruma
 
-      - uses: actions/upload-artifact@v4
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          jobs=$(sysctl -n hw.ncpu)
+          ./configure MAKE=gmake
+          .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openbsd-config.log
           path: gen/config.log
 
   netbsd:
     name: NetBSD
+    runs-on: ubuntu-24.04
 
-    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run tests
-        uses: cross-platform-actions/action@v0.24.0
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
         with:
           operating_system: netbsd
-          version: "10.0"
+          version: "10.1"
 
-          run: |
-            PATH="/sbin:/usr/sbin:$PATH"
-            sudo pkgin -y install \
-                bash \
-                oniguruma \
-                pkgconf \
-                tcl-expect
-            jobs=$(sysctl -n hw.ncpu)
-            ./configure
-            make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkgin -y install \
+              bash \
+              oniguruma \
+              pkgconf
 
-      - uses: actions/upload-artifact@v4
+      - name: Run tests
+        shell: cpa.sh {0}
+        run: |
+          PATH="/sbin:/usr/sbin:$PATH"
+          jobs=$(sysctl -n hw.ncpu)
+          ./configure
+          .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: netbsd-config.log
           path: gen/config.log
 
   dragonflybsd:
     name: DragonFly BSD
+    runs-on: ubuntu-24.04
 
-    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
+        with:
+          operating_system: dragonflybsd
+          version: "6.4.2"
+
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg install -y \
+              bash \
+              llvm18 \
+              oniguruma \
+              pkgconf \
+              sudo
 
       - name: Run tests
-        uses: vmactions/dragonflybsd-vm@v1
-        with:
-          release: "6.4.0"
-          usesh: true
+        shell: cpa.sh {0}
+        run: |
+          jobs=$(sysctl -n hw.ncpu)
+          ./configure CC=clang18
+          .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-          prepare: |
-            pkg install -y \
-                bash \
-                expect \
-                oniguruma \
-                pkgconf \
-                sudo \
-                tcl-wrapper
-            pw useradd -n action -m -G wheel -s /usr/local/bin/bash
-            echo "%wheel ALL=(ALL) NOPASSWD: ALL" >>/usr/local/etc/sudoers
-
-          run: |
-            chown -R action:action .
-            jobs=$(sysctl -n hw.ncpu)
-            sudo -u action ./configure
-            sudo -u action make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dragonfly-config.log
           path: gen/config.log
 
   omnios:
     name: OmniOS
+    runs-on: ubuntu-24.04
 
-    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start VM
+        uses: cross-platform-actions/action@0c165ad7eb2d6a7e8552d6af5aad2bbedfc646b0 # v1.1.0
+        with:
+          operating_system: omnios
+          version: "r151058"
+
+      - name: Install dependencies
+        shell: cpa.sh {0}
+        run: |
+          sudo pkg install \
+              bash \
+              build-essential \
+              gnu-make \
+              onig
 
       - name: Run tests
-        uses: vmactions/omnios-vm@v1
-        with:
-          release: "r151048"
-          usesh: true
+        shell: cpa.sh {0}
+        run: |
+          PATH="/usr/xpg4/bin:$PATH"
+          jobs=$(getconf NPROCESSORS_ONLN)
+          ./configure MAKE=gmake
+          .github/diag.sh gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
-          prepare: |
-            pkg install \
-                bash \
-                build-essential \
-                expect \
-                gnu-make \
-                onig \
-                sudo
-            useradd -m -g staff action
-            echo "%staff ALL=(ALL) NOPASSWD: ALL" >>/etc/sudoers
-
-          run: |
-            PATH="/usr/xpg4/bin:$PATH"
-            chown -R action:staff .
-            jobs=$(getconf NPROCESSORS_ONLN)
-            sudo -u action ./configure MAKE=gmake
-            sudo -u action gmake -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: omnios-config.log
           path: gen/config.log

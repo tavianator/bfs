@@ -1,5 +1,315 @@
+4.*
+===
+
+4.1.2
+-----
+
+**May 6, 2026**
+
+## Bug fixes
+
+- Fixed `./configure`-time detection of `sysctlbyname()` on FreeBSD
+  ([#219](https://github.com/tavianator/bfs/issues/219))
+
+- Bumped the default version number, which was missed in 4.1.1
+
+
+4.1.1
+-----
+
+**April 29, 2026**
+
+## Bug fixes
+
+- Fixed `./configure CFLAGS=...` being overridden by auto-detected flags
+  ([`70341236`](https://github.com/tavianator/bfs/commit/703412368c8afc811f2cec47684054e3875b607b))
+
+- Fixed the build for [WASIX](https://wasix.org/)
+  ([`5de89564`](https://github.com/tavianator/bfs/commit/5de89564baf301b93f09d567c96e6b991e6be30c))
+
+- Fixed the build on Android < 11
+  ([#215](https://github.com/tavianator/bfs/issues/215))
+
+- `bfs` now takes system-wide open file limits into account.
+  Previously, a handful of concurrent `bfs` instances could overwhelm a system with a low global limit, particularly macOS.
+  ([`6f6f760a`](https://github.com/tavianator/bfs/commit/6f6f760a138a9c16471bffc56eabc0a5f6431645))
+
+
+4.1
+---
+
+**August 11, 2025**
+
+### New features
+
+- Added support for the `$LSCOLORS` variable used by FreeBSD and macOS
+  ([#54](https://github.com/tavianator/bfs/issues/54),
+  [#157](https://github.com/tavianator/bfs/pull/157))
+
+### Changes
+
+- Switched from C17 to [C23](https://en.cppreference.com/w/c/23) by default.
+  C17 is still supported as a fallback as long as your compiler supports some common extensions.
+
+
+4.0.8
+-----
+
+**June 20, 2025**
+
+### Bug fixes
+
+- Fixed an invalid optimization that transformed
+
+      $ bfs -user you -or -user me
+
+  into just
+
+      $ bfs -user you
+
+  The bug was originally introduced in bfs 2.0 (October 14, 2020).
+  ([#155](https://github.com/tavianator/bfs/issues/155))
+
+
+4.0.7
+-----
+
+**June 15, 2025**
+
+### Changes
+
+- `bfs` now takes CPU affinity into account when picking how many threads to use
+  ([`a36774b`](https://github.com/tavianator/bfs/commit/a36774be636c3429c6e73de33bf65a1bdbdcfb4b))
+
+- `-execdir /bin/...` is now allowed even with a relative path in `$PATH`
+  ([`cb40f51`](https://github.com/tavianator/bfs/commit/cb40f51e4e6375a10265484b6959c6b1b0591378))
+
+- *Expect* is no longer a test suite dependency
+  ([`7102fec`](https://github.com/tavianator/bfs/commit/7102fec257835302cb4978160bba4cbebd0b63e1))
+
+### Bug fixes
+
+- Only the last `-files0-from` argument now has any effect, to match GNU find
+  ([`a662fda`](https://github.com/tavianator/bfs/commit/a662fda2642e17478bc8e78adb4c6642a8505cdb))
+
+- Fixed `-execdir {}`, which was inadvertently broken in bfs 4.0
+  ([`def4a83`](https://github.com/tavianator/bfs/commit/def4a832425bfe94b96b8cb1146a83552b754fb4))
+
+
+4.0.6
+-----
+
+**February 26, 2025**
+
+### Bug fixes
+
+- Fixed `-fstype` with btrfs subvolumes (requires Linux 5.8+)
+  ([`0dccdae`](https://github.com/tavianator/bfs/commit/0dccdae4510ff5603247be871e64a6119647ea2a))
+
+- Fixed `-ls` with timestamps very far in the future
+  ([`dd5df1f`](https://github.com/tavianator/bfs/commit/dd5df1f8997550c5bf49205578027715b957bd01))
+
+- Fixed the `posix/exec_sigmask` test on mips64el Linux
+  ([`532dec0`](https://github.com/tavianator/bfs/commit/532dec0849dcdc3e15e530ac40a8168f146a41cd))
+
+- Fixed time-related tests with `mawk 1.3.4 20250131`
+  ([#152](https://github.com/tavianator/bfs/issues/152))
+
+
+4.0.5
+-----
+
+**January 18, 2025**
+
+### Bug fixes
+
+- Fixed a bug that could cause child processes (e.g. from `-exec`) to run with all signals blocked.
+  The bug was introduced in version 3.3.
+  ([`af207e7`](https://github.com/tavianator/bfs/commit/af207e702148e5c9ae08047d7a2dce6394653b62))
+
+### Changes
+
+- Fixed the build against old liburing versions
+  ([#147](https://github.com/tavianator/bfs/issues/147))
+
+- Async I/O performance optimizations
+
+
+4.0.4
+-----
+
+**October 31, 2024**
+
+## Bug fixes
+
+- Fixed a man page typo
+  ([#144](https://github.com/tavianator/bfs/pull/144))
+
+- Fixed the build on PowerPC macOS
+  ([#145](https://github.com/tavianator/bfs/issues/145))
+
+- Fixed a bug introduced in bfs 4.0.3 that colorized every file as if it had capabilities on non-Linux systems
+  ([#146](https://github.com/tavianator/bfs/pull/146))
+
+
+4.0.3
+-----
+
+**October 22, 2024**
+
+### Bug fixes
+
+- Fixed an assertion failure when `$LS_COLORS` contained escaped NUL bytes like `*\0.gz=`
+  ([`f5eaadb9`](https://github.com/tavianator/bfs/commit/f5eaadb96fb94b2d3666e53a99495840a3099aec))
+
+- Fixed a use-after-free bug introduced in bfs 4.0 when unregistering and re-registering signal hooks.
+  This could be reproduced with `bfs -nocolor` by repeatedly sending `SIGINFO`/`SIGUSR1` to toggle the status bar.
+  ([`39ff273`](https://github.com/tavianator/bfs/commit/39ff273df97e51b1285358b9e6808b117ea8adb1))
+
+- Fixed a hang present since bfs 3.0 colorizing paths like `notdir/file`, where `notdir` is a symlink pointing to a non-directory file.
+  ([`b89f22cb`](https://github.com/tavianator/bfs/commit/b89f22cbf250958a802915eb7b6bf0e5f38376ca))
+
+
+4.0.2
+-----
+
+**September 17, 2024**
+
+### New features
+
+- Implemented `./configure --version=X.Y.Z`, mainly for packagers to override the version number
+  ([`4a278d3`](https://github.com/tavianator/bfs/commit/4a278d3e39a685379711727eac7bfaa83679e0e4))
+
+### Changes
+
+- Minor refactoring of the build system
+
+### Bug fixes
+
+- Fixed `./configure --help`, which was broken since `bfs` 4.0
+  ([`07ae989`](https://github.com/tavianator/bfs/commit/07ae98906dbb0caaac2f758d72e88dd0975b2a81))
+
+- Fixed compiler flag auto-detection on systems with non-GNU `sed`.
+  This fixes a potential race condition on FreeBSD since `bfs` 4.0 due to the [switch to `_Fork()`](https://github.com/tavianator/bfs/commit/085bb402c7b2c2f96624fb0523ff3f9686fe26d9) without passing `-z now` to the linker.
+  ([`34e6081`](https://github.com/tavianator/bfs/commit/34e60816adb0ea8ddb155a454676a99ab225dc8a))
+
+- Fixed `$MAKE distcheck` when `$MAKE` is not `make`, e.g. `gmake distcheck` on BSD
+  ([`2135b00`](https://github.com/tavianator/bfs/commit/2135b00d215efc5c2c38e1abd3254baf31229ad4))
+
+- Fixed some roff syntax issues in the `bfs` manpage
+  ([`812ecd1`](https://github.com/tavianator/bfs/commit/812ecd1feeb002252dd4d732b395d31c4179afaf))
+
+- Fixed an assertion failure optimizing expressions like `bfs -not \( -prune , -type f \)` since `bfs` 3.1.
+  Release builds were not affected, since their assertions are disabled and the behaviour was otherwise correct.
+  ([`b1a9998`](https://github.com/tavianator/bfs/commit/b1a999892b9e13181ddd9a7d895f3d1c65fbb449))
+
+
+4.0.1
+-----
+
+**August 19, 2024**
+
+### Bug fixes
+
+- `bfs` no longer prints a "suppressed errors" warning unless `-noerror` is actually suppressing errors
+  ([`5d03c9d`](https://github.com/tavianator/bfs/commit/5d03c9d460d1c1afcdf062d494537986ce96a690))
+
+
+4.0
+---
+
+**August 16, 2024**
+
+### New features
+
+- To match BSD `find` (and the POSIX Utility Syntax Guidelines), multiple flags can now be given in a single argument like `-LEXO2`.
+  Previously, you would have had to write `-L -E -X -O2`.
+  ([`c0fd33a`](https://github.com/tavianator/bfs/commit/c0fd33aaef5f345566a41c7c2558f27adf05558b))
+
+- Explicit timestamps can now be written as `@SECONDS_SINCE_EPOCH`.
+  For example, `bfs -newermt @946684800` will print files modified since January 1, 2000 (UTC).
+  ([`c6bb003`](https://github.com/tavianator/bfs/commit/c6bb003b8882e9a16941f5803d072ec1cb728318))
+
+- The new `-noerror` option suppresses all error messages during traversal.
+  ([#142](https://github.com/tavianator/bfs/issues/142))
+
+### Changes
+
+- `-mount` now excludes mount points entirely, to comply with the recently published POSIX 2024 standard.
+  Use `-xdev` to include the mount point itself, but not its contents.
+  `bfs` has been warning about this change since version 1.5.1 (September 2019).
+  ([`33b85e1`](https://github.com/tavianator/bfs/commit/33b85e1f8769e7f75721887638ae454d109a034f))
+
+- `-perm` now takes the current file creation mask into account when parsing a symbolic mode like `+rw`, as clarified by [POSIX defect 1392](https://www.austingroupbugs.net/view.php?id=1392).
+    This matches the behaviour of BSD `find`, contrary to the behaviour of GNU `find`.
+  ([`6290ce4`](https://github.com/tavianator/bfs/commit/6290ce41f3ec1f889abb881cf90ca91da869b5b2))
+
+### Bug fixes
+
+- Fixed commands like `./configure CC=clang --enable-release` that set variables before other options
+  ([`49a5d48`](https://github.com/tavianator/bfs/commit/49a5d48d0a43bac313c8b8d1b167e60da9eaadf6))
+
+- Fixed the build on RISC-V with GCC versions older than 14
+  ([`e93a1dc`](https://github.com/tavianator/bfs/commit/e93a1dccd82f831a2f0d2cc382d8af5e1fda55ed))
+
+- Fixed running `bfs` under Valgrind
+  ([`a01cfac`](https://github.com/tavianator/bfs/commit/a01cfacd423af28af6b7c13ba51e2395f3a52ee7))
+
+- Fixed the exit code when failing to execute a non-existent command with `-exec`/`-ok` on some platforms including OpenBSD and HPPA
+  ([`8c130ca`](https://github.com/tavianator/bfs/commit/8c130ca0117fd225c24569be2ec16c7dc2150a13))
+
+- Fixed `$LS_COLORS` case-sensitivity to match GNU ls more closely when the same extension is specified multiple times
+  ([`08030ae`](https://github.com/tavianator/bfs/commit/08030aea919039165c02805e8c637a9ec1ad0d70))
+
+- Fixed the `-status` bar on Solaris/Illumos
+
+
 3.*
 ===
+
+3.3.1
+-----
+
+**June 3, 2024**
+
+### Bug fixes
+
+- Reduced the scope of the symbolic link loop change in version 3.3.
+  `-xtype l` remains true for symbolic link loops, matching a change in GNU findutils 4.10.0.
+  However, `-L` will report an error, just like `bfs` prior to 3.3 and other `find` implementations, as required by POSIX.
+
+
+3.3
+---
+
+**May 28, 2024**
+
+### New features
+
+- The `-status` bar can now be toggled by `SIGINFO` (<kbd>Ctrl</kbd>+<kbd>T</kbd>) on systems that support it, and `SIGUSR1` on other systems
+
+- `-regextype` now supports all regex types from GNU find ([#21](https://github.com/tavianator/bfs/issues/21))
+
+- File birth times are now supported on OpenBSD
+
+### Changes
+
+- Symbolic link loops are now treated like other broken links, rather than an error
+
+- `./configure` now expects `--with-libacl`, `--without-libcap`, etc. rather than `--enable-`/`--disable-`
+
+- The ` ` (space) flag is now restricted to numeric `-printf` specifiers
+
+### Bug fixes
+
+- `-regextype emacs` now supports [shy](https://www.gnu.org/software/emacs/manual/html_node/elisp/Regexp-Backslash.html#index-shy-groups) (non-capturing) groups
+
+- Fixed `-status` bar visual corruption when the terminal is resized
+
+- `bfs` now prints a reset escape sequence when terminated by a signal in the middle of colored output ([#138](https://github.com/tavianator/bfs/issues/138))
+
+- `./configure CFLAGS=...` no longer overrides flags from `pkg-config` during configuration
+
 
 3.2
 ---
@@ -183,7 +493,7 @@
 
   - Breadth-first search could become highly unbalanced, negating many of the benefits of `bfs`
 
-  - On non-{Linux,FreeBSD} plaforms, directories could stay open longer than necessary, consuming extra memory
+  - On non-{Linux,FreeBSD} platforms, directories could stay open longer than necessary, consuming extra memory
 
 [#107]: https://github.com/tavianator/bfs/pull/107
 

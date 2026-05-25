@@ -1,3 +1,10 @@
 perms
-perms/rw
-perms/rwx
+perms/drwxr-xr-x
+perms/drwxrwxr-x
+perms/drwxrwxrwx
+perms/frw-r--r--
+perms/frw-rw-r--
+perms/frw-rw-rw-
+perms/frwxr-xr-x
+perms/frwxrwxr-x
+perms/frwxrwxrwx

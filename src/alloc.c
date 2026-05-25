@@ -1,11 +1,13 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "alloc.h"
+
+#include "bfs.h"
 #include "bit.h"
 #include "diag.h"
 #include "sanity.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -18,24 +20,22 @@
 #  define ALLOC_MAX (SIZE_MAX / 2)
 #endif
 
-/** Portable aligned_alloc()/posix_memalign(). */
+/** posix_memalign() wrapper. */
 static void *xmemalign(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
 	bfs_assert(align >= sizeof(void *));
-	bfs_assert(is_aligned(align, size));
 
-#if BFS_HAS_ALIGNED_ALLOC
-	return aligned_alloc(align, size);
-#else
+	// Since https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2072.htm,
+	// aligned_alloc() doesn't require the size to be a multiple of align.
+	// But the sanitizers don't know about that yet, so always use
+	// posix_memalign().
 	void *ptr = NULL;
 	errno = posix_memalign(&ptr, align, size);
 	return ptr;
-#endif
 }
 
 void *alloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert(is_aligned(align, size));
 
 	if (size > ALLOC_MAX) {
 		errno = EOVERFLOW;
@@ -51,7 +51,6 @@ void *alloc(size_t align, size_t size) {
 
 void *zalloc(size_t align, size_t size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert(is_aligned(align, size));
 
 	if (size > ALLOC_MAX) {
 		errno = EOVERFLOW;
@@ -71,8 +70,6 @@ void *zalloc(size_t align, size_t size) {
 
 void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size) {
 	bfs_assert(has_single_bit(align));
-	bfs_assert(is_aligned(align, old_size));
-	bfs_assert(is_aligned(align, new_size));
 
 	if (new_size == 0) {
 		free(ptr);
@@ -106,10 +103,10 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count) {
 	size_t old_size = size * count;
 
 	// Capacity is doubled every power of two, from 0→1, 1→2, 2→4, etc.
-	// If we stayed within the same size class, re-use ptr.
+	// If we stayed within the same size class, reuse ptr.
 	if (count & (count - 1)) {
 		// Tell sanitizers about the new array element
-		sanitize_alloc((char *)ptr + old_size, size);
+		sanitize_resize(ptr, old_size, old_size + size, bit_ceil(count) * size);
 		errno = 0;
 		return ptr;
 	}
@@ -124,7 +121,7 @@ void *reserve(void *ptr, size_t align, size_t size, size_t count) {
 	}
 
 	// Pretend we only allocated one more element
-	sanitize_free((char *)ret + old_size + size, new_size - old_size - size);
+	sanitize_resize(ret, new_size, old_size + size, new_size);
 	errno = 0;
 	return ret;
 }
@@ -176,7 +173,7 @@ void arena_init(struct arena *arena, size_t align, size_t size) {
 }
 
 /** Allocate a new slab. */
-attr(cold)
+[[_cold]]
 static int slab_alloc(struct arena *arena) {
 	// Make the initial allocation size ~4K
 	size_t size = 4096;
@@ -231,6 +228,7 @@ void arena_free(struct arena *arena, void *ptr) {
 	union chunk *chunk = ptr;
 	chunk_set_next(arena, chunk, arena->chunks);
 	arena->chunks = chunk;
+	sanitize_uninit(chunk, arena->size);
 	sanitize_free(chunk, arena->size);
 }
 
@@ -250,7 +248,7 @@ void arena_destroy(struct arena *arena) {
 	sanitize_uninit(arena);
 }
 
-void varena_init(struct varena *varena, size_t align, size_t min, size_t offset, size_t size) {
+void varena_init(struct varena *varena, size_t align, size_t offset, size_t size) {
 	varena->align = align;
 	varena->offset = offset;
 	varena->size = size;
@@ -259,7 +257,7 @@ void varena_init(struct varena *varena, size_t align, size_t min, size_t offset,
 
 	// The smallest size class is at least as many as fit in the smallest
 	// aligned allocation size
-	size_t min_count = (flex_size(align, min, offset, size, 1) - offset + size - 1) / size;
+	size_t min_count = (flex_size(align, offset, size, 1) - offset + size - 1) / size;
 	varena->shift = bit_width(min_count - 1);
 }
 
@@ -272,7 +270,7 @@ static size_t varena_size_class(struct varena *varena, size_t count) {
 
 /** Get the exact size of a flexible struct. */
 static size_t varena_exact_size(const struct varena *varena, size_t count) {
-	return flex_size(varena->align, 0, varena->offset, varena->size, count);
+	return flex_size(varena->align, varena->offset, varena->size, count);
 }
 
 /** Get the arena for the given array length. */
@@ -306,8 +304,7 @@ void *varena_alloc(struct varena *varena, size_t count) {
 	}
 
 	// Tell the sanitizers the exact size of the allocated struct
-	sanitize_free(ret, arena->size);
-	sanitize_alloc(ret, varena_exact_size(varena, count));
+	sanitize_resize(ret, arena->size, varena_exact_size(varena, count), arena->size);
 
 	return ret;
 }
@@ -319,15 +316,14 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 		return NULL;
 	}
 
-	size_t new_exact_size = varena_exact_size(varena, new_count);
-	size_t old_exact_size = varena_exact_size(varena, old_count);
+	size_t old_size = old_arena->size;
+	size_t new_size = new_arena->size;
 
 	if (new_arena == old_arena) {
-		if (new_count < old_count) {
-			sanitize_free((char *)ptr + new_exact_size, old_exact_size - new_exact_size);
-		} else if (new_count > old_count) {
-			sanitize_alloc((char *)ptr + old_exact_size, new_exact_size - old_exact_size);
-		}
+		sanitize_resize(ptr,
+			varena_exact_size(varena, old_count),
+			varena_exact_size(varena, new_count),
+			new_size);
 		return ptr;
 	}
 
@@ -336,16 +332,18 @@ void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t 
 		return NULL;
 	}
 
-	size_t old_size = old_arena->size;
-	sanitize_alloc((char *)ptr + old_exact_size, old_size - old_exact_size);
+	// Non-sanitized builds don't bother computing exact sizes, and just use
+	// the potentially-larger arena size for each size class instead.  To
+	// allow the below memcpy() to work with the less-precise sizes, expand
+	// the old allocation to its full capacity.
+	sanitize_resize(ptr, varena_exact_size(varena, old_count), old_size, old_size);
 
-	size_t new_size = new_arena->size;
 	size_t min_size = new_size < old_size ? new_size : old_size;
 	memcpy(ret, ptr, min_size);
 
 	arena_free(old_arena, ptr);
-	sanitize_free((char *)ret + new_exact_size, new_size - new_exact_size);
 
+	sanitize_resize(ret, new_size, varena_exact_size(varena, new_count), new_size);
 	return ret;
 }
 

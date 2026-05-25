@@ -18,9 +18,10 @@
  *   various helper functions to take fewer parameters.
  */
 
-#include "prelude.h"
 #include "bftw.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "diag.h"
 #include "dir.h"
@@ -30,6 +31,7 @@
 #include "mtab.h"
 #include "stat.h"
 #include "trie.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -251,6 +253,7 @@ struct bftw_file {
 	/** The length of the file's name. */
 	size_t namelen;
 	/** The file's name. */
+	// [[_counted_by(namelen + 1)]]
 	char name[];
 };
 
@@ -446,7 +449,7 @@ static void bftw_queue_rebalance(struct bftw_queue *queue, bool async) {
 	}
 }
 
-/** Detatch the next waiting file. */
+/** Detach the next waiting file. */
 static void bftw_queue_detach(struct bftw_queue *queue, struct bftw_file *file, bool async) {
 	bfs_assert(!file->ioqueued);
 
@@ -913,7 +916,7 @@ static int bftw_state_init(struct bftw_state *state, const struct bftw_args *arg
 	size_t qdepth = 4096;
 	size_t nthreads = args->nthreads;
 
-#if BFS_USE_LIBURING
+#if BFS_WITH_LIBURING
 	// io_uring uses one fd per ring, ioq uses one ring per thread
 	if (nthreads >= nopenfd - 1) {
 		nthreads = nopenfd - 2;
@@ -1006,6 +1009,7 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		return -1;
 	}
 
+	ioq_submit(ioq);
 	struct ioq_ent *ent = ioq_pop(ioq, block);
 	if (!ent) {
 		return -1;
@@ -1048,6 +1052,10 @@ static int bftw_ioq_pop(struct bftw_state *state, bool block) {
 		}
 
 		bftw_queue_attach(&state->fileq, file, true);
+		break;
+
+	default:
+		bfs_bug("Unexpected ioq op %d", (int)op);
 		break;
 	}
 
@@ -1160,12 +1168,13 @@ static int bftw_file_open(struct bftw_state *state, struct bftw_file *file, cons
 	struct bftw_list parents;
 	SLIST_INIT(&parents);
 
-	struct bftw_file *cur;
-	for (cur = file; cur != base; cur = cur->parent) {
+	// Reverse the chain of parents
+	for (struct bftw_file *cur = file; cur != base; cur = cur->parent) {
 		SLIST_PREPEND(&parents, cur);
 	}
 
-	while ((cur = SLIST_POP(&parents))) {
+	// Open each component relative to its parent
+	drain_slist (struct bftw_file, cur, &parents) {
 		if (!cur->parent || cur->parent->fd >= 0) {
 			bftw_file_openat(state, cur, cur->parent, cur->name);
 		}
@@ -1281,8 +1290,8 @@ static int bftw_pin_parent(struct bftw_state *state, struct bftw_file *file) {
 
 	int fd = parent->fd;
 	if (fd < 0) {
-		bfs_static_assert(AT_FDCWD != -1);
-		return -1;
+		// Don't confuse failures with AT_FDCWD
+		return (int)AT_FDCWD == -1 ? -2 : -1;
 	}
 
 	bftw_cache_pin(&state->cache, parent);
@@ -1298,7 +1307,7 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 	}
 
 	int dfd = bftw_pin_parent(state, file);
-	if (dfd < 0 && dfd != AT_FDCWD) {
+	if (dfd < 0 && dfd != (int)AT_FDCWD) {
 		goto fail;
 	}
 
@@ -1431,7 +1440,7 @@ static bool bftw_must_stat(const struct bftw_state *state, size_t depth, enum bf
 		if (!(bftw_stat_flags(state, depth) & BFS_STAT_NOFOLLOW)) {
 			return true;
 		}
-		fallthru;
+		[[fallthrough]];
 
 	default:
 #if __linux__
@@ -1450,7 +1459,7 @@ static int bftw_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
 	}
 
 	int dfd = bftw_pin_parent(state, file);
-	if (dfd < 0 && dfd != AT_FDCWD) {
+	if (dfd < 0 && dfd != (int)AT_FDCWD) {
 		goto fail;
 	}
 
@@ -1477,7 +1486,8 @@ fail:
 
 /** Check if we should stat() a file asynchronously. */
 static bool bftw_should_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
-	// To avoid surprising users too much, process the roots in order
+	// POSIX wants the root paths to be processed in order
+	// See https://www.austingroupbugs.net/view.php?id=1859
 	if (file->depth == 0) {
 		return false;
 	}
@@ -1529,11 +1539,28 @@ static bool bftw_pop_file(struct bftw_state *state) {
 	return bftw_pop(state, &state->fileq);
 }
 
+/** Add a path component to the path. */
+static void bftw_prepend_path(char *path, size_t nameoff, size_t namelen, const char *name) {
+	if (nameoff > 0) {
+		path[nameoff - 1] = '/';
+	}
+	memcpy(path + nameoff, name, namelen);
+}
+
 /** Build the path to the current file. */
 static int bftw_build_path(struct bftw_state *state, const char *name) {
 	const struct bftw_file *file = state->file;
 
-	size_t pathlen = file ? file->nameoff + file->namelen : 0;
+	size_t nameoff, namelen;
+	if (name) {
+		nameoff = file ? bftw_child_nameoff(file) : 0;
+		namelen = strlen(name);
+	} else {
+		nameoff = file->nameoff;
+		namelen = file->namelen;
+	}
+
+	size_t pathlen = nameoff + namelen;
 	if (dstresize(&state->path, pathlen) != 0) {
 		state->error = errno;
 		return -1;
@@ -1546,11 +1573,11 @@ static int bftw_build_path(struct bftw_state *state, const char *name) {
 	}
 
 	// Build the path backwards
+	if (name) {
+		bftw_prepend_path(state->path, nameoff, namelen, name);
+	}
 	while (file && file != ancestor) {
-		if (file->nameoff > 0) {
-			state->path[file->nameoff - 1] = '/';
-		}
-		memcpy(state->path + file->nameoff, file->name, file->namelen);
+		bftw_prepend_path(state->path, file->nameoff, file->namelen, file->name);
 
 		if (ancestor && ancestor->depth == file->depth) {
 			ancestor = ancestor->parent;
@@ -1559,20 +1586,6 @@ static int bftw_build_path(struct bftw_state *state, const char *name) {
 	}
 
 	state->previous = state->file;
-
-	if (name) {
-		if (pathlen > 0 && state->path[pathlen - 1] != '/') {
-			if (dstrapp(&state->path, '/') != 0) {
-				state->error = errno;
-				return -1;
-			}
-		}
-		if (dstrcat(&state->path, name) != 0) {
-			state->error = errno;
-			return -1;
-		}
-	}
-
 	return 0;
 }
 
@@ -1676,6 +1689,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 	ftwbuf->visit = visit;
 	ftwbuf->type = BFS_UNKNOWN;
 	ftwbuf->error = state->direrror;
+	ftwbuf->loopoff = 0;
 	ftwbuf->at_fd = AT_FDCWD;
 	ftwbuf->at_path = ftwbuf->path;
 	bftw_stat_init(&ftwbuf->stat_bufs, &state->stat_buf, &state->lstat_buf);
@@ -1733,6 +1747,7 @@ static void bftw_init_ftwbuf(struct bftw_state *state, enum bftw_visit visit) {
 			if (ancestor->dev == statbuf->dev && ancestor->ino == statbuf->ino) {
 				ftwbuf->type = BFS_ERROR;
 				ftwbuf->error = ELOOP;
+				ftwbuf->loopoff = ancestor->nameoff + ancestor->namelen;
 				return;
 			}
 		}
@@ -1863,8 +1878,8 @@ static int bftw_gc(struct bftw_state *state, enum bftw_gc_flags flags) {
 	}
 	state->direrror = 0;
 
-	while ((file = SLIST_POP(&state->to_close, ready))) {
-		bftw_unwrapdir(state, file);
+	drain_slist (struct bftw_file, dead, &state->to_close, ready) {
+		bftw_unwrapdir(state, dead);
 	}
 
 	enum bftw_gc_flags visit = BFTW_VISIT_FILE;
@@ -1945,6 +1960,10 @@ static void bftw_flush(struct bftw_state *state) {
 
 	bftw_queue_flush(&state->dirq);
 	bftw_ioq_opendirs(state);
+
+	if (state->ioq) {
+		ioq_submit(state->ioq);
+	}
 }
 
 /** Close the current directory. */

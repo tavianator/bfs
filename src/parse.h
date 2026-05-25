@@ -11,9 +11,9 @@
 /**
  * Parse the command line.
  *
- * @param argc
+ * @argc
  *         The number of arguments.
- * @param argv
+ * @argv
  *         The arguments to parse.
  * @return
  *         A new bfs context, or NULL on failure.

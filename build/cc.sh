@@ -3,14 +3,17 @@
 # Copyright © Tavian Barnes <tavianator@tavianator.com>
 # SPDX-License-Identifier: 0BSD
 
-# Run the compiler and check if it succeeded
+# Run the compiler and check if it succeeded.  Usage:
+#
+#     $ build/cc.sh [-q] path/to/file.c [-flags -Warnings ...]
 
 set -eu
 
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
-
-(
+# Without -q, print the executed command for config.log
+if [ "$1" = "-q" ]; then
+    shift
+else
     set -x
-    $XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS "$@" $XLDLIBS -o "$TMP"
-)
+fi
+
+$XCC $XCPPFLAGS $XCFLAGS $XLDFLAGS "$@" $XLDLIBS

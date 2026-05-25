@@ -1,24 +1,28 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "mtab.h"
+
 #include "alloc.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "stat.h"
 #include "trie.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 
-#if !defined(BFS_USE_MNTENT) && BFS_HAS_GETMNTENT_1
-#  define BFS_USE_MNTENT true
-#elif !defined(BFS_USE_MNTINFO) && BFS_HAS_GETMNTINFO
-#  define BFS_USE_MNTINFO true
-#elif !defined(BFS_USE_MNTTAB) && BFS_HAS_GETMNTENT_2
-#  define BFS_USE_MNTTAB true
+#ifndef BFS_USE_MNTENT
+#  define BFS_USE_MNTENT BFS_HAS_GETMNTENT_1
+#endif
+#ifndef BFS_USE_MNTINFO
+#  define BFS_USE_MNTINFO (!BFS_USE_MNTENT && BFS_HAS_GETMNTINFO)
+#endif
+#ifndef BFS_USE_MNTTAB
+#  define BFS_USE_MNTTAB (!BFS_USE_MNTINFO && BFS_HAS_GETMNTENT_2)
 #endif
 
 #if BFS_USE_MNTENT
@@ -65,7 +69,7 @@ struct bfs_mtab {
 /**
  * Add an entry to the mount table.
  */
-attr(maybe_unused)
+[[_maybe_unused]]
 static int bfs_mtab_add(struct bfs_mtab *mtab, const char *path, const char *type) {
 	size_t path_size = strlen(path) + 1;
 	size_t type_size = strlen(type) + 1;
@@ -252,10 +256,7 @@ static int bfs_mtab_fill_types(struct bfs_mtab *mtab) {
 			continue;
 		}
 
-		struct trie_leaf *leaf = trie_insert_mem(&mtab->types, &sb.dev, sizeof(sb.dev));
-		if (leaf) {
-			leaf->value = mount->type;
-		} else {
+		if (trie_set_mem(&mtab->types, &sb.mnt_id, sizeof(sb.mnt_id), mount->type) != 0) {
 			goto fail;
 		}
 	}
@@ -278,9 +279,9 @@ const char *bfs_fstype(const struct bfs_mtab *mtab, const struct bfs_stat *statb
 		}
 	}
 
-	const struct trie_leaf *leaf = trie_find_mem(&mtab->types, &statbuf->dev, sizeof(statbuf->dev));
-	if (leaf) {
-		return leaf->value;
+	const char *type = trie_get_mem(&mtab->types, &statbuf->mnt_id, sizeof(statbuf->mnt_id));
+	if (type) {
+		return type;
 	} else {
 		return "unknown";
 	}

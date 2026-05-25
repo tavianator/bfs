@@ -1,10 +1,10 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "bfstd.h"
 #include "sanity.h"
 #include "xtime.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -120,7 +120,7 @@ static int at_flags(const struct args *args) {
 /** Touch one path. */
 static int xtouch(const struct args *args, const char *path) {
 	int dfd = open_parent(args, &path);
-	if (dfd < 0 && dfd != AT_FDCWD) {
+	if (dfd < 0 && dfd != (int)AT_FDCWD) {
 		return -1;
 	}
 
@@ -217,11 +217,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (marg) {
-		char *end;
-		long mode = strtol(marg, &end, 8);
-		// https://github.com/llvm/llvm-project/issues/64946
-		sanitize_init(&end);
-		if (*marg && !*end && mode >= 0 && mode < 01000) {
+		unsigned int mode;
+		if (xstrtoui(marg, NULL, 8, &mode) == 0 && mode < 01000) {
 			args.fmode = args.dmode = mode;
 		} else {
 			fprintf(stderr, "%s: Invalid mode '%s'\n", cmd, marg);
@@ -247,8 +244,8 @@ int main(int argc, char *argv[]) {
 		times[1] = times[0];
 	} else {
 		// Don't use UTIME_NOW, so that multiple paths all get the same timestamp
-		if (xgettime(&times[0]) != 0) {
-			perror("xgettime()");
+		if (clock_gettime(CLOCK_REALTIME, &times[0]) != 0) {
+			perror("clock_gettime()");
 			return EXIT_FAILURE;
 		}
 		times[1] = times[0];

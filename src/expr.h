@@ -8,12 +8,36 @@
 #ifndef BFS_EXPR_H
 #define BFS_EXPR_H
 
-#include "prelude.h"
 #include "color.h"
 #include "eval.h"
 #include "stat.h"
+
 #include <sys/types.h>
 #include <time.h>
+
+/**
+ * Argument/token/expression kinds.
+ */
+enum bfs_kind {
+	/** A regular argument. */
+	BFS_ARG,
+
+	/** A flag (-H, -L, etc.). */
+	BFS_FLAG,
+
+	/** A root path. */
+	BFS_PATH,
+
+	/** An option (-follow, -mindepth, etc.). */
+	BFS_OPTION,
+	/** A test (-name, -size, etc.). */
+	BFS_TEST,
+	/** An action (-print, -exec, etc.). */
+	BFS_ACTION,
+
+	/** An operator (-and, -or, etc.). */
+	BFS_OPERATOR,
+};
 
 /**
  * Integer comparison modes.
@@ -97,6 +121,8 @@ struct bfs_expr {
 	size_t argc;
 	/** The command line arguments comprising this expression. */
 	char **argv;
+	/** The kind of expression this is. */
+	enum bfs_kind kind;
 
 	/** The number of files this expression keeps open between evaluations. */
 	int persistent_fds;
@@ -123,7 +149,7 @@ struct bfs_expr {
 	/** Total time spent running this predicate. */
 	struct timespec elapsed;
 
-	/** Auxilliary data for the evaluation function. */
+	/** Auxiliary data for the evaluation function. */
 	union {
 		/** Child expressions. */
 		struct bfs_exprs children;
@@ -207,7 +233,7 @@ struct bfs_ctx;
 /**
  * Create a new expression.
  */
-struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv);
+struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval, size_t argc, char **argv, enum bfs_kind kind);
 
 /**
  * @return Whether this type of expression has children.
@@ -243,5 +269,11 @@ bool bfs_expr_cmp(const struct bfs_expr *expr, long long n);
  * Free any resources owned by an expression.
  */
 void bfs_expr_clear(struct bfs_expr *expr);
+
+/**
+ * Iterate over the children of an expression.
+ */
+#define for_expr(child, expr) \
+	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next)
 
 #endif // BFS_EXPR_H

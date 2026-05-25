@@ -8,15 +8,22 @@
 #ifndef BFS_DIR_H
 #define BFS_DIR_H
 
-#include "prelude.h"
+#include "bfs.h"
+
 #include <sys/types.h>
 
 /**
  * Whether the implementation uses the getdents() syscall directly, rather than
  * libc's readdir().
  */
-#if !defined(BFS_USE_GETDENTS) && (__linux__ || __FreeBSD__)
-#  define BFS_USE_GETDENTS (BFS_HAS_GETDENTS || BFS_HAS_GETDENTS64 | BFS_HAS_GETDENTS64_SYSCALL)
+#ifndef BFS_USE_GETDENTS
+#  if BFS_HAS_POSIX_GETDENTS
+#    define BFS_USE_GETDENTS true
+#  elif __linux__ || __FreeBSD__
+#    define BFS_USE_GETDENTS (BFS_HAS_GETDENTS || BFS_HAS_GETDENTS64 | BFS_HAS_GETDENTS64_SYSCALL)
+#  else
+#    define BFS_USE_GETDENTS false
+#  endif
 #endif
 
 /**
@@ -82,7 +89,7 @@ struct arena;
 /**
  * Initialize an arena for directories.
  *
- * @param arena
+ * @arena
  *         The arena to initialize.
  */
 void bfs_dir_arena(struct arena *arena);
@@ -100,14 +107,14 @@ enum bfs_dir_flags {
 /**
  * Open a directory.
  *
- * @param dir
+ * @dir
  *         The allocated directory.
- * @param at_fd
+ * @at_fd
  *         The base directory for path resolution.
- * @param at_path
+ * @at_path
  *         The path of the directory to open, relative to at_fd.  Pass NULL to
  *         open at_fd itself.
- * @param flags
+ * @flags
  *         Flags that control which directory entries are listed.
  * @return
  *         0 on success, or -1 on failure.
@@ -122,7 +129,7 @@ int bfs_dirfd(const struct bfs_dir *dir);
 /**
  * Performs any I/O necessary for the next bfs_readdir() call.
  *
- * @param dir
+ * @dir
  *         The directory to poll.
  * @return
  *         1 on success, 0 on EOF, or -1 on failure.
@@ -132,9 +139,9 @@ int bfs_polldir(struct bfs_dir *dir);
 /**
  * Read a directory entry.
  *
- * @param dir
+ * @dir
  *         The directory to read.
- * @param[out] dirent
+ * @dirent[out]
  *         The directory entry to populate.
  * @return
  *         1 on success, 0 on EOF, or -1 on failure.
@@ -160,7 +167,7 @@ int bfs_closedir(struct bfs_dir *dir);
 /**
  * Detach the file descriptor from an open directory.
  *
- * @param dir
+ * @dir
  *         The directory to detach.
  * @return
  *         The file descriptor of the directory.

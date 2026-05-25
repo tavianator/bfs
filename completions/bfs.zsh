@@ -41,7 +41,8 @@ args=(
     '*-noignore_readdir_race[do not report an error if bfs detects file tree is modified during search]'
     '*-maxdepth[ignore files deeper than N]:maximum search depth'
     '*-mindepth[ignore files shallower than N]:minimum search depth'
-    "*-mount[don't descend into other mount points]"
+    "*-mount[exclude mount points]"
+    '*-noerror[ignore any errors that occur during traversal]'
     '*-nohidden[exclude hidden files]'
     '*-noleaf[ignored, for compatibility with GNU find]'
     '-regextype[type of regex to use, default posix-basic]:regexp syntax:(help posix-basic posix-extended ed emacs grep sed)'
@@ -90,11 +91,11 @@ args=(
     '*-user[find files owned by user NAME]:user:_users'
     '*-hidden[find hidden files (those beginning with .)]'
 
-    '*-ilname[find symbolic links whose target matches GLOB (case insensitve)]:link pattern to search (case insensitive):'
+    '*-ilname[find symbolic links whose target matches GLOB (case insensitive)]:link pattern to search (case insensitive):'
     '*-iname[find files whose name matches GLOB (case insensitive)]:name pattern to match (case insensitive):'
     '*-inum[find files with inode number N]:inode number:'
-    '*-ipath[find files whose entire path matches GLOB (case insenstive)]:path pattern to search (case insensitive):'
-    '*-iregex[find files whose entire path matches REGEX (case insenstive)]:regular expression to search (case insensitive):'
+    '*-ipath[find files whose entire path matches GLOB (case insensitive)]:path pattern to search (case insensitive):'
+    '*-iregex[find files whose entire path matches REGEX (case insensitive)]:regular expression to search (case insensitive):'
     '*-iwholename[find files whose entire path matches GLOB (case insensitive)]:full path pattern to search (case insensitive):'
 
     '*-links[find files with N hard links]:number of links:'

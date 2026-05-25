@@ -27,10 +27,11 @@ asan lsan msan tsan ubsan gcov lint release::
 
 # Print an error if `make` is run before `./configure`
 gen/config.mk::
-	@if ! [ -e $@ ]; then \
+	if ! [ -e $@ ]; then \
 	    printf 'error: You must run `./configure` before `%s`.\n' "${MAKE}" >&2; \
 	    false; \
 	fi
+.SILENT: gen/config.mk
 
 ## Build phase (`make`)
 
@@ -42,46 +43,72 @@ bfs: bin/find2fd
 BINS := \
     bin/find2fd \
     bin/tests/mksock \
+    bin/tests/ptyx \
     bin/tests/units \
     bin/tests/xspawnee \
-    bin/tests/xtouch
+    bin/tests/xtouch \
+    bin/bench/ioq
 
 all: ${BINS}
 .PHONY: all
 
+# All object files except the entry point
+LIBBFS := \
+    obj/src/alloc.o \
+    obj/src/bar.o \
+    obj/src/bfstd.o \
+    obj/src/bftw.o \
+    obj/src/color.o \
+    obj/src/ctx.o \
+    obj/src/diag.o \
+    obj/src/dir.o \
+    obj/src/dstring.o \
+    obj/src/eval.o \
+    obj/src/exec.o \
+    obj/src/expr.o \
+    obj/src/fsade.o \
+    obj/src/ioq.o \
+    obj/src/mtab.o \
+    obj/src/opt.o \
+    obj/src/parse.o \
+    obj/src/printf.o \
+    obj/src/pwcache.o \
+    obj/src/sighook.o \
+    obj/src/stat.o \
+    obj/src/thread.o \
+    obj/src/trie.o \
+    obj/src/typo.o \
+    obj/src/version.o \
+    obj/src/xregex.o \
+    obj/src/xspawn.o \
+    obj/src/xtime.o
+
+# All object files
+OBJS := ${LIBBFS}
+
 # The main binary
-bin/find2fd: ${LIBBFS} obj/src/main.o
+bin/find2fd: obj/src/main.o ${LIBBFS}
+OBJS += obj/src/main.o
 
 ${BINS}:
 	@${MKDIR} ${@D}
-	+${MSG} "[ LD ] $@" ${CC} ${CFLAGS} ${LDFLAGS} ${.ALLSRC} ${LDLIBS} -o $@
+	+${MSG} "[ LD ] $@" ${CC} ${_CFLAGS} ${_LDFLAGS} $^ ${_LDLIBS} -o $@
 	${POSTLINK}
 
 # Get the .c file for a .o file
 CSRC = ${@:obj/%.o=%.c}
 
-# Rebuild when the configuration changes
-${OBJS}: gen/config.mk
-	@${MKDIR} ${@D}
-	${MSG} "[ CC ] ${CSRC}" ${CC} ${CPPFLAGS} ${CFLAGS} -c ${CSRC} -o $@
-
 # Save the version number to this file, but only update version.c if it changes
-gen/version.c.new::
-	@${MKDIR} ${@D}
-	@printf 'const char bfs_version[] = "' >$@
-	@if [ "$$VERSION" ]; then \
-	    printf '%s' "$$VERSION"; \
-	elif test -e src/../.git && command -v git >/dev/null 2>&1; then \
-	    git -C src/.. describe --always --dirty; \
-	else \
-	    echo "3.2"; \
-	fi | tr -d '\n' >>$@
-	@printf '";\n' >>$@
+gen/version.i.new::
+	${MKDIR} ${@D}
+	build/version.sh | tr -d '\n' | build/embed.sh >$@
+.SILENT: gen/version.i.new
 
-gen/version.c: gen/version.c.new
-	@test -e $@ && cmp -s $@ ${.ALLSRC} && rm ${.ALLSRC} || mv ${.ALLSRC} $@
+gen/version.i: gen/version.i.new
+	test -e $@ && cmp -s $@ $^ && ${RM} $^ || mv $^ $@
+.SILENT: gen/version.i
 
-obj/gen/version.o: gen/version.c
+obj/src/version.o: gen/version.i
 
 ## Test phase (`make check`)
 
@@ -93,6 +120,7 @@ UTEST_BINS := \
 # Integration test binaries
 ITEST_BINS := \
     bin/tests/mksock \
+    bin/tests/ptyx \
     bin/tests/xtouch
 
 # Build (but don't run) test binaries
@@ -108,12 +136,24 @@ unit-tests: ${UTEST_BINS}
 	${MSG} "[TEST] tests/units" bin/tests/units
 .PHONY: unit-tests
 
-bin/tests/units: \
-    ${UNIT_OBJS} \
-    ${LIBBFS}
+# Unit test objects
+UNIT_OBJS := \
+    obj/tests/alloc.o \
+    obj/tests/bfstd.o \
+    obj/tests/bit.o \
+    obj/tests/ioq.o \
+    obj/tests/list.o \
+    obj/tests/main.o \
+    obj/tests/sighook.o \
+    obj/tests/trie.o \
+    obj/tests/xspawn.o \
+    obj/tests/xtime.o
 
-bin/tests/xspawnee: \
-    obj/tests/xspawnee.o
+bin/tests/units: ${UNIT_OBJS} ${LIBBFS}
+OBJS += ${UNIT_OBJS}
+
+bin/tests/xspawnee: obj/tests/xspawnee.o
+OBJS += obj/tests/xspawnee.o
 
 # The different flag combinations we check
 INTEGRATIONS := default dfs ids eds j1 j2 j3 s
@@ -138,13 +178,14 @@ check-j1 check-j2 check-j3 check-s: bin/find2fd ${ITEST_BINS}
 integration-tests: ${INTEGRATION_TESTS}
 .PHONY: integration-tests
 
-bin/tests/mksock: \
-    obj/tests/mksock.o \
-    ${LIBBFS}
+bin/tests/mksock: obj/tests/mksock.o ${LIBBFS}
+OBJS += obj/tests/mksock.o
 
-bin/tests/xtouch: \
-    obj/tests/xtouch.o \
-    ${LIBBFS}
+bin/tests/ptyx: obj/tests/ptyx.o ${LIBBFS}
+OBJS += obj/tests/ptyx.o
+
+bin/tests/xtouch: obj/tests/xtouch.o ${LIBBFS}
+OBJS += obj/tests/xtouch.o
 
 # `make distcheck` configurations
 DISTCHECKS := \
@@ -158,13 +199,15 @@ DISTCHECKS := \
 distcheck:
 	@+${MAKE} distcheck-asan
 	@+test "$$(uname)" = Darwin || ${MAKE} distcheck-msan
-	@+${MAKE} distcheck-tsan
+	@+test "$$(uname)" = FreeBSD || ${MAKE} distcheck-tsan
 	@+test "$$(uname)-$$(uname -m)" != Linux-x86_64 || ${MAKE} distcheck-m32
 	@+${MAKE} distcheck-release
+	@+${MAKE} -C distcheck-release check-install
+	@+test "$$(uname)" != Linux || ${MAKE} check-man
 .PHONY: distcheck
 
 # Per-distcheck configuration
-DISTCHECK_CONFIG_asan := --enable-asan --enable-ubsan
+DISTCHECK_CONFIG_asan := --enable-asan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_msan := --enable-msan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_tsan := --enable-tsan --enable-ubsan CC=clang
 DISTCHECK_CONFIG_m32 := EXTRA_CFLAGS="-m32" PKG_CONFIG_LIBDIR=/usr/lib32/pkgconfig
@@ -172,11 +215,41 @@ DISTCHECK_CONFIG_release := --enable-release
 
 ${DISTCHECKS}::
 	@${MKDIR} $@
+	@test "$${GITHUB_ACTIONS-}" != true || printf '::group::%s\n' $@
 	@+cd $@ \
-	    && ../configure ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
+	    && ../configure MAKE="${MAKE}" ${DISTCHECK_CONFIG_${@:distcheck-%=%}} \
 	    && ${MAKE} check TEST_FLAGS="--sudo --verbose=skipped"
+	@test "$${GITHUB_ACTIONS-}" != true || printf '::endgroup::\n'
 
-## Packaging (`make install`)
+## Benchmarks (`make bench`)
+
+bench: bin/bench/ioq
+.PHONY: bench
+
+bin/bench/ioq: obj/bench/ioq.o ${LIBBFS}
+OBJS += obj/bench/ioq.o
+
+## Automatic dependency tracking
+
+# Rebuild when the configuration changes
+${OBJS}: gen/config.mk
+	@${MKDIR} ${@D}
+	${MSG} "[ CC ] ${CSRC}" ${CC} ${_CPPFLAGS} ${_CFLAGS} -c ${CSRC} -o $@
+
+# Include any generated dependency files
+-include ${OBJS:.o=.d}
+
+## Packaging (`make dist`, `make install`)
+
+TARBALL = bfs-$$(build/version.sh).tar.gz
+
+dist:
+	${MSG} "[DIST] ${TARBALL}" git archive HEAD -o ${TARBALL}
+
+distsign: dist
+	${MSG} "[SIGN] ${TARBALL}" ssh-keygen -Y sign -q -f $$(git config user.signingkey) -n file ${TARBALL}
+
+.PHONY: dist distsign
 
 DEST_PREFIX := ${DESTDIR}${PREFIX}
 DEST_MANDIR := ${DESTDIR}${MANDIR}
@@ -217,6 +290,12 @@ check-install::
 	bin/bfs pkg -not -type d -print -exit 1
 	${RM} -r pkg
 
+# Check man page markup
+check-man::
+	${MSG} "[LINT] docs/bfs.1"
+	${Q}groff -man -rCHECKSTYLE=3 -ww -b -z docs/bfs.1
+	${Q}mandoc -Tlint -Wwarning docs/bfs.1
+
 ## Cleanup (`make clean`)
 
 # Clean all build products
@@ -226,6 +305,6 @@ clean::
 
 # Clean everything, including generated files
 distclean: clean
-	${MSG} "[ RM ] gen" \
+	${MSG} "[ RM ] gen distcheck-*" \
 	    ${RM} -r gen ${DISTCHECKS}
 .PHONY: distclean

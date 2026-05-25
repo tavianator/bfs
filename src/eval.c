@@ -5,9 +5,11 @@
  * Implementation of all the primary expressions.
  */
 
-#include "prelude.h"
 #include "eval.h"
+
+#include "atomic.h"
 #include "bar.h"
+#include "bfs.h"
 #include "bfstd.h"
 #include "bftw.h"
 #include "color.h"
@@ -22,14 +24,18 @@
 #include "printf.h"
 #include "pwcache.h"
 #include "sanity.h"
+#include "sighook.h"
 #include "stat.h"
 #include "trie.h"
 #include "xregex.h"
+#include "xtime.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <grp.h>
 #include <pwd.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -37,10 +43,15 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>
+
+#if BFS_HAS_SYSCTLBYNAME
+#  include <sys/sysctl.h>
+#endif
 
 struct bfs_eval {
 	/** Data about the current file. */
@@ -51,6 +62,8 @@ struct bfs_eval {
 	enum bftw_action action;
 	/** The bfs_eval() return value. */
 	int *ret;
+	/** The number of errors that have occurred. */
+	size_t *nerrors;
 	/** Whether to quit immediately. */
 	bool quit;
 };
@@ -58,20 +71,24 @@ struct bfs_eval {
 /**
  * Print an error message.
  */
-attr(printf(2, 3))
+[[_printf(2, 3)]]
 static void eval_error(struct bfs_eval *state, const char *format, ...) {
+	const struct bfs_ctx *ctx = state->ctx;
+
+	++*state->nerrors;
+	if (ctx->ignore_errors) {
+		return;
+	}
+
 	// By POSIX, any errors should be accompanied by a non-zero exit status
 	*state->ret = EXIT_FAILURE;
 
-	int error = errno;
-	const struct bfs_ctx *ctx = state->ctx;
 	CFILE *cerr = ctx->cerr;
 
 	bfs_error(ctx, "%pP: ", state->ftwbuf);
 
 	va_list args;
 	va_start(args, format);
-	errno = error;
 	cvfprintf(cerr, format, args);
 	va_end(args);
 }
@@ -90,7 +107,7 @@ static bool eval_should_ignore(const struct bfs_eval *state, int error) {
  */
 static void eval_report_error(struct bfs_eval *state) {
 	if (!eval_should_ignore(state, errno)) {
-		eval_error(state, "%m.\n");
+		eval_error(state, "%s.\n", errstr());
 	}
 }
 
@@ -99,9 +116,9 @@ static void eval_report_error(struct bfs_eval *state) {
  */
 static void eval_io_error(const struct bfs_expr *expr, struct bfs_eval *state) {
 	if (expr->path) {
-		eval_error(state, "'%s': %m.\n", expr->path);
+		eval_error(state, "'%s': %s.\n", expr->path, errstr());
 	} else {
-		eval_error(state, "(standard output): %m.\n");
+		eval_error(state, "(standard output): %s.\n", errstr());
 	}
 
 	// Don't report the error again in bfs_ctx_free()
@@ -124,11 +141,9 @@ static const struct bfs_stat *eval_stat(struct bfs_eval *state) {
  * Get the difference (in seconds) between two struct timespecs.
  */
 static time_t timespec_diff(const struct timespec *lhs, const struct timespec *rhs) {
-	time_t ret = lhs->tv_sec - rhs->tv_sec;
-	if (lhs->tv_nsec < rhs->tv_nsec) {
-		--ret;
-	}
-	return ret;
+	struct timespec diff = *lhs;
+	timespec_sub(&diff, rhs);
+	return diff.tv_sec;
 }
 
 bool bfs_expr_cmp(const struct bfs_expr *expr, long long n) {
@@ -228,7 +243,7 @@ bool eval_context(const struct bfs_expr *expr, struct bfs_eval *state) {
 static const struct timespec *eval_stat_time(const struct bfs_stat *statbuf, enum bfs_stat_field field, struct bfs_eval *state) {
 	const struct timespec *ret = bfs_stat_time(statbuf, field);
 	if (!ret) {
-		eval_error(state, "Couldn't get file %s: %m.\n", bfs_stat_field_name(field));
+		eval_error(state, "Couldn't get file %s: %s.\n", bfs_stat_field_name(field), errstr());
 	}
 	return ret;
 }
@@ -247,8 +262,7 @@ bool eval_newer(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	return time->tv_sec > expr->reftime.tv_sec
-		|| (time->tv_sec == expr->reftime.tv_sec && time->tv_nsec > expr->reftime.tv_nsec);
+	return timespec_cmp(time, &expr->reftime) > 0;
 }
 
 /**
@@ -269,10 +283,10 @@ bool eval_time(const struct bfs_expr *expr, struct bfs_eval *state) {
 	switch (expr->time_unit) {
 	case BFS_DAYS:
 		diff /= 60 * 24;
-		fallthru;
+		[[fallthrough]];
 	case BFS_MINUTES:
 		diff /= 60;
-		fallthru;
+		[[fallthrough]];
 	case BFS_SECONDS:
 		break;
 	}
@@ -398,13 +412,13 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 	if (expr->eval_fn == eval_exec) {
 		if (bfs_exec_finish(expr->exec) != 0) {
 			if (errno != 0) {
-				bfs_error(ctx, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+				bfs_error(ctx, "${blu}%pq${rs} ${bld}%pq${rs}: %s.\n", expr->argv[0], expr->argv[1], errstr());
 			}
 			ret = -1;
 		}
 	}
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (eval_exec_finish(child, ctx) != 0) {
 			ret = -1;
 		}
@@ -419,7 +433,7 @@ static int eval_exec_finish(const struct bfs_expr *expr, const struct bfs_ctx *c
 bool eval_exec(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret = bfs_exec(expr->exec, state->ftwbuf) == 0;
 	if (errno != 0) {
-		eval_error(state, "%s %s: %m.\n", expr->argv[0], expr->argv[1]);
+		eval_error(state, "${blu}%pq${rs} ${bld}%pq${rs}: %s.\n", expr->argv[0], expr->argv[1], errstr());
 	}
 	return ret;
 }
@@ -690,6 +704,34 @@ static int print_owner(FILE *file, const char *name, uintmax_t id, int *width) {
 	}
 }
 
+/** Print a file's modification time. */
+static int print_time(FILE *file, time_t time, time_t now) {
+	struct tm tm;
+	if (!localtime_r(&time, &tm)) {
+		goto error;
+	}
+
+	char time_str[256];
+	size_t time_ret;
+
+	time_t six_months_ago = now - 6 * 30 * 24 * 60 * 60;
+	time_t tomorrow = now + 24 * 60 * 60;
+	if (time <= six_months_ago || time >= tomorrow) {
+		time_ret = strftime(time_str, sizeof(time_str), "%b %e  %Y", &tm);
+	} else {
+		time_ret = strftime(time_str, sizeof(time_str), "%b %e %H:%M", &tm);
+	}
+
+	if (time_ret == 0) {
+		goto error;
+	}
+
+	return fprintf(file, " %s", time_str);
+
+error:
+	return fprintf(file, " %jd", (intmax_t)time);
+}
+
 /**
  * -f?ls action.
  */
@@ -746,28 +788,11 @@ bool eval_fls(const struct bfs_expr *expr, struct bfs_eval *state) {
 
 	time_t time = statbuf->mtime.tv_sec;
 	time_t now = ctx->now.tv_sec;
-	time_t six_months_ago = now - 6 * 30 * 24 * 60 * 60;
-	time_t tomorrow = now + 24 * 60 * 60;
-	struct tm tm;
-	if (!localtime_r(&time, &tm)) {
-		goto error;
-	}
-	char time_str[256];
-	size_t time_ret;
-	if (time <= six_months_ago || time >= tomorrow) {
-		time_ret = strftime(time_str, sizeof(time_str), "%b %e  %Y", &tm);
-	} else {
-		time_ret = strftime(time_str, sizeof(time_str), "%b %e %H:%M", &tm);
-	}
-	if (time_ret == 0) {
-		errno = EOVERFLOW;
-		goto error;
-	}
-	if (cfprintf(cfile, " %s${rs}", time_str) < 0) {
+	if (print_time(file, time, now) < 0) {
 		goto error;
 	}
 
-	if (cfprintf(cfile, " %pP", ftwbuf) < 0) {
+	if (cfprintf(cfile, "${rs} %pP", ftwbuf) < 0) {
 		goto error;
 	}
 
@@ -902,7 +927,7 @@ bool eval_regex(const struct bfs_expr *expr, struct bfs_eval *state) {
 			eval_error(state, "%s.\n", str);
 			free(str);
 		} else {
-			eval_error(state, "bfs_regerror(): %m.\n");
+			eval_error(state, "bfs_regerror(): %s.\n", errstr());
 		}
 	}
 
@@ -999,6 +1024,13 @@ bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	enum bfs_stat_flags flags = ftwbuf->stat_flags ^ (BFS_STAT_NOFOLLOW | BFS_STAT_TRYFOLLOW);
 	enum bfs_type type = bftw_type(ftwbuf, flags);
+
+	// GNU find treats ELOOP as a broken symbolic link for -xtype l
+	// (but not -L -type l)
+	if ((flags & BFS_STAT_TRYFOLLOW) && type == BFS_ERROR && errno == ELOOP) {
+		type = BFS_LNK;
+	}
+
 	if (type == BFS_ERROR) {
 		eval_report_error(state);
 		return false;
@@ -1007,40 +1039,23 @@ bool eval_xtype(const struct bfs_expr *expr, struct bfs_eval *state) {
 	}
 }
 
-#if _POSIX_MONOTONIC_CLOCK > 0
-#  define BFS_CLOCK CLOCK_MONOTONIC
-#elif _POSIX_TIMERS > 0
-#  define BFS_CLOCK CLOCK_REALTIME
-#endif
-
 /**
- * Call clock_gettime(), if available.
+ * clock_gettime() wrapper.
  */
 static int eval_gettime(struct bfs_eval *state, struct timespec *ts) {
-#ifdef BFS_CLOCK
-	int ret = clock_gettime(BFS_CLOCK, ts);
+	clockid_t clock = CLOCK_REALTIME;
+
+#if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
+	if (sysoption(MONOTONIC_CLOCK) > 0) {
+		clock = CLOCK_MONOTONIC;
+	}
+#endif
+
+	int ret = clock_gettime(clock, ts);
 	if (ret != 0) {
-		bfs_warning(state->ctx, "%pP: clock_gettime(): %m.\n", state->ftwbuf);
+		bfs_warning(state->ctx, "%pP: clock_gettime(): %s.\n", state->ftwbuf, errstr());
 	}
 	return ret;
-#else
-	return -1;
-#endif
-}
-
-/**
- * Record an elapsed time.
- */
-static void timespec_elapsed(struct timespec *elapsed, const struct timespec *start, const struct timespec *end) {
-	elapsed->tv_sec += end->tv_sec - start->tv_sec;
-	elapsed->tv_nsec += end->tv_nsec - start->tv_nsec;
-	if (elapsed->tv_nsec < 0) {
-		elapsed->tv_nsec += 1000000000L;
-		--elapsed->tv_sec;
-	} else if (elapsed->tv_nsec >= 1000000000L) {
-		elapsed->tv_nsec -= 1000000000L;
-		++elapsed->tv_sec;
-	}
 }
 
 /**
@@ -1061,7 +1076,8 @@ static bool eval_expr(struct bfs_expr *expr, struct bfs_eval *state) {
 
 	if (time) {
 		if (eval_gettime(state, &end) == 0) {
-			timespec_elapsed(&expr->elapsed, &start, &end);
+			timespec_sub(&end, &start);
+			timespec_add(&expr->elapsed, &end);
 		}
 	}
 
@@ -1091,7 +1107,7 @@ bool eval_not(const struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate a conjunction.
  */
 bool eval_and(const struct bfs_expr *expr, struct bfs_eval *state) {
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (!eval_expr(child, state) || state->quit) {
 			return false;
 		}
@@ -1104,7 +1120,7 @@ bool eval_and(const struct bfs_expr *expr, struct bfs_eval *state) {
  * Evaluate a disjunction.
  */
 bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (eval_expr(child, state) || state->quit) {
 			return true;
 		}
@@ -1119,7 +1135,7 @@ bool eval_or(const struct bfs_expr *expr, struct bfs_eval *state) {
 bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
 	bool ret uninit(false);
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		ret = eval_expr(child, state);
 		if (state->quit) {
 			break;
@@ -1130,20 +1146,7 @@ bool eval_comma(const struct bfs_expr *expr, struct bfs_eval *state) {
 }
 
 /** Update the status bar. */
-static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct timespec *last_status, size_t count) {
-	struct timespec now;
-	if (eval_gettime(state, &now) == 0) {
-		struct timespec elapsed = {0};
-		timespec_elapsed(&elapsed, last_status, &now);
-
-		// Update every 0.1s
-		if (elapsed.tv_sec > 0 || elapsed.tv_nsec >= 100000000L) {
-			*last_status = now;
-		} else {
-			return;
-		}
-	}
-
+static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, size_t count) {
 	size_t width = bfs_bar_width(bar);
 	if (width < 3) {
 		return;
@@ -1159,7 +1162,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 
 	size_t rhslen = xstrwidth(rhs);
 	if (3 + rhslen > width) {
-		dstresize(&rhs, 0);
+		dstrshrink(rhs, 0);
 		rhslen = 0;
 	}
 
@@ -1188,7 +1191,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 	for (size_t i = lhslen; lhslen < pathlen; lhslen = i) {
 		wint_t wc = xmbrtowc(status, &i, pathlen, &mb);
 		int cwidth;
-		if (wc == WEOF) {
+		if (wc == (wint_t)WEOF) {
 			// Invalid byte sequence, assume a single-width '?'
 			cwidth = 1;
 		} else {
@@ -1203,7 +1206,7 @@ static void eval_status(struct bfs_eval *state, struct bfs_bar *bar, struct time
 		}
 		pathwidth += cwidth;
 	}
-	dstresize(&status, lhslen);
+	dstrshrink(status, lhslen);
 
 	if (dstrcat(&status, "...") != 0) {
 		goto out;
@@ -1270,7 +1273,7 @@ static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, enu
 	bfs_debug_prefix(ctx, DEBUG_STAT);
 
 	fprintf(stderr, "bfs_stat(");
-	if (ftwbuf->at_fd == AT_FDCWD) {
+	if (ftwbuf->at_fd == (int)AT_FDCWD) {
 		fprintf(stderr, "AT_FDCWD");
 	} else {
 		size_t baselen = strlen(ftwbuf->path) - strlen(ftwbuf->at_path);
@@ -1286,7 +1289,7 @@ static void debug_stat(const struct bfs_ctx *ctx, const struct BFTW *ftwbuf, enu
 	DEBUG_FLAG(flags, BFS_STAT_TRYFOLLOW);
 	DEBUG_FLAG(flags, BFS_STAT_NOSYNC);
 
-	fprintf(stderr, ") == %d", err ? 0 : -1);
+	fprintf(stderr, ") == %d", err == 0 ? 0 : -1);
 
 	if (err) {
 		fprintf(stderr, " [%d]", err);
@@ -1373,17 +1376,84 @@ struct callback_args {
 
 	/** The status bar. */
 	struct bfs_bar *bar;
-	/** The time of the last status update. */
-	struct timespec last_status;
+	/** The SIGALRM hook. */
+	struct sighook *alrm_hook;
+	/** The interval timer. */
+	struct timer *timer;
+	/** Flag set by SIGALRM. */
+	atomic bool alrm_flag;
+	/** Flag set by SIGINFO. */
+	atomic bool info_flag;
+
 	/** The number of files visited so far. */
 	size_t count;
 
 	/** The set of seen files. */
 	struct trie *seen;
 
+	/** The number of errors that have occurred. */
+	size_t nerrors;
 	/** Eventual return value from bfs_eval(). */
 	int ret;
 };
+
+/** Update the status bar in response to SIGALRM. */
+static void eval_sigalrm(int sig, siginfo_t *info, void *ptr) {
+	struct callback_args *args = ptr;
+	store(&args->alrm_flag, true, relaxed);
+}
+
+/** Show/hide the bar in response to SIGINFO. */
+static void eval_siginfo(int sig, siginfo_t *info, void *ptr) {
+	struct callback_args *args = ptr;
+	store(&args->info_flag, true, relaxed);
+}
+
+/** Show the status bar. */
+static void eval_show_bar(struct callback_args *args) {
+	args->alrm_hook = sighook(SIGALRM, eval_sigalrm, args, SH_CONTINUE);
+	if (!args->alrm_hook) {
+		goto fail;
+	}
+
+	args->bar = bfs_bar_show();
+	if (!args->bar) {
+		goto fail;
+	}
+
+	// Update the bar every 0.1s
+	struct timespec ival = { .tv_nsec = 100 * 1000 * 1000 };
+	args->timer = xtimer_start(&ival);
+	if (!args->timer) {
+		goto fail;
+	}
+
+	// Update the bar immediately
+	store(&args->alrm_flag, true, relaxed);
+
+	return;
+
+fail:
+	bfs_warning(args->ctx, "Couldn't show status bar: %s.\n\n", errstr());
+
+	bfs_bar_hide(args->bar);
+	args->bar = NULL;
+
+	sigunhook(args->alrm_hook);
+	args->alrm_hook = NULL;
+}
+
+/** Hide the status bar. */
+static void eval_hide_bar(struct callback_args *args) {
+	xtimer_stop(args->timer);
+	args->timer = NULL;
+
+	sigunhook(args->alrm_hook);
+	args->alrm_hook = NULL;
+
+	bfs_bar_hide(args->bar);
+	args->bar = NULL;
+}
 
 /**
  * bftw() callback.
@@ -1399,17 +1469,37 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 	state.ctx = ctx;
 	state.action = BFTW_CONTINUE;
 	state.ret = &args->ret;
+	state.nerrors = &args->nerrors;
 	state.quit = false;
 
-	if (args->bar) {
-		eval_status(&state, args->bar, &args->last_status, args->count);
+	// Check whether SIGINFO was delivered and show/hide the bar
+	if (exchange(&args->info_flag, false, relaxed)) {
+		if (args->bar) {
+			eval_hide_bar(args);
+		} else {
+			eval_show_bar(args);
+		}
+	}
+
+	if (exchange(&args->alrm_flag, false, relaxed)) {
+		eval_status(&state, args->bar, args->count);
 	}
 
 	if (ftwbuf->type == BFS_ERROR) {
-		if (!eval_should_ignore(&state, ftwbuf->error)) {
-			eval_error(&state, "%s.\n", xstrerror(ftwbuf->error));
-		}
 		state.action = BFTW_PRUNE;
+
+		if (ftwbuf->error == ELOOP && ftwbuf->loopoff > 0) {
+			char *loop = strndup(ftwbuf->path, ftwbuf->loopoff);
+			if (loop) {
+				eval_error(&state, "Filesystem loop back to ${di}%pq${rs}\n", loop);
+				free(loop);
+				goto done;
+			}
+		} else if (eval_should_ignore(&state, ftwbuf->error)) {
+			goto done;
+		}
+
+		eval_error(&state, "%s.\n", xstrerror(ftwbuf->error));
 		goto done;
 	}
 
@@ -1464,17 +1554,88 @@ done:
 	return state.action;
 }
 
+#if BFS_HAS_SYSCTLBYNAME
+/** Simple wrapper over sysctlbyname() that only reads. */
+static int xsysctl(const char *name, void *ptr, size_t size) {
+	size_t retsize = size;
+	int ret = sysctlbyname(name, ptr, &retsize, NULL, 0);
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (retsize != size) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	return 0;
+}
+#endif
+
+/** Get the system-wide open file limit if possible. */
+static rlim_t system_fdlimit(void) {
+	rlim_t ret = RLIM_INFINITY;
+
+#if BFS_HAS_SYSCTLBYNAME
+	int32_t value;
+	if (xsysctl("kern.maxfiles", &value, sizeof(value)) == 0) {
+		ret = value;
+	}
+#elif __linux__
+	FILE *file = xfopen("/proc/sys/fs/file-max", O_RDONLY | O_CLOEXEC);
+	if (!file) {
+		return ret;
+	}
+
+	long value;
+	if (fscanf(file, "%ld", &value) == 1) {
+		ret = value;
+	}
+
+	fclose(file);
+#endif
+
+	return ret;
+}
+
+/** Get the per-process open file limit, if different from ulimit -n. */
+static rlim_t process_fdlimit(void) {
+#if BFS_HAS_SYSCTLBYNAME
+	int32_t value;
+	if (xsysctl("kern.maxfilesperproc", &value, sizeof(value)) == 0) {
+		return value;
+	}
+#endif
+
+	return RLIM_INFINITY;
+}
+
 /** Raise RLIMIT_NOFILE if possible, and return the new limit. */
 static int raise_fdlimit(struct bfs_ctx *ctx) {
 	rlim_t cur = ctx->orig_nofile.rlim_cur;
 	rlim_t max = ctx->orig_nofile.rlim_max;
-
-	rlim_t target = 64 << 10;
-	if (rlim_cmp(target, max) > 0) {
-		target = max;
+	if (!ctx->raise_nofile) {
+		max = cur;
 	}
 
+	// Default to 64k files
+	rlim_t target = 64 << 10;
+
+	// Don't exceed ulimit -Hn
+	target = rlim_min(target, max);
+
+	// FreeBSD/macOS have a fairly low system-wide limit that we should try to respect
+	rlim_t sys_limit = system_fdlimit();
+	if (sys_limit != RLIM_INFINITY) {
+		// Play nice and restrict ourselves to 1/16th of the system-wide limit
+		target = rlim_min(target, sys_limit / 16);
+	}
+
+	// FreeBSD/macOS have this limit separately from ulimit -n
+	target = rlim_min(target, process_fdlimit());
+
 	if (rlim_cmp(target, cur) <= 0) {
+		// No need to raise the limit
 		return target;
 	}
 
@@ -1484,6 +1645,7 @@ static int raise_fdlimit(struct bfs_ctx *ctx) {
 	};
 
 	if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+		// Failed to raise, return the original limit
 		return cur;
 	}
 
@@ -1596,7 +1758,7 @@ static bool eval_must_buffer(const struct bfs_expr *expr) {
 		return true;
 	}
 
-	for (struct bfs_expr *child = bfs_expr_children(expr); child; child = child->next) {
+	for_expr (child, expr) {
 		if (eval_must_buffer(child)) {
 			return true;
 		}
@@ -1617,11 +1779,15 @@ int bfs_eval(struct bfs_ctx *ctx) {
 	};
 
 	if (ctx->status) {
-		args.bar = bfs_bar_show();
-		if (!args.bar) {
-			bfs_warning(ctx, "Couldn't show status bar: %m.\n\n");
-		}
+		eval_show_bar(&args);
 	}
+
+#ifdef SIGINFO
+	int siginfo = SIGINFO;
+#else
+	int siginfo = SIGUSR1;
+#endif
+	struct sighook *info_hook = sighook(siginfo, eval_siginfo, &args, SH_CONTINUE);
 
 	struct trie seen;
 	if (ctx->unique) {
@@ -1690,7 +1856,14 @@ int bfs_eval(struct bfs_ctx *ctx) {
 		trie_destroy(&seen);
 	}
 
-	bfs_bar_hide(args.bar);
+	sigunhook(info_hook);
+	if (args.bar) {
+		eval_hide_bar(&args);
+	}
+
+	if (ctx->ignore_errors && args.nerrors > 0) {
+		bfs_warning(ctx, "Suppressed errors: %zu\n", args.nerrors);
+	}
 
 	return args.ret;
 }

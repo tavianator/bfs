@@ -8,127 +8,145 @@
 #ifndef BFS_ALLOC_H
 #define BFS_ALLOC_H
 
-#include "prelude.h"
+#include "bfs.h"
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
 
+#define IS_ALIGNED(align, size) \
+	(((size) & ((align) - 1)) == 0)
+
 /** Check if a size is properly aligned. */
 static inline bool is_aligned(size_t align, size_t size) {
-	return (size & (align - 1)) == 0;
+	return IS_ALIGNED(align, size);
 }
+
+#define ALIGN_FLOOR(align, size) \
+	((size) & ~((align) - 1))
 
 /** Round down to a multiple of an alignment. */
 static inline size_t align_floor(size_t align, size_t size) {
-	return size & ~(align - 1);
+	return ALIGN_FLOOR(align, size);
 }
+
+#define ALIGN_CEIL(align, size) \
+	((((size) - 1) | ((align) - 1)) + 1)
 
 /** Round up to a multiple of an alignment. */
 static inline size_t align_ceil(size_t align, size_t size) {
-	return align_floor(align, size + align - 1);
+	return ALIGN_CEIL(align, size);
 }
 
 /**
- * Saturating array size.
- *
- * @param align
- *         Array element alignment.
- * @param size
- *         Array element size.
- * @param count
- *         Array element count.
- * @return
- *         size * count, saturating to the maximum aligned value on overflow.
+ * Saturating size addition.
  */
-static inline size_t array_size(size_t align, size_t size, size_t count) {
+static inline size_t size_add(size_t lhs, size_t rhs) {
+	size_t ret = lhs + rhs;
+	return ret >= lhs ? ret : (size_t)-1;
+}
+
+/**
+ * Saturating size multiplication.
+ */
+static inline size_t size_mul(size_t size, size_t count) {
 	size_t ret = size * count;
-	return ret / size == count ? ret : ~(align - 1);
+	return ret / size == count ? ret : (size_t)-1;
 }
 
 /** Saturating array sizeof. */
 #define sizeof_array(type, count) \
-	array_size(alignof(type), sizeof(type), count)
+	size_mul(sizeof(type), count)
 
 /** Size of a struct/union field. */
 #define sizeof_member(type, member) \
 	sizeof(((type *)NULL)->member)
 
 /**
+ * @internal
+ * Our flexible struct size calculations assume that structs have the minimum
+ * trailing padding to align the type properly.  A pathological ABI that adds
+ * extra padding would result in us under-allocating space for those structs,
+ * so we static_assert() that no such padding exists.
+ */
+#define ASSERT_FLEX_ABI(type, member) \
+	ASSERT_FLEX_ABI_( \
+		ALIGN_CEIL(alignof(type), offsetof(type, member)) >= sizeof(type), \
+		"Unexpected tail padding in " #type)
+
+/**
+ * @internal
+ * The contortions here allow static_assert() to be used in expressions, rather
+ * than just declarations.
+ */
+#define ASSERT_FLEX_ABI_(...) \
+	((void)sizeof(struct { char _; static_assert(__VA_ARGS__); }))
+
+/**
  * Saturating flexible struct size.
  *
- * @param align
+ * @align
  *         Struct alignment.
- * @param min
- *         Minimum struct size.
- * @param offset
+ * @offset
  *         Flexible array member offset.
- * @param size
+ * @size
  *         Flexible array element size.
- * @param count
+ * @count
  *         Flexible array element count.
  * @return
  *         The size of the struct with count flexible array elements.  Saturates
  *         to the maximum aligned value on overflow.
  */
-static inline size_t flex_size(size_t align, size_t min, size_t offset, size_t size, size_t count) {
-	size_t ret = size * count;
-	size_t overflow = ret / size != count;
-
-	size_t extra = offset + align - 1;
-	ret += extra;
-	overflow |= ret < extra;
-	ret |= -overflow;
+static inline size_t flex_size(size_t align, size_t offset, size_t size, size_t count) {
+	size_t ret = size_mul(size, count);
+	ret = size_add(ret, offset + align - 1);
 	ret = align_floor(align, ret);
-
-	// Make sure flex_sizeof(type, member, 0) >= sizeof(type), even if the
-	// type has more padding than necessary for alignment
-	if (min > align_ceil(align, offset)) {
-		ret = ret < min ? min : ret;
-	}
-
 	return ret;
 }
 
 /**
  * Computes the size of a flexible struct.
  *
- * @param type
+ * @type
  *         The type of the struct containing the flexible array.
- * @param member
+ * @member
  *         The name of the flexible array member.
- * @param count
+ * @count
  *         The length of the flexible array.
  * @return
  *         The size of the struct with count flexible array elements.  Saturates
  *         to the maximum aligned value on overflow.
  */
 #define sizeof_flex(type, member, count) \
-	flex_size(alignof(type), sizeof(type), offsetof(type, member), sizeof_member(type, member[0]), count)
+	(ASSERT_FLEX_ABI(type, member), flex_size( \
+		alignof(type), offsetof(type, member), sizeof_member(type, member[0]), count))
 
 /**
  * General memory allocator.
  *
- * @param align
+ * @align
  *         The required alignment.
- * @param size
+ * @size
  *         The size of the allocation.
  * @return
  *         The allocated memory, or NULL on failure.
  */
-attr(malloc(free, 1), aligned_alloc(1, 2))
+[[_malloc(free, 1)]]
+[[_aligned_alloc(1, 2)]]
 void *alloc(size_t align, size_t size);
 
 /**
  * Zero-initialized memory allocator.
  *
- * @param align
+ * @align
  *         The required alignment.
- * @param size
+ * @size
  *         The size of the allocation.
  * @return
  *         The allocated memory, or NULL on failure.
  */
-attr(malloc(free, 1), aligned_alloc(1, 2))
+[[_malloc(free, 1)]]
+[[_aligned_alloc(1, 2)]]
 void *zalloc(size_t align, size_t size);
 
 /** Allocate memory for the given type. */
@@ -158,18 +176,19 @@ void *zalloc(size_t align, size_t size);
 /**
  * Alignment-aware realloc().
  *
- * @param ptr
+ * @ptr
  *         The pointer to reallocate.
- * @param align
+ * @align
  *         The required alignment.
- * @param old_size
+ * @old_size
  *         The previous allocation size.
- * @param new_size
+ * @new_size
  *         The new allocation size.
  * @return
  *         The reallocated memory, or NULL on failure.
  */
-attr(nodiscard, aligned_alloc(2, 4))
+[[_nodiscard]]
+[[_aligned_alloc(2, 4)]]
 void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
 
 /** Reallocate memory for an array. */
@@ -183,11 +202,11 @@ void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
 /**
  * Reserve space for one more element in a dynamic array.
  *
- * @param ptr
+ * @ptr
  *         The pointer to reallocate.
- * @param align
+ * @align
  *         The required alignment.
- * @param count
+ * @count
  *         The current size of the array.
  * @return
  *         The reallocated memory, on both success *and* failure.  On success,
@@ -195,17 +214,17 @@ void *xrealloc(void *ptr, size_t align, size_t old_size, size_t new_size);
  *         for (count + 1) elements.  On failure, errno will be non-zero, and
  *         ptr will returned unchanged.
  */
-attr(nodiscard)
+[[_nodiscard]]
 void *reserve(void *ptr, size_t align, size_t size, size_t count);
 
 /**
  * Convenience macro to grow a dynamic array.
  *
- * @param type
+ * @type
  *         The array element type.
- * @param type **ptr
+ * @type **ptr
  *         A pointer to the array.
- * @param size_t *count
+ * @size_t *count
  *         A pointer to the array's size.
  * @return
  *         On success, a pointer to the newly reserved array element, i.e.
@@ -253,7 +272,7 @@ void arena_free(struct arena *arena, void *ptr);
 /**
  * Allocate an object out of the arena.
  */
-attr(malloc(arena_free, 2))
+[[_malloc(arena_free, 2)]]
 void *arena_alloc(struct arena *arena);
 
 /**
@@ -287,40 +306,39 @@ struct varena {
 /**
  * Initialize a varena for a struct with the given layout.
  *
- * @param varena
+ * @varena
  *         The varena to initialize.
- * @param align
+ * @align
  *         alignof(type)
- * @param min
- *         sizeof(type)
- * @param offset
+ * @offset
  *         offsetof(type, flexible_array)
- * @param size
+ * @size
  *         sizeof(flexible_array[i])
  */
-void varena_init(struct varena *varena, size_t align, size_t min, size_t offset, size_t size);
+void varena_init(struct varena *varena, size_t align, size_t offset, size_t size);
 
 /**
  * Initialize a varena for the given type and flexible array.
  *
- * @param varena
+ * @varena
  *         The varena to initialize.
- * @param type
+ * @type
  *         A struct type containing a flexible array.
- * @param member
+ * @member
  *         The name of the flexible array member.
  */
 #define VARENA_INIT(varena, type, member) \
-	varena_init(varena, alignof(type), sizeof(type), offsetof(type, member), sizeof_member(type, member[0]))
+	(ASSERT_FLEX_ABI(type, member), varena_init( \
+		varena, alignof(type), offsetof(type, member), sizeof_member(type, member[0])))
 
 /**
  * Free an arena-allocated flexible struct.
  *
- * @param varena
+ * @varena
  *         The that allocated the object.
- * @param ptr
+ * @ptr
  *         The object to free.
- * @param count
+ * @count
  *         The length of the flexible array.
  */
 void varena_free(struct varena *varena, void *ptr, size_t count);
@@ -328,46 +346,46 @@ void varena_free(struct varena *varena, void *ptr, size_t count);
 /**
  * Arena-allocate a flexible struct.
  *
- * @param varena
+ * @varena
  *         The varena to allocate from.
- * @param count
+ * @count
  *         The length of the flexible array.
  * @return
  *         The allocated struct, or NULL on failure.
  */
-attr(malloc(varena_free, 2))
+[[_malloc(varena_free, 2)]]
 void *varena_alloc(struct varena *varena, size_t count);
 
 /**
  * Resize a flexible struct.
  *
- * @param varena
+ * @varena
  *         The varena to allocate from.
- * @param ptr
+ * @ptr
  *         The object to resize.
- * @param old_count
- *         The old array lenth.
- * @param new_count
+ * @old_count
+ *         The old array length.
+ * @new_count
  *         The new array length.
  * @return
  *         The resized struct, or NULL on failure.
  */
-attr(nodiscard)
+[[_nodiscard]]
 void *varena_realloc(struct varena *varena, void *ptr, size_t old_count, size_t new_count);
 
 /**
  * Grow a flexible struct by an arbitrary amount.
  *
- * @param varena
+ * @varena
  *         The varena to allocate from.
- * @param ptr
+ * @ptr
  *         The object to resize.
- * @param count
+ * @count
  *         Pointer to the flexible array length.
  * @return
  *         The resized struct, or NULL on failure.
  */
-attr(nodiscard)
+[[_nodiscard]]
 void *varena_grow(struct varena *varena, void *ptr, size_t *count);
 
 /**

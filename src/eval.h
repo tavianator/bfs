@@ -9,8 +9,6 @@
 #ifndef BFS_EVAL_H
 #define BFS_EVAL_H
 
-#include "prelude.h"
-
 struct bfs_ctx;
 struct bfs_expr;
 
@@ -22,9 +20,9 @@ struct bfs_eval;
 /**
  * Expression evaluation function.
  *
- * @param expr
+ * @expr
  *         The current expression.
- * @param state
+ * @state
  *         The current evaluation state.
  * @return
  *         The result of the test.
@@ -34,7 +32,7 @@ typedef bool bfs_eval_fn(const struct bfs_expr *expr, struct bfs_eval *state);
 /**
  * Evaluate the command line.
  *
- * @param ctx
+ * @ctx
  *         The bfs context to evaluate.
  * @return
  *         EXIT_SUCCESS on success, otherwise on failure.

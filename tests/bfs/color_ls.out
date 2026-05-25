@@ -8,5 +8,5 @@
 [01;34mfoo/bar/[0m[01;31mnowhere/nothing[0m
 [01;34mfoo/bar/[0mbaz
 [01;34mfoo/bar/[0mbaz
-[01;34mfoo/bar/baz[0m[01;31m//qux[0m
-[01;34mfoo/bar/baz[0m[01;31m//qux[0m
+[01;34mfoo/bar/[0mbaz[01;31m//qux[0m
+[01;34mfoo/bar/[0mbaz[01;31m//qux[0m

@@ -5,11 +5,7 @@
 
 ## Argument parsing
 
-if command -v nproc &>/dev/null; then
-    JOBS=$(nproc)
-else
-    JOBS=1
-fi
+JOBS=$(_nproc)
 MAKE=
 PATTERNS=()
 SUDO=()
@@ -23,7 +19,6 @@ VERBOSE_TESTS=0
 
 # Print usage information
 usage() {
-    local pad=$(printf "%*s" ${#0} "")
     color cat <<EOF
 Usage: ${GRN}$0${RST}
            [${BLU}-j${RST}${BLD}N${RST}] [${BLU}--make${RST}=${BLD}MAKE${RST}] [${BLU}--bfs${RST}=${BLD}path/to/bfs${RST}] [${BLU}--sudo${RST}[=${BLD}COMMAND${RST}]]

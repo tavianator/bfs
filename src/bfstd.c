@@ -1,13 +1,15 @@
 // Copyright © Tavian Barnes <tavianator@tavianator.com>
 // SPDX-License-Identifier: 0BSD
 
-#include "prelude.h"
 #include "bfstd.h"
+
+#include "bfs.h"
 #include "bit.h"
 #include "diag.h"
 #include "sanity.h"
 #include "thread.h"
 #include "xregex.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <langinfo.h>
@@ -15,25 +17,28 @@
 #include <locale.h>
 #include <nl_types.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
 #include <wchar.h>
 
-#if BFS_USE_SYS_SYSMACROS_H
+#if __has_include(<sys/sysmacros.h>)
 #  include <sys/sysmacros.h>
-#elif BFS_USE_SYS_MKDEV_H
+#elif __has_include(<sys/mkdev.h>)
 #  include <sys/mkdev.h>
 #endif
 
-#if BFS_USE_UTIL_H
+#if __has_include(<util.h>)
 #  include <util.h>
 #endif
 
@@ -48,7 +53,7 @@ bool error_is_like(int error, int category) {
 
 	case ENOSYS:
 		// https://github.com/opencontainers/runc/issues/2151
-		return errno == EPERM;
+		return error == EPERM;
 
 #if __DragonFly__
 	// https://twitter.com/tavianator/status/1742991411203485713
@@ -199,6 +204,171 @@ const char *xgetprogname(void) {
 	return cmd;
 }
 
+/** Common prologue for xstrto*() wrappers. */
+static int xstrtox_prologue(const char *str) {
+	// strto*() skips leading spaces, but we want to reject them
+	if (xisspace(str[0])) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	errno = 0;
+	return 0;
+}
+
+/** Common epilogue for xstrto*() wrappers. */
+static int xstrtox_epilogue(const char *str, char **end, char *endp) {
+	if (errno != 0) {
+		return -1;
+	}
+
+	if (end) {
+		*end = endp;
+	}
+
+	// If end is NULL, make sure the entire string is valid
+	if (endp == str || (!end && *endp != '\0')) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	return 0;
+}
+
+int xstrtos(const char *str, char **end, int base, short *value) {
+	long n;
+	if (xstrtol(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n < SHRT_MIN || n > SHRT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+int xstrtoi(const char *str, char **end, int base, int *value) {
+	long n;
+	if (xstrtol(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n < INT_MIN || n > INT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+int xstrtol(const char *str, char **end, int base, long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtol(str, &endp, base);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtoll(const char *str, char **end, int base, long long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtoll(str, &endp, base);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtof(const char *str, char **end, float *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtof(str, &endp);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtod(const char *str, char **end, double *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtod(str, &endp);
+	return xstrtox_epilogue(str, end, endp);
+}
+
+int xstrtous(const char *str, char **end, int base, unsigned short *value) {
+	unsigned long n;
+	if (xstrtoul(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n > USHRT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+int xstrtoui(const char *str, char **end, int base, unsigned int *value) {
+	unsigned long n;
+	if (xstrtoul(str, end, base, &n) != 0) {
+		return -1;
+	}
+
+	if (n > UINT_MAX) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	*value = n;
+	return 0;
+}
+
+/** Common epilogue for xstrtou*() wrappers. */
+static int xstrtoux_epilogue(const char *str, char **end, char *endp) {
+	if (xstrtox_epilogue(str, end, endp) != 0) {
+		return -1;
+	}
+
+	if (str[0] == '-') {
+		errno = ERANGE;
+		return -1;
+	}
+
+	return 0;
+}
+
+int xstrtoul(const char *str, char **end, int base, unsigned long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtoul(str, &endp, base);
+	return xstrtoux_epilogue(str, end, endp);
+}
+
+int xstrtoull(const char *str, char **end, int base, unsigned long long *value) {
+	if (xstrtox_prologue(str) != 0) {
+		return -1;
+	}
+
+	char *endp;
+	*value = strtoull(str, &endp, base);
+	return xstrtoux_epilogue(str, end, endp);
+}
+
 /** Compile and execute a regular expression for xrpmatch(). */
 static int xrpregex(nl_item item, const char *response) {
 	const char *pattern = nl_langinfo(item);
@@ -285,7 +455,7 @@ const char *xstrerror(int errnum) {
 
 	// On FreeBSD with MemorySanitizer, duplocale() triggers
 	// https://github.com/llvm/llvm-project/issues/65532
-#if BFS_HAS_STRERROR_L && !(__FreeBSD__ && SANITIZE_MEMORY)
+#if BFS_HAS_STRERROR_L && !(__FreeBSD__ && __SANITIZE_MEMORY__)
 #  if BFS_HAS_USELOCALE
 	locale_t loc = uselocale((locale_t)0);
 #  else
@@ -320,6 +490,10 @@ const char *xstrerror(int errnum) {
 
 	errno = saved;
 	return ret;
+}
+
+const char *errstr(void) {
+	return xstrerror(errno);
 }
 
 /** Get the single character describing the given file type. */
@@ -436,8 +610,18 @@ int rlim_cmp(rlim_t a, rlim_t b) {
 	return (a > b) - (a < b);
 }
 
+rlim_t rlim_min(rlim_t a, rlim_t b) {
+	if (rlim_cmp(a, b) <= 0) {
+		return a;
+	} else {
+		return b;
+	}
+}
+
 dev_t xmakedev(int ma, int mi) {
-#ifdef makedev
+#if __QNX__
+	return makedev(0, ma, mi);
+#elif defined(makedev)
 	return makedev(ma, mi);
 #else
 	return (ma << 8) | mi;
@@ -466,6 +650,36 @@ pid_t xwaitpid(pid_t pid, int *status, int flags) {
 		ret = waitpid(pid, status, flags);
 	} while (ret < 0 && errno == EINTR);
 	return ret;
+}
+
+int open_cterm(int flags) {
+#if BFS_HAS_CTERMID
+	char path[L_ctermid];
+	if (ctermid(path) == NULL || strlen(path) == 0) {
+		errno = ENOTTY;
+		return -1;
+	}
+#else
+	const char *path = "/dev/tty";
+#endif
+
+	return open(path, flags);
+}
+
+int xtcgetwinsize(int fd, struct winsize *ws) {
+#if BFS_HAS_TCGETWINSIZE
+	return tcgetwinsize(fd, ws);
+#else
+	return ioctl(fd, TIOCGWINSZ, ws);
+#endif
+}
+
+int xtcsetwinsize(int fd, const struct winsize *ws) {
+#if BFS_HAS_TCSETWINSIZE
+	return tcsetwinsize(fd, ws);
+#else
+	return ioctl(fd, TIOCSWINSZ, ws);
+#endif
 }
 
 int dup_cloexec(int fd) {
@@ -671,40 +885,117 @@ int xstrtofflags(const char **str, unsigned long long *set, unsigned long long *
 #endif
 }
 
+long xsysconf(int name) {
+#if __FreeBSD__ && __SANITIZE_MEMORY__
+	// Work around https://github.com/llvm/llvm-project/issues/88163
+	__msan_scoped_disable_interceptor_checks();
+#endif
+
+	long ret = sysconf(name);
+
+#if __FreeBSD__ && __SANITIZE_MEMORY__
+	__msan_scoped_enable_interceptor_checks();
+#endif
+
+	return ret;
+}
+
+#if BFS_HAS_SCHED_GETAFFINITY
+/** Get the CPU count in an affinity mask of the given size. */
+static long bfs_sched_getaffinity(size_t size) {
+	cpu_set_t set, *pset = &set;
+
+	if (size > sizeof(set)) {
+		pset = malloc(size);
+		if (!pset) {
+			return -1;
+		}
+	}
+
+	long ret = -1;
+	if (sched_getaffinity(0, size, pset) == 0) {
+#  ifdef CPU_COUNT_S
+		ret = CPU_COUNT_S(size, pset);
+#  else
+		bfs_assert(size <= sizeof(set));
+		ret = CPU_COUNT(pset);
+# endif
+	}
+
+	if (pset != &set) {
+		free(pset);
+	}
+	return ret;
+}
+#endif
+
+long nproc(void) {
+	long ret = 0;
+
+#if BFS_HAS_SCHED_GETAFFINITY
+	size_t size = sizeof(cpu_set_t);
+	do {
+		ret = bfs_sched_getaffinity(size);
+
+#  ifdef CPU_COUNT_S
+		// On Linux, sched_getaffinity(2) says:
+		//
+		//     When working on systems with large kernel CPU affinity masks, one must
+		//     dynamically allocate the mask argument (see CPU_ALLOC(3)).  Currently,
+		//     the only way to do this is by probing for the size of the required mask
+		//     using sched_getaffinity() calls with increasing mask sizes (until the
+		//     call does not fail with the error EINVAL).
+		size *= 2;
+#  else
+		// No support for dynamically-sized CPU masks
+		break;
+#  endif
+	} while (ret < 0 && errno == EINVAL);
+#endif
+
+	if (ret < 1) {
+		ret = xsysconf(_SC_NPROCESSORS_ONLN);
+	}
+
+	if (ret < 1) {
+		ret = 1;
+	}
+
+	return ret;
+}
+
 size_t asciilen(const char *str) {
 	return asciinlen(str, strlen(str));
 }
 
 size_t asciinlen(const char *str, size_t n) {
+	const unsigned char *ustr = (const unsigned char *)str;
 	size_t i = 0;
 
-#if SIZE_WIDTH % 8 == 0
 	// Word-at-a-time isascii()
-	for (size_t word; i + sizeof(word) <= n; i += sizeof(word)) {
-		memcpy(&word, str + i, sizeof(word));
-
-		const size_t mask = (SIZE_MAX / 0xFF) << 7; // 0x808080...
-		word &= mask;
-		if (!word) {
-			continue;
-		}
-
-#if ENDIAN_NATIVE == ENDIAN_BIG
-		word = bswap(word);
-#elif ENDIAN_NATIVE != ENDIAN_LITTLE
-		break;
-#endif
-
-		size_t first = trailing_zeros(word) / 8;
-		return i + first;
+#define CHUNK(n) CHUNK_(uint##n##_t, load8_leu##n)
+#define CHUNK_(type, load8) \
+	(n - i >= sizeof(type)) { \
+		type word = load8(ustr + i); \
+		type mask = (((type)-1) / 0xFF) << 7; /* 0x808080.. */ \
+		word &= mask; \
+		i += trailing_zeros(word) / 8; \
+		if (word) { \
+			return i; \
+		} \
 	}
-#endif
 
-	for (; i < n; ++i) {
-		if (!xisascii(str[i])) {
-			break;
-		}
-	}
+#if SIZE_WIDTH >= 64
+	while CHUNK(64);
+	if CHUNK(32);
+#else
+	while CHUNK(32);
+#endif
+	if CHUNK(16);
+	if CHUNK(8);
+
+#undef CHUNK_
+#undef CHUNK
 
 	return i;
 }
@@ -740,7 +1031,7 @@ size_t xstrwidth(const char *str) {
 	mbstate_t mb = {0};
 	while (i < len) {
 		wint_t wc = xmbrtowc(str, &i, len, &mb);
-		if (wc == WEOF) {
+		if (wc == (wint_t)WEOF) {
 			// Assume a single-width '?'
 			++ret;
 			continue;
@@ -824,7 +1115,7 @@ static size_t printable_len(const char *str, size_t len, enum wesc_flags flags) 
 	mbstate_t mb = {0};
 	for (size_t j = i; i < len; i = j) {
 		wint_t wc = xmbrtowc(str, &j, len, &mb);
-		if (wc == WEOF) {
+		if (wc == (wint_t)WEOF) {
 			break;
 		}
 		if (!wesc_iswprint(wc, flags)) {
@@ -874,7 +1165,7 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len, en
 		bool safe = false;
 
 		wint_t wc = xmbrtowc(str, &i, len, &mb);
-		if (wc != WEOF) {
+		if (wc != (wint_t)WEOF) {
 			safe = wesc_iswprint(wc, flags);
 		}
 
@@ -907,14 +1198,14 @@ static char *dollar_quote(char *dest, char *end, const char *str, size_t len, en
 
 /** How much of this string is safe as a bare word? */
 static size_t bare_len(const char *str, size_t len) {
-	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02
+	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_02
 	size_t ret = strcspn(str, "|&;<>()$`\\\"' *?[#~=%!{}");
 	return ret < len ? ret : len;
 }
 
 /** How much of this string is safe to double-quote? */
 static size_t quotable_len(const char *str, size_t len) {
-	// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_02_03
+	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_02_03
 	size_t ret = strcspn(str, "`$\\\"!");
 	return ret < len ? ret : len;
 }
