@@ -10,6 +10,7 @@
 #include <langinfo.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -203,10 +204,42 @@ static void check_strwidth(void) {
 	bfs_check(xstrwidth("Hello\1world") == 10);
 }
 
+/** Check a single xgetdelim() result. */
+static void check_getdelim(FILE *file, char delim, const char *expected) {
+	char *chunk = xgetdelim(file, delim);
+	if (expected) {
+		if (bfs_echeck(chunk, "xgetdelim()")) {
+			bfs_check(strcmp(chunk, expected) == 0, "xgetdelim() == '%s' (!= '%s')", chunk, expected);
+		}
+	} else {
+		bfs_check(!chunk && errno == 0, "xgetdelim() == '%s' (!= NULL)", chunk);
+	}
+	free(chunk);
+}
+
+/** xgetdelim() test cases. */
+static void check_xgetdelim(void) {
+	char str[] = "foo|bar|baz||qux|quux";
+	FILE *file = fmemopen(str, strlen(str), "r");
+	bfs_everify(file, "fmemopen()");
+
+	check_getdelim(file, '|', "foo");
+	check_getdelim(file, '|', "bar");
+	check_getdelim(file, '|', "baz");
+	check_getdelim(file, '|', "");
+	check_getdelim(file, '|', "qux");
+	check_getdelim(file, '|', "quux");
+	check_getdelim(file, '|', NULL);
+	check_getdelim(file, '|', NULL);
+
+	bfs_echeck(fclose(file) == 0, "fclose()");
+}
+
 void check_bfstd(void) {
 	check_asciilen();
 	check_basedirs();
 	check_wordescs();
 	check_strtox();
 	check_strwidth();
+	check_xgetdelim();
 }

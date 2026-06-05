@@ -175,9 +175,9 @@ char *xgetdelim(FILE *file, char delim) {
 	char *chunk = NULL;
 	size_t n = 0;
 	ssize_t len = getdelim(&chunk, &n, delim, file);
-	if (len >= 0) {
-		if (chunk[len] == delim) {
-			chunk[len] = '\0';
+	if (len > 0) {
+		if (chunk[len - 1] == delim) {
+			chunk[len - 1] = '\0';
 		}
 		return chunk;
 	} else {
