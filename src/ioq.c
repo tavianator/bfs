@@ -835,8 +835,11 @@ static struct io_uring_sqe *ioq_dispatch_async(struct ioq_ring_state *state, str
 	case IOQ_CLOSEDIR:
 #if BFS_USE_UNWRAPDIR
 		if (ops & IOQ_RING_CLOSE) {
-			sqe = ioq_get_sqe(state);
-			io_uring_prep_close(sqe, bfs_unwrapdir(ent->closedir.dir));
+			int fd = bfs_unwrapdir(ent->closedir.dir);
+			if (fd >= 0) {
+				sqe = ioq_get_sqe(state);
+				io_uring_prep_close(sqe, fd);
+			}
 		}
 #endif
 		return sqe;

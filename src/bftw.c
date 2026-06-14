@@ -1247,16 +1247,17 @@ static int bftw_unwrapdir(struct bftw_state *state, struct bftw_file *file) {
 
 #if BFS_USE_UNWRAPDIR
 	if (reffed || pinned) {
-		bfs_unwrapdir(dir);
-		bftw_freedir(cache, dir);
-		file->dir = NULL;
-		return 0;
+		if (bfs_unwrapdir(dir) >= 0) {
+			bftw_freedir(cache, dir);
+			file->dir = NULL;
+			return 0;
+		}
 	}
-#else
+#endif
+
 	if (pinned) {
 		return -1;
 	}
-#endif
 
 	if (!reffed) {
 		return bftw_close(state, file);

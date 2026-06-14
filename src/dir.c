@@ -364,7 +364,18 @@ int bfs_unwrapdir(struct bfs_dir *dir) {
 #if BFS_USE_GETDENTS
 	int ret = dir->fd;
 #elif BFS_HAS_FDCLOSEDIR
-	int ret = fdclosedir(dir->dir);
+#  if __APPLE__ && __has_builtin(__builtin_available)
+#    define BFS_FDCLOSEDIR_AVAILABLE  __builtin_available(macos 26.4, ios 26.4, watchos 26.4, tvos 26.4, visionos 26.4, *)
+#  else
+#    define BFS_FDCLOSEDIR_AVAILABLE true
+#  endif
+	int ret;
+	if (BFS_FDCLOSEDIR_AVAILABLE) {
+		ret = fdclosedir(dir->dir);
+	} else {
+		errno = ENOTSUP;
+		return -1;
+	}
 #endif
 
 	bfs_destroydir(dir);
