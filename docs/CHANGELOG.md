@@ -1,6 +1,20 @@
 4.*
 ===
 
+4.1.3
+-----
+
+**June 15, 2026**
+
+## Bug fixes
+
+- Fixed a segfault when binaries built on macOS 26.4+ were run on older macOS versions
+  ([#229](https://github.com/tavianator/bfs/issues/229))
+
+- Fixed a potential hang in the test suite
+  ([`77915eb9`](https://github.com/tavianator/bfs/commit/77915eb9a70a2c60dadbca869f39d2808e819d28))
+
+
 4.1.2
 -----
 
