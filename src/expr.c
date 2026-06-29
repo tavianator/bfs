@@ -14,6 +14,21 @@
 
 #include <string.h>
 
+off_t bfs_size_unit_factor(enum bfs_size_unit unit) {
+	static const off_t factors[] = {
+		[BFS_BLOCKS] = 512,
+		[BFS_BYTES] = 1,
+		[BFS_WORDS] = 2,
+		[BFS_KB] = 1LL << 10,
+		[BFS_MB] = 1LL << 20,
+		[BFS_GB] = 1LL << 30,
+		[BFS_TB] = 1LL << 40,
+		[BFS_PB] = 1LL << 50,
+	};
+
+	return factors[unit];
+}
+
 struct bfs_expr *bfs_expr_new(struct bfs_ctx *ctx, bfs_eval_fn *eval_fn, size_t argc, char **argv, enum bfs_kind kind) {
 	bfs_assert(kind != BFS_PATH);
 

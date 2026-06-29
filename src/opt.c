@@ -182,29 +182,54 @@ static void constrain_max(struct df_range *range, long long value) {
 	range->max = min_value(range->max, value);
 }
 
+/** Intersect two ranges. */
+static void range_intersect(struct df_range *range, const struct df_range *other) {
+	constrain_min(range, other->min);
+	constrain_max(range, other->max);
+}
+
 /** Constrain a range to a single value. */
 static void constrain_range(struct df_range *range, long long value) {
-	constrain_min(range, value);
-	constrain_max(range, value);
+	const struct df_range other = {
+		.min = value,
+		.max = value,
+	};
+	range_intersect(range, &other);
+}
+
+/** Check if a range contains a value. */
+static bool range_contains(const struct df_range *range, long long value) {
+	return value >= range->min && value <= range->max;
+}
+
+/** Subtract a range from another range. */
+static void range_subtract(struct df_range *range, const struct df_range *other) {
+	if (range_contains(other, range->min)) {
+		range->min = other->max;
+		if (range->min < LLONG_MAX) {
+			++range->min;
+		} else {
+			range->max = LLONG_MIN;
+		}
+	}
+
+	if (range_contains(other, range->max)) {
+		range->max = other->min;
+		if (range->max > LLONG_MIN) {
+			--range->max;
+		} else {
+			range->min = LLONG_MAX;
+		}
+	}
 }
 
 /** Remove a single value from a range. */
 static void range_remove(struct df_range *range, long long value) {
-	if (range->min == value) {
-		if (range->min == LLONG_MAX) {
-			range->max = LLONG_MIN;
-		} else {
-			++range->min;
-		}
-	}
-
-	if (range->max == value) {
-		if (range->max == LLONG_MIN) {
-			range->min = LLONG_MAX;
-		} else {
-			--range->max;
-		}
-	}
+	const struct df_range other = {
+		.min = value,
+		.max = value,
+	};
+	range_subtract(range, &other);
 }
 
 /** Compute the union of two ranges. */
@@ -1597,28 +1622,32 @@ static void data_flow_pred(struct bfs_opt *opt, enum pred_type pred, bool value)
 
 /** Transfer function for icmp-style ([+-]N) expressions. */
 static void data_flow_icmp(struct bfs_opt *opt, const struct bfs_expr *expr, enum range_type type) {
-	struct df_range *true_range = &opt->after_true.ranges[type];
-	struct df_range *false_range = &opt->after_false.ranges[type];
 	long long value = expr->num;
+	struct df_range range;
 
 	switch (expr->int_cmp) {
 	case BFS_INT_EQUAL:
-		constrain_range(true_range, value);
-		range_remove(false_range, value);
+		range.min = range.max = value;
 		break;
 
 	case BFS_INT_LESS:
-		constrain_min(false_range, value);
-		constrain_max(true_range, value);
-		range_remove(true_range, value);
+		range.min = LLONG_MIN;
+		range.max = value;
+		range_remove(&range, value);
 		break;
 
 	case BFS_INT_GREATER:
-		constrain_max(false_range, value);
-		constrain_min(true_range, value);
-		range_remove(true_range, value);
+		range.min = value;
+		range.max = LLONG_MAX;
+		range_remove(&range, value);
 		break;
 	}
+
+	struct df_range *true_range = &opt->after_true.ranges[type];
+	range_intersect(true_range, &range);
+
+	struct df_range *false_range = &opt->after_false.ranges[type];
+	range_subtract(false_range, &range);
 }
 
 /** Transfer function for -{execut,read,writ}able. */
@@ -1710,8 +1739,54 @@ static struct bfs_expr *data_flow_samefile(struct bfs_opt *opt, struct bfs_expr 
 
 /** Transfer function for -size. */
 static struct bfs_expr *data_flow_size(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
-	struct df_range *range = &opt->after_true.ranges[SIZE_RANGE];
-	if (range->min == range->max) {
+	long long size = expr->num;
+	long long factor = bfs_size_unit_factor(expr->size_unit);
+
+	struct df_range range;
+	range_init_bottom(&range);
+
+	if (size - 1 <= LLONG_MAX / factor) {
+		range.min = factor * (size - 1);
+
+		if (range.min <= LLONG_MAX - factor) {
+			range.max = range.min + factor;
+		} else {
+			range.max = LLONG_MAX;
+		}
+
+		range_remove(&range, range.min);
+	}
+
+	switch (expr->int_cmp) {
+	case BFS_INT_EQUAL:
+		break;
+
+	case BFS_INT_LESS:
+		if (range_is_bottom(&range)) {
+			range_init_top(&range);
+		} else {
+			range.max = range.min;
+			range.min = LLONG_MIN;
+			range_remove(&range, range.max);
+		}
+		break;
+
+	case BFS_INT_GREATER:
+		if (!range_is_bottom(&range)) {
+			range.min = range.max;
+			range.max = LLONG_MAX;
+			range_remove(&range, range.min);
+		}
+		break;
+	}
+
+	struct df_range *true_range = &opt->after_true.ranges[SIZE_RANGE];
+	range_intersect(true_range, &range);
+
+	struct df_range *false_range = &opt->after_false.ranges[SIZE_RANGE];
+	range_subtract(false_range, &range);
+
+	if (true_range->min == true_range->max) {
 		expr->probability = 0.01;
 	} else {
 		expr->probability = 0.5;
@@ -1892,7 +1967,6 @@ static struct bfs_expr *data_flow_visit(struct bfs_opt *opt, struct bfs_expr *ex
 		{eval_gid,     GID_RANGE},
 		{eval_inum,   INUM_RANGE},
 		{eval_links, LINKS_RANGE},
-		{eval_size,   SIZE_RANGE},
 		{eval_uid,     UID_RANGE},
 	};
 

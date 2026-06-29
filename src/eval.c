@@ -955,19 +955,8 @@ bool eval_size(const struct bfs_expr *expr, struct bfs_eval *state) {
 		return false;
 	}
 
-	static const off_t scales[] = {
-		[BFS_BLOCKS] = 512,
-		[BFS_BYTES] = 1,
-		[BFS_WORDS] = 2,
-		[BFS_KB] = 1LL << 10,
-		[BFS_MB] = 1LL << 20,
-		[BFS_GB] = 1LL << 30,
-		[BFS_TB] = 1LL << 40,
-		[BFS_PB] = 1LL << 50,
-	};
-
-	off_t scale = scales[expr->size_unit];
-	off_t size = (statbuf->size + scale - 1) / scale; // Round up
+	off_t factor = bfs_size_unit_factor(expr->size_unit);
+	off_t size = (statbuf->size + factor - 1) / factor; // Round up
 	return bfs_expr_cmp(expr, size);
 }
 

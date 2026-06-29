@@ -97,6 +97,9 @@ enum bfs_size_unit {
 	BFS_PB,
 };
 
+/** Get the scaling factor for a size unit. */
+off_t bfs_size_unit_factor(enum bfs_size_unit unit);
+
 /**
  * A linked list of expressions.
  */
