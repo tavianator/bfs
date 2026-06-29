@@ -1,6 +1,29 @@
 4.*
 ===
 
+4.1.4
+-----
+
+**June 29, 2026**
+
+## Bug fixes
+
+- Fixed an optimizer bug that ignored the units of `-size` arguments, meaning
+
+      $ bfs -size 1k -size 1024c
+
+  would claim that
+
+      bfs: warning: bfs -size 1k -size 1024c
+      bfs: warning:              ~~~~~~~~~~~
+      bfs: warning: This expression is always false.
+
+  and return no results.
+
+  The bug was originally introduced in bfs 1.3.3 (February 10, 2019)
+  ([`a6aecebe`](https://github.com/tavianator/bfs/commit/a6aecebeef8bb920c05043f392ac5ed80f676fa4))
+
+
 4.1.3
 -----
 
