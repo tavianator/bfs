@@ -1711,7 +1711,7 @@ static struct bfs_expr *data_flow_inum(struct bfs_opt *opt, struct bfs_expr *exp
 /** Transfer function for -links. */
 static struct bfs_expr *data_flow_links(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
 	struct df_range *range = &opt->after_true.ranges[LINKS_RANGE];
-	if (1 >= range->min && 1 <= range->max) {
+	if (range_contains(range, 1)) {
 		expr->probability = 0.99;
 	} else {
 		expr->probability = 0.5;
