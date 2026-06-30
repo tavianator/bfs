@@ -133,13 +133,13 @@ FILE *xfopen(const char *path, int flags) {
 
 	switch (flags & O_ACCMODE) {
 	case O_RDONLY:
-		strcpy(mode, "rb");
+		memcpy(mode, "rb", 3);
 		break;
 	case O_WRONLY:
-		strcpy(mode, "wb");
+		memcpy(mode, "wb", 3);
 		break;
 	case O_RDWR:
-		strcpy(mode, "r+b");
+		memcpy(mode, "r+b", 4);
 		break;
 	default:
 		bfs_bug("Invalid access mode");
@@ -531,7 +531,7 @@ static char type_char(mode_t mode) {
 }
 
 void xstrmode(mode_t mode, char str[11]) {
-	strcpy(str, "----------");
+	memcpy(str, "----------", 11);
 
 	str[0] = type_char(mode);
 
