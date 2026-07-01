@@ -771,16 +771,18 @@ static void ioq_ring_submit(struct ioq_ring_state *state) {
 	// Submit all prepped SQEs
 	while (prepped > 0) {
 		int ret = io_uring_submit_and_wait(state->ring, wait_nr);
-		if (ret <= 0) {
-			continue;
+
+		if (ret > 0) {
+			state->submitted += ret;
+			prepped -= ret;
 		}
 
-		state->submitted += ret;
-		prepped -= ret;
 		if (prepped > 0) {
 			// In the unlikely event of a short submission, any SQE
 			// links will be broken.  Wait for all SQEs to complete
-			// to preserve any ordering requirements.
+			// to preserve any ordering requirements.  On an error
+			// like EAGAIN/EBUSY, we may have to reap CQEs to free
+			// up enough resources for the submit to succeed.
 			ioq_ring_drain(state, state->submitted);
 			wait_nr = 0;
 		}
