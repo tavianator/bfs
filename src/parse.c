@@ -2505,7 +2505,7 @@ static struct bfs_expr *parse_status(struct bfs_parser *parser, int arg1, int ar
 }
 
 /**
- * Parse -x?type [bcdpflsD].
+ * Parse -x?type [bcdpflswD].
  */
 static struct bfs_expr *parse_type(struct bfs_parser *parser, int x, int arg2) {
 	struct bfs_ctx *ctx = parser->ctx;
@@ -2555,7 +2555,7 @@ static struct bfs_expr *parse_type(struct bfs_parser *parser, int x, int arg2) {
 			return NULL;
 
 		default:
-			parse_expr_error(parser, expr, "Unknown type flag ${err}%c${rs}; expected one of [${bld}bcdpflsD${rs}].\n", *c);
+			parse_expr_error(parser, expr, "Unknown type flag ${err}%c${rs}; expected one of [${bld}bcdpflswD${rs}].\n", *c);
 			return NULL;
 		}
 
