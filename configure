@@ -134,7 +134,7 @@ for arg; do
             ;;
         --disable-*|--without-*)
             case "$arg" in
-                *=*) invalid "arg" ;;
+                *=*) invalid "$arg" ;;
                 *) yn=n ;;
             esac
             ;;

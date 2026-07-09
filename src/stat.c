@@ -28,7 +28,7 @@ const char *bfs_stat_field_name(enum bfs_stat_field field) {
 	case BFS_STAT_DEV:
 		return "device number";
 	case BFS_STAT_INO:
-		return "inode nunmber";
+		return "inode number";
 	case BFS_STAT_NLINK:
 		return "link count";
 	case BFS_STAT_GID:

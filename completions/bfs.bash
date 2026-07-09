@@ -239,7 +239,7 @@ _bfs() {
             ;;
         -uid)
             # -uid [-+]N
-            #     Find files owned by auser ID N
+            #     Find files owned by user ID N
             _uids
             return
             ;;

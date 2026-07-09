@@ -2755,7 +2755,7 @@ static struct bfs_expr *parse_help(struct bfs_parser *parser, int arg1, int arg2
 	cfprintf(cout, "      Don't descend into other mount points (same as ${blu}-xdev${rs})\n");
 
 	cfprintf(cout, "  ${cyn}-f${rs} ${mag}PATH${rs}\n");
-	cfprintf(cout, "      Treat ${mag}PATH${rs} as a path to search (useful if begins with a dash)\n");
+	cfprintf(cout, "      Treat ${mag}PATH${rs} as a path to search (useful if it begins with a dash)\n");
 	cfprintf(cout, "  ${cyn}-D${rs} ${bld}FLAG${rs}\n");
 	cfprintf(cout, "      Turn on a debugging flag (see ${cyn}-D${rs} ${bld}help${rs})\n");
 	cfprintf(cout, "  ${cyn}-O${bld}N${rs}\n");

@@ -97,7 +97,7 @@ const struct group *bfs_getgrnam(struct bfs_groups *groups, const char *name);
  *
  * @groups
  *         The group cache.
- * @uid
+ * @gid
  *         The ID to look up.
  * @return
  *         The matching group, or NULL if not found (errno == 0) or an error

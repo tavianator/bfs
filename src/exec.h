@@ -86,7 +86,7 @@ struct bfs_exec *bfs_exec_parse(const struct bfs_ctx *ctx, char **argv, enum bfs
  * @ftwbuf
  *         The bftw() data for the current file.
  * @return 0 if the command succeeded, -1 if it failed.  If the command could
- *         be executed, -1 is returned, and errno will be non-zero.  For
+ *         not be executed, -1 is returned, and errno will be non-zero.  For
  *         BFS_EXEC_MULTI, errors will not be reported until bfs_exec_finish().
  */
 int bfs_exec(struct bfs_exec *execbuf, const struct BFTW *ftwbuf);

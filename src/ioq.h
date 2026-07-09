@@ -15,7 +15,7 @@
 #include <stddef.h>
 
 /**
- * An queue of asynchronous I/O operations.
+ * A queue of asynchronous I/O operations.
  */
 struct ioq;
 
