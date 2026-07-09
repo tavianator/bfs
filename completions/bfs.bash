@@ -33,6 +33,7 @@ _bfs() {
     local nocomp=(
         -{a,B,c,m}{min,since,time}
         -context
+        -flags
         -ilname
         -iname
         -inum
@@ -61,6 +62,7 @@ _bfs() {
     local filecomp=(
         -{a,B,c,m}newer
         -f
+        -files0-from
         -fls
         -fprint
         -fprint0
@@ -111,6 +113,7 @@ _bfs() {
 
     # Tests that take no arguments
     local nullary_tests=(
+        -acl
         -capable
         -empty
         -executable

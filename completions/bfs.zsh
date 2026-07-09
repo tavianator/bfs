@@ -7,7 +7,7 @@ local -a state line args alts disp smatch
 args=(
     # Flags
     '(-depth)-d[search in post-order (descendents first)]'
-    '-D[print diagnostics]:debug option:(cost exec opt rates search stat time tree all help)'
+    '-D[print diagnostics]:debug option:(cost exec opt rates search stat tree all help)'
     '-E[use extended regular expressions with -regex/-iregex]'
     '-f[specify file hierarchy to traverse]:path:_directories'
     '-O+[enable query optimisation]:level:(0 1 2 3 4 fast)'
