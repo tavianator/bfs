@@ -501,6 +501,8 @@ char *bfs_getfilecon(const struct BFTW *ftwbuf) {
 		ret = getfilecon(path, &con);
 	}
 
+	free_fake_at(ftwbuf, path);
+
 	if (ret >= 0) {
 		return con;
 	} else {
