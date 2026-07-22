@@ -35,6 +35,7 @@ gen/vars.mk::
 	@printf 'MANDIR := %s\n' "$$XMANDIR" >>$@
 	@printf 'OS := %s\n' "$${OS:-$$(uname)}" >>$@
 	@printf 'CC := %s\n' "$$XCC" >>$@
+	@printf 'AR := %s\n' "$$XAR" >>$@
 	@printf 'INSTALL := %s\n' "$$XINSTALL" >>$@
 	@printf 'MKDIR := %s\n' "$$XMKDIR" >>$@
 	@printf 'PKG_CONFIG := %s\n' "$$XPKG_CONFIG" >>$@

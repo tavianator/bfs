@@ -53,6 +53,8 @@ extern const char bfs_confflags[];
 extern const char bfs_cc[];
 extern const char bfs_cppflags[];
 extern const char bfs_cflags[];
+extern const char bfs_ar[];
+extern const char bfs_arflags[];
 extern const char bfs_ldflags[];
 extern const char bfs_ldlibs[];
 

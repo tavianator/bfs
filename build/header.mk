@@ -83,6 +83,8 @@ gen/config.h: ${PKG_HEADERS} ${HEADERS}
 	@printf '%s' "$$XCC" | build/embed.sh >gen/cc.i
 	@printf '%s' "$$XCPPFLAGS" | build/embed.sh >gen/cppflags.i
 	@printf '%s' "$$XCFLAGS" | build/embed.sh >gen/cflags.i
+	@printf '%s' "$$XAR" | build/embed.sh >gen/ar.i
+	@printf '%s' "$$XARFLAGS" | build/embed.sh >gen/arflags.i
 	@printf '%s' "$$XLDFLAGS" | build/embed.sh >gen/ldflags.i
 	@printf '%s' "$$XLDLIBS" | build/embed.sh >gen/ldlibs.i
 .PHONY: gen/config.h

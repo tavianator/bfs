@@ -23,6 +23,14 @@ const char bfs_cflags[] = {
 #include "cflags.i"
 };
 
+const char bfs_ar[] = {
+#include "ar.i"
+};
+
+const char bfs_arflags[] = {
+#include "arflags.i"
+};
+
 const char bfs_ldflags[] = {
 #include "ldflags.i"
 };

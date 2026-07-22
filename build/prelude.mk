@@ -20,6 +20,7 @@ MANDIR ?= ${PREFIX}/share/man
 
 # Configurable executables
 CC ?= cc
+AR ?= ar
 INSTALL ?= install
 MKDIR ?= mkdir -p
 PKG_CONFIG ?= pkg-config

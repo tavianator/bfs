@@ -3033,6 +3033,8 @@ static struct bfs_expr *parse_version(struct bfs_parser *parser, int arg1, int a
 	printf("CC        := %s\n", bfs_cc);
 	printf("CPPFLAGS  := %s\n", bfs_cppflags);
 	printf("CFLAGS    := %s\n", bfs_cflags);
+	printf("AR        := %s\n", bfs_ar);
+	printf("ARFLAGS   := %s\n", bfs_arflags);
 	printf("LDFLAGS   := %s\n", bfs_ldflags);
 	printf("LDLIBS    := %s\n", bfs_ldlibs);
 
