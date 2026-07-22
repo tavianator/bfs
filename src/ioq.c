@@ -726,9 +726,7 @@ static void ioq_ring_drain(struct ioq_ring_state *state, size_t wait_nr) {
 
 	while (state->submitted > 0) {
 		struct io_uring_cqe *cqe;
-		if (wait_nr > 0) {
-			io_uring_wait_cqes(ring, &cqe, wait_nr, NULL, NULL);
-		}
+		io_uring_wait_cqes(ring, &cqe, wait_nr, NULL, NULL);
 
 		unsigned int head;
 		size_t seen = 0;
@@ -863,7 +861,7 @@ static struct io_uring_sqe *ioq_dispatch_async(struct ioq_ring_state *state, str
 	return NULL;
 }
 
-/** Check if ioq_ring_reap() has work to do. */
+/** Check if ioq_ring_submit() has work to do. */
 static bool ioq_ring_empty(struct ioq_ring_state *state) {
 	size_t prepped = io_uring_sq_ready(state->ring);
 	return !prepped && !state->submitted && ioq_batch_empty(&state->ready);
@@ -1043,7 +1041,12 @@ static int ioq_ring_init(struct ioq *ioq, struct ioq_thread *thread) {
 #  endif
 #  ifdef IORING_SETUP_DEFER_TASKRUN
 			// Don't interrupt us aggressively with completion events
-			ioq_ring_probe_flags(&params, IORING_SETUP_DEFER_TASKRUN);
+			if (ioq_ring_probe_flags(&params, IORING_SETUP_DEFER_TASKRUN)) {
+#    ifdef IORING_SETUP_TASKRUN_FLAG
+				// Do let us know when deferred tasks are pending
+				ioq_ring_probe_flags(&params, IORING_SETUP_TASKRUN_FLAG);
+#    endif
+			}
 #  endif
 		}
 #endif
