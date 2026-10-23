@@ -18,6 +18,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#if BFS_HAS_PRCTL
+#  include <sys/prctl.h>
+#endif
+
 /** Signal handler that increments a counter. */
 static void counter_hook(int sig, siginfo_t *info, void *arg) {
 	atomic size_t *counter = arg;
@@ -144,6 +148,20 @@ unhook:
 	sigunhook(hook);
 }
 
+/** Disable core dumps for intentional crashes. */
+static void disable_core_dumps(void) {
+	const struct rlimit rl = {
+		.rlim_cur = 0,
+		.rlim_max = 0,
+	};
+	setrlimit(RLIMIT_CORE, &rl);
+
+#if BFS_HAS_PRCTL
+	// Don't even trigger the core dump handler
+	prctl(PR_SET_DUMPABLE, 0L);
+#endif
+}
+
 /** atsigexit() hook. */
 static void exit_hook(int sig, siginfo_t *info, void *arg) {
 	// Write the signal that's killing us to the pipe
@@ -194,12 +212,7 @@ static void check_sigexit(int sig) {
 		xclose(ready[0]);
 		xclose(killed[0]);
 
-		// Don't dump core
-		const struct rlimit rl = {
-			.rlim_cur = 0,
-			.rlim_max = 0,
-		};
-		setrlimit(RLIMIT_CORE, &rl);
+		disable_core_dumps();
 
 		// exit_hook() will write to killed[1]
 		bfs_everify(atsigexit(exit_hook, killed) != NULL);
