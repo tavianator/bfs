@@ -1106,6 +1106,25 @@ static int bftw_cache_reserve(struct bftw_state *state) {
 	return 0;
 }
 
+/** Check if we should follow symlinks at the given depth. */
+static bool bftw_follow(const struct bftw_state *state, size_t depth) {
+	enum bftw_flags mask = BFTW_FOLLOW_ALL;
+	if (depth == 0) {
+		mask |= BFTW_FOLLOW_ROOTS;
+	}
+
+	return state->flags & mask;
+}
+
+/** Figure out bfs_opendir() flags. */
+static enum bfs_dir_flags bftw_dir_flags(const struct bftw_state *state, size_t depth) {
+	enum bfs_dir_flags flags = state->dir_flags;
+	if (!bftw_follow(state, depth)) {
+		flags |= BFS_DIR_NOFOLLOW;
+	}
+	return flags;
+}
+
 /** Open a bftw_file relative to another one. */
 static int bftw_file_openat(struct bftw_state *state, struct bftw_file *file, struct bftw_file *base, const char *at_path) {
 	bfs_assert(file->fd < 0);
@@ -1123,7 +1142,7 @@ static int bftw_file_openat(struct bftw_state *state, struct bftw_file *file, st
 		goto unpin;
 	}
 
-	int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
+	int flags = bfs_dir_oflags(bftw_dir_flags(state, file->depth));
 	fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && errno == EMFILE) {
@@ -1321,7 +1340,8 @@ static int bftw_ioq_opendir(struct bftw_state *state, struct bftw_file *file) {
 		goto unpin;
 	}
 
-	if (ioq_opendir(state->ioq, dir, dfd, file->name, state->dir_flags, file) != 0) {
+	enum bfs_dir_flags flags = bftw_dir_flags(state, file->depth);
+	if (ioq_opendir(state->ioq, dir, dfd, file->name, flags, file) != 0) {
 		goto free;
 	}
 
@@ -1412,12 +1432,7 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 
 /** Figure out bfs_stat() flags. */
 static enum bfs_stat_flags bftw_stat_flags(const struct bftw_state *state, size_t depth) {
-	enum bftw_flags mask = BFTW_FOLLOW_ALL;
-	if (depth == 0) {
-		mask |= BFTW_FOLLOW_ROOTS;
-	}
-
-	if (state->flags & mask) {
+	if (bftw_follow(state, depth)) {
 		return BFS_STAT_TRYFOLLOW;
 	} else {
 		return BFS_STAT_NOFOLLOW;

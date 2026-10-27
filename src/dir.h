@@ -100,9 +100,16 @@ void bfs_dir_arena(struct arena *arena);
 enum bfs_dir_flags {
 	/** Include whiteouts in the results. */
 	BFS_DIR_WHITEOUTS = 1 << 0,
+	/** Don't follow a symlink in the final component of a directory path. */
+	BFS_DIR_NOFOLLOW  = 1 << 1,
 	/** @internal Start of private flags. */
-	BFS_DIR_PRIVATE   = 1 << 1,
+	BFS_DIR_PRIVATE   = 1 << 2,
 };
+
+/**
+ * @return The open(2) flags bfs_opendir() would use for the given bfs_dir_flags.
+ */
+int bfs_dir_oflags(enum bfs_dir_flags flags);
 
 /**
  * Open a directory.

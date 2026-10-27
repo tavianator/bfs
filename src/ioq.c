@@ -827,7 +827,7 @@ static struct io_uring_sqe *ioq_dispatch_async(struct ioq_ring_state *state, str
 		if (ops & IOQ_RING_OPENAT) {
 			sqe = ioq_get_sqe(state);
 			struct ioq_opendir *args = &ent->opendir;
-			int flags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
+			int flags = bfs_dir_oflags(args->flags);
 			io_uring_prep_openat(sqe, args->dfd, args->path, flags, 0);
 		}
 		return sqe;

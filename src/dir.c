@@ -151,10 +151,18 @@ void bfs_dir_arena(struct arena *arena) {
 	arena_init(arena, alignof(struct bfs_dir), DIR_SIZE);
 }
 
+int bfs_dir_oflags(enum bfs_dir_flags flags) {
+	int oflags = O_RDONLY | O_CLOEXEC | O_DIRECTORY;
+	if (flags & BFS_DIR_NOFOLLOW) {
+		oflags |= O_NOFOLLOW;
+	}
+	return oflags;
+}
+
 int bfs_opendir(struct bfs_dir *dir, int at_fd, const char *at_path, enum bfs_dir_flags flags) {
 	int fd;
 	if (at_path) {
-		fd = openat(at_fd, at_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+		fd = openat(at_fd, at_path, bfs_dir_oflags(flags));
 		if (fd < 0) {
 			return -1;
 		}
