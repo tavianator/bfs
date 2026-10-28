@@ -1,6 +1,39 @@
 4.*
 ===
 
+4.1.5
+-----
+
+**October 28, 2026**
+
+## Changes
+
+- `bfs` now builds a static library as part of the build process.
+  For release builds with LTO, some systems will require an `ar` wrapper to find the linker plugin, such as
+
+      $ ./configure --enable-release AR=gcc-ar
+
+  (or `AR=llvm-ar` for Clang builds).
+  Most modern systems will not require overriding the default `AR`.
+  ([`9d6880c2`](https://github.com/tavianator/bfs/commit/9d6880c2323c7caaf81943bf1381bddf4529371b))
+
+- As hardening against some race conditions and buggy file systems, `bfs` will refuse to follow symbolic links in more cases
+  ([`18415819`](https://github.com/tavianator/bfs/commit/184158197c9e80df334e4a4253807a78188e61b0))
+
+## Bug fixes
+
+- Fixed an optimizer bug that assumed if `-samefile` didn't match, `-inum` couldn't match either.
+  This is false for files on different mount points, which is why (device, inode) number pairs are necessary to uniquely identify a file.
+  The bug was originally introduced in bfs 3.1 (February 6, 2024).
+  ([`1537b7e6`](https://github.com/tavianator/bfs/commit/1537b7e62a61f5ad1b654cc53d28319372d4eea5))
+
+- Added some missing primary expression types to various shell completions
+  ([`fa35eb9c`](https://github.com/tavianator/bfs/commit/fa35eb9ce26251a02b9d8ce3ad5b543430f871aa))
+
+- Fixed a memory leak in `-context`
+  ([`568c1bd0`](https://github.com/tavianator/bfs/commit/568c1bd03a723df7585b293b18d0f43d0b051295))
+
+
 4.1.4
 -----
 
