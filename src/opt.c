@@ -1730,10 +1730,6 @@ static struct bfs_expr *data_flow_lname(struct bfs_opt *opt, struct bfs_expr *ex
 static struct bfs_expr *data_flow_samefile(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
 	struct df_range *true_range = &opt->after_true.ranges[INUM_RANGE];
 	constrain_range(true_range, expr->ino);
-
-	struct df_range *false_range = &opt->after_false.ranges[INUM_RANGE];
-	range_remove(false_range, expr->ino);
-
 	return expr;
 }
 
