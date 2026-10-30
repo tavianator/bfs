@@ -43,7 +43,7 @@ It is otherwise compatible with many versions of `find`, including
 
 </div>
 
-If you're not familiar with `find`, the [GNU find manual](https://www.gnu.org/software/findutils/manual/html_mono/find.html) provides a good introduction.
+If you're not familiar with `find`, the [GNU find manual](https://www.gnu.org/software/findutils/manual/find.html) provides a good introduction.
 
 
 Features
@@ -228,7 +228,7 @@ Installation
 <strong><a href="https://archlinux.org/packages/extra/x86_64/bfs/">Arch Linux</a></strong>
 # pacman -S bfs
 
-<strong><a href="https://packages.debian.org/sid/bfs">Debian</a>/<a href="https://packages.ubuntu.com/kinetic/bfs">Ubuntu</a></strong>
+<strong><a href="https://packages.debian.org/sid/bfs">Debian</a>/<a href="https://packages.ubuntu.com/bfs">Ubuntu</a></strong>
 # apt install bfs
 
 <strong><a href="https://src.fedoraproject.org/rpms/bfs">Fedora Linux</a></strong>

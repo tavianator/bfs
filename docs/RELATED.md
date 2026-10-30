@@ -9,7 +9,7 @@ This is a catalogue of some of the most important/interesting ones.
 
 These `find` implementations are commonly installed as the system `find` utility in UNIX-like operating systems:
 
-- [GNU findutils](https://www.gnu.org/software/findutils/) ([manual](https://www.gnu.org/software/findutils/manual/html_node/find_html/index.html), [source](https://git.savannah.gnu.org/cgit/findutils.git))
+- [GNU findutils](https://www.gnu.org/software/findutils/) ([manual](https://www.gnu.org/software/findutils/manual/html_node/index.html), [source](https://cgit.git.savannah.gnu.org/cgit/findutils.git))
 - BSD `find`
   - FreeBSD `find` ([manual](https://www.freebsd.org/cgi/man.cgi?find(1)), [source](https://cgit.freebsd.org/src/tree/usr.bin/find))
   - OpenBSD `find` ([manual](https://man.openbsd.org/find.1), [source](https://cvsweb.openbsd.org/src/usr.bin/find/))
@@ -35,7 +35,7 @@ These utilities are not `find`-compatible, but serve a similar purpose:
 
 - [`fd`](https://github.com/sharkdp/fd): A simple, fast and user-friendly alternative to 'find'
 - `locate`
-  - [GNU `locate`](https://www.gnu.org/software/findutils/locate)
+  - [GNU `locate`](https://www.gnu.org/software/findutils/manual/html_node/Invoking-locate.html)
   - [`mlocate`](https://pagure.io/mlocate) ([manual](), [source](https://pagure.io/mlocate/tree/master))
   - [`plocate`](https://plocate.sesse.net/) ([manual](https://plocate.sesse.net/plocate.1.html), [source](https://git.sesse.net/?p=plocate))
 - [`walk`](https://github.com/google/walk): Plan 9 style utilities to replace find(1)

@@ -73,7 +73,7 @@ Other build profiles can be enabled:
 --enable-<a href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">ubsan</a>
     Enable sanitizers
 
---enable-<a href="https://gcc.gnu.org/onlinedocs/gcc/gcov/introduction-to-gcov.html">gcov</a>
+--enable-<a href="https://gcc.gnu.org/onlinedocs/gcc/Gcov-Intro.html">gcov</a>
     Enable code coverage instrumentation
 </pre>
 

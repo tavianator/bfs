@@ -41,7 +41,6 @@ static struct dstring *dstrheader(const dchar *dstr) {
  * allocation.
  *
  * - https://stackoverflow.com/q/25296019
- * - https://mastodon.social/@void_friend@tech.lgbt/111144859908104311
  */
 static dchar *dstrdata(struct dstring *header) {
 	return (char *)header + DSTR_OFFSET;
