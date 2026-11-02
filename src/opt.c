@@ -1910,7 +1910,12 @@ done:
 	if (!delete && expr->pure) {
 		// If we're not deleting the expression entirely, replace it with -false
 		expr = opt_const(opt, false);
+
+		// We may return false in more cases than before, so update data flow
+		df_join(&opt->after_false, &opt->after_true);
+		df_init_bottom(&opt->after_true);
 	}
+
 	return expr;
 }
 

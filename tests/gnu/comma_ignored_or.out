@@ -1,0 +1,9 @@
+links/broken
+links/deeply/nested/broken
+links/deeply/nested/file
+links/deeply/nested/link
+links/file
+links/hardlink
+links/notdir
+links/skip
+links/symlink
