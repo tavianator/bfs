@@ -1082,7 +1082,7 @@ static bool must_stat(const struct colors *colors, enum bfs_type type) {
 			return true;
 		}
 
-#ifdef ST_DATALESS
+#ifdef SF_DATALESS
 		if (colors->dataless) {
 			return true;
 		}
