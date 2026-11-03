@@ -684,7 +684,7 @@ int bfs_exec_finish(struct bfs_exec *execbuf) {
 			execbuf->ret |= bfs_exec_flush(execbuf);
 		}
 		if (execbuf->ret != 0) {
-			bfs_exec_debug(execbuf, "One or more executions of '%s' failed\n", execbuf->argv[0]);
+			bfs_exec_debug(execbuf, "One or more executions of '%s' failed\n", execbuf->tmpl_argv[0]);
 		}
 	}
 	return execbuf->ret;
