@@ -266,7 +266,12 @@ int bfs_regexec(struct bfs_regex *regex, const char *str, enum bfs_regexec_flags
 
 	int ret;
 	if (flags & BFS_REGEX_ANCHOR) {
-		ret = onig_match(regex->impl, ustr, end, ustr, NULL, ONIG_OPTION_DEFAULT);
+#ifdef ONIG_OPTION_MATCH_WHOLE_STRING
+		OnigOptionType options = ONIG_OPTION_MATCH_WHOLE_STRING;
+#else
+		OnigOptionType options = ONIG_OPTION_FIND_LONGEST;
+#endif
+		ret = onig_match(regex->impl, ustr, end, ustr, NULL, options);
 	} else {
 		ret = onig_search(regex->impl, ustr, end, ustr, end, NULL, ONIG_OPTION_DEFAULT);
 	}
