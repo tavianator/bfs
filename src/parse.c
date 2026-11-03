@@ -1971,7 +1971,6 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		switch (state) {
 		case MODE_CLAUSE:
 			who = 0;
-			mask = 0777;
 			state = MODE_WHO;
 			[[fallthrough]];
 
@@ -1990,6 +1989,12 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				who |= 0777;
 				break;
 			default:
+				if (who == 0) {
+					who = 0777;
+					mask = who & ~umask;
+				} else {
+					mask = who;
+				}
 				state = MODE_ACTION;
 				continue;
 			}
@@ -2013,13 +2018,6 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			[[fallthrough]];
 
 		case MODE_ACTION:
-			if (who == 0) {
-				who = 0777;
-				mask = who & ~umask;
-			} else {
-				mask = who;
-			}
-
 			switch (*i) {
 			case '+':
 				op = MODE_PLUS;
