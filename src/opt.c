@@ -1835,6 +1835,14 @@ static struct bfs_expr *data_flow_enter(struct bfs_opt *opt, struct bfs_expr *ex
 
 /** Data flow visitor exit. */
 static struct bfs_expr *data_flow_leave(struct bfs_opt *opt, struct bfs_expr *expr, const struct visitor *visitor) {
+	if (bfs_expr_is_parent(expr)) {
+		// Our children may have been rewritten, so recompute the annotations
+		expr = visit_shallow(opt, expr, &annotate);
+		if (!expr) {
+			return NULL;
+		}
+	}
+
 	if (expr->always_true) {
 		expr->probability = 1.0;
 		df_init_bottom(&opt->after_false);
@@ -2199,7 +2207,7 @@ static struct bfs_expr *simplify_comma(struct bfs_opt *opt, struct bfs_expr *exp
 		return only_child(expr);
 	}
 
-	return expr;
+	return visit_shallow(opt, expr, &annotate);
 }
 
 /**
