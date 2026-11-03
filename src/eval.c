@@ -561,12 +561,25 @@ bool eval_hidden(const struct bfs_expr *expr, struct bfs_eval *state) {
 	const struct BFTW *ftwbuf = state->ftwbuf;
 	const char *name = ftwbuf->path + ftwbuf->nameoff;
 
-	// Don't treat "." or ".." as hidden directories.  Otherwise we'd filter
-	// out everything when given
-	//
-	//     $ bfs . -nohidden
-	//     $ bfs .. -nohidden
-	return name[0] == '.' && strcmp(name, ".") != 0 && strcmp(name, "..") != 0;
+	if (name[0] != '.') {
+		return false;
+	}
+
+	// Don't treat "." or "./" as a hidden directory
+	if (!name[1] || name[1] == '/') {
+		return false;
+	}
+
+	if (name[1] != '.') {
+		return true;
+	}
+
+	// Don't treat ".." or "../" as a hidden directory
+	if (!name[2] || name[2] == '/') {
+		return false;
+	}
+
+	return true;
 }
 
 /**
