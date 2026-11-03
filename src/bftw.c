@@ -2210,7 +2210,14 @@ static enum bftw_action bftw_ids_callback(const struct BFTW *ftwbuf, void *ptr) 
 	}
 
 	if (ftwbuf->type == BFS_ERROR) {
-		if (ftwbuf->depth + 1 >= state->min_depth) {
+		// bftw_gc() reports direrrors with the depth of the directory itself, but
+		// conceptually they happen during the (depth + 1) ply
+		size_t depth = ftwbuf->depth;
+		if (state->nested.direrror != 0) {
+			++depth;
+		}
+
+		if (depth >= state->min_depth) {
 			return state->delegate(ftwbuf, state->ptr);
 		} else {
 			return BFTW_PRUNE;
