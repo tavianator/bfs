@@ -265,6 +265,16 @@ static void bfs_exec_free_arg(char *arg, const char *tmpl) {
 	}
 }
 
+/** Get the length of the working directory prefix of a path. */
+static size_t bfs_exec_wd_len(const struct BFTW *ftwbuf) {
+	size_t len = ftwbuf->nameoff;
+	if (len == 0 && ftwbuf->path[0] == '/') {
+		// Root paths like "/" run from "/"
+		++len;
+	}
+	return len;
+}
+
 /** Open a file to use as the working directory. */
 static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	bfs_assert(execbuf->wd_fd < 0);
@@ -285,14 +295,10 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 		}
 	}
 
-	execbuf->wd_len = ftwbuf->nameoff;
+	execbuf->wd_len = bfs_exec_wd_len(ftwbuf);
 	if (execbuf->wd_len == 0) {
-		if (ftwbuf->path[0] == '/') {
-			++execbuf->wd_len;
-		} else {
-			// The path is something like "foo", so we're already in the right directory
-			return 0;
-		}
+		// The path is something like "foo", so we're already in the right directory
+		return 0;
 	}
 
 	execbuf->wd_path = strndup(ftwbuf->path, execbuf->wd_len);
@@ -574,8 +580,9 @@ static int bfs_exec_flush(struct bfs_exec *execbuf) {
 /** Check if we need to flush the execbuf because we're changing directories. */
 static bool bfs_exec_changed_dirs(const struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	if (execbuf->flags & BFS_EXEC_CHDIR) {
-		if (ftwbuf->nameoff > execbuf->wd_len
-		    || (execbuf->wd_path && strncmp(ftwbuf->path, execbuf->wd_path, execbuf->wd_len) != 0)) {
+		size_t wd_len = bfs_exec_wd_len(ftwbuf);
+		if (wd_len != execbuf->wd_len
+		    || (execbuf->wd_path && strncmp(ftwbuf->path, execbuf->wd_path, wd_len) != 0)) {
 			bfs_exec_debug(execbuf, "Changed directories, executing buffered command\n");
 			return true;
 		}
