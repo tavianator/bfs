@@ -702,6 +702,8 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 #else
 	pid_t pid = fork();
 #endif
+	int error = errno;
+
 	if (pid == 0) {
 		// Child
 		bfs_spawn_exec(res, ctx, argv, envp, &old_mask, pipefd);
@@ -713,12 +715,12 @@ static pid_t bfs_fork_spawn(struct bfs_resolver *res, const struct bfs_spawn *ct
 
 	if (pid < 0) {
 		// fork() failed
+		errno = error;
 		goto fail;
 	}
 
 	xclose(pipefd[1]);
 
-	int error;
 	ssize_t nbytes = xread(pipefd[0], &error, sizeof(error));
 	xclose(pipefd[0]);
 	if (nbytes == sizeof(error)) {
