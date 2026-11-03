@@ -1146,9 +1146,16 @@ static int bftw_file_openat(struct bftw_state *state, struct bftw_file *file, st
 	fd = openat(at_fd, at_path, flags);
 
 	if (fd < 0 && errno == EMFILE) {
+		// Drain the ioq before retrying to unpin parents and account
+		// for unprocessed async close()s
+		while (bftw_ioq_pop(state, true) >= 0);
+
 		if (bftw_cache_pop(cache) == 0) {
 			fd = openat(at_fd, at_path, flags);
+		} else {
+			errno = EMFILE;
 		}
+
 		cache->capacity = 1;
 	}
 
