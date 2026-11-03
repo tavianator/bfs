@@ -1470,7 +1470,7 @@ static enum bftw_action eval_callback(const struct BFTW *ftwbuf, void *ptr) {
 		}
 	}
 
-	if (exchange(&args->alrm_flag, false, relaxed)) {
+	if (exchange(&args->alrm_flag, false, relaxed) && args->bar) {
 		eval_status(&state, args->bar, args->count);
 	}
 
