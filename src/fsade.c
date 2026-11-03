@@ -163,7 +163,7 @@ static int bfs_acl_entry(acl_t acl, int which, acl_entry_t *entry) {
 	}
 
 	acl_entry_t last = &acl->acl_entry[acl->acl_cnt];
-	return *entry == last;
+	return *entry != last;
 #else
 	errno = ENOTSUP;
 	return -1;
