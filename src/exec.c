@@ -275,9 +275,27 @@ static size_t bfs_exec_wd_len(const struct BFTW *ftwbuf) {
 	return len;
 }
 
+/** Close the working directory. */
+static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
+	if (execbuf->wd_fd >= 0) {
+		if (!ftwbuf || execbuf->wd_fd != ftwbuf->at_fd) {
+			close_quietly(execbuf->wd_fd);
+		}
+		execbuf->wd_fd = -1;
+	}
+
+	if (execbuf->wd_path) {
+		free(execbuf->wd_path);
+		execbuf->wd_path = NULL;
+	}
+
+	execbuf->wd_len = 0;
+}
+
 /** Open a file to use as the working directory. */
 static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
 	bfs_assert(execbuf->wd_fd < 0);
+	bfs_assert(execbuf->wd_len == 0);
 	bfs_assert(!execbuf->wd_path);
 
 	if (ftwbuf->at_fd != (int)AT_FDCWD) {
@@ -303,34 +321,20 @@ static int bfs_exec_openwd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) 
 
 	execbuf->wd_path = strndup(ftwbuf->path, execbuf->wd_len);
 	if (!execbuf->wd_path) {
+		bfs_exec_closewd(execbuf, ftwbuf);
 		return -1;
 	}
 
 	if (execbuf->wd_fd < 0) {
-		execbuf->wd_fd = open(execbuf->wd_path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+		execbuf->wd_fd = open(execbuf->wd_path, O_SEARCH | O_CLOEXEC | O_DIRECTORY);
 	}
 
 	if (execbuf->wd_fd < 0) {
+		bfs_exec_closewd(execbuf, ftwbuf);
 		return -1;
 	}
 
 	return 0;
-}
-
-/** Close the working directory. */
-static void bfs_exec_closewd(struct bfs_exec *execbuf, const struct BFTW *ftwbuf) {
-	if (execbuf->wd_fd >= 0) {
-		if (!ftwbuf || execbuf->wd_fd != ftwbuf->at_fd) {
-			xclose(execbuf->wd_fd);
-		}
-		execbuf->wd_fd = -1;
-	}
-
-	if (execbuf->wd_path) {
-		free(execbuf->wd_path);
-		execbuf->wd_path = NULL;
-		execbuf->wd_len = 0;
-	}
 }
 
 /** Actually spawn the process. */
