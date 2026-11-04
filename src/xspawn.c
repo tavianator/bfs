@@ -9,6 +9,7 @@
 #include "diag.h"
 #include "list.h"
 #include "sighook.h"
+#include "stat.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -429,11 +430,33 @@ static bool bfs_resolve_next(const char **path, const char **next, size_t *len) 
 	return true;
 }
 
+/** Check if a path is executable. */
+static int bfs_check_executable(int at_fd, const char *at_path) {
+	if (xfaccessat(at_fd, at_path, X_OK) != 0) {
+		return -1;
+	}
+
+	// Directories might be executable too, but we can't execute them
+	struct bfs_stat sb;
+	if (bfs_stat(at_fd, at_path, BFS_STAT_FOLLOW, &sb) != 0) {
+		return -1;
+	}
+
+	if (!S_ISREG(sb.mode)) {
+		errno = EACCES;
+		return -1;
+	}
+
+	return 0;
+}
+
 /** Finish resolving an executable, potentially from the child process. */
 static int bfs_resolve_late(struct bfs_resolver *res) {
 	if (res->done) {
 		return 0;
 	}
+
+	int error = ENOENT;
 
 	char *buf = res->buf;
 	char *end = buf + res->len;
@@ -447,18 +470,20 @@ static int bfs_resolve_late(struct bfs_resolver *res) {
 		cur = xstpecpy(cur, end, res->exe);
 		if (cur == end) {
 			bfs_bug("PATH resolution buffer too small");
-			errno = ENOMEM;
-			return -1;
+			error = ENOMEM;
+			break;
 		}
 
-		if (xfaccessat(AT_FDCWD, buf, X_OK) == 0) {
+		if (bfs_check_executable(AT_FDCWD, buf) == 0) {
 			res->exe = buf;
 			res->done = true;
 			return 0;
+		} else if (error != EACCES) {
+			error = errno;
 		}
 	}
 
-	errno = ENOENT;
+	errno = error;
 	return -1;
 }
 
@@ -502,8 +527,8 @@ static bool bfs_spawn_will_chdir(const struct bfs_spawn *ctx) {
 	return false;
 }
 
-/** Check if we can call xfaccessat() before file actions. */
-static bool bfs_can_access_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
+/** Check if we can call bfs_check_executable() before file actions. */
+static bool bfs_can_check_early(const struct bfs_resolver *res, const struct bfs_spawn *ctx) {
 	if (res->exe[0] == '/') {
 		return true;
 	}
@@ -552,13 +577,13 @@ static int bfs_resolve_early(struct bfs_resolver *res, const char *exe, const st
 	};
 
 	if (bfs_can_skip_resolve(res, ctx)) {
-		if (bfs_can_access_early(res, ctx)) {
+		if (bfs_can_check_early(res, ctx)) {
 			// Do this check eagerly, even though posix_spawn()/execv() also
 			// would, because:
 			//
-			//     - faccessat() is faster than fork()/clone() + execv()
+			//     - faccessat() + stat() is faster than fork()/clone() + execv()
 			//     - posix_spawn() is not guaranteed to report ENOENT
-			if (xfaccessat(AT_FDCWD, exe, X_OK) != 0) {
+			if (bfs_check_executable(AT_FDCWD, exe) != 0) {
 				return -1;
 			}
 		}
