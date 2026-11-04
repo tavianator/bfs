@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
@@ -69,30 +70,6 @@ struct bfs_spawn_action {
 	};
 };
 
-int bfs_spawn_init(struct bfs_spawn *ctx) {
-	ctx->flags = 0;
-	SLIST_INIT(ctx);
-
-#if BFS_POSIX_SPAWN >= 0
-	if (sysoption(SPAWN) > 0) {
-		ctx->flags |= BFS_SPAWN_USE_POSIX;
-
-		errno = posix_spawn_file_actions_init(&ctx->actions);
-		if (errno != 0) {
-			return -1;
-		}
-
-		errno = posix_spawnattr_init(&ctx->attr);
-		if (errno != 0) {
-			posix_spawn_file_actions_destroy(&ctx->actions);
-			return -1;
-		}
-	}
-#endif
-
-	return 0;
-}
-
 /**
  * Clear the BFS_SPAWN_USE_POSIX flag and free the attributes.
  */
@@ -118,18 +95,29 @@ int bfs_spawn_destroy(struct bfs_spawn *ctx) {
 }
 
 #if BFS_POSIX_SPAWN >= 0
+
+#if BFS_HAS_POSIX_SPAWN_XFLAGS
+#  define BFS_POSIX_SPAWN_GETFLAGS posix_spawnattr_getxflags
+#  define BFS_POSIX_SPAWN_SETFLAGS posix_spawnattr_setxflags
+typedef uint32_t bfs_posix_spawn_flags;
+#else
+#  define BFS_POSIX_SPAWN_GETFLAGS posix_spawnattr_getflags
+#  define BFS_POSIX_SPAWN_SETFLAGS posix_spawnattr_setflags
+typedef short bfs_posix_spawn_flags;
+#endif
+
 /** Set some posix_spawnattr flags. */
 [[_maybe_unused]]
-static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
-	short prev;
-	errno = posix_spawnattr_getflags(&ctx->attr, &prev);
+static int bfs_spawn_addflags(struct bfs_spawn *ctx, bfs_posix_spawn_flags flags) {
+	bfs_posix_spawn_flags prev;
+	errno = BFS_POSIX_SPAWN_GETFLAGS(&ctx->attr, &prev);
 	if (errno != 0) {
 		return -1;
 	}
 
-	short next = prev | flags;
+	bfs_posix_spawn_flags next = prev | flags;
 	if (next != prev) {
-		errno = posix_spawnattr_setflags(&ctx->attr, next);
+		errno = BFS_POSIX_SPAWN_SETFLAGS(&ctx->attr, next);
 		if (errno != 0) {
 			return -1;
 		}
@@ -137,7 +125,86 @@ static int bfs_spawn_addflags(struct bfs_spawn *ctx, short flags) {
 
 	return 0;
 }
+
+#if BFS_HAS_POSIX_SPAWNATTR_SETSIGIGNORE
+#  define BFS_POSIX_SPAWNATTR_SETSIGIGNORE posix_spawnattr_setsigignore
+#elif BFS_HAS_POSIX_SPAWNATTR_SETSIGIGNORE_NP
+#  define BFS_POSIX_SPAWNATTR_SETSIGIGNORE posix_spawnattr_setsigignore_np
 #endif
+
+#ifdef POSIX_SPAWN_SETSIGIGN
+#  define BFS_POSIX_SPAWN_SETSIGIGN POSIX_SPAWN_SETSIGIGN
+#elif defined(POSIX_SPAWN_SETSIGIGN_NP)
+#  define BFS_POSIX_SPAWN_SETSIGIGN POSIX_SPAWN_SETSIGIGN_NP
+#endif
+
+/** Tell posix_spawn() to set SIG_IGN dispositions, if possible. */
+static int bfs_spawn_setsigign(struct bfs_spawn *ctx, const sigset_t *signals) {
+#if defined(BFS_POSIX_SPAWNATTR_SETSIGIGNORE) && defined(BFS_POSIX_SPAWN_SETSIGIGN)
+	errno = BFS_POSIX_SPAWNATTR_SETSIGIGNORE(&ctx->attr, signals);
+	if (errno != 0) {
+		goto fail;
+	}
+
+	if (bfs_spawn_addflags(ctx, BFS_POSIX_SPAWN_SETSIGIGN) != 0) {
+		goto fail;
+	}
+
+	return 0;
+
+fail:
+	return -1;
+#else
+	// bfs_fork_spawn() always does the right thing through sigreset()
+	bfs_spawn_clear_posix(ctx);
+	return 0;
+#endif
+}
+
+/** Preserve SIG_IGN dispositions overridden by sighook(). */
+static int bfs_spawn_restore_sig_ign(struct bfs_spawn *ctx) {
+	if (!sigreset_needed()) {
+		return 0;
+	}
+
+	sigset_t signals;
+	if (sigignored(&signals) != 0) {
+		return -1;
+	}
+
+	return bfs_spawn_setsigign(ctx, &signals);
+}
+
+#endif // BFS_POSIX_SPAWN >= 0
+
+int bfs_spawn_init(struct bfs_spawn *ctx) {
+	ctx->flags = 0;
+	SLIST_INIT(ctx);
+
+#if BFS_POSIX_SPAWN >= 0
+	if (sysoption(SPAWN) > 0) {
+		ctx->flags |= BFS_SPAWN_USE_POSIX;
+
+		errno = posix_spawn_file_actions_init(&ctx->actions);
+		if (errno != 0) {
+			return -1;
+		}
+
+		errno = posix_spawnattr_init(&ctx->attr);
+		if (errno != 0) {
+			posix_spawn_file_actions_destroy(&ctx->actions);
+			return -1;
+		}
+
+		if (bfs_spawn_restore_sig_ign(ctx) != 0) {
+			bfs_spawn_destroy(ctx);
+			return -1;
+		}
+	}
+#endif
+
+	return 0;
+}
 
 /** Allocate a spawn action. */
 static struct bfs_spawn_action *bfs_spawn_action(enum bfs_spawn_op op) {
@@ -289,12 +356,12 @@ int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit
 	}
 
 #ifdef POSIX_SPAWN_SETRLIMIT
-	if (bfs_spawn_addflags(ctx, POSIX_SPAWN_SETRLIMIT) != 0) {
+	errno = posix_spawnattr_setrlimit(&ctx->attr, resource, rl);
+	if (errno != 0) {
 		goto fail;
 	}
 
-	errno = posix_spawnattr_setrlimit(&ctx->attr, resource, rl);
-	if (errno != 0) {
+	if (bfs_spawn_addflags(ctx, POSIX_SPAWN_SETRLIMIT) != 0) {
 		goto fail;
 	}
 #else

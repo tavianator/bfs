@@ -28,4 +28,4 @@ else
     YN="$N"
 fi
 
-build/msg.sh "$(printf "%-37s  $YN" "$MSG")"
+build/msg.sh "$(printf "%-44s  $YN" "$MSG")"

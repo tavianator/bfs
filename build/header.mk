@@ -45,6 +45,9 @@ HEADERS := \
     gen/has/posix-getdents.h \
     gen/has/posix-spawn-addfchdir-np.h \
     gen/has/posix-spawn-addfchdir.h \
+    gen/has/posix-spawn-xflags.h \
+    gen/has/posix-spawnattr-setsigignore-np.h \
+    gen/has/posix-spawnattr-setsigignore.h \
     gen/has/pthread-set-name-np.h \
     gen/has/pthread-setname-np.h \
     gen/has/sched-getaffinity.h \

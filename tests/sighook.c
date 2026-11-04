@@ -214,6 +214,9 @@ static void check_sigexit(int sig) {
 
 		disable_core_dumps();
 
+		// atsigexit() doesn't hook ignored signals
+		bfs_everify(signal(sig, SIG_DFL) != SIG_ERR);
+
 		// exit_hook() will write to killed[1]
 		bfs_everify(atsigexit(exit_hook, killed) != NULL);
 
@@ -226,6 +229,60 @@ static void check_sigexit(int sig) {
 			nanosleep(&dur, NULL);
 		}
 	}
+}
+
+/** Run a test in a child process, so it doesn't change our signal dispositions. */
+static void fork_and_check(void (*fn)(void)) {
+	pid_t pid;
+	bfs_everify((pid = fork()) >= 0);
+
+	if (pid == 0) {
+		fn();
+		_Exit(EXIT_SUCCESS);
+	}
+
+	int wstatus;
+	if (bfs_echeck(xwaitpid(pid, &wstatus, 0) == pid)) {
+		bfs_check(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == EXIT_SUCCESS);
+	}
+}
+
+/** Check that atsigexit() doesn't override SIG_IGN. */
+static void sigexit_ignored(void) {
+	bfs_everify(signal(SIGHUP, SIG_IGN) != SIG_ERR);
+
+	atomic size_t count = 0;
+	struct sighook *hook = atsigexit(counter_hook, &count);
+	bfs_everify(hook, "atsigexit()");
+
+	struct sigaction sa;
+	bfs_everify(sigaction(SIGHUP, NULL, &sa) == 0);
+	bfs_verify(!(sa.sa_flags & SA_SIGINFO) && sa.sa_handler == SIG_IGN);
+
+	// Should be ignored, not run the hook and die
+	bfs_everify(raise(SIGHUP) == 0);
+
+	size_t value = load(&count, relaxed);
+	bfs_verify(value == 0);
+}
+
+/** Check that sighook() on an ignored signal doesn't make it fatal. */
+static void sighook_ignored(void) {
+	bfs_everify(signal(SIGUSR1, SIG_IGN) != SIG_ERR);
+
+	atomic size_t count = 0;
+	struct sighook *hook = sighook(SIGUSR1, counter_hook, &count, 0);
+	bfs_everify(hook, "sighook(SIGUSR1)");
+
+	// The hook should run, but we shouldn't die
+	bfs_everify(raise(SIGUSR1) == 0);
+	sigunhook(hook);
+
+	size_t value = load(&count, relaxed);
+	bfs_verify(value == 1);
+
+	// Still shouldn't die after sigunhook()
+	bfs_everify(raise(SIGUSR1) == 0);
 }
 
 /** Regression test for removing the last hook in the list. */
@@ -271,6 +328,9 @@ void check_sighook(void) {
 #if !__APPLE__
 	check_sigexit(SIGSEGV);
 #endif
+
+	fork_and_check(sigexit_ignored);
+	fork_and_check(sighook_ignored);
 
 	check_sigunhook_tail();
 }

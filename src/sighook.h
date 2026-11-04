@@ -80,4 +80,20 @@ void sigunhook(struct sighook *hook);
  */
 int sigreset(void);
 
+/**
+ * @return Whether any SIG_IGN dispositions were overridden, making sigreset()
+ *         necessary before spawning a child process.
+ */
+bool sigreset_needed(void);
+
+/**
+ * Get the signals known to have SIG_IGN disposition before sighook() ever ran.
+ *
+ * @signals[out]
+ *         The set of SIG_IGN signals.
+ * @return
+ *         0 on success, -1 on failure.
+ */
+int sigignored(sigset_t *signals);
+
 #endif // BFS_SIGHOOK_H

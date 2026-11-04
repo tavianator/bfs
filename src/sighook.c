@@ -481,6 +481,50 @@ static enum sigflags run_hooks(struct rcu_list *list, int sig, siginfo_t *info) 
 	return ret;
 }
 
+/** The set of signals that were originally SIG_IGNored. */
+static struct rcu ignored_signals;
+/** Whether any ignored signals were overridden by sighook(). */
+static atomic bool any_ignored_overridden = false;
+
+/** Check if a signal was originally ignored. */
+static bool was_ignored(int sig) {
+	struct arc *slot;
+	const sigset_t *set = rcu_read(&ignored_signals, &slot);
+	bool ret = set && sigismember(set, sig) == 1;
+	arc_put(slot);
+	return ret;
+}
+
+/** Add a signal to the ignored set. */
+static int mark_ignored(int sig) {
+	const sigset_t *prev = rcu_peek(&ignored_signals);
+	if (prev && sigismember(prev, sig) == 1) {
+		return 0;
+	}
+
+	sigset_t *next = ALLOC(sigset_t);
+	if (!next) {
+		return -1;
+	}
+
+	if (prev) {
+		*next = *prev;
+	} else if (sigemptyset(next) != 0) {
+		goto fail;
+	}
+
+	if (sigaddset(next, sig) != 0) {
+		goto fail;
+	}
+
+	free(rcu_update(&ignored_signals, next));
+	return 0;
+
+fail:
+	free(next);
+	return -1;
+}
+
 /** Dispatches a signal to the registered handlers. */
 static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	// If we get a fault (e.g. a "real" SIGSEGV, not something like
@@ -520,7 +564,7 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 	enum sigflags flags = run_hooks(list, sig, info);
 
 	// Run the atsigexit() hooks, if we're exiting
-	if (!(flags & SH_CONTINUE) && is_fatal(sig)) {
+	if (!(flags & SH_CONTINUE) && is_fatal(sig) && !was_ignored(sig)) {
 		list = siglist(0);
 		run_hooks(list, sig, info);
 		reraise(info);
@@ -542,7 +586,7 @@ static struct rcu_list saved;
 static atomic bool initialized = false;
 
 /** Make sure our signal handler is installed for a given signal. */
-static int siginit(int sig) {
+static int siginit(int sig, bool override_sig_ign) {
 #ifdef SA_RESTART
 #  define BFS_SA_RESTART SA_RESTART
 #else
@@ -567,6 +611,7 @@ static int siginit(int sig) {
 		}
 
 		rcu_list_init(&saved);
+		rcu_init(&ignored_signals, NULL);
 		store(&initialized, true, release);
 	}
 
@@ -587,6 +632,16 @@ static int siginit(int sig) {
 		return -1;
 	}
 
+	bool ignored = !(original.sa_flags & SA_SIGINFO) && original.sa_handler == SIG_IGN;
+	if (ignored) {
+		if (mark_ignored(sig) != 0) {
+			return -1;
+		}
+		if (!override_sig_ign) {
+			return 0;
+		}
+	}
+
 	struct sigsave *save = ALLOC(struct sigsave);
 	if (!save) {
 		return -1;
@@ -600,6 +655,10 @@ static int siginit(int sig) {
 		rcu_list_remove(&saved, &save->node);
 		free(save);
 		return -1;
+	}
+
+	if (ignored) {
+		store(&any_ignored_overridden, true, release);
 	}
 
 	signals = updated;
@@ -630,7 +689,7 @@ struct sighook *sighook(int sig, sighook_fn *fn, void *arg, enum sigflags flags)
 	mutex_lock(&sigmutex);
 
 	struct sighook *ret = NULL;
-	if (siginit(sig) == 0) {
+	if (siginit(sig, true) == 0) {
 		ret = sighook_impl(sig, fn, arg, flags);
 	}
 
@@ -645,12 +704,12 @@ struct sighook *atsigexit(sighook_fn *fn, void *arg) {
 		// Ignore errors; atsigexit() is best-effort anyway and things
 		// like sanitizer runtimes or valgrind may reserve signals for
 		// their own use
-		siginit(FATAL_SIGNALS[i]);
+		siginit(FATAL_SIGNALS[i], false);
 	}
 
 #ifdef SIGRTMIN
 	for (int i = SIGRTMIN; i <= SIGRTMAX; ++i) {
-		siginit(i);
+		siginit(i, false);
 	}
 #endif
 
@@ -688,5 +747,28 @@ int sigreset(void) {
 		}
 	}
 
+	return ret;
+}
+
+bool sigreset_needed(void) {
+	return load(&any_ignored_overridden, acquire);
+}
+
+int sigignored(sigset_t *signals) {
+	if (!load(&initialized, acquire)) {
+		return sigemptyset(signals);
+	}
+
+	int ret = 0;
+	mutex_lock(&sigmutex);
+
+	const sigset_t *current = rcu_peek(&ignored_signals);
+	if (current) {
+		*signals = *current;
+	} else {
+		ret = sigemptyset(signals);
+	}
+
+	mutex_unlock(&sigmutex);
 	return ret;
 }
