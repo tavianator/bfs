@@ -988,22 +988,23 @@ static struct bfs_expr *parse_time(struct bfs_parser *parser, int field, int arg
 		return expr;
 	}
 
-	unsigned long long time = expr->num;
+	long long time = expr->num;
 	expr->num = 0;
 
 	while (true) {
+		long long scale = 1;
 		switch (*tail) {
 		case 'w':
-			time *= 7;
+			scale *= 7;
 			[[fallthrough]];
 		case 'd':
-			time *= 24;
+			scale *= 24;
 			[[fallthrough]];
 		case 'h':
-			time *= 60;
+			scale *= 60;
 			[[fallthrough]];
 		case 'm':
-			time *= 60;
+			scale *= 60;
 			[[fallthrough]];
 		case 's':
 			break;
@@ -1012,7 +1013,12 @@ static struct bfs_expr *parse_time(struct bfs_parser *parser, int field, int arg
 			return NULL;
 		}
 
-		expr->num += time;
+		// Make sure expr->num + time * scale doesn't overflow
+		if (time > (LLONG_MAX - expr->num) / scale) {
+			parse_expr_error(parser, expr, "Time is too large.\n");
+			return NULL;
+		}
+		expr->num += time * scale;
 
 		if (!*++tail) {
 			break;
