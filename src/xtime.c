@@ -429,7 +429,7 @@ struct timer *xtimer_start(const struct timespec *interval) {
 	}
 
 #if BFS_POSIX_TIMERS >= 0
-	if (sysoption(TIMERS)) {
+	if (sysoption(TIMERS) > 0) {
 		clockid_t clock = CLOCK_REALTIME;
 
 #if defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
