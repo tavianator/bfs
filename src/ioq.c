@@ -753,6 +753,7 @@ static void ioq_ring_drain(struct ioq_ring_state *state, size_t wait_nr) {
 
 /** Submit prepped SQEs, and wait for some to complete. */
 static void ioq_ring_submit(struct ioq_ring_state *state) {
+	struct ioq *ioq = state->ioq;
 	struct io_uring *ring = state->ring;
 
 	size_t prepped = io_uring_sq_ready(ring);
@@ -768,6 +769,11 @@ static void ioq_ring_submit(struct ioq_ring_state *state) {
 	if (unreaped > ring->sq.ring_entries) {
 		// Keep the completion queue below half full
 		wait_nr = unreaped - ring->sq.ring_entries;
+	}
+
+	if (wait_nr > 0) {
+		// Don't hold up already-completed requests while we wait
+		ioq_batch_flush(ioq->ready, &state->ready);
 	}
 
 	// Submit all prepped SQEs
