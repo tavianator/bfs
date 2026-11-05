@@ -3593,6 +3593,7 @@ static int parse_files0_roots(struct bfs_parser *parser) {
 		char *path = xgetdelim(file, '\0');
 		if (!path) {
 			if (errno) {
+				parse_expr_error(parser, expr, "%s.\n", errstr());
 				goto fail;
 			} else {
 				break;
