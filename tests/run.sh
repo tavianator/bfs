@@ -413,6 +413,19 @@ epoch_time() {
     fi
 }
 
+# Get a timezone where the current time is between 06:00 and 18:00, so that
+# recently created files are from the same day, even if the test is slow
+midday_tz() {
+    local now=$(epoch_time)
+    local hour=$(((now / 60 / 60) % 24))
+
+    if ((hour >= 6 && hour < 18)); then
+        echo UTC0
+    else
+        echo NZST-12
+    fi
+}
+
 ## Snapshot testing
 
 # Return value when a difference is detected
