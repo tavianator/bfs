@@ -1,6 +1,83 @@
 4.*
 ===
 
+4.1.6
+-----
+
+**November 5, 2026**
+
+## Bug fixes
+
+- Fixed optimizer bugs that could produce wrong results for expressions involving the comma operator, like
+
+      $ bfs \( -type f -o -type d \) , \! -type d
+
+  The bugs were originally introduced in bfs 3.1 (February 6, 2024).
+  ([`9b36c6bf`](https://github.com/tavianator/bfs/commit/9b36c6bf152985d86b9153a892224d4664288fc0),
+  [`b6a703a3`](https://github.com/tavianator/bfs/commit/b6a703a3e5d67e5ac1a0d908f38fc24b3bfef798))
+
+- Fixed `-regex` with Oniguruma when a partial match was found before a complete one.
+  For example, `-regex '.*/a*\(ab\)*'` failed to match `./aab`.
+  The bug was originally introduced in bfs 2.4 (February 22, 2022).
+  ([`90bd8929`](https://github.com/tavianator/bfs/commit/90bd89291a7c855d0284be61c1f609ffe866cce6))
+
+- Fixed `-fstype` on Linux bind mounts of the same file system.
+  The bug was originally introduced in bfs 4.0.6 (February 26, 2025).
+  ([`6fd62172`](https://github.com/tavianator/bfs/commit/6fd621720300ecab2eba79aa048e1be4f8a98126))
+
+- Fixed `-perm` with multiple actions in a single symbolic mode, like `+r+w`, which only applied the file creation mask to the first action.
+  The bug was originally introduced in bfs 4.0 (August 16, 2024).
+  ([`0b16a06b`](https://github.com/tavianator/bfs/commit/0b16a06b1f8b01edf8fa4bd14b1de59ce0bce731))
+
+- Fixed `-hidden` and `-nohidden` with root paths like `./` or `../`, which are now treated the same as `.` and `..`.
+  The bug was originally introduced in bfs 2.2 (March 6, 2021).
+  ([`95e9fec5`](https://github.com/tavianator/bfs/commit/95e9fec591c4da41b420f6105d4254222c8b7872))
+
+- Signals that were ignored at startup (for example by `nohup`) now stay ignored, both by `bfs` itself and by any child processes it spawns.
+  The bug was originally introduced in bfs 3.3 (May 28, 2024).
+  ([`3da97069`](https://github.com/tavianator/bfs/commit/3da97069c36b964f7b4f3de30f43a7d03d6f585a))
+
+- Fixed `-execdir ... {} +` detection of a changed working directory with `-depth` and multiple root paths.
+  The bug had been present since `-execdir` was implemented in bfs 1.0 (April 24, 2017).
+  ([`c855df75`](https://github.com/tavianator/bfs/commit/c855df756df26ffbcdfb83a47a454cd52f2d62b3))
+
+- Fixed an assertion failure after `-execdir` failed to open a parent directory.
+  `-execdir` now also works in directories that are searchable but not readable.
+  ([`f330325b`](https://github.com/tavianator/bfs/commit/f330325b791b81dd51c64a0aca34f98580824f84))
+
+- Fixed `-exec`, etc. attempting to execute a directory if it appeared earlier in `$PATH` than the actual binary.
+  The bug was originally introduced in bfs 2.3 (November 25, 2021).
+  ([`a44963fe`](https://github.com/tavianator/bfs/commit/a44963feda1219a942bbfb472b014539f3762842))
+
+- Fixed integer overflow in `-mtime` and friends with very large time units, which are now reported as an error
+  ([`b7bd6b7d`](https://github.com/tavianator/bfs/commit/b7bd6b7d439e7a853bd058b36c564af774b7fd1f))
+
+- Fixed a potential crash when hiding the `-status` bar with `SIGINFO`/`SIGUSR1`.
+  The bug was originally introduced in bfs 4.0.3 (October 22, 2024).
+  ([`f63154bf`](https://github.com/tavianator/bfs/commit/f63154bfe69dd5fc9bf89194ccee7e8cdd9b247f))
+
+- Fixed a use-after-free in `-D exec` with commands like `-exec {} +`.
+  The bug was originally introduced in bfs 1.2.3 (July 15, 2018).
+  ([`d68703db`](https://github.com/tavianator/bfs/commit/d68703dbe3a7f582de8bd57318d18ad9c350fa13))
+
+- Fixed spurious `EMFILE` errors by waiting for pending I/O before retrying.
+  The bug was originally introduced in bfs 3.0 (July 13, 2023).
+  ([`b5361674`](https://github.com/tavianator/bfs/commit/b53616748e2a1f1412928fc43df277116725aac1))
+
+- Fixed duplicate error messages for files that couldn't be `stat()`ed with `-S {ids,eds}`
+  ([`b79d51a4`](https://github.com/tavianator/bfs/commit/b79d51a4bb87a54cd82b293b3d4f430777ac77d2))
+
+- Fixed error messages when `fork()` fails.
+  The bug was originally introduced in bfs 4.0 (August 16, 2024).
+  ([`07ddac5c`](https://github.com/tavianator/bfs/commit/07ddac5c41aa0c420083a2f7fee49593eb510d63))
+
+- Fixed coloring of dataless files on macOS
+  ([`a96e7570`](https://github.com/tavianator/bfs/commit/a96e75701ae6e7e751f9ad5fa77330b719447803))
+
+- Fixed `-acl` on DragonFly BSD
+  ([`fc37d66c`](https://github.com/tavianator/bfs/commit/fc37d66cd591313eedff55c89f06f4d2b2410f22))
+
+
 4.1.5
 -----
 
