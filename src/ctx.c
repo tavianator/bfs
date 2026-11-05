@@ -216,7 +216,6 @@ static int bfs_ctx_fclose(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 	if (ctx_file->error) {
 		// An error was previously reported during bfs_ctx_flush()
 		ret = -1;
-		error = ctx_file->error;
 	}
 
 	// Flush the file just before we remove the hook, to maximize the chance
@@ -240,7 +239,7 @@ static int bfs_ctx_fclose(struct bfs_ctx *ctx, struct bfs_ctx_file *ctx_file) {
 		ret = 0;
 	}
 
-	if (ret != 0 && ctx->cerr) {
+	if (ret != 0 && error && ctx->cerr) {
 		if (ctx_file->path) {
 			bfs_error(ctx, "%pq: %s.\n", ctx_file->path, xstrerror(error));
 		} else if (cfile == ctx->cout) {
