@@ -369,6 +369,8 @@ struct bftw_queue {
 	struct bftw_list waiting;
 	/** A list of already-serviced files. */
 	struct bftw_list ready;
+	/** Where to insert newly-ready files (unused with BFTW_QORDER). */
+	struct bftw_file **cursor;
 	/** The current size of the queue. */
 	size_t size;
 	/** The number of files currently in-service. */
@@ -383,6 +385,7 @@ static void bftw_queue_init(struct bftw_queue *queue, enum bftw_qflags flags) {
 	SLIST_INIT(&queue->buffer);
 	SLIST_INIT(&queue->waiting);
 	SLIST_INIT(&queue->ready);
+	queue->cursor = queue->ready.tail;
 	queue->size = 0;
 	queue->ioqueued = 0;
 	queue->imbalance = 0;
@@ -482,7 +485,7 @@ static void bftw_queue_attach(struct bftw_queue *queue, struct bftw_file *file, 
 	}
 
 	if (!(queue->flags & BFTW_QORDER)) {
-		SLIST_APPEND(&queue->ready, file, ready);
+		queue->cursor = SLIST_INSERT(&queue->ready, queue->cursor, file, ready);
 	}
 }
 
@@ -528,6 +531,9 @@ static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 	bfs_assert(SLIST_EMPTY(&queue->buffer));
 
 	struct bftw_file *file = SLIST_POP(&queue->ready, ready);
+	queue->cursor = (queue->flags & BFTW_QLIFO)
+		? &queue->ready.head
+		: queue->ready.tail;
 
 	if (!file || file == SLIST_HEAD(&queue->waiting)) {
 		// If no files are ready, try the waiting list.  Or, if
@@ -1429,7 +1435,8 @@ static bool bftw_pop_dir(struct bftw_state *state) {
 		}
 	} else if (!bftw_queue_ready(&state->dirq)) {
 		// Don't block if we have files ready to visit
-		if (bftw_queue_ready(&state->fileq)) {
+		bool files_first = state->strategy == BFTW_BFS || state->dirq.ioqueued > 0;
+		if (files_first && bftw_queue_ready(&state->fileq)) {
 			return false;
 		}
 	}
@@ -1509,6 +1516,10 @@ fail:
 
 /** Check if we should stat() a file asynchronously. */
 static bool bftw_should_ioq_stat(struct bftw_state *state, struct bftw_file *file) {
+	if (!state->ioq) {
+		return false;
+	}
+
 	// POSIX wants the root paths to be processed in order
 	// See https://www.austingroupbugs.net/view.php?id=1859
 	if (file->depth == 0) {
