@@ -469,13 +469,15 @@ struct ioq_batch {
 	size_t head;
 	/** The end of the batch. */
 	size_t tail;
+	/** The number of non-blocking pops to skip before the next fill. */
+	size_t skip;
 	/** The array of entries. */
 	struct ioq_ent *entries[IOQ_BATCH];
 };
 
 /** Reset a batch. */
 static void ioq_batch_reset(struct ioq_batch *batch) {
-	batch->head = batch->tail = 0;
+	batch->head = batch->tail = batch->skip = 0;
 }
 
 /** Check if a batch is empty. */
@@ -509,6 +511,8 @@ static bool ioq_batch_fill(struct ioqq *ioqq, struct ioq_batch *batch, bool bloc
 		struct ioq_ent *ent = batch->entries[i];
 		if (ent) {
 			batch->entries[batch->tail++] = ent;
+		} else {
+			++batch->skip;
 		}
 	}
 
@@ -522,8 +526,8 @@ static struct ioq_ent *ioq_batch_pop(struct ioqq *ioqq, struct ioq_batch *batch,
 		// corresponds to a single (amortized) increment of ioqq->head.
 		// Otherwise, we start skipping many slots and batching ends up
 		// degrading performance.
-		if (!block && batch->head < IOQ_BATCH) {
-			++batch->head;
+		if (!block && batch->skip > 0) {
+			--batch->skip;
 			return NULL;
 		}
 
