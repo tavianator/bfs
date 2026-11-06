@@ -364,13 +364,13 @@ static const int FATAL_SIGNALS[] = {
 	SIGABRT,
 	SIGALRM,
 	SIGBUS,
+#ifdef SIGEMT
+	SIGEMT,
+#endif
 	SIGFPE,
 	SIGHUP,
 	SIGILL,
 	SIGINT,
-#ifdef SIGIO
-	SIGIO,
-#endif
 	SIGPIPE,
 #ifdef SIGPOLL
 	SIGPOLL,
@@ -378,7 +378,8 @@ static const int FATAL_SIGNALS[] = {
 #ifdef SIGPROF
 	SIGPROF,
 #endif
-#ifdef SIGPWR
+#if defined(SIGPWR) && __linux__
+	// SIGPWR is fatal on Linux but not other Unices
 	SIGPWR,
 #endif
 	SIGQUIT,
