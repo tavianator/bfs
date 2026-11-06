@@ -207,6 +207,9 @@ static void check_sigexit(int sig) {
 		if (bfs_echeck(xread(killed[0], &hsig, sizeof(hsig)) == sizeof(hsig))) {
 			bfs_check(hsig == sig);
 		}
+
+		// Check that the signal hook only ran once
+		bfs_check(xread(killed[0], &hsig, sizeof(hsig)) == 0);
 	} else {
 		// Child
 		xclose(ready[0]);
@@ -327,6 +330,12 @@ void check_sighook(void) {
 	// macOS cannot distinguish between sync and async SIG{BUS,ILL,SEGV}
 #if !__APPLE__
 	check_sigexit(SIGSEGV);
+#endif
+
+#ifdef SIGRTMIN
+	if (64 >= SIGRTMIN && 64 <= SIGRTMAX) {
+		check_sigexit(64);
+	}
 #endif
 
 	fork_and_check(sigexit_ignored);
