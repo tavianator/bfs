@@ -163,7 +163,7 @@ UNIT_OBJS := \
 bin/tests/units: ${UNIT_OBJS} lib/libbfs.a
 OBJS += ${UNIT_OBJS}
 
-bin/tests/xspawnee: obj/tests/xspawnee.o
+bin/tests/xspawnee: obj/tests/xspawnee.o lib/libbfs.a
 OBJS += obj/tests/xspawnee.o
 
 # The different flag combinations we check

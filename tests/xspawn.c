@@ -127,6 +127,13 @@ static void check_use_path(bool use_posix) {
 		spawn.flags &= ~BFS_SPAWN_USE_POSIX;
 	}
 
+	// Regression test: free up fd 3, so we can assert it's still unopened in the child
+	bool free_three = bfs_echeck(bfs_spawn_adddup2(&spawn, STDERR_FILENO, 3) == 0)
+		&& bfs_echeck(bfs_spawn_addclose(&spawn, 3) == 0);
+	if (!free_three) {
+		goto destroy;
+	}
+
 	bool init = bfs_echeck(bfs_spawn_addopen(&spawn, 10, "bin", O_RDONLY | O_DIRECTORY, 0) == 0)
 		&& bfs_echeck(bfs_spawn_adddup2(&spawn, 10, 11) == 0)
 		&& bfs_echeck(bfs_spawn_addclose(&spawn, 10) == 0)
