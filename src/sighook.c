@@ -454,7 +454,7 @@ fail:
 
 /** Check whether we should run a hook. */
 static bool should_run(int sig, struct sighook *hook) {
-	if (hook->sig != sig && hook->sig != 0) {
+	if (hook->sig != sig) {
 		return false;
 	}
 
@@ -468,11 +468,11 @@ static bool should_run(int sig, struct sighook *hook) {
 }
 
 /** Find any matching hooks and run them. */
-static enum sigflags run_hooks(struct rcu_list *list, int sig, siginfo_t *info) {
+static enum sigflags run_hooks(struct rcu_list *list, int expected, int sig, siginfo_t *info) {
 	enum sigflags ret = 0;
 
 	for_rcu (struct sighook, hook, list) {
-		if (should_run(sig, hook)) {
+		if (should_run(expected, hook)) {
 			hook->fn(sig, info, hook->arg);
 			ret |= hook->flags;
 		}
@@ -561,12 +561,12 @@ static void sigdispatch(int sig, siginfo_t *info, void *context) {
 
 	// Run the normal hooks
 	struct rcu_list *list = siglist(sig);
-	enum sigflags flags = run_hooks(list, sig, info);
+	enum sigflags flags = run_hooks(list, sig, sig, info);
 
 	// Run the atsigexit() hooks, if we're exiting
 	if (!(flags & SH_CONTINUE) && is_fatal(sig) && !was_ignored(sig)) {
 		list = siglist(0);
-		run_hooks(list, sig, info);
+		run_hooks(list, 0, sig, info);
 		reraise(info);
 	}
 
