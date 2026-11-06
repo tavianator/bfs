@@ -393,6 +393,11 @@ int xtcsetwinsize(int fd, const struct winsize *ws);
 // #include <unistd.h>
 
 /**
+ * Check if a file descriptor is open.
+ */
+bool isopen(int fd);
+
+/**
  * Like dup(), but set the FD_CLOEXEC flag.
  *
  * @fd

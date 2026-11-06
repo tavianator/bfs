@@ -63,13 +63,6 @@
 #include <unistd.h>
 
 /**
- * Check if a file descriptor is open.
- */
-static bool isopen(int fd) {
-	return fcntl(fd, F_GETFD) >= 0 || errno != EBADF;
-}
-
-/**
  * Open a file and redirect it to a particular descriptor.
  */
 static int redirect(int fd, const char *path, int flags) {

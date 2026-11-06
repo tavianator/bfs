@@ -682,6 +682,10 @@ int xtcsetwinsize(int fd, const struct winsize *ws) {
 #endif
 }
 
+bool isopen(int fd) {
+	return fcntl(fd, F_GETFD) >= 0 || errno != EBADF;
+}
+
 int dup_cloexec(int fd) {
 #ifdef F_DUPFD_CLOEXEC
 	return fcntl(fd, F_DUPFD_CLOEXEC, 0);

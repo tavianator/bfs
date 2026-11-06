@@ -711,6 +711,7 @@ static void bfs_spawn_exec(struct bfs_resolver *res, const struct bfs_spawn *ctx
 				if (dup2(fd, action->out_fd) < 0) {
 					goto fail;
 				}
+				xclose(fd);
 			}
 			break;
 		case BFS_SPAWN_CLOSE:
