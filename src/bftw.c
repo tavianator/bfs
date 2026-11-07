@@ -369,15 +369,24 @@ struct bftw_queue {
 	struct bftw_list waiting;
 	/** A list of already-serviced files. */
 	struct bftw_list ready;
-	/** Where to insert newly-ready files (unused with BFTW_QORDER). */
+	/** Where to insert newly-ready files. */
 	struct bftw_file **cursor;
 	/** The current size of the queue. */
 	size_t size;
 	/** The number of files currently in-service. */
 	size_t ioqueued;
+	/** The number of files on the ready list. */
+	size_t nready;
 	/** Tracks the imbalance between synchronous and async service. */
 	unsigned long imbalance;
 };
+
+/** Reset the insertion point for newly-ready files. */
+static void bftw_queue_reset_cursor(struct bftw_queue *queue) {
+	queue->cursor = (queue->flags & BFTW_QLIFO)
+		? &queue->ready.head
+		: queue->ready.tail;
+}
 
 /** Initialize a queue. */
 static void bftw_queue_init(struct bftw_queue *queue, enum bftw_qflags flags) {
@@ -385,9 +394,10 @@ static void bftw_queue_init(struct bftw_queue *queue, enum bftw_qflags flags) {
 	SLIST_INIT(&queue->buffer);
 	SLIST_INIT(&queue->waiting);
 	SLIST_INIT(&queue->ready);
-	queue->cursor = queue->ready.tail;
+	bftw_queue_reset_cursor(queue);
 	queue->size = 0;
 	queue->ioqueued = 0;
+	queue->nready = 0;
 	queue->imbalance = 0;
 }
 
@@ -399,11 +409,13 @@ static void bftw_queue_push(struct bftw_queue *queue, struct bftw_file *file) {
 		SLIST_PREPEND(&queue->waiting, file);
 		if (queue->flags & BFTW_QORDER) {
 			SLIST_PREPEND(&queue->ready, file, ready);
+			++queue->nready;
 		}
 	} else {
 		SLIST_APPEND(&queue->waiting, file);
 		if (queue->flags & BFTW_QORDER) {
 			SLIST_APPEND(&queue->ready, file, ready);
+			++queue->nready;
 		}
 	}
 
@@ -419,11 +431,10 @@ static void bftw_queue_flush(struct bftw_queue *queue) {
 	if (queue->flags & BFTW_QORDER) {
 		// When sorting, add files to the ready list at the same time
 		// (and in the same order) as they are added to the waiting list
-		struct bftw_file **cursor = (queue->flags & BFTW_QLIFO)
-			? &queue->ready.head
-			: queue->ready.tail;
+		bftw_queue_reset_cursor(queue);
 		for_slist (struct bftw_file, file, &queue->buffer) {
-			cursor = SLIST_INSERT(&queue->ready, cursor, file, ready);
+			queue->cursor = SLIST_INSERT(&queue->ready, queue->cursor, file, ready);
+			++queue->nready;
 		}
 	}
 
@@ -486,6 +497,7 @@ static void bftw_queue_attach(struct bftw_queue *queue, struct bftw_file *file, 
 
 	if (!(queue->flags & BFTW_QORDER)) {
 		queue->cursor = SLIST_INSERT(&queue->ready, queue->cursor, file, ready);
+		++queue->nready;
 	}
 }
 
@@ -531,9 +543,11 @@ static struct bftw_file *bftw_queue_pop(struct bftw_queue *queue) {
 	bfs_assert(SLIST_EMPTY(&queue->buffer));
 
 	struct bftw_file *file = SLIST_POP(&queue->ready, ready);
-	queue->cursor = (queue->flags & BFTW_QLIFO)
-		? &queue->ready.head
-		: queue->ready.tail;
+	if (file) {
+		--queue->nready;
+	}
+
+	bftw_queue_reset_cursor(queue);
 
 	if (!file || file == SLIST_HEAD(&queue->waiting)) {
 		// If no files are ready, try the waiting list.  Or, if
@@ -1369,9 +1383,38 @@ fail:
 	return -1;
 }
 
+/** The number of directories to keep in the pipeline for depth-first modes. */
+static size_t bftw_dir_window(const struct bftw_state *state) {
+	return 8 * state->nthreads;
+}
+
+/** Check if we should open another directory asynchronously. */
+static bool bftw_should_ioq_opendir(const struct bftw_state *state) {
+	const struct bftw_queue *dirq = &state->dirq;
+
+	if (dirq->flags & BFTW_QBALANCE) {
+		// BFTW_QBALANCE provides its own queue depth control
+		return bftw_queue_balanced(dirq);
+	}
+
+	if (dirq->flags & BFTW_QORDER) {
+		// Stay deterministic for sorted traversals
+		return true;
+	}
+
+	if (state->strategy == BFTW_BFS) {
+		// Queues are unbounded in breadth-first mode
+		return true;
+	}
+
+	// In depth-first modes, leave some room to open deeper directories
+	// rather than saturating the queue with shallow ones
+	return dirq->ioqueued + dirq->nready < bftw_dir_window(state);
+}
+
 /** Open a batch of directories asynchronously. */
 static void bftw_ioq_opendirs(struct bftw_state *state) {
-	while (bftw_queue_balanced(&state->dirq)) {
+	while (bftw_should_ioq_opendir(state)) {
 		struct bftw_file *dir = bftw_queue_waiting(&state->dirq);
 		if (!dir) {
 			break;
@@ -1424,21 +1467,52 @@ static bool bftw_pop(struct bftw_state *state, struct bftw_queue *queue) {
 	return true;
 }
 
+/** Check if we should skip popping a directory to process queued files. */
+static bool bftw_defer_dir(const struct bftw_state *state) {
+	const struct bftw_queue *fileq = &state->fileq;
+	const struct bftw_queue *dirq = &state->dirq;
+
+	if (!bftw_queue_ready(fileq)) {
+		// Can't defer if no files are ready
+		return false;
+	}
+
+	if (dirq->flags & BFTW_QORDER) {
+		// Keep strict breadth-/depth-first order when sorting
+		return state->strategy == BFTW_BFS;
+	}
+
+	if (bftw_queue_ready(dirq)) {
+		// Don't defer if any dirs are ready
+		return false;
+	}
+
+	if (state->strategy == BFTW_BFS) {
+		// In breadth-first mode, never block on popping a directory if
+		// we have files to visit
+		return true;
+	}
+
+	if (dirq->flags & BFTW_QBALANCE) {
+		// When balancing, only defer when an async open is in progress
+		return dirq->ioqueued > 0;
+	}
+
+	if (dirq->size < bftw_dir_window(state)) {
+		// In depth-first modes, bound the number of directories we can
+		// have enqueued without a visit
+		return true;
+	}
+
+	return false;
+}
+
 /** Pop a directory to read from the queue. */
 static bool bftw_pop_dir(struct bftw_state *state) {
 	bfs_assert(!state->file);
 
-	if (state->flags & BFTW_SORT) {
-		// Keep strict breadth-first order when sorting
-		if (state->strategy == BFTW_BFS && bftw_queue_ready(&state->fileq)) {
-			return false;
-		}
-	} else if (!bftw_queue_ready(&state->dirq)) {
-		// Don't block if we have files ready to visit
-		bool files_first = state->strategy == BFTW_BFS || state->dirq.ioqueued > 0;
-		if (files_first && bftw_queue_ready(&state->fileq)) {
-			return false;
-		}
+	if (bftw_defer_dir(state)) {
+		return false;
 	}
 
 	return bftw_pop(state, &state->dirq);
