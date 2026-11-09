@@ -408,7 +408,7 @@ bench-early-quit-corpus() {
             cmds+=("$fd -usg1 \$(shuf -n1 \$FILES) $dir")
         done
 
-        do-hyperfine "${cmds[@]}"
+        do-hyperfine -S "${cmds[@]}"
     done
 }
 
