@@ -2099,8 +2099,12 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 				break;
 			case 'x':
 				file_change |= mask & 0111;
-				[[fallthrough]];
+				dir_change |= mask & 0111;
+				break;
 			case 'X':
+				if (expr->file_mode & 0111) {
+					file_change |= mask & 0111;
+				}
 				dir_change |= mask & 0111;
 				break;
 			case 's':
