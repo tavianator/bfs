@@ -523,7 +523,7 @@ static bool ioq_batch_fill(struct ioqq *ioqq, struct ioq_batch *batch, bool bloc
 static struct ioq_ent *ioq_batch_pop(struct ioqq *ioqq, struct ioq_batch *batch, bool block) {
 	if (ioq_batch_empty(batch)) {
 		// For non-blocking pops, make sure that each ioq_batch_pop()
-		// corresponds to a single (amortized) increment of ioqq->head.
+		// corresponds to a single (amortized) increment of ioqq->tail.
 		// Otherwise, we start skipping many slots and batching ends up
 		// degrading performance.
 		if (!block && batch->skip > 0) {
@@ -670,6 +670,8 @@ struct ioq_ring_state {
 	size_t submitted;
 	/** Whether to stop the loop. */
 	bool stop;
+	/** A batch of pending entries. */
+	struct ioq_batch pending;
 	/** A batch of ready entries. */
 	struct ioq_batch ready;
 };
@@ -902,12 +904,9 @@ static bool ioq_ring_prep(struct ioq_ring_state *state) {
 
 	struct ioq *ioq = state->ioq;
 
-	struct ioq_batch pending;
-	ioq_batch_reset(&pending);
-
 	while (true) {
 		bool block = ioq_ring_empty(state);
-		struct ioq_ent *ent = ioq_batch_pop(ioq->pending, &pending, block);
+		struct ioq_ent *ent = ioq_batch_pop(ioq->pending, &state->pending, block);
 		if (ent == &IOQ_STOP) {
 			ioqq_push(ioq->pending, ent);
 			state->stop = true;
@@ -919,7 +918,7 @@ static bool ioq_ring_prep(struct ioq_ring_state *state) {
 		}
 	}
 
-	bfs_assert(ioq_batch_empty(&pending));
+	bfs_assert(ioq_batch_empty(&state->pending));
 	return !ioq_ring_empty(state);
 }
 
