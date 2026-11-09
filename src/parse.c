@@ -1983,20 +1983,20 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 		case MODE_WHO:
 			switch (*i) {
 			case 'u':
-				who |= 0700;
+				who |= 04700;
 				break;
 			case 'g':
-				who |= 0070;
+				who |= 02070;
 				break;
 			case 'o':
-				who |= 0007;
+				who |= 01007;
 				break;
 			case 'a':
-				who |= 0777;
+				who |= 07777;
 				break;
 			default:
 				if (who == 0) {
-					who = 0777;
+					who = 07777;
 					mask = who & ~umask;
 				} else {
 					mask = who;
@@ -2010,7 +2010,8 @@ static int parse_mode(const struct bfs_parser *parser, const char *mode, struct 
 			switch (op) {
 			case MODE_EQUALS:
 				expr->file_mode &= ~who;
-				expr->dir_mode &= ~who;
+				// GNU chmod preserves setuid/setgid on directories
+				expr->dir_mode &= ~who | S_ISUID | S_ISGID;
 				[[fallthrough]];
 			case MODE_PLUS:
 				expr->file_mode |= file_change;
