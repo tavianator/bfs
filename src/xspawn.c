@@ -357,13 +357,15 @@ int bfs_spawn_setrlimit(struct bfs_spawn *ctx, int resource, const struct rlimit
 	}
 
 #ifdef POSIX_SPAWN_SETRLIMIT
-	errno = posix_spawnattr_setrlimit(&ctx->attr, resource, rl);
-	if (errno != 0) {
-		goto fail;
-	}
+	if (ctx->flags & BFS_SPAWN_USE_POSIX) {
+		errno = posix_spawnattr_setrlimit(&ctx->attr, resource, rl);
+		if (errno != 0) {
+			goto fail;
+		}
 
-	if (bfs_spawn_addflags(ctx, POSIX_SPAWN_SETRLIMIT) != 0) {
-		goto fail;
+		if (bfs_spawn_addflags(ctx, POSIX_SPAWN_SETRLIMIT) != 0) {
+			goto fail;
+		}
 	}
 #else
 	bfs_spawn_clear_posix(ctx);
