@@ -168,6 +168,8 @@ struct bfs_bar *bfs_bar_show(void) {
 	if (!bar->winch_hook) {
 		goto fail_hook;
 	}
+#else
+	bar->winch_hook = NULL;
 #endif
 
 	bfs_bar_resize(bar);
