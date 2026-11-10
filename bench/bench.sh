@@ -65,6 +65,10 @@ usage() {
     printf '      Sorted traversal benchmark.\n'
     printf '      Default corpus is --sorted=%s\n\n' "${SORTED_DEFAULT[*]}"
 
+    printf '  --ioq[=ARGS]\n'
+    printf '      I/O queue benchmark (bin/bench/ioq), e.g. --ioq="-H -j4".\n'
+    printf '      Runs the ioq from each --build=COMMIT, or else the current tree.\n\n'
+
     printf '  --build=COMMIT\n'
     printf '      Build this bfs commit and benchmark it.  Specify multiple times to\n'
     printf '      compare, e.g. --build=3.0.1 --build=3.0.2\n\n'
@@ -127,6 +131,9 @@ setup() {
     JOBS=()
     EXEC=()
     SORTED=()
+
+    IOQ=0
+    IOQ_ARGS=()
 
     for arg; do
         case "$arg" in
@@ -207,6 +214,13 @@ setup() {
             --sorted=*)
                 read -ra SORTED <<<"${arg#*=}"
                 ;;
+            --ioq)
+                IOQ=1
+                ;;
+            --ioq=*)
+                IOQ=1
+                read -ra IOQ_ARGS <<<"${arg#*=}"
+                ;;
             --default)
                 COMPLETE=("${COMPLETE_DEFAULT[@]}")
                 EARLY_QUIT=("${EARLY_QUIT_DEFAULT[@]}")
@@ -278,6 +292,10 @@ setup() {
                 else
                     as-user cp ./bfs "$bin/bfs-$commit"
                 fi
+                if ((IOQ)); then
+                    as-user make -s -j"$nproc" bin/bench/ioq
+                    as-user cp ./bin/bench/ioq "$bin/ioq-$commit"
+                fi
                 as-user make -s clean
             )
         done
@@ -297,6 +315,19 @@ setup() {
     export_array JOBS
     export_array EXEC
     export_array SORTED
+
+    IOQ_BINS=()
+    if ((IOQ)); then
+        for commit in "${BUILD[@]}"; do
+            IOQ_BINS+=("ioq-$commit")
+        done
+        if ((${#IOQ_BINS[@]} == 0)); then
+            IOQ_BINS=(./bin/bench/ioq)
+        fi
+    fi
+
+    export_array IOQ_BINS
+    export_array IOQ_ARGS
 
     if ((UID == 0)); then
         turbo-off
@@ -687,6 +718,25 @@ bench-sorted() {
     fi
 }
 
+# I/O queue microbenchmark
+bench-ioq() {
+    if (($#)); then
+        group "I/O queue"
+
+        local md="$BENCH_DIR/bench.md"
+
+        for ioq; do
+            subgroup '`%s`' "$ioq ${IOQ_ARGS[*]}"
+
+            printf '```\n' >>"$md"
+            "$ioq" "${IOQ_ARGS[@]}" | tee -a "$md"
+            printf '```\n' >>"$md"
+
+            printf '\n' | tee -a "$md"
+        done
+    fi
+}
+
 # Print benchmarked versions
 bench-versions() {
     subgroup "Versions"
@@ -737,6 +787,9 @@ bench() {
     import_array EXEC
     import_array SORTED
 
+    import_array IOQ_BINS
+    import_array IOQ_ARGS
+
     bench-complete "${COMPLETE[@]}"
     bench-early-quit "${EARLY_QUIT[@]}"
     bench-stat "${STAT[@]}"
@@ -745,5 +798,6 @@ bench() {
     bench-jobs "${JOBS[@]}"
     bench-exec "${EXEC[@]}"
     bench-sorted "${SORTED[@]}"
+    bench-ioq "${IOQ_BINS[@]}"
     bench-details
 }
