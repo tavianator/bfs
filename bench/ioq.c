@@ -195,7 +195,7 @@ static void times_init(struct times *times) {
 	gettime(&times->start);
 	times->pushed = 0;
 	times->popped = 0;
-	bfs_assert(!times->timing);
+	times->timing = false;
 	lats_init(&times->lats);
 }
 
@@ -216,6 +216,7 @@ static void times_lap(struct times *total, struct times *lap) {
 	total->popped += lap->popped;
 	lats_merge(&total->lats, &lap->lats);
 
+	bfs_assert(!lap->timing);
 	times_init(lap);
 }
 
