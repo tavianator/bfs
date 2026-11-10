@@ -37,14 +37,13 @@ fi
 
 JOBS=$((NPROC < 8 ? NPROC : 8))
 
+if ! [ -e "$REPO" ]; then
+    git init -q --bare -- "$REPO"
+fi
+
 do-git() {
     git -C "$REPO" "$@"
 }
-
-if ! [ -e "$REPO" ]; then
-    mkdir -p -- "$REPO"
-    do-git init -q --bare
-fi
 
 has-ref() {
     do-git rev-list --quiet -1 --missing=allow-promisor "$1" &>/dev/null
@@ -82,7 +81,7 @@ fi
 # List gitlinks (submodule references) in the tree
 ls-gitlinks() {
     do-git ls-tree -zr "$TAG" \
-        | sed -zn 's/.* commit //p'
+        | sed -zn 's/^[0-9]* commit //p'
 }
 
 # Get the submodule ID for a path
@@ -90,31 +89,35 @@ submodule-for-path() {
     do-git config --blob "$TAG:.gitmodules" \
                   --name-only \
                   --fixed-value \
-                  --get-regexp 'submodule\..**\.path' "$1" \
+                  --get-regexp 'submodule\..*\.path' "$1" \
         | sed -En 's/submodule\.(.*)\.path/\1/p'
 }
 
 # Get the URL for a submodule
 submodule-url() {
-    # - https://chrome-internal.googlesource.com/
-    #   - not publicly accessible
-    # - https://chromium.googlesource.com/external/github.com/WebKit/webkit.git
-    #   - is accessible, but the commit (59e9de61b7b3) isn't
-    # - https://android.googlesource.com/
-    #   - is accessible, but you need an account
-
     do-git config --blob "$TAG:.gitmodules" \
-                  --get "submodule.$1.url" \
-        | sed -E \
-              -e '\|^https://chrome-internal.googlesource.com/|Q1' \
-              -e '\|^https://chromium.googlesource.com/external/github.com/WebKit/webkit.git|Q1' \
-              -e '\|^https://android.googlesource.com/|Q1'
+                  --get "submodule.$1.url"
 }
 
 # Recursively checkout submodules
 while read -rd '' SUBREF SUBDIR; do
     SUBNAME=$(submodule-for-path "$SUBDIR")
     SUBURL=$(submodule-url "$SUBNAME") || continue
+
+    case "$SUBURL" in
+        "https://chrome-internal.googlesource.com/"*)
+            # Not publicly accessible
+            continue
+            ;;
+        "https://chromium.googlesource.com/external/github.com/WebKit/webkit.git"*)
+            # Accessible, but the commit (59e9de61b7b3) isn't
+            continue
+            ;;
+        "https://android.googlesource.com/"*)
+            # Accessible, but you need an account
+            continue
+            ;;
+    esac
 
     if (($(jobs -pr | wc -w) >= JOBS)); then
         wait -n
@@ -135,8 +138,8 @@ xtouch() (
 # Check out files
 printf 'Checking out %s ...\n' "$DIR" >&2
 mkdir -p -- "$DIR"
-do-git ls-tree -zr "$TAG"\
-    | sed -zn 's/.* blob .*\t//p' \
+do-git ls-tree -zr "$TAG" \
+    | sed -zn 's/^[0-9]* blob [^\t]*\t//p' \
     | xtouch
 
 # Wait for cleaning/submodules
