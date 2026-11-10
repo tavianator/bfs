@@ -212,7 +212,9 @@ static void check_getdelim(FILE *file, char delim, const char *expected) {
 			bfs_check(strcmp(chunk, expected) == 0, "xgetdelim() == '%s' (!= '%s')", chunk, expected);
 		}
 	} else {
-		bfs_check(!chunk && errno == 0, "xgetdelim() == '%s' (!= NULL)", chunk);
+		if (bfs_check(!chunk, "xgetdelim() == '%s' (!= NULL)", chunk)) {
+			bfs_echeck(errno == 0, "xgetdelim()");
+		}
 	}
 	free(chunk);
 }

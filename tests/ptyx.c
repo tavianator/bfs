@@ -118,10 +118,10 @@ int main(int argc, char *argv[]) {
 	// On Solaris/illumos, a pty doesn't behave like a terminal until we
 	// push some STREAMS modules (see ptm(4D), ptem(4M), ldterm(4M)).
 	if (i_push(pts, "ptem") != 0) {
-		die("ioctl(I_PUSH, ptem)");
+		edie("ioctl(I_PUSH, ptem)");
 	}
 	if (i_push(pts, "ldterm") != 0) {
-		die("ioctl(I_PUSH, ldterm)");
+		edie("ioctl(I_PUSH, ldterm)");
 	}
 #endif
 
@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
 			// Linux reports EIO rather than EOF when pts is closed
 			break;
 		} else {
-			die("read()");
+			edie("read()");
 		}
 	}
 

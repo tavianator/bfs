@@ -64,13 +64,13 @@ static void check_xgetdate(void) {
 	check_one_xgetdate("1991-12-14T03-07", 0, 692704800);
 	check_one_xgetdate("1991-12-14T06:41-03:30", 0, 692705460);
 	check_one_xgetdate("1991-12-14T03:11:12-07:00", 0, 692705472);
-	check_one_xgetdate("19911214 031112-0700", 0, 692705472);;
+	check_one_xgetdate("19911214 031112-0700", 0, 692705472);
 }
 
 #define TM_FORMAT "%04d-%02d-%02d %02d:%02d:%02d (%d/7, %d/365%s)"
 
 #define TM_PRINTF(tm) \
-	(1900 + (tm).tm_year), (tm).tm_mon, (tm).tm_mday, \
+	(1900 + (tm).tm_year), ((tm).tm_mon + 1), (tm).tm_mday, \
 	(tm).tm_hour, (tm).tm_min, (tm).tm_sec, \
 	((tm).tm_wday + 1), ((tm).tm_yday + 1), \
 	((tm).tm_isdst ? ((tm).tm_isdst < 0 ? ", DST?" : ", DST") : "")

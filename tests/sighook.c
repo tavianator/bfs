@@ -192,6 +192,7 @@ static void check_sigexit(int sig) {
 		// Wait for the child to call atsigexit()
 		char c;
 		bfs_everify(xread(ready[0], &c, 1) == 1);
+		xclose(ready[0]);
 
 		// Kill the child with the signal
 		bfs_everify(kill(pid, sig) == 0);
@@ -210,6 +211,8 @@ static void check_sigexit(int sig) {
 
 		// Check that the signal hook only ran once
 		bfs_check(xread(killed[0], &hsig, sizeof(hsig)) == 0);
+
+		xclose(killed[0]);
 	} else {
 		// Child
 		xclose(ready[0]);
@@ -298,7 +301,7 @@ static void check_sigunhook_tail(void) {
 	}
 
 	struct sighook *h2 = sighook(SIGUSR1, counter_hook, &count, SH_CONTINUE);
-	if (!bfs_check(h2, "sighook(SIGUSR1)")) {
+	if (!bfs_echeck(h2, "sighook(SIGUSR1)")) {
 		sigunhook(h1);
 		return;
 	}
@@ -306,7 +309,7 @@ static void check_sigunhook_tail(void) {
 	sigunhook(h2);
 
 	h2 = sighook(SIGUSR1, counter_hook, &count, SH_CONTINUE);
-	if (!bfs_check(h2, "sighook(SIGUSR1)")) {
+	if (!bfs_echeck(h2, "sighook(SIGUSR1)")) {
 		sigunhook(h1);
 		return;
 	}

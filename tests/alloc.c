@@ -65,7 +65,7 @@ void check_alloc(void) {
 	}
 
 	// Check varena_realloc() (un)poisoning
-	struct flexible *flexy = varena_alloc(&varena, 160);
+	struct flexible *flexy = varena_alloc(&varena, 0);
 	bfs_everify(flexy);
 
 	flexy = check_varena_realloc(&varena, flexy, 0, 160);

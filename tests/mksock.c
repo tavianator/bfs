@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	struct sockaddr_un sock;
+	struct sockaddr_un sock = {0};
 	if (init_sun(&sock, path) != 0) {
 		errmsg(cmd, path);
 		return EXIT_FAILURE;
