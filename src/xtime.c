@@ -16,24 +16,17 @@
 #include <unistd.h>
 
 int xmktime(struct tm *tm, time_t *timep) {
-	time_t time = mktime(tm);
+	// POSIX.1-2024 clarifies that tm_wday is not changed on error, so it
+	// should be used to check for errors since -1 is a valid return value
+	struct tm copy = *tm;
+	copy.tm_wday = -1;
 
-	if (time == -1) {
-		int error = errno;
-
-		struct tm tmp;
-		if (!localtime_r(&time, &tmp)) {
-			bfs_ebug("localtime_r(-1)");
-			return -1;
-		}
-
-		if (tm->tm_year != tmp.tm_year || tm->tm_yday != tmp.tm_yday
-		    || tm->tm_hour != tmp.tm_hour || tm->tm_min != tmp.tm_min || tm->tm_sec != tmp.tm_sec) {
-			errno = error;
-			return -1;
-		}
+	time_t time = mktime(&copy);
+	if (time == (time_t)-1 && copy.tm_wday < 0) {
+		return -1;
 	}
 
+	*tm = copy;
 	*timep = time;
 	return 0;
 }
@@ -42,24 +35,15 @@ int xmktime(struct tm *tm, time_t *timep) {
 #if BFS_HAS_TIMEGM && !(__FreeBSD__ && __SANITIZE_MEMORY__)
 
 int xtimegm(struct tm *tm, time_t *timep) {
-	time_t time = timegm(tm);
+	struct tm copy = *tm;
+	copy.tm_wday = -1;
 
-	if (time == -1) {
-		int error = errno;
-
-		struct tm tmp;
-		if (!gmtime_r(&time, &tmp)) {
-			bfs_ebug("gmtime_r(-1)");
-			return -1;
-		}
-
-		if (tm->tm_year != tmp.tm_year || tm->tm_yday != tmp.tm_yday
-		    || tm->tm_hour != tmp.tm_hour || tm->tm_min != tmp.tm_min || tm->tm_sec != tmp.tm_sec) {
-			errno = error;
-			return -1;
-		}
+	time_t time = timegm(&copy);
+	if (time == (time_t)-1 && copy.tm_wday < 0) {
+		return -1;
 	}
 
+	*tm = copy;
 	*timep = time;
 	return 0;
 }

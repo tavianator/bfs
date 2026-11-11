@@ -111,15 +111,14 @@ static void check_xmktime(void) {
 /** Check one xtimegm() result. */
 static void check_one_xtimegm(const struct tm *tm) {
 	struct tm tma = *tm;
-	tma.tm_wday = -1;
-	time_t ta = mktime(&tma);
-	bool aok = tma.tm_wday >= 0;
+	time_t ta = -1;
+	bool aok = xmktime(&tma, &ta) == 0;
 
 	struct tm tmb = *tm;
 	time_t tb = -1;
 	bool bok = xtimegm(&tmb, &tb) == 0;
 
-	bool pass = bfs_check(aok == bok, "mktime() %s; xtimegm() %s",
+	bool pass = bfs_check(aok == bok, "xmktime() %s; xtimegm() %s",
 		aok ? "succeeded" : "failed",
 		bok ? "succeeded" : "failed");
 
@@ -130,7 +129,7 @@ static void check_one_xtimegm(const struct tm *tm) {
 	}
 
 	if (!pass) {
-		bfs_diag("mktime():  " TM_FORMAT, TM_PRINTF(tma));
+		bfs_diag("xmktime(): " TM_FORMAT, TM_PRINTF(tma));
 		bfs_diag("xtimegm(): " TM_FORMAT, TM_PRINTF(tmb));
 		bfs_diag("(input):   " TM_FORMAT, TM_PRINTF(*tm));
 	}
