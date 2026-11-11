@@ -9,7 +9,7 @@ concurrency:
 jobs:
   linux-x86:
     name: Linux (x86)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     # Don't run on both pushes and pull requests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
@@ -52,7 +52,7 @@ jobs:
 
   linux-arm:
     name: Linux (Arm64)
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
 
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
@@ -101,7 +101,7 @@ jobs:
 
   freebsd:
     name: FreeBSD
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
@@ -135,7 +135,7 @@ jobs:
 
   openbsd:
     name: OpenBSD
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
@@ -170,7 +170,7 @@ jobs:
 
   netbsd:
     name: NetBSD
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
@@ -206,7 +206,7 @@ jobs:
 
   dragonflybsd:
     name: DragonFly BSD
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
@@ -243,7 +243,7 @@ jobs:
 
   omnios:
     name: OmniOS
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
 
