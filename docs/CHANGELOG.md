@@ -1,6 +1,46 @@
 4.*
 ===
 
+4.1.7
+-----
+
+**November 11, 2026**
+
+## Changes
+
+- Parallel depth-first searches (`-S dfs -j3` and up) now stay much closer to depth-first order, rather than degrading towards breadth-first
+  ([`c650271c`](https://github.com/tavianator/bfs/commit/c650271cbde3c2915f02ff2a26e6d77b9e4ba660))
+
+## Bug fixes
+
+- Fixed the traversal order of `-S dfs` when `stat()` calls weren't needed, which was not actually depth-first.
+  The bug was originally introduced in bfs 3.1 (February 6, 2024).
+  ([`fe6e2867`](https://github.com/tavianator/bfs/commit/fe6e2867b999f874b47a86030b43a70726f2d960))
+
+- Fixed `-perm` with `X` in symbolic modes like `u+x,g+X`, which now takes execute bits set earlier in the same mode into account.
+  The bug had been present since `-perm` was implemented in bfs 0.84 (October 29, 2016).
+  ([`c9be2981`](https://github.com/tavianator/bfs/commit/c9be2981ed3954c6e8e30ac5b856aabef2d23930))
+
+- Fixed `-perm` with `=` in symbolic modes like `u+s,u=r` or `o+t,o=r`, which failed to clear the set-user-ID, set-group-ID, and sticky bits.
+  As with GNU `chmod`, the set-user-ID and set-group-ID bits are still preserved for directories.
+  The bug had been present since `-perm` was implemented in bfs 0.84 (October 29, 2016).
+  ([`efdf3ad5`](https://github.com/tavianator/bfs/commit/efdf3ad5af169235304602af2e212768d9cdf4e9))
+
+- Fixed and extended the mapping from C locale charsets to Oniguruma encodings for `-regex`
+  ([`c3794ef0`](https://github.com/tavianator/bfs/commit/c3794ef0b884d052d688a4e95ccb0d7a01428772))
+
+- Fixed a missing error message when `-files0-from` failed to read from its file.
+  The bug was originally introduced in bfs 2.6.3 (January 31, 2023).
+  ([`17f5165c`](https://github.com/tavianator/bfs/commit/17f5165c18b68e3b551637c9f1ac4dcc7e17911b))
+
+- Fixed a redundant error message when closing a file after a write error had already been reported, as in
+
+      $ bfs -print -exec true \; >/dev/full
+
+  The bug was originally introduced in bfs 3.3 (May 28, 2024).
+  ([`2c970dbd`](https://github.com/tavianator/bfs/commit/2c970dbdbc9de9668faf401478af63b422f53eed))
+
+
 4.1.6
 -----
 
