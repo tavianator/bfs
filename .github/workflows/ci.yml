@@ -224,7 +224,7 @@ jobs:
         run: |
           sudo pkg install -y \
               bash \
-              llvm18 \
+              llvm23 \
               oniguruma \
               pkgconf \
               sudo
@@ -233,7 +233,7 @@ jobs:
         shell: cpa.sh {0}
         run: |
           jobs=$(sysctl -n hw.ncpu)
-          ./configure CC=clang18
+          ./configure CC=clang23
           .github/diag.sh make -j$jobs check TEST_FLAGS="--sudo --verbose=skipped"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
