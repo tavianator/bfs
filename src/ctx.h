@@ -62,6 +62,8 @@ struct bfs_ctx {
 	int optlevel;
 	/** Debugging flags (-D). */
 	enum debug_flags debug;
+	/** Whether to ignore files ignored by VCS (e.g. git). */
+	bool ignore_vcs;
 	/** Whether to ignore deletions that race with bfs (-ignore_readdir_race). */
 	bool ignore_races;
 	/** Whether to follow POSIXisms more closely ($POSIXLY_CORRECT). */

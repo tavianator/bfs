@@ -13,6 +13,54 @@
 
 #include <stddef.h>
 
+/** Destructor for bfs_path-associated data. */
+typedef void (*bfs_path_data_dtor)(void *data);
+
+/** A node in a bfs traversal path. */
+struct bfs_path {
+	const struct bfs_path *parent;
+	const char *name;
+	size_t namelen;
+	void *data;
+	bfs_path_data_dtor dtor;
+};
+
+static inline void bfs_path_init(struct bfs_path *path, const struct bfs_path *parent,
+	const char *name, size_t namelen) {
+	path->parent = parent;
+	path->name = name;
+	path->namelen = namelen;
+	path->data = NULL;
+	path->dtor = NULL;
+}
+
+static inline void *bfs_path_data(const struct bfs_path *path) {
+	return path ? path->data : NULL;
+}
+
+static inline void bfs_path_set_data(const struct bfs_path *path, void *data, bfs_path_data_dtor dtor) {
+	struct bfs_path *mut = (struct bfs_path *)path;
+	if (!mut) {
+		return;
+	}
+	if (mut->dtor && mut->data && mut->data != data) {
+		mut->dtor(mut->data);
+	}
+	mut->data = data;
+	mut->dtor = dtor;
+}
+
+static inline void bfs_path_reset(struct bfs_path *path) {
+	if (!path) {
+		return;
+	}
+	if (path->dtor && path->data) {
+		path->dtor(path->data);
+	}
+	path->data = NULL;
+	path->dtor = NULL;
+}
+
 /**
  * Possible visit occurrences.
  */
@@ -45,6 +93,8 @@ struct BFTW {
 	const char *path;
 	/** The string offset of the filename. */
 	size_t nameoff;
+	/** Structured metadata for the current path component. */
+	const struct bfs_path *pathinfo;
 
 	/** The root path passed to bftw(). */
 	const char *root;
@@ -69,6 +119,11 @@ struct BFTW {
 	enum bfs_stat_flags stat_flags;
 	/** Cached bfs_stat() info. */
 	struct bftw_stat stat_bufs;
+
+#if BFS_WITH_LIBGIT2
+	/** For internal use by bftw_is_gitignored(). */
+	const void *internal;
+#endif
 };
 
 /**
@@ -134,6 +189,12 @@ enum bftw_action {
  *         An action value.
  */
 typedef enum bftw_action bftw_callback(const struct BFTW *ftwbuf, void *ptr);
+
+#if BFS_WITH_LIBGIT2
+struct bfs_ctx;
+/** Check if a file is ignored by git. */
+bool bftw_is_gitignored(const struct BFTW *ftwbuf, const struct bfs_ctx *ctx);
+#endif
 
 /**
  * Flags that control bftw() behavior.
