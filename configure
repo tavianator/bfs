@@ -164,7 +164,7 @@ for arg; do
 
         --enable-*|--disable-*)
             case "$name" in
-                release|lto|asan|lsan|msan|tsan|tysan|ubsan|lint|gcov)
+                release|lto|asan|lsan|msan|tsan|tysan|ubsan|gcov)
                     set -- "$@" "$NAME=$yn"
                     ;;
                 *)
@@ -197,7 +197,7 @@ for arg; do
             ;;
 
         # Warn about MAKE variables that have documented configure flags
-        RELEASE=*|LTO=*|ASAN=*|LSAN=*|MSAN=*|TSAN=*|TYSAN=*|UBSAN=*|LINT=*|GCOV=*)
+        RELEASE=*|LTO=*|ASAN=*|LSAN=*|MSAN=*|TSAN=*|TYSAN=*|UBSAN=*|GCOV=*)
             name=$(printf '%s' "$NAME" | tr 'A-Z_' 'a-z-')
             warn '"%s" is deprecated; use --enable-%s' "$arg" "$name"
             set -- "$@" "$arg"

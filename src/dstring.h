@@ -15,18 +15,7 @@
 #include <stddef.h>
 
 /** Marker type for dynamic strings. */
-#if BFS_LINT && __clang__
-// Abuse [[gnu::aligned]] to make a type that allows
-//
-//     dchar * -> char *
-//
-// conversions, but warns (with Clang's -Walign-mismatch) on
-//
-//     char * -> dchar *
-typedef char dchar [[gnu::aligned(alignof(size_t))]];
-#else
 typedef char dchar;
-#endif
 
 /**
  * Free a dynamic string.

@@ -41,10 +41,6 @@
 #  define BFS_HOMEPAGE "https://tavianator.com/projects/bfs.html"
 #endif
 
-#ifndef BFS_LINT
-#  define BFS_LINT false
-#endif
-
 // This is a symbol instead of a literal so we don't have to rebuild everything
 // when the version number changes
 extern const char bfs_version[];
