@@ -43,7 +43,7 @@ static struct dstring *dstrheader(const dchar *dstr) {
  * - https://stackoverflow.com/q/25296019
  */
 static dchar *dstrdata(struct dstring *header) {
-	return (char *)header + DSTR_OFFSET;
+	return (dchar *)((char *)header + DSTR_OFFSET);
 }
 
 /** Set the length of a dynamic string. */

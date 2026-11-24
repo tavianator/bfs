@@ -436,7 +436,7 @@ static const struct esc_seq *get_ext(const struct colors *colors, const char *fi
  * @return
  *         0 on success, -1 on failure.
  */
-static int unescape(char **str, const char *value, char end, const char **next) {
+static int unescape(dchar **str, const char *value, char end, const char **next) {
 	*next = NULL;
 
 	if (!value) {
