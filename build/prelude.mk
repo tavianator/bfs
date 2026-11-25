@@ -25,6 +25,7 @@ INSTALL ?= install
 MKDIR ?= mkdir -p
 PKG_CONFIG ?= pkg-config
 RM ?= rm -f
+CLANG_TIDY ?= clang-tidy
 
 # GNU and BSD make have incompatible syntax for conditionals, but we can do a
 # lot with just nested variable expansion.  We use "y" as the canonical

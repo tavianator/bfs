@@ -40,6 +40,7 @@ gen/vars.mk::
 	@printf 'MKDIR := %s\n' "$$XMKDIR" >>$@
 	@printf 'PKG_CONFIG := %s\n' "$$XPKG_CONFIG" >>$@
 	@printf 'RM := %s\n' "$$XRM" >>$@
+	@printf 'CLANG_TIDY := %s\n' "$$XCLANG_TIDY" >>$@
 	@test -z "$$VERSION" || printf 'export VERSION=%s\n' "$$VERSION" >>$@
 	${VCAT} $@
 

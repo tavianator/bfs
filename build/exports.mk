@@ -12,6 +12,7 @@ export XINSTALL=${INSTALL}
 export XMKDIR=${MKDIR}
 export XPKG_CONFIG=${PKG_CONFIG}
 export XRM=${RM}
+export XCLANG_TIDY=${CLANG_TIDY}
 
 export XCPPFLAGS=${_CPPFLAGS}
 export XCFLAGS=${_CFLAGS}

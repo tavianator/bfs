@@ -40,6 +40,8 @@ These variables specify binaries to run during the configuration and build proce
     Detect external libraries and required build flags
 <b>RM</b>="<i>rm -f</i>"
     Delete files
+<b>CLANG_TIDY</b>=<i>clang-tidy</i>
+    C linter, used by <i>make lint</i>
 </pre>
 
 These flags will be used by the build process:
@@ -128,6 +130,8 @@ make <b>integration-tests</b>
     Builds and runs the integration tests
 make <b>distcheck</b>
     Builds and runs the tests in multiple different configurations
+make <b>lint</b>
+    Runs linters on the C sources and documentation
 
 make <b>install</b>
     Installs bfs globally

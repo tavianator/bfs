@@ -1,0 +1,54 @@
+# Copyright © Tavian Barnes <tavianator@tavianator.com>
+# SPDX-License-Identifier: 0BSD
+
+Checks: >
+  -*,
+  custom-dchar-conversion,
+
+WarningsAsErrors: '*'
+
+HeaderFilterRegex: '.*'
+
+CustomChecks:
+  - Name: dchar-conversion
+
+    Query: |
+      let dchar qualType(hasDeclaration(typedefDecl(hasName("dchar"))))
+      let char qualType(isAnyCharacter(), unless(dchar))
+
+      let dcharPtr anyOf(
+        pointsTo(dchar),
+        pointsTo(pointsTo(dchar)),
+      )
+
+      let charPtr anyOf(
+        pointsTo(char),
+        pointsTo(pointsTo(char)),
+      )
+
+      let bad expr(
+        anyOf(
+          hasType(charPtr),
+          implicitCastExpr(hasSourceExpression(hasType(charPtr))),
+        )
+      ).bind("bad")
+
+      # Catch `[const] dchar *str = <char *>;`
+      match varDecl(hasType(dcharPtr), hasInitializer(bad))
+
+      # Catch `<dchar *> = <char *>;`
+      match binaryOperator(isAssignmentOperator(), hasLHS(hasType(dcharPtr)), hasRHS(bad))
+
+      # Catch `dchar *foo() { return <char *>; }`
+      match returnStmt(hasReturnValue(bad), forFunction(functionDecl(returns(dcharPtr))))
+
+      # Catch `int foo(dchar *); foo(<char *>);`
+      match callExpr(
+        forEachArgumentWithParam(expr().bind("arg"), parmVarDecl(hasType(dcharPtr))),
+        hasAnyArgument(expr(bad, ignoringParenCasts(equalsBoundNode("arg")))),
+      )
+
+    Diagnostic:
+      - BindName: bad
+        Message: implicit conversion from 'char' to 'dchar'
+        Level: Warning

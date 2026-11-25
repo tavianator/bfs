@@ -214,7 +214,6 @@ distcheck:
 	@+test "$$(uname)-$$(uname -m)" != Linux-x86_64 || ${MAKE} distcheck-m32
 	@+${MAKE} distcheck-release
 	@+${MAKE} -C distcheck-release check-install
-	@+test "$$(uname)" != Linux || ${MAKE} check-man
 .PHONY: distcheck
 
 # Per-distcheck configuration
@@ -301,8 +300,27 @@ check-install::
 	bin/bfs pkg -not -type d -print -exit 1
 	${RM} -r pkg
 
+## Linting (`make lint`)
+
+# Run all the linters
+lint: lint-c lint-man
+.PHONY: lint
+
+C_LINTS := ${OBJS:obj/%.o=lint/%.c}
+
+# Lint the C sources with clang-tidy (configured by .clang-tidy)
+lint-c: ${C_LINTS}
+.PHONY: lint-c
+
+${C_LINTS}: gen/config.mk
+	${MSG} "[LINT] ${@:lint/%=%}" \
+	    ${CLANG_TIDY} --quiet --experimental-custom-checks ${@:lint/%=%} -- ${_CPPFLAGS} ${_CFLAGS}
+.PHONY: ${C_LINTS}
+
+lint/src/version.c: gen/version.i
+
 # Check man page markup
-check-man::
+lint-man::
 	${MSG} "[LINT] docs/bfs.1"
 	${Q}groff -man -rCHECKSTYLE=3 -ww -b -z docs/bfs.1
 	${Q}mandoc -Tlint -Wwarning docs/bfs.1

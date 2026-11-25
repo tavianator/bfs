@@ -23,6 +23,8 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y \
               mandoc \
+              clang-22 \
+              clang-tidy-22 \
               gcc-multilib \
               libgcc-s1:i386 \
               acl \
@@ -41,7 +43,12 @@ jobs:
           sudo ln -s libcap.so.2 /lib/i386-linux-gnu/libcap.so
           sudo ln -s libonig.so.5 /lib/i386-linux-gnu/libonig.so
 
-      - name: Run tests
+      - name: Lint
+        run: |
+          ./configure CC=clang-22 CLANG_TIDY=clang-tidy-22
+          .github/diag.sh make -j$(nproc) lint
+
+      - name: Check
         run: |
           .github/diag.sh make -j$(nproc) distcheck
 
@@ -64,6 +71,8 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y \
               mandoc \
+              clang-22 \
+              clang-tidy-22 \
               acl \
               libacl1-dev \
               attr \
@@ -72,7 +81,12 @@ jobs:
               libonig-dev \
               liburing-dev
 
-      - name: Run tests
+      - name: Lint
+        run: |
+          ./configure CC=clang-22 CLANG_TIDY=clang-tidy-22
+          .github/diag.sh make -j$(nproc) lint
+
+      - name: Check
         run: |
           .github/diag.sh make -j$(nproc) distcheck
 
@@ -94,7 +108,7 @@ jobs:
         run: |
           brew install bash
 
-      - name: Run tests
+      - name: Check
         run: |
           jobs=$(sysctl -n hw.ncpu)
           .github/diag.sh make -j$jobs distcheck
@@ -123,7 +137,7 @@ jobs:
               pkgconf
           sudo mount -t fdescfs none /dev/fd
 
-      - name: Run tests
+      - name: Check
         shell: cpa.sh {0}
         run: |
           .github/diag.sh make -j$(nproc) distcheck
@@ -156,7 +170,7 @@ jobs:
               gmake \
               oniguruma
 
-      - name: Run tests
+      - name: Check
         shell: cpa.sh {0}
         run: |
           jobs=$(sysctl -n hw.ncpu)
@@ -191,7 +205,7 @@ jobs:
               oniguruma \
               pkgconf
 
-      - name: Run tests
+      - name: Check
         shell: cpa.sh {0}
         run: |
           PATH="/sbin:/usr/sbin:$PATH"
@@ -229,7 +243,7 @@ jobs:
               pkgconf \
               sudo
 
-      - name: Run tests
+      - name: Check
         shell: cpa.sh {0}
         run: |
           jobs=$(sysctl -n hw.ncpu)
@@ -265,7 +279,7 @@ jobs:
               gnu-make \
               onig
 
-      - name: Run tests
+      - name: Check
         shell: cpa.sh {0}
         run: |
           PATH="/usr/xpg4/bin:$PATH"
